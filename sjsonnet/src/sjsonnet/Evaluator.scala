@@ -1,40 +1,50 @@
 package sjsonnet
 import Expr._
-object Cleanup {
-  val precedenceTable = Seq(
-    Seq("*", "/", "%"),
-    Seq("+", "-"),
-    Seq("<<", ">>"),
-    Seq("<", ">", "<=", ">=", "in"),
-    Seq("==", "!="),
-    Seq("&"),
-    Seq("^"),
-    Seq("|"),
-    Seq("&&"),
-    Seq("||"),
-  )
-  val precedence = precedenceTable
-    .reverse
-    .zipWithIndex
-    .flatMap{case (ops, idx) => ops.map(_ -> idx)}
-    .toMap
-
-  def visitExpr(expr: Expr): Expr = expr match{
-    case Null => expr
-    case True => expr
-    case False => expr
+object Evaluator {
+  def visitExpr(expr: Expr, scope: Map[String, Value]): Value = expr match{
+    case Null => Value.Null
+    case True => Value.True
+    case False => Value.False
     case Self => expr
     case Super => expr
     case $ => expr
-    case Str(value) => expr
-    case Num(value) => expr
-    case Id(value) => expr
-    case Arr(value) => Arr(value.map(visitExpr))
+    case Str(value) => Value.Str(value)
+    case Num(value) => Value.Num(value)
+    case Id(value) => scope(value)
+    case Arr(value) => Value.Arr(value.map(visitExpr(_, scope)))
     case Obj(value) => Obj(visitObjBody(value))
 
-    case UnaryOp(op, value) => UnaryOp(op, visitExpr(value))
+    case UnaryOp(op, value) => (op, visitExpr(value, scope)) match{
+      case ("-", Value.Num(v)) => Value.Num(-v)
+      case ("+", Value.Num(v)) => Value.Num(-v)
+      case ("~", Value.Num(v)) => Value.Num(~v.toLong)
+      case ("!", Value.True) => Value.False
+      case ("!", Value.False) => Value.True
+    }
 
-    case BinaryOp(lhs, op, rhs) => ???
+    case BinaryOp(lhs, op, rhs) => (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
+      case (Value.Num(l), "*", Value.Num(r)) => Value.Num(l * r)
+      case (Value.Num(l), "/", Value.Num(r)) => Value.Num(l / r)
+      case (Value.Num(l), "%", Value.Num(r)) => Value.Num(l % r)
+      case (Value.Num(l), "+", Value.Num(r)) => Value.Num(l + r)
+      case (Value.Num(l), "-", Value.Num(r)) => Value.Num(l - r)
+      case (Value.Num(l), "<<", Value.Num(r)) => Value.Num(l.toLong << r.toLong)
+      case (Value.Num(l), ">>", Value.Num(r)) => Value.Num(l.toLong >> r.toLong)
+      case (Value.Num(l), "<", Value.Num(r)) => if (l < r) Value.True else Value.False
+      case (Value.Num(l), ">", Value.Num(r)) => if (l > r) Value.True else Value.False
+      case (Value.Num(l), "<=", Value.Num(r)) => if (l <= r) Value.True else Value.False
+      case (Value.Num(l), ">=", Value.Num(r)) => if (l >= r) Value.True else Value.False
+      case (l, "==", r) => if (l == r) Value.True else Value.False
+      case (Value.Str(l), "in", Value.Obj(r)) => if (r.contains(l)) Value.True else Value.False
+      case (Value.Num(l), "&", Value.Num(r)) => Value.Num(l.toLong & r.toLong)
+      case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
+      case (Value.Num(l), "|", Value.Num(r)) => Value.Num(l.toLong | r.toLong)
+      case (Value.True, "&&", Value.True) => Value.True
+      case (_, "&&", _) => Value.True
+      case (Value.False, "||", Value.False) => Value.False
+      case (_, "||", _) => Value.True
+      case (Value.Obj(l), "+", Value.Obj(r)) => Value.Obj(l + r)
+    }
 
     case AssertExpr(Member.AssertStmt(value, msg), returned) =>
       AssertExpr(Member.AssertStmt(visitExpr(value), msg.map(visitExpr)), visitExpr(returned))

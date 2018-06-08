@@ -3,6 +3,24 @@ package sjsonnet
 import fastparse.WhitespaceApi
 
 object Parser{
+  val precedenceTable = Seq(
+    Seq("*", "/", "%"),
+    Seq("+", "-"),
+    Seq("<<", ">>"),
+    Seq("<", ">", "<=", ">=", "in"),
+    Seq("==", "!="),
+    Seq("&"),
+    Seq("^"),
+    Seq("|"),
+    Seq("&&"),
+    Seq("||"),
+  )
+  val precedence = precedenceTable
+    .reverse
+    .zipWithIndex
+    .flatMap{case (ops, idx) => ops.map(_ -> idx)}
+    .toMap
+
   val White = WhitespaceApi.Wrapper {
     import fastparse.all._
     NoTrace(CharsWhileIn(" \t\n", 0))
@@ -70,7 +88,7 @@ object Parser{
         remaining.headOption match{
           case None => false
           case Some((op, next)) =>
-            val prec: Int = Cleanup.precedence(op)
+            val prec: Int = Evaluator.precedence(op)
             if (prec < minPrec) false
             else{
               remaining = remaining.tail
