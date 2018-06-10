@@ -28,6 +28,15 @@ object EvaluatorTests extends TestSuite{
       eval("""{[{local x = $.y + "lol", y: x, z: "1"}.z]: 2}["1"]""") ==> Value.Num(2)
       eval("{local x = 1, y: { z: x }}.y.z") ==> Value.Num(1)
     }
+    'extends - {
+      eval("(function(a) a.x + a.y)({x: 1}{y: 2})") ==> Value.Num(3)
+      eval("(function(a) a.x + a.y)({x: 1}{x: 2, y: 3})") ==> Value.Num(5)
+      eval("({x: 1}{x+: 2}).x") ==> Value.Num(3)
+      eval("({x+: 1}{x: 2}).x") ==> Value.Num(2)
+      eval("({x+: 1}{x+: 2}).x") ==> Value.Num(3)
+      eval("({x+: 1} + {x+: 2}).x") ==> Value.Num(3)
+      eval("(function(a, b) a + b)({x+: 1}, {x+: 2}).x") ==> Value.Num(3)
+    }
     'ifElse - {
       eval("if true then 1 else 0") ==> Value.Num(1)
       eval("if 2 > 1 then 1 else 0") ==> Value.Num(1)

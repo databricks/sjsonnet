@@ -15,6 +15,6 @@ object Value{
   case class Str(value: String) extends Value
   case class Num(value: Double) extends Value
   case class Arr(value: Seq[Ref]) extends Value
-  case class Obj(value: Map[String, Ref]) extends Value
+  case class Obj(value: Map[String, (Boolean, Ref)]) extends Value
   case class Func(value: Seq[(Option[String], Ref)] => Value) extends Value
 }

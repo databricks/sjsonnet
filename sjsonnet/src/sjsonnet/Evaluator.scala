@@ -55,7 +55,7 @@ object Evaluator {
       case (_, "&&", _) => Value.True
       case (Value.False, "||", Value.False) => Value.False
       case (_, "||", _) => Value.True
-      case (Value.Obj(l), "+", Value.Obj(r)) => Value.Obj(l ++ r)
+      case (Value.Obj(l), "+", Value.Obj(r)) => mergeObjects(Value.Obj(l), Value.Obj(r))
     }
 
     case AssertExpr(Member.AssertStmt(value, msg), returned) =>
@@ -70,15 +70,15 @@ object Evaluator {
 
 //    case Import(value) => expr
 //    case ImportStr(value) => expr
-//    case Error(value) => Error(visitExpr(value))
+    case Error(value) => throw new Exception(visitExpr(value, scope).asInstanceOf[Value.Str].value)
     case Apply(value, Args(args)) =>
       visitExpr(value, scope).asInstanceOf[Value.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
 
-    case Select(value, name) => visitExpr(value, scope).asInstanceOf[Value.Obj].value(name).force(scope.dollar0)
+    case Select(value, name) => visitExpr(value, scope).asInstanceOf[Value.Obj].value(name)._2.force(scope.dollar0)
     case Lookup(value, index) =>
       val res = (visitExpr(value, scope), visitExpr(index, scope)) match{
         case (v: Value.Arr, i: Value.Num) => v.value(i.value.toInt)
-        case (v: Value.Obj, i: Value.Str) => v.value(i.value)
+        case (v: Value.Obj, i: Value.Str) => v.value(i.value)._2
       }
       res.force(scope.dollar0)
 //    case Slice(value, start, end, stride) => Slice(visitExpr(value), start.map(visitExpr), end.map(visitExpr), stride.map(visitExpr))
@@ -89,7 +89,31 @@ object Evaluator {
         case Value.False => visitExpr(else0.get, scope)
       }
 //    case Comp(value, first, rest) => Comp(visitExpr(value), visitForSpec(first), rest.map(visitCompSpec))
-//    case ObjExtend(value, ext) => ObjExtend(visitExpr(value), ext)
+    case ObjExtend(value, ext) => {
+      val original = visitExpr(value, scope).asInstanceOf[Value.Obj]
+      mergeObjects(original, visitObjBody(ext, scope))
+    }
+  }
+  def mergeObjects(lhs: Value.Obj, rhs: Value.Obj) = {
+    lazy val newSelf: Value.Obj = Value.Obj(
+      lhs.value ++
+      rhs.value.map{
+        case (k, v) =>
+          (k,
+            (
+              false,
+              if (!v._1 || !lhs.value.contains(k)) v._2
+              else Ref(
+                (lhs.value(k)._2.force(Some(newSelf)), v._2.force(Some(newSelf))) match{
+                  case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
+                  case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
+                }
+              )
+            )
+          )
+      }
+    )
+    newSelf
   }
 
 
@@ -129,9 +153,9 @@ object Evaluator {
 
       lazy val newSelf = Value.Obj(value.flatMap {
         case Member.Field(fieldName, plus, None, sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> Ref(visitExpr(rhs, newScope)))
+          Some(visitFieldName(fieldName, scope) -> (plus, Ref(visitExpr(rhs, newScope))))
         case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> Ref(visitMethod(newScope, rhs, argSpec)))
+          Some(visitFieldName(fieldName, scope) -> (false, Ref(visitMethod(newScope, rhs, argSpec))))
 
         case _: Member.BindStmt => None
         case Member.AssertStmt(value, msg) => None
@@ -146,7 +170,7 @@ object Evaluator {
 
       lazy val newSelf = Value.Obj(
         visitComp(first :: rest.toList, Seq(newScope))
-          .map(s => visitExpr(key, s).asInstanceOf[Value.Str].value -> Ref(visitExpr(value, s)))
+          .map(s => visitExpr(key, s).asInstanceOf[Value.Str].value -> (false, Ref(visitExpr(value, s))))
           .toMap
       )
 
