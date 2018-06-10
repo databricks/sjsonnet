@@ -72,13 +72,21 @@ object Parser{
   val `super` = P("super").map(_ => Expr.Super)
 
   val obj: P[Expr] = P( "{" ~ objinside.map(Expr.Obj) ~ "}" )
-  val arr: P[Expr] = P( "[" ~ expr.rep(sep = ",").map(Expr.Arr) ~ ",".? ~ "]" )
+  val arr: P[Expr] = P(
+    "[" ~ ("]".!.map(_ => Expr.Arr(Nil)) | arrBody ~ "]")
+  )
+  val compSuffix = P( forspec ~ compspec ).map(Left(_))
+  val arrBody: P[Expr] = P(
+    expr ~ ( compSuffix | "," ~ (compSuffix | (expr.rep(1, sep=",") ~ ",".?).map(Right(_)))).?
+  ).map{
+    case (first, None) => Expr.Arr(Seq(first))
+    case (first, Some(Left(comp))) => Expr.Comp(first, comp._1, comp._2)
+    case (first, Some(Right(rest))) => Expr.Arr(Seq(first) ++ rest)
+  }
   val assertExpr: P[Expr] = P( assertStmt ~ ";" ~ expr ).map(Expr.AssertExpr.tupled)
   val function: P[Expr] = P( "(" ~ params ~ ")" ~ expr ).map(Expr.Function.tupled)
   val ifElse: P[Expr] = P( expr ~ "then" ~ expr ~ ("else" ~ expr).? ).map(Expr.IfElse.tupled)
   val localExpr: P[Expr] = P( bind.rep(min=1, sep=",") ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
-
-  val comp: P[Expr] = P( "[" ~ expr ~ ",".? ~ forspec ~ compspec ~ "]" ).map(Expr.Comp.tupled)
 
   val expr: P[Expr] = P(expr1 ~ (binaryop ~ expr1).rep).map{ case (pre, fs) =>
     var remaining = fs
@@ -123,7 +131,7 @@ object Parser{
   // Any `expr` that isn't naively left-recursive
   val expr2 = P(
     `null` | `true` | `false` | `self` | $ | number |
-    string.map(Expr.Str) | obj | arr | comp | `super`
+    string.map(Expr.Str) | obj | arr | `super`
     | id.map(Expr.Id)
     | "local" ~ localExpr
     | "(" ~ expr.map(Expr.Parened) ~ ")"
