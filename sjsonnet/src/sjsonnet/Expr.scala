@@ -26,7 +26,7 @@ object Expr{
   object Member{
     case class Field(fieldName: FieldName,
                      plus: Boolean,
-                     args: Params,
+                     args: Option[Params],
                      sep: String,
                      rhs: Expr) extends Member
     case class BindStmt(value: Bind) extends Member

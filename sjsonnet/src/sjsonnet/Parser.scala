@@ -88,7 +88,7 @@ object Parser{
         remaining.headOption match{
           case None => false
           case Some((op, next)) =>
-            val prec: Int = Evaluator.precedence(op)
+            val prec: Int = precedence(op)
             if (prec < minPrec) false
             else{
               remaining = remaining.tail
@@ -144,9 +144,9 @@ object Parser{
 
   val member: P[Expr.Member] = P( objlocal | assertStmt | field )
   val field = P(
-    (fieldname ~ "+".!.? ~ ("(" ~ params.? ~ ")").? ~ h ~ expr).map{
+    (fieldname ~ "+".!.? ~ ("(" ~ params ~ ")").? ~ h ~ expr).map{
       case (name, plus, p, h2, e) =>
-        Expr.Member.Field(name, plus.nonEmpty, p.flatten.getOrElse(Expr.Params(Nil)), h2, e)
+        Expr.Member.Field(name, plus.nonEmpty, p, h2, e)
     }
   )
   val h = P( ":" | "::" | ":::" ).!
