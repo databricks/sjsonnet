@@ -47,6 +47,7 @@ object Evaluator {
       case (Value.Num(l), "<=", Value.Num(r)) => if (l <= r) Value.True else Value.False
       case (Value.Num(l), ">=", Value.Num(r)) => if (l >= r) Value.True else Value.False
       case (l, "==", r) => if (l == r) Value.True else Value.False
+      case (l, "!=", r) => if (l != r) Value.True else Value.False
       case (Value.Str(l), "in", Value.Obj(r)) => if (r.contains(l)) Value.True else Value.False
       case (Value.Num(l), "&", Value.Num(r)) => Value.Num(l.toLong & r.toLong)
       case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
@@ -88,7 +89,8 @@ object Evaluator {
         case Value.True => visitExpr(then, scope)
         case Value.False => visitExpr(else0.get, scope)
       }
-//    case Comp(value, first, rest) => Comp(visitExpr(value), visitForSpec(first), rest.map(visitCompSpec))
+    case Comp(value, first, rest) =>
+      Value.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
     case ObjExtend(value, ext) => {
       val original = visitExpr(value, scope).asInstanceOf[Value.Obj]
       mergeObjects(original, visitObjBody(ext, scope))

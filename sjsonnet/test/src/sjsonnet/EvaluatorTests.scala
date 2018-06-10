@@ -56,6 +56,11 @@ object EvaluatorTests extends TestSuite{
       eval("[{x: $.y, y: $.x}.x, 2][1]") ==> Value.Num(2)
       eval("{x: $.y, y: $.x, local z(z0) = [3], w: z($.x)}.w[0]") ==> Value.Num(3)
     }
+    'comprehensions - {
+      eval("[x + 1 for x in [1, 2, 3]][2]") ==> Value.Num(4)
+//      eval("""{[""+x]: x * x for x in [1, 2, 3]}["3"]""") ==> Value.Num(9)
+      eval("[x + y for x in [1, 2, 3] for y in [4, 5, 6] if x + y != 7][3]") ==> Value.Num(8)
+    }
   }
 
 }
