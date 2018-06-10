@@ -39,6 +39,8 @@ object Evaluator {
       case (Value.Num(l), "%", Value.Num(r)) => Value.Num(l % r)
       case (Value.Num(l), "+", Value.Num(r)) => Value.Num(l + r)
       case (Value.Str(l), "+", Value.Str(r)) => Value.Str(l + r)
+      case (Value.Str(l), "+", Value.Num(r)) => Value.Str(l + (if (r == r.toInt) r.toInt else r))
+      case (Value.Num(l), "+", Value.Str(r)) => Value.Str((if (l == l.toInt) l.toInt else l) + r)
       case (Value.Num(l), "-", Value.Num(r)) => Value.Num(l - r)
       case (Value.Num(l), "<<", Value.Num(r)) => Value.Num(l.toLong << r.toLong)
       case (Value.Num(l), ">>", Value.Num(r)) => Value.Num(l.toLong >> r.toLong)
@@ -166,12 +168,25 @@ object Evaluator {
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
-      lazy val newScope: Scope = new Scope(scope.dollar0.orElse(Some(newSelf)), Some(newSelf), scope.bindings ++ newBindings)
+      lazy val compScope: Scope = new Scope(
+        scope.dollar0,
+        scope.self0,
+        scope.bindings ++ newBindings
+      )
 
-      lazy val newBindings = visitBindings(preLocals.collect{ case Member.BindStmt(b) => b}, newScope)
+      lazy val newScope: Scope = new Scope(
+        scope.dollar0.orElse(Some(newSelf)),
+        Some(newSelf),
+        scope.bindings ++ newBindings
+      )
+
+      lazy val newBindings = visitBindings(
+        preLocals.collect{ case Member.BindStmt(b) => b},
+        newScope
+      )
 
       lazy val newSelf = Value.Obj(
-        visitComp(first :: rest.toList, Seq(newScope))
+        visitComp(first :: rest.toList, Seq(compScope))
           .map(s => visitExpr(key, s).asInstanceOf[Value.Str].value -> (false, Ref(visitExpr(value, s))))
           .toMap
       )

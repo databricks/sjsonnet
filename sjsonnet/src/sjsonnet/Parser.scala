@@ -71,24 +71,24 @@ object Parser{
   val $ = P("$").map(_ => Expr.$)
   val `super` = P("super").map(_ => Expr.Super)
 
-  val obj: P[Expr] = P( "{" ~ objinside.map(Expr.Obj) ~ "}" )
+  val obj: P[Expr] = P( "{" ~/ objinside.map(Expr.Obj) ~ "}" )
   val arr: P[Expr] = P(
-    "[" ~ ("]".!.map(_ => Expr.Arr(Nil)) | arrBody ~ "]")
+    "[" ~/ ("]".!.map(_ => Expr.Arr(Nil)) | arrBody ~ "]")
   )
   val compSuffix = P( forspec ~ compspec ).map(Left(_))
   val arrBody: P[Expr] = P(
-    expr ~ ( compSuffix | "," ~ (compSuffix | (expr.rep(1, sep=",") ~ ",".?).map(Right(_)))).?
+    expr ~ (compSuffix | "," ~/ (compSuffix | (expr.rep(1, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
     case (first, None) => Expr.Arr(Seq(first))
     case (first, Some(Left(comp))) => Expr.Comp(first, comp._1, comp._2)
     case (first, Some(Right(rest))) => Expr.Arr(Seq(first) ++ rest)
   }
-  val assertExpr: P[Expr] = P( assertStmt ~ ";" ~ expr ).map(Expr.AssertExpr.tupled)
-  val function: P[Expr] = P( "(" ~ params ~ ")" ~ expr ).map(Expr.Function.tupled)
+  val assertExpr: P[Expr] = P( assertStmt ~/ ";" ~ expr ).map(Expr.AssertExpr.tupled)
+  val function: P[Expr] = P( "(" ~/ params ~ ")" ~ expr ).map(Expr.Function.tupled)
   val ifElse: P[Expr] = P( expr ~ "then" ~ expr ~ ("else" ~ expr).? ).map(Expr.IfElse.tupled)
-  val localExpr: P[Expr] = P( bind.rep(min=1, sep=",") ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+  val localExpr: P[Expr] = P( bind.rep(min=1, sep = ","~/) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
-  val expr: P[Expr] = P(expr1 ~ (binaryop ~ expr1).rep).map{ case (pre, fs) =>
+  val expr: P[Expr] = P(expr1 ~ (binaryop ~/ expr1).rep).map{ case (pre, fs) =>
     var remaining = fs
     def climb(minPrec: Int, current: Expr): Expr = {
       var result = current
@@ -117,13 +117,13 @@ object Parser{
   }
 
   val exprSuffix2: P[Expr => Expr] = P(
-    ("." ~ id).map(x => Expr.Select(_: Expr, x)) |
-    ("[" ~ expr.? ~ (":" ~ expr.?).rep ~ "]").map{
+    ("." ~/ id).map(x => Expr.Select(_: Expr, x)) |
+    ("[" ~/ expr.? ~ (":" ~ expr.?).rep ~ "]").map{
       case (Some(tree), Seq()) => Expr.Lookup(_: Expr, tree)
       case (start, ins) => Expr.Slice(_: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
     } |
-    ("(" ~ args ~ ")").map(x => Expr.Apply(_: Expr, x)) |
-    ("{" ~ objinside ~ "}").map(x => Expr.ObjExtend(_: Expr, x))
+    ("(" ~/ args ~ ")").map(x => Expr.Apply(_: Expr, x)) |
+    ("{" ~/ objinside ~ "}").map(x => Expr.ObjExtend(_: Expr, x))
   )
 
 
@@ -133,41 +133,48 @@ object Parser{
     `null` | `true` | `false` | `self` | $ | number |
     string.map(Expr.Str) | obj | arr | `super`
     | id.map(Expr.Id)
-    | "local" ~ localExpr
-    | "(" ~ expr.map(Expr.Parened) ~ ")"
-    | "if" ~ ifElse
-    | "function" ~ function
-    | "import" ~ string.map(Expr.Import)
-    | "importstr" ~ string.map(Expr.ImportStr)
-    | "error" ~ expr.map(Expr.Error)
+    | "local" ~/ localExpr
+    | "(" ~/ expr.map(Expr.Parened) ~ ")"
+    | "if" ~/ ifElse
+    | "function" ~/ function
+    | "import" ~/ string.map(Expr.Import)
+    | "importstr" ~/ string.map(Expr.ImportStr)
+    | "error" ~/ expr.map(Expr.Error)
     | assertExpr
-    | (unaryop ~ expr).map(Expr.UnaryOp.tupled)
+    | (unaryop ~/ expr).map(Expr.UnaryOp.tupled)
   )
 
-  val objinside: P[Expr.ObjBody] = P( memberList | objComp )
-  val memberList = P( member.rep(sep=",") ~ ",".? ).map(Expr.ObjBody.MemberList)
-  val objComp = P(
-    (objlocal ~ ",").rep ~ "[" ~ expr ~ "]" ~ ":" ~ expr ~ ("," ~ objlocal).rep  ~ ",".? ~ forspec ~ compspec
-  ).map(Expr.ObjBody.ObjComp.tupled)
+  val objinside: P[Expr.ObjBody] = P(
+    member.rep(sep = ",") ~ (",".? ~ forspec ~ compspec).?
+  ).map{
+    case (exprs, None) => Expr.ObjBody.MemberList(exprs)
+    case (exprs, Some(comps)) =>
+      val preLocals = exprs.takeWhile(_.isInstanceOf[Expr.Member.BindStmt]).map(_.asInstanceOf[Expr.Member.BindStmt])
+      val Expr.Member.Field(Expr.FieldName.Dyn(lhs), false, None, ":", rhs) =
+        exprs(preLocals.length)
+      val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
+        .map(_.asInstanceOf[Expr.Member.BindStmt])
+      Expr.ObjBody.ObjComp(preLocals, lhs, rhs, postLocals, comps._1, comps._2)
+  }
 
   val member: P[Expr.Member] = P( objlocal | assertStmt | field )
   val field = P(
-    (fieldname ~ "+".!.? ~ ("(" ~ params ~ ")").? ~ h ~ expr).map{
+    (fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~ expr).map{
       case (name, plus, p, h2, e) =>
         Expr.Member.Field(name, plus.nonEmpty, p, h2, e)
     }
   )
-  val h = P( ":" | "::" | ":::" ).!
-  val objlocal = P( "local" ~ bind ).map(Expr.Member.BindStmt)
+  val fieldKeySep = P( ":" | "::" | ":::" ).!
+  val objlocal = P( "local" ~/ bind ).map(Expr.Member.BindStmt)
   val compspec: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
-  val forspec = P( "for" ~ id ~ "in" ~ expr ).map(Expr.ForSpec.tupled)
-  val ifspec = P( "if" ~ expr ).map(Expr.IfSpec)
+  val forspec = P( "for" ~/ id ~ "in" ~ expr ).map(Expr.ForSpec.tupled)
+  val ifspec = P( "if" ~/ expr ).map(Expr.IfSpec)
   val fieldname = P( id.map(Expr.FieldName.Fixed) | string.map(Expr.FieldName.Fixed) | "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]" )
-  val assertStmt = P( "assert" ~ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
-  val bind = P( id ~ ("(" ~ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
-  val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).map(Expr.Args)
+  val assertStmt = P( "assert" ~/ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
+  val bind = P( id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+  val args = P( ((id ~ "=").? ~ expr).rep(sep = ","~/) ~ ",".? ).map(Expr.Args)
 
-  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep=",") ~ ",".? ).map(Expr.Params)
+  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).map(Expr.Params)
 
   val binaryop = P("*" | "/" | "%" | "+" | "-" | "<<" | ">>" | "<" | "<=" | ">" | ">=" | "==" | "!=" | "in" | "&" | "^" | "|" | "&&" | "||" ).!
   val unaryop	= P("-" | "+" | "!" | "~").!
