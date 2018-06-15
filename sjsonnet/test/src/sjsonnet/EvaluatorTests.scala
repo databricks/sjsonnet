@@ -63,6 +63,9 @@ object EvaluatorTests extends TestSuite{
       eval("""{[""+x]: x * x for x in [1, 2, 3]}["3"]""") ==> Value.Num(9)
       eval("""{local y = $["2"], [x]: if x == "1" then y else 0, for x in ["1", "2"]}["1"]""") ==> Value.Num(0)
     }
+    'supers - {
+      eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
+    }
   }
 
 }
