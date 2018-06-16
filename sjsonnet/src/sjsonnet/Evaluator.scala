@@ -1,6 +1,28 @@
 package sjsonnet
 import Expr._
 object Evaluator {
+  object Scope{
+    val Std = Value.Obj(
+      Map(
+        "assertEqual" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
+            val x1 = Materializer(v1.calc)
+            val x2 = Materializer(v2.calc)
+            if (x1 == x2) Value.True
+            else throw new Exception("assertEqual failed: " + x1 + " != " + x2)
+          })
+        )),
+        "toString" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
+          })
+        ))
+      )
+    )
+  }
+
   class Scope(val dollar0: Option[Value.Obj],
               val self0: Option[Value.Obj],
               val bindings: Map[String, Ref]){
@@ -33,34 +55,45 @@ object Evaluator {
       case ("!", Value.False) => Value.True
     }
 
-    case BinaryOp(lhs, op, rhs) => (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
-      case (Value.Num(l), "*", Value.Num(r)) => Value.Num(l * r)
-      case (Value.Num(l), "/", Value.Num(r)) => Value.Num(l / r)
-      case (Value.Num(l), "%", Value.Num(r)) => Value.Num(l % r)
-      case (Value.Num(l), "+", Value.Num(r)) => Value.Num(l + r)
-      case (Value.Str(l), "+", Value.Str(r)) => Value.Str(l + r)
-      case (Value.Str(l), "+", Value.Num(r)) => Value.Str(l + (if (r == r.toInt) r.toInt else r))
-      case (Value.Num(l), "+", Value.Str(r)) => Value.Str((if (l == l.toInt) l.toInt else l) + r)
-      case (Value.Num(l), "-", Value.Num(r)) => Value.Num(l - r)
-      case (Value.Num(l), "<<", Value.Num(r)) => Value.Num(l.toLong << r.toLong)
-      case (Value.Num(l), ">>", Value.Num(r)) => Value.Num(l.toLong >> r.toLong)
-      case (Value.Num(l), "<", Value.Num(r)) => if (l < r) Value.True else Value.False
-      case (Value.Num(l), ">", Value.Num(r)) => if (l > r) Value.True else Value.False
-      case (Value.Num(l), "<=", Value.Num(r)) => if (l <= r) Value.True else Value.False
-      case (Value.Num(l), ">=", Value.Num(r)) => if (l >= r) Value.True else Value.False
-      case (l, "==", r) => if (l == r) Value.True else Value.False
-      case (l, "!=", r) => if (l != r) Value.True else Value.False
-      case (Value.Str(l), "in", Value.Obj(r)) => if (r.contains(l)) Value.True else Value.False
-      case (Value.Num(l), "&", Value.Num(r)) => Value.Num(l.toLong & r.toLong)
-      case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
-      case (Value.Num(l), "|", Value.Num(r)) => Value.Num(l.toLong | r.toLong)
-      case (Value.True, "&&", Value.True) => Value.True
-      case (_, "&&", _) => Value.True
-      case (Value.False, "||", Value.False) => Value.False
-      case (_, "||", _) => Value.True
-      case (Value.Obj(l), "+", Value.Obj(r)) => mergeObjects(Value.Obj(l), Value.Obj(r))
-    }
+    case BinaryOp(lhs, op, rhs) => {
+      op match{
+        case "&&" | "||" =>
+          (visitExpr(lhs, scope), op) match {
+            case (Value.False, "&&") => Value.False
+            case (Value.True, "||") => Value.True
+            case _ => visitExpr(rhs, scope)
 
+          }
+        case _ =>
+          (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
+            case (Value.Num(l), "*", Value.Num(r)) => Value.Num(l * r)
+            case (Value.Num(l), "/", Value.Num(r)) => Value.Num(l / r)
+            case (Value.Num(l), "%", Value.Num(r)) => Value.Num(l % r)
+            case (Value.Num(l), "+", Value.Num(r)) => Value.Num(l + r)
+            case (Value.Str(l), "+", Value.Str(r)) => Value.Str(l + r)
+            case (Value.Str(l), "<", Value.Str(r)) => if (l < r) Value.True else Value.False
+            case (Value.Str(l), ">", Value.Str(r)) => if (l > r) Value.True else Value.False
+            case (Value.Str(l), "<=", Value.Str(r)) => if (l <= r) Value.True else Value.False
+            case (Value.Str(l), ">=", Value.Str(r)) => if (l >= r) Value.True else Value.False
+            case (Value.Str(l), "+", r) => Value.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+            case (l, "+", Value.Str(r)) => Value.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+            case (Value.Num(l), "-", Value.Num(r)) => Value.Num(l - r)
+            case (Value.Num(l), "<<", Value.Num(r)) => Value.Num(l.toLong << r.toLong)
+            case (Value.Num(l), ">>", Value.Num(r)) => Value.Num(l.toLong >> r.toLong)
+            case (Value.Num(l), "<", Value.Num(r)) => if (l < r) Value.True else Value.False
+            case (Value.Num(l), ">", Value.Num(r)) => if (l > r) Value.True else Value.False
+            case (Value.Num(l), "<=", Value.Num(r)) => if (l <= r) Value.True else Value.False
+            case (Value.Num(l), ">=", Value.Num(r)) => if (l >= r) Value.True else Value.False
+            case (l, "==", r) => if (Materializer(l) == Materializer(r)) Value.True else Value.False
+            case (l, "!=", r) => if (Materializer(l) != Materializer(r)) Value.True else Value.False
+            case (Value.Str(l), "in", Value.Obj(r)) => if (r.contains(l)) Value.True else Value.False
+            case (Value.Num(l), "&", Value.Num(r)) => Value.Num(l.toLong & r.toLong)
+            case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
+            case (Value.Num(l), "|", Value.Num(r)) => Value.Num(l.toLong | r.toLong)
+            case (Value.Obj(l), "+", Value.Obj(r)) => mergeObjects(Value.Obj(l), Value.Obj(r))
+          }
+        }
+    }
     case AssertExpr(Member.AssertStmt(value, msg), returned) =>
       if (visitExpr(value, scope) != Value.True) {
         throw new Exception(msg.fold("")(visitExpr(_, scope).asInstanceOf[Value.Str].value))
@@ -84,6 +117,7 @@ object Evaluator {
     case Lookup(value, index) =>
       val res = (visitExpr(value, scope), visitExpr(index, scope)) match{
         case (v: Value.Arr, i: Value.Num) => v.value(i.value.toInt)
+        case (v: Value.Str, i: Value.Num) => Ref(Value.Str(new String(Array(v.value(i.value.toInt)))))
         case (v: Value.Obj, i: Value.Str) => v.value(i.value)._2(v)
       }
       res.force(scope.dollar0)

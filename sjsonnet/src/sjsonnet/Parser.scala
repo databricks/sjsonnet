@@ -23,7 +23,14 @@ object Parser{
 
   val White = WhitespaceApi.Wrapper {
     import fastparse.all._
-    NoTrace(CharsWhileIn(" \t\n", 0))
+    NoTrace(
+      (
+        CharsWhileIn(" \t\n", 1) |
+        "/*" ~ (!"*/" ~ AnyChar).rep ~ "*/"  |
+        "//" ~ CharsWhile(_ != '\n', 0) |
+        "#" ~ CharsWhile(_ != '\n', 0)
+      ).rep
+    )
   }
   import fastparse.noApi._
   import White._
@@ -77,7 +84,7 @@ object Parser{
   )
   val compSuffix = P( forspec ~ compspec ).map(Left(_))
   val arrBody: P[Expr] = P(
-    expr ~ (compSuffix | "," ~/ (compSuffix | (expr.rep(1, sep = ",") ~ ",".?).map(Right(_)))).?
+    expr ~ (compSuffix | "," ~/ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
     case (first, None) => Expr.Arr(Seq(first))
     case (first, Some(Left(comp))) => Expr.Comp(first, comp._1, comp._2)
@@ -88,7 +95,7 @@ object Parser{
   val ifElse: P[Expr] = P( expr ~ "then" ~ expr ~ ("else" ~ expr).? ).map(Expr.IfElse.tupled)
   val localExpr: P[Expr] = P( bind.rep(min=1, sep = ","~/) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
-  val expr: P[Expr] = P(expr1 ~ (binaryop ~/ expr1).rep).map{ case (pre, fs) =>
+  val expr: P[Expr] = P("" ~ expr1 ~ (binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
     var remaining = fs
     def climb(minPrec: Int, current: Expr): Expr = {
       var result = current
@@ -145,7 +152,7 @@ object Parser{
   )
 
   val objinside: P[Expr.ObjBody] = P(
-    member.rep(sep = ",") ~ (",".? ~ forspec ~ compspec).?
+    member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
   ).map{
     case (exprs, None) => Expr.ObjBody.MemberList(exprs)
     case (exprs, Some(comps)) =>
@@ -176,7 +183,7 @@ object Parser{
 
   val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).map(Expr.Params)
 
-  val binaryop = P("*" | "/" | "%" | "+" | "-" | "<<" | ">>" | "<" | "<=" | ">" | ">=" | "==" | "!=" | "in" | "&" | "^" | "|" | "&&" | "||" ).!
+  val binaryop = P( precedenceTable.flatten.sortBy(-_.length).map(LiteralStr).reduce(_ | _) ).!
   val unaryop	= P("-" | "+" | "!" | "~").!
 
 }
