@@ -47,7 +47,8 @@ object EvaluatorTests extends TestSuite{
       eval("{x: 1, y: $.x + 10}.y") ==> Value.Num(11)
       eval("{x: 1, y: self.x}.y'") ==> Value.Num(1)
       eval("{x: 1, y: {x: 2, z: $.x + 10}}.y.z") ==> Value.Num(11)
-      eval("{x: 1, y: {x: 2, z: self.x + 10}}.y.z") ==> Value.Num(11)
+      eval("{x: 1, y: {x: 2, z: self.x + 10}}.y.z") ==> Value.Num(12)
+      eval("{x: 1, y: {x: 0, y: self.x}.y}.y") ==> Value.Num(0)
     }
     'topLevel - {
       eval("local p(n='A') = {w: 'H'+n}; {p: p()}.p.w") ==> Value.Str("HA")

@@ -38,7 +38,7 @@ object Evaluator {
     case Parened(inner) => visitExpr(inner, scope)
     case True => Value.True
     case False => Value.False
-    case Self => scope.dollar
+    case Self => scope.self
     case Super => ???
     case $ => scope.dollar
     case Str(value) => Value.Str(value)
@@ -188,7 +188,6 @@ object Evaluator {
   }
   def visitObjBody(b: ObjBody, scope: => Scope): Value.Obj = b match{
     case ObjBody.MemberList(value) =>
-
       def makeNewScope(self: => Value.Obj): Scope = new Scope(scope.dollar0.orElse(Some(self)), Some(self), scope.bindings ++ newBindings)
       lazy val newScope: Scope = makeNewScope(newSelf)
 
