@@ -70,7 +70,10 @@ object EvaluatorTests extends TestSuite{
     }
     'supers - {
       eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
+      eval("({ local x = $.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
+      eval("({ local x = self.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
     }
+
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
 //      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")
