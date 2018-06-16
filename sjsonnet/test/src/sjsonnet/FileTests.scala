@@ -20,7 +20,7 @@ object FileTests extends TestSuite{
     'assert - check
     'binary - check
     'comments - check
-//    'condition - check
+    'condition - check
 //    'format - check
     'functions - check
   }

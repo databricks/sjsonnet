@@ -126,7 +126,7 @@ object Evaluator {
     case IfElse(cond, then, else0) =>
       visitExpr(cond, scope) match{
         case Value.True => visitExpr(then, scope)
-        case Value.False => visitExpr(else0.get, scope)
+        case Value.False => else0.fold[Value](Value.Null)(visitExpr(_, scope))
       }
     case Comp(value, first, rest) =>
       Value.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
