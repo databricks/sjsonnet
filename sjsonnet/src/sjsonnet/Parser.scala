@@ -62,14 +62,23 @@ object Parser{
     case "t" => "\t"
   }
   val string: P[String] = P(
-    "\"" ~~ (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" |
-    "'" ~~ (CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'" |
-    "@\"" ~~ (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"" |
-    "@'" ~~ (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" |
-    "|||".~/ ~~ CharsWhileIn(" \t", 0).log() ~~ "\n" ~~ (CharsWhileIn(" ", min=1).! ~~ CharsWhile(_ != '\n').!).flatMap { case (w, s) =>
-      (&("\n").map(_ => "") | w ~ CharsWhile(_ != '\n').!).repX(sep = "\n").map(x => Seq(x.mkString("\n")))
-    } ~ " ".rep ~ "|||"
-  ).map(_.mkString)
+    "\"".~/ ~~ (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" |
+    "'".~/ ~~ (CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'" |
+    "@\"".~/ ~~ (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"" |
+    "@'".~/ ~~ (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" |
+    "|||".~/ ~~ CharsWhileIn(" \t", 0) ~~ "\n" ~~ tripleBarStringHead.flatMap { case (pre, w, head) =>
+      tripleBarStringBody(w, head).map(pre ++ _)
+    } ~~ "\n" ~~ CharsWhileIn(" \t", min=0) ~~ "|||"
+  ).map(_.mkString).opaque()
+
+  val tripleBarStringHead = P(
+    (CharsWhileIn(" \t", min=0) ~~ "\n".!).repX ~~
+    CharsWhileIn(" \t", min=1).! ~~
+    CharsWhile(_ != '\n').!
+  )
+  def tripleBarStringBody(w: String, head: String) = P(
+    ("\n" ~~ CharsWhileIn(" \t", min=0) ~~ &("\n").map(_ => "") | "\n" ~~ w ~~ CharsWhile(_ != '\n').!).repX.map(x => Seq(head, x.mkString("\n")))
+  )
 
   val `null` = P("null").map(_ => Expr.Null)
   val `true` = P("true").map(_ => Expr.True)
@@ -133,8 +142,6 @@ object Parser{
     ("{" ~/ objinside ~ "}").map(x => Expr.ObjExtend(_: Expr, x))
   )
 
-
-
   // Any `expr` that isn't naively left-recursive
   val expr2 = P(
     `null` | `true` | `false` | `self` | $ | number |
@@ -148,7 +155,7 @@ object Parser{
     | "importstr" ~/ string.map(Expr.ImportStr)
     | "error" ~/ expr.map(Expr.Error)
     | assertExpr
-    | (unaryop ~/ expr).map(Expr.UnaryOp.tupled)
+    | (unaryop ~/ expr1).map(Expr.UnaryOp.tupled)
   )
 
   val objinside: P[Expr.ObjBody] = P(
@@ -171,7 +178,7 @@ object Parser{
         Expr.Member.Field(name, plus.nonEmpty, p, h2, e)
     }
   )
-  val fieldKeySep = P( ":" | "::" | ":::" ).!
+  val fieldKeySep = P( ":::" | "::" | ":" ).!
   val objlocal = P( "local" ~/ bind ).map(Expr.Member.BindStmt)
   val compspec: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   val forspec = P( "for" ~/ id ~ "in" ~ expr ).map(Expr.ForSpec.tupled)

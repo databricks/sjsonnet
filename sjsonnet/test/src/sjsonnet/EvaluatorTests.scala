@@ -10,12 +10,15 @@ object EvaluatorTests extends TestSuite{
     'arithmetic - {
       eval("1 + 2 + 3") ==> Value.Num(6)
       eval("1 + 2 * 3") ==> Value.Num(7)
+      eval("-1 + 2 * 3") ==> Value.Num(5)
+      eval("6 - 3 + 2") ==> Value.Num(5)
     }
     'objects - {
       eval("{x: 1}.x") ==> Value.Num(1)
     }
     'arrays - {
       eval("[1, [2, 3], 4][1][0]") ==> Value.Num(2)
+      eval("([1, 2, 3] + [4, 5, 6])[3]") ==> Value.Num(4)
     }
     'functions - {
       eval("(function(x) x)(1)") ==> Value.Num(1)
@@ -68,5 +71,12 @@ object EvaluatorTests extends TestSuite{
     'supers - {
       eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
     }
+//    'format - {
+//      eval("\"%s\" % \"world\"") ==> Value.Str("world")
+//      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")
+//      eval("\"%s %s\" % [\"hello\", \"world\"]") ==> Value.Str("hello world")
+//      eval("\"%(hello)s\" % {hello: \"world\"}") ==> Value.Str("world")
+//    }
   }
 }
+

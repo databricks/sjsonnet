@@ -49,7 +49,7 @@ object Evaluator {
 
     case UnaryOp(op, value) => (op, visitExpr(value, scope)) match{
       case ("-", Value.Num(v)) => Value.Num(-v)
-      case ("+", Value.Num(v)) => Value.Num(-v)
+      case ("+", Value.Num(v)) => Value.Num(v)
       case ("~", Value.Num(v)) => Value.Num(~v.toLong)
       case ("!", Value.True) => Value.False
       case ("!", Value.False) => Value.True
@@ -91,6 +91,7 @@ object Evaluator {
             case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
             case (Value.Num(l), "|", Value.Num(r)) => Value.Num(l.toLong | r.toLong)
             case (Value.Obj(l), "+", Value.Obj(r)) => mergeObjects(Value.Obj(l), Value.Obj(r))
+            case (Value.Arr(l), "+", Value.Arr(r)) => Value.Arr(l ++ r)
           }
         }
     }
