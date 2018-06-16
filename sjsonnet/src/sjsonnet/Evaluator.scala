@@ -168,9 +168,9 @@ object Evaluator {
 
   def visitMethod(scope: Scope, rhs: Expr, argSpec: Params) = {
     Value.Func { args =>
-      val newScope =
+      lazy val newScope: Scope =
         scope ++
-        argSpec.args.collect{case (k, Some(default)) => (k, Ref(visitExpr(default, scope)))} ++
+        argSpec.args.collect{case (k, Some(default)) => (k, Ref(visitExpr(default, newScope)))} ++
         args.zipWithIndex.map{
           case ((Some(name), v), _) => (name, v)
           case ((None, v), i) => (argSpec.args(i)._1, v)

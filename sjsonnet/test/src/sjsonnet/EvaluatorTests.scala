@@ -56,6 +56,7 @@ object EvaluatorTests extends TestSuite{
     'lazy - {
       eval("[{x: $.y, y: $.x}.x, 2][1]") ==> Value.Num(2)
       eval("{x: $.y, y: $.x, local z(z0) = [3], w: z($.x)}.w[0]") ==> Value.Num(3)
+      eval("(function(a=[1, b[1]], b=[a[0], 2]) [a, b])()[0][1]") ==> Value.Num(2)
     }
     'comprehensions - {
       eval("[x + 1 for x in [1, 2, 3]][2]") ==> Value.Num(4)
@@ -68,5 +69,4 @@ object EvaluatorTests extends TestSuite{
       eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
     }
   }
-
 }
