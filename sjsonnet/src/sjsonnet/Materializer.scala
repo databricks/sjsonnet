@@ -7,7 +7,7 @@ object Materializer {
     case Value.Null => Js.Null
     case Value.Num(n) => Js.Num(n)
     case Value.Str(s) => Js.Str(s)
-    case Value.Arr(xs) => Js.Arr(xs.map(x => apply(x.calc)))
+    case Value.Arr(xs) => Js.Arr.from(xs.map(x => apply(x.calc)))
     case obj @ Value.Obj(kvs) => Js.Obj.from(kvs.mapValues(x => apply(x._2(obj).calc)))
   }
 }

@@ -67,7 +67,7 @@ object Parser{
     "@\"".~/ ~~ (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"" |
     "@'".~/ ~~ (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" |
     "|||".~/ ~~ CharsWhileIn(" \t", 0) ~~ "\n" ~~ tripleBarStringHead.flatMap { case (pre, w, head) =>
-      tripleBarStringBody(w, head).map(pre ++ _)
+      tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
     } ~~ "\n" ~~ CharsWhileIn(" \t", min=0) ~~ "|||"
   ).map(_.mkString).opaque()
 
@@ -76,8 +76,9 @@ object Parser{
     CharsWhileIn(" \t", min=1).! ~~
     CharsWhile(_ != '\n').!
   )
-  def tripleBarStringBody(w: String, head: String) = P(
-    ("\n" ~~ CharsWhileIn(" \t", min=0) ~~ &("\n").map(_ => "") | "\n" ~~ w ~~ CharsWhile(_ != '\n').!).repX.map(x => Seq(head, x.mkString("\n")))
+  val tripleBarBlank = P( "\n" ~~ CharsWhileIn(" \t", min=0) ~~ &("\n").map(_ => "\n") )
+  def tripleBarStringBody(w: String) = P(
+    (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
 
   val `null` = P("null").map(_ => Expr.Null)

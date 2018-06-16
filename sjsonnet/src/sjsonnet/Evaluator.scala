@@ -18,6 +18,17 @@ object Evaluator {
           (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
           })
+        )),
+        "lines" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Str(
+              Materializer.apply(v1.calc).asInstanceOf[ujson.Js.Arr]
+                .value
+                .map{case ujson.Js.Str(s) => s + "\n"}
+                .mkString
+            )
+          })
         ))
       )
     )
