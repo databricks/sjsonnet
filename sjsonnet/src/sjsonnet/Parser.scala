@@ -66,9 +66,9 @@ object Parser{
     "'" ~~ (CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'" |
     "@\"" ~~ (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"" |
     "@'" ~~ (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" |
-    "|||" ~~ CharsWhileIn(" \t", 0) ~~ "\n" ~~ CharsWhileIn(" ", min=1).!.flatMap(s =>
-      (s ~~ CharsWhile(_ != '\n').!).repX(sep = "\n").map(x => Seq(x.mkString("\n")))
-    )
+    "|||".~/ ~~ CharsWhileIn(" \t", 0).log() ~~ "\n" ~~ (CharsWhileIn(" ", min=1).! ~~ CharsWhile(_ != '\n').!).flatMap { case (w, s) =>
+      (&("\n").map(_ => "") | w ~ CharsWhile(_ != '\n').!).repX(sep = "\n").map(x => Seq(x.mkString("\n")))
+    } ~ " ".rep ~ "|||"
   ).map(_.mkString)
 
   val `null` = P("null").map(_ => Expr.Null)

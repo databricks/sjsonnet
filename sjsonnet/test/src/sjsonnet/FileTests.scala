@@ -21,6 +21,7 @@ object FileTests extends TestSuite{
     'binary - check
     'comments - check
 //    'condition - check
+    'format - check
   }
 }
 
