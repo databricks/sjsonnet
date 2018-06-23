@@ -6,7 +6,7 @@ object FileTests extends TestSuite{
   def eval(s: String) = {
     Evaluator.visitExpr(
       Parser.expr.parse(s).get.value,
-      new Evaluator.Scope(None, None, Map("std" -> ((self: Value.Obj) => Ref(Evaluator.Scope.Std))))
+      new Evaluator.Scope(None, None, Map("std" -> Ref(Evaluator.Scope.Std)))
     )
   }
   def check(expected: Value = Value.True)(implicit tp: utest.framework.TestPath) = {
