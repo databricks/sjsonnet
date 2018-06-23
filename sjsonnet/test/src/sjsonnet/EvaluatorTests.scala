@@ -69,17 +69,21 @@ object EvaluatorTests extends TestSuite{
       eval("""{local y = $["2"], [x]: if x == "1" then y else 0, for x in ["1", "2"]}["1"]""") ==> Value.Num(0)
     }
     'supers - {
-      eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
-      eval("({ local x = $.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
-      eval("({ local x = self.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
-      eval("local A = {x: 1, local outer = self, y: A{z: outer}}; A.y.z.x") ==> Value.Num(1)
-      eval("{local x = self, y: 1, z: {a: x, y: 2}}.z.a.y") ==> Value.Num(1)
-      eval("local A = {x: 1, local outer = self, y: A{x: outer.x}}; A.y.x") ==> Value.Num(1)
-      eval("local A = {x: 1, local outer = self, y: A{x: outer.x + 1}}; A.y.y.x") ==> Value.Num(3)
-    }
-    'super2 - {
-      Materializer(eval("{ x: 1, y: self.x } + { x: 2, y: super.y + 1, z: super.y }")) ==>
-        ujson.read("""{ "x": 2, "y": 3, "z": 2 }""")
+      'implicit - {
+
+        eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
+        eval("({ local x = $.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
+        eval("({ local x = self.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
+        eval("local A = {x: 1, local outer = self, y: A{z: outer}}; A.y.z.x") ==> Value.Num(1)
+        eval("{local x = self, y: 1, z: {a: x, y: 2}}.z.a.y") ==> Value.Num(1)
+        eval("local A = {x: 1, local outer = self, y: A{x: outer.x}}; A.y.x") ==> Value.Num(1)
+        eval("local A = {x: 1, local outer = self, y: A{x: outer.x + 1}}; A.y.y.x") ==> Value.Num(3)
+      }
+      'explicit - {
+
+        Materializer(eval("{ x: 1, y: self.x } + { x: 2, y: super.y + 1}")) ==>
+          ujson.read("""{ "x": 2, "y": 3 }""")
+      }
     }
 
 //    'format - {

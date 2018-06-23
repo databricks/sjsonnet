@@ -52,4 +52,3 @@ object FileTests extends TestSuite{
     'verbatim_strings - check()
   }
 }
-

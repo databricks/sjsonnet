@@ -79,7 +79,18 @@ object Evaluator {
     case True => Value.True
     case False => Value.False
     case Self => scope.self
-    case Super => scope.self.`super`.get
+
+    case Select(Super, name) =>
+      scope.self.`super`.get.value(name, self = scope.self).calc
+
+    case Lookup(Super, index) =>
+      val key = visitExpr(index, scope).asInstanceOf[Value.Str]
+      scope.self.`super`.get.value(key.value).calc
+
+    case BinaryOp(lhs, "in", Super) =>
+      val key = visitExpr(lhs, scope).asInstanceOf[Value.Str]
+      if (scope.self.`super`.get.value0.contains(key.value)) Value.True else Value.False
+
     case $ => scope.dollar
     case Str(value) => Value.Str(value)
     case Num(value) => Value.Num(value)
@@ -155,7 +166,6 @@ object Evaluator {
 
     case Select(value, name) =>
       val self = visitExpr(value, scope).asInstanceOf[Value.Obj]
-
       self.value(name).force(scope.dollar0)
 
     case Lookup(value, index) =>

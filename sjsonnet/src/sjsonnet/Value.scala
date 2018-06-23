@@ -17,26 +17,26 @@ object Value{
   case class Arr(value: Seq[Ref]) extends Value
   case class Obj(value0: Map[String, (Boolean, Obj => Ref)],
                  `super`: Option[Obj]) extends Value{
-    val valueCache = collection.mutable.Map.empty[String, Ref]
-    def value(k: String) = valueCache.getOrElseUpdate(
-      k,
+    val valueCache = collection.mutable.Map.empty[(String, Obj), Ref]
+    def value(k: String, self: Obj = this) = valueCache.getOrElseUpdate(
+      (k, self),
       {
         def rec(current: Obj, acc: List[Ref]): Ref = {
           current.value0.get(k) match{
             case Some((add, ref)) =>
               if (!add) {
-                Ref(acc.iterator.map(_.calc).foldLeft(ref(this).calc){
+                Ref(acc.iterator.map(_.calc).foldLeft(ref(self).calc){
                   case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
                   case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
                 })
               }
               else {
                 current.`super` match{
-                  case None => Ref(acc.iterator.map(_.calc).foldLeft(ref(this).calc){
+                  case None => Ref(acc.iterator.map(_.calc).foldLeft(ref(self).calc){
                     case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
                     case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
                   })
-                  case Some(s) => rec(s, ref(this) :: acc)
+                  case Some(s) => rec(s, ref(self) :: acc)
                 }
               }
             case None => current.`super` match{
