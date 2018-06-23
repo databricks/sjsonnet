@@ -33,7 +33,7 @@ object FileTests extends TestSuite{
       ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / "invariant_manifest.jsonnet.golden"))
     )
     'local - check()
-//    'merge - check()
+    'merge - check()
     'null - check()
     'object - check()
     'oop - check()

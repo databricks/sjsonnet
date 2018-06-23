@@ -146,6 +146,29 @@ object Scope{
              end.calc.asInstanceOf[Value.Num].value.toInt)
               .map(i => Ref(Value.Num(i))))
         })
+      )),
+      "mergePatch" -> ((
+        false,
+        "::",
+        (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, base), (None, patch)) =>
+          def rec(l: ujson.Js, r: ujson.Js): ujson.Js = {
+            (l, r) match{
+              case (l0, r: ujson.Js.Obj) =>
+                val l = l0 match{
+                  case l: ujson.Js.Obj => l
+                  case _ => ujson.Js.Obj()
+                }
+                for((k, v) <- r.value){
+                  if (v == ujson.Js.Null) l.value.remove(k)
+                  else if (l.value.contains(k)) l(k) = rec(l(k), r(k))
+                  else l(k) = rec(ujson.Js.Obj(), r(k))
+                }
+                l
+              case (_, _) => r
+            }
+          }
+          Materializer.reverse(rec(Materializer(base.calc), Materializer(patch.calc)))
+        })
       ))
     ),
     None
