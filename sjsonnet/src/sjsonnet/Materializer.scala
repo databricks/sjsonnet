@@ -11,7 +11,7 @@ object Materializer {
     case obj: Value.Obj =>
       Js.Obj.from(
         for {
-          (k, hidden) <- obj.getVisibleKeys()
+          (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
         }yield k -> apply(obj.value(k).calc)
       )

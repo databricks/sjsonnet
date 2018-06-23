@@ -63,7 +63,7 @@ object Parser{
     case "t" => "\t"
   }
   val escape1 = P( "\\u" ~~ CharIn('0' to '9').repX(min=4, max=4).! ).map{
-    s => s.toInt.toChar.toString
+    s => Integer.parseInt(s, 16).toChar.toString
   }
   val string: P[String] = P(
     "\"".~/ ~~ (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" |

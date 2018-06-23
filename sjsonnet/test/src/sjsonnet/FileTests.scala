@@ -9,8 +9,10 @@ object FileTests extends TestSuite{
       new Evaluator.Scope(None, None, None, Map("std" -> Ref(Evaluator.Scope.Std)))
     )
   }
-  def check(expected: Value = Value.True)(implicit tp: utest.framework.TestPath) = {
-    val res = eval(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / s"${tp.value.last}.jsonnet"))
+  def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
+    val res = Materializer(
+      eval(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / s"${tp.value.last}.jsonnet"))
+    )
     assert(res == expected)
     res
   }
@@ -39,16 +41,17 @@ object FileTests extends TestSuite{
 //    'recursive_function - check()
     'recursive_import_ok - check()
     'recursive_object - check()
-    'sanity - check(Value.False)
-    'sanity2 - check(Value.False)
+    'sanity - check(ujson.Js.False)
+    'sanity2 - check(ujson.Js.False)
     'shebang - check()
 //    "slice.sugar" - check()
     'std_all_hidden - check()
 //    'stdlib - check()
     'text_block - check()
-//    "tla.simple" - check()
     'unicode - check()
-//    'unparse - check()
+    'unparse - check(
+      ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / "unparse.jsonnet.golden"))
+    )
     'verbatim_strings - check()
   }
 }
