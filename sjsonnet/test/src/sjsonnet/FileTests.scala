@@ -16,6 +16,9 @@ object FileTests extends TestSuite{
     assert(res == expected)
     res
   }
+  def checkGolden()(implicit tp: utest.framework.TestPath) = {
+    check(ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / s"${tp.value.last}.jsonnet.golden")))
+  }
   def tests = Tests{
     'arith_bool - check()
     'arith_float - check()
@@ -25,13 +28,15 @@ object FileTests extends TestSuite{
     'binary - check()
     'comments - check()
     'condition - check()
+//    'dos_line_endings - checkGolden()
     'format - check()
+//    'formatter - checkGolden()
+    'formatting_braces - checkGolden()
+    'formatting_braces2 - checkGolden()
     'functions - check()
 //    'import - check()
     'invariant - check()
-    'invariant_manifest - check(
-      ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / "invariant_manifest.jsonnet.golden"))
-    )
+    'invariant_manifest - checkGolden()
     'local - check()
     'merge - check()
     'null - check()
@@ -43,17 +48,16 @@ object FileTests extends TestSuite{
 //    'recursive_function - check()
     'recursive_import_ok - check()
     'recursive_object - check()
-    'sanity - check(ujson.Js.False)
-    'sanity2 - check(ujson.Js.False)
+    'sanity - checkGolden()
+    'sanity2 - checkGolden()
     'shebang - check()
     "slice.sugar" - check()
     'std_all_hidden - check()
 //    'stdlib - check()
     'text_block - check()
     'unicode - check()
-    'unparse - check(
-      ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / "unparse.jsonnet.golden"))
-    )
+    'unix_line_endings - checkGolden()
+    'unparse - checkGolden()
     'verbatim_strings - check()
   }
 }
