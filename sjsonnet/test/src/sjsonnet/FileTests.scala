@@ -29,7 +29,9 @@ object FileTests extends TestSuite{
     'functions - check()
 //    'import - check()
     'invariant - check()
-//    'invariant_manifest - check()
+    'invariant_manifest - check(
+      ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / "invariant_manifest.jsonnet.golden"))
+    )
     'local - check()
 //    'merge - check()
     'null - check()
