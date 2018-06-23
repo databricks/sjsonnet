@@ -6,7 +6,7 @@ object FileTests extends TestSuite{
   def eval(s: String) = {
     Evaluator.visitExpr(
       Parser.expr.parse(s).get.value,
-      new Evaluator.Scope(None, None, None, Map("std" -> Ref(Evaluator.Scope.Std)))
+      new Scope(None, None, None, Map("std" -> Ref(Scope.Std)))
     )
   }
   def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
