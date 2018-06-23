@@ -6,7 +6,7 @@ object FileTests extends TestSuite{
   def eval(s: String) = {
     Evaluator.visitExpr(
       Parser.expr.parse(s).get.value,
-      new Evaluator.Scope(None, None, Map("std" -> Ref(Evaluator.Scope.Std)))
+      new Evaluator.Scope(None, None, None, Map("std" -> Ref(Evaluator.Scope.Std)))
     )
   }
   def check(expected: Value = Value.True)(implicit tp: utest.framework.TestPath) = {
@@ -32,8 +32,8 @@ object FileTests extends TestSuite{
 //    'merge - check()
     'null - check()
     'object - check()
-//    'oop - check()
-//    'oop_extra - check()
+    'oop - check()
+    'oop_extra - check()
     'parsing_edge_cases - check()
     'precedence - check()
 //    'recursive_function - check()

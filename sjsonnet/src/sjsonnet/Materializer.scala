@@ -11,7 +11,7 @@ object Materializer {
     case obj: Value.Obj =>
 
       def rec(current: Value.Obj): Seq[String] = {
-        current.value0.keys.toSeq ++ current.`super`.toSeq.flatMap(rec)
+        current.`super`.toSeq.flatMap(rec) ++ current.value0.keys.toSeq
       }
       val allKeys = rec(obj).distinct
       Js.Obj.from(allKeys.map{k => k -> apply(obj.value(k).calc)})

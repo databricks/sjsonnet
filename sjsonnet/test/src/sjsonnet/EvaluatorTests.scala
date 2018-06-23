@@ -4,7 +4,7 @@ import utest._
 
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
-    Evaluator.visitExpr(Parser.expr.parse(s).get.value, new Evaluator.Scope(None, None, Map.empty))
+    Evaluator.visitExpr(Parser.expr.parse(s).get.value, new Evaluator.Scope(None, None, None, Map.empty))
   }
   def tests = Tests{
     'arithmetic - {
@@ -68,7 +68,7 @@ object EvaluatorTests extends TestSuite{
       eval("""{[""+x]: x * x for x in [1, 2, 3]}["3"]""") ==> Value.Num(9)
       eval("""{local y = $["2"], [x]: if x == "1" then y else 0, for x in ["1", "2"]}["1"]""") ==> Value.Num(0)
     }
-    'supers - {
+    'super - {
       'implicit - {
 
         eval("({ x: 1, y: self.x } + { x: 2 }).y") ==> Value.Num(2)
@@ -83,6 +83,9 @@ object EvaluatorTests extends TestSuite{
 
         Materializer(eval("{ x: 1, y: self.x } + { x: 2, y: super.y + 1}")) ==>
           ujson.read("""{ "x": 2, "y": 3 }""")
+
+        Materializer(eval("{ x: 1 } + { x: 2, y: super.x } + { x: 3, z: super.x }")) ==>
+          ujson.read("""{ "x": 3, "y": 1, "z": 2 }""")
       }
     }
 
