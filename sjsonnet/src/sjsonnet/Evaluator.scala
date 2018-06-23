@@ -8,7 +8,7 @@ object Evaluator {
       Map(
         "assertEqual" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
             val x1 = Materializer(v1.calc)
             val x2 = Materializer(v2.calc)
@@ -18,28 +18,93 @@ object Evaluator {
         )),
         "toString" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
           })
         )),
         "codepoint" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Num(v1.calc.asInstanceOf[Value.Str].value.charAt(0).toInt)
           })
         )),
         "length" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
-            Value.Num(v1.calc.asInstanceOf[Value.Str].value.length)
+            Value.Num(
+              v1.calc match{
+                case Value.Str(s) => s.length
+                case Value.Arr(s) => s.length
+                case o: Value.Obj => o.getVisibleKeys().count(!_._2)
+              }
+            )
+          })
+        )),
+        "objectHas" -> ((
+          false,
+          "::",
+          (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
+            if (v1.calc.asInstanceOf[Value.Obj].getVisibleKeys().get(v2.calc.asInstanceOf[Value.Str].value) == Some(false)){
+              Value.True
+            } else Value.False
+          })
+        )),
+        "objectHasAll" -> ((
+          false,
+          "::",
+          (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
+            if (v1.calc.asInstanceOf[Value.Obj].getVisibleKeys().get(v2.calc.asInstanceOf[Value.Str].value).isDefined){
+              Value.True
+            } else Value.False
+          })
+        )),
+        "objectFields" -> ((
+          false,
+          "::",
+          (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Arr(
+              v1.calc.asInstanceOf[Value.Obj]
+                .getVisibleKeys()
+                .collect{case (k, false) => Ref(Value.Str(k))}
+                .toSeq
+            )
+          })
+        )),
+        "objectFieldsAll" -> ((
+          false,
+          "::",
+          (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Arr(
+              v1.calc.asInstanceOf[Value.Obj]
+                .getVisibleKeys()
+                .collect{case (k, _) => Ref(Value.Str(k))}
+                .toSeq
+            )
+          })
+        )),
+        "type" -> ((
+          false,
+          "::",
+          (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Str(
+              v1.calc match{
+                case Value.True | Value.False => "boolean"
+                case Value.Null => "null"
+                case _: Value.Obj => "object"
+                case _: Value.Arr => "array"
+                case _: Value.Func => "function"
+                case _: Value.Num => "number"
+                case _: Value.Str => "string"
+              }
+            )
           })
         )),
         "lines" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Str(
               Materializer.apply(v1.calc).asInstanceOf[ujson.Js.Arr]
@@ -51,7 +116,7 @@ object Evaluator {
         )),
         "format" -> ((
           false,
-          ":",
+          "::",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
             val formatStr = v1.calc.asInstanceOf[Value.Str].value
 

@@ -17,6 +17,25 @@ object Value{
   case class Arr(value: Seq[Ref]) extends Value
   case class Obj(value0: Map[String, (Boolean, String, (Obj, Option[Obj]) => Ref)],
                  `super`: Option[Obj]) extends Value{
+
+    def getVisibleKeys() = {
+      def rec(current: Value.Obj): Seq[(String, String)] = {
+        current.`super`.toSeq.flatMap(rec) ++ current.value0.map{case (k, (add, sep, f)) => (k, sep)}.toSeq
+      }
+
+      val mapping = collection.mutable.LinkedHashMap.empty[String, Boolean]
+      for ((k, sep) <- rec(this)){
+        (mapping.get(k), sep) match{
+          case (None, "::") => mapping(k) = true
+          case (None, _)    => mapping(k) = false
+
+          case (Some(false), "::") => mapping(k) = true
+          case (Some(true), ":::") => mapping(k) = false
+          case (Some(x), _) => mapping(k) = x
+        }
+      }
+      mapping
+    }
     val valueCache = collection.mutable.Map.empty[(String, Obj), Ref]
     def value(k: String, self: Obj = this) = valueCache.getOrElseUpdate(
       (k, self),
@@ -40,7 +59,7 @@ object Value{
                 }
               }
             case None => current.`super` match{
-              case None => ???
+              case None => throw new Exception("Unknown key: " + k)
               case Some(s) => rec(s, acc)
             }
           }

@@ -26,7 +26,7 @@ object FileTests extends TestSuite{
     'format - check()
     'functions - check()
 //    'import - check()
-//    'invariant - check()
+    'invariant - check()
 //    'invariant_manifest - check()
     'local - check()
 //    'merge - check()
@@ -43,7 +43,7 @@ object FileTests extends TestSuite{
     'sanity2 - check(Value.False)
     'shebang - check()
 //    "slice.sugar" - check()
-//    'std_all_hidden - check()
+    'std_all_hidden - check()
 //    'stdlib - check()
     'text_block - check()
 //    "tla.simple" - check()
@@ -52,3 +52,4 @@ object FileTests extends TestSuite{
     'verbatim_strings - check()
   }
 }
+
