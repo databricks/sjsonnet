@@ -1,8 +1,10 @@
 package sjsonnet
 
+import ammonite.ops.Path
+
 
 object Scope{
-
+  val Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd)
   val Std = Value.Obj(
     Map(
       "assertEqual" -> ((
@@ -175,10 +177,11 @@ object Scope{
   )
 }
 
-class Scope(val dollar0: Option[Value.Obj],
-            val self0: Option[Value.Obj],
-            val super0: Option[Value.Obj],
-            val bindings0: Map[String, Ref]){
+case class Scope(val dollar0: Option[Value.Obj],
+                 val self0: Option[Value.Obj],
+                 val super0: Option[Value.Obj],
+                 val bindings0: Map[String, Ref],
+                 val cwd: Path){
   def dollar = dollar0.get
   def self = self0.get
   val bindingCache = collection.mutable.Map.empty[String, Ref]
@@ -188,7 +191,8 @@ class Scope(val dollar0: Option[Value.Obj],
       dollar0,
       self0,
       super0,
-      bindings0 ++ traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}
+      bindings0 ++ traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))},
+      cwd
     )
   }
 }

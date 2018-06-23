@@ -4,9 +4,12 @@ import utest._
 
 object FileTests extends TestSuite{
   def eval(s: String) = {
-    Evaluator.visitExpr(
+    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)),
+      ammonite.ops.pwd / 'test_suite
+    )
+    new Evaluator(scope).visitExpr(
       Parser.expr.parse(s).get.value,
-      new Scope(None, None, None, Map("std" -> Ref(Scope.Std)))
+      scope
     )
   }
   def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
@@ -34,7 +37,7 @@ object FileTests extends TestSuite{
     'formatting_braces - checkGolden()
     'formatting_braces2 - checkGolden()
     'functions - check()
-//    'import - check()
+    'import - check()
     'invariant - check()
     'invariant_manifest - checkGolden()
     'local - check()

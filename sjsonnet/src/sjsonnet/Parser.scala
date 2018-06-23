@@ -156,8 +156,8 @@ object Parser{
     | "(" ~/ expr.map(Expr.Parened) ~ ")"
     | "if" ~/ ifElse
     | "function" ~/ function
-    | "import" ~/ string.map(Expr.Import)
     | "importstr" ~/ string.map(Expr.ImportStr)
+    | "import" ~/ string.map(Expr.Import)
     | "error" ~/ expr.map(Expr.Error)
     | assertExpr
     | (unaryop ~/ expr1).map(Expr.UnaryOp.tupled)

@@ -1,8 +1,10 @@
 package sjsonnet
 import Expr._
-object Evaluator {
-
-
+import ammonite.ops.{Path, RelPath}
+object Evaluator extends Evaluator(Scope.Empty)
+class Evaluator(originalScope: Scope) {
+  val imports = collection.mutable.Map.empty[Path, Value]
+  val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: => Scope): Value = expr match{
     case Null => Value.Null
     case Parened(inner) => visitExpr(inner, scope)
@@ -88,8 +90,26 @@ object Evaluator {
       lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
       visitExpr(returned, newScope)
 
-//    case Import(value) => expr
-//    case ImportStr(value) => expr
+    case Import(value) =>
+
+      val p = scope.cwd / RelPath(value)
+      imports.getOrElseUpdate(
+        p,
+        visitExpr(
+          Parser.expr.parse(ammonite.ops.read(p)).get.value,
+          originalScope.copy(cwd = p / ammonite.ops.up)
+        )
+      )
+
+
+    case ImportStr(value) =>
+      val p = scope.cwd / RelPath(value)
+      Value.Str(
+        importStrs.getOrElseUpdate(
+          p,
+          ammonite.ops.read(p)
+        )
+      )
     case Error(value) => throw new Exception(visitExpr(value, scope).asInstanceOf[Value.Str].value)
     case Apply(value, Args(args)) =>
       visitExpr(value, scope).asInstanceOf[Value.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
@@ -176,7 +196,8 @@ object Evaluator {
         scope.dollar0.orElse(Some(self)),
         Some(self),
         sup,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(self, sup))}
+        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(self, sup))},
+        scope.cwd
       )
 
 
@@ -208,14 +229,16 @@ object Evaluator {
         scope.dollar0,
         scope.self0,
         None,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}
+        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))},
+        scope.cwd
       )
 
       lazy val newScope: Scope = new Scope(
         scope.dollar0.orElse(Some(newSelf)),
         Some(newSelf),
         None,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}
+        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))},
+        scope.cwd
       )
 
       lazy val newBindings = visitBindings(
