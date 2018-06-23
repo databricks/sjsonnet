@@ -47,7 +47,7 @@ object FileTests extends TestSuite{
 //    'stdlib - check()
     'text_block - check()
 //    "tla.simple" - check()
-//    'unicode - check()
+    'unicode - check()
 //    'unparse - check()
     'verbatim_strings - check()
   }

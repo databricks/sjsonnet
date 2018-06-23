@@ -50,7 +50,8 @@ object Parser{
     (("e" | "E") ~ ("+" | "-").? ~~ CharsWhileIn('0' to '9')).?
   ).!.map(s => Expr.Num(s.toDouble))
 
-  val escape = P("\\" ~~ AnyChar.!).map{
+  val escape = P( escape0 | escape1 )
+  val escape0 = P("\\" ~~ !"u" ~~ AnyChar.!).map{
     case "\"" => "\""
     case "'" => "\'"
     case "\\" => "\\"
@@ -60,6 +61,9 @@ object Parser{
     case "n" => "\n"
     case "r" => "\r"
     case "t" => "\t"
+  }
+  val escape1 = P( "\\u" ~~ CharIn('0' to '9').repX(min=4, max=4).! ).map{
+    s => s.toInt.toChar.toString
   }
   val string: P[String] = P(
     "\"".~/ ~~ (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" |
