@@ -21,7 +21,11 @@ object Scope{
         false,
         "::",
         (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v1)) =>
-          Val.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
+          v1.calc match{
+            case Val.Str(s) => Val.Str(s)
+            case v =>
+              Val.Str(Materializer.apply(v).transform(new Renderer()).toString)
+          }
         }))
       )),
       "codepoint" -> ((
@@ -358,7 +362,108 @@ object Scope{
             }
           )
         }))
-      ))
+      )),
+      "map" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, f), (None, arr)) =>
+          Val.Arr(
+            arr.calc.asInstanceOf[Val.Arr].value.map{i =>
+              Ref(f.calc.asInstanceOf[Val.Func].value(Seq(None -> i)))
+            }
+          )
+        }))
+      )),
+      "mapWithKey" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, f), (None, arr)) =>
+          val allKeys = arr.calc.asInstanceOf[Val.Obj].getVisibleKeys()
+          Val.Obj(
+            allKeys.map{ k =>
+              k._1 -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(
+                f.calc.asInstanceOf[Val.Func].value(
+                  Seq(None -> Ref(Val.Str(k._1)), None -> arr.calc.asInstanceOf[Val.Obj].value(k._1))
+                )
+              )))
+            }.toMap,
+            None
+          )
+        }))
+      )),
+      "mapWithIndex" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, f), (None, arr)) =>
+          Val.Arr(
+            arr.calc.asInstanceOf[Val.Arr].value.zipWithIndex.map{ case (i, i2) =>
+              Ref(f.calc.asInstanceOf[Val.Func].value(Seq(None -> i, None -> Ref(Val.Num(i2)))))
+            }
+          )
+        }))
+      )),
+      "filterMap" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, f1), (None, f2), (None, arr)) =>
+          Val.Arr(
+            arr.calc.asInstanceOf[Val.Arr].value.filter{i =>
+              f1.calc.asInstanceOf[Val.Func].value(Seq(None -> i)) == Val.True
+            }.map{i =>
+              Ref(f2.calc.asInstanceOf[Val.Func].value(Seq(None -> i)))
+            }
+          )
+        }))
+      )),
+      "substr" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, s), (None, start), (None, end)) =>
+          Val.Str(s.calc.asInstanceOf[Val.Str].value.substring(
+            start.calc.asInstanceOf[Val.Num].value.toInt,
+            end.calc.asInstanceOf[Val.Num].value.toInt + 1
+          ))
+        }))
+      )),
+      "startsWith" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, s), (None, snip)) =>
+          if (s.calc.asInstanceOf[Val.Str].value.startsWith(snip.calc.asInstanceOf[Val.Str].value))
+            Val.True
+          else
+            Val.False
+        }))
+      )),
+      "endsWith" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, s), (None, snip)) =>
+          if (s.calc.asInstanceOf[Val.Str].value.endsWith(snip.calc.asInstanceOf[Val.Str].value))
+            Val.True
+          else
+            Val.False
+        }))
+      )),
+      "char" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, c)) =>
+          Val.Str(c.calc.asInstanceOf[Val.Num].value.toInt.toChar.toString)
+        }))
+      )),
+      "strReplace" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, s), (None, a), (None, b)) =>
+          Val.Str(
+            s.calc.asInstanceOf[Val.Str].value.replace(
+              a.calc.asInstanceOf[Val.Str].value,
+              b.calc.asInstanceOf[Val.Str].value
+            )
+          )
+        }))
+      )),
     ),
     None
   )
