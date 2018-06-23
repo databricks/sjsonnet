@@ -8,6 +8,7 @@ object Evaluator {
       Map(
         "assertEqual" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
             val x1 = Materializer(v1.calc)
             val x2 = Materializer(v2.calc)
@@ -17,24 +18,28 @@ object Evaluator {
         )),
         "toString" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
           })
         )),
         "codepoint" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Num(v1.calc.asInstanceOf[Value.Str].value.charAt(0).toInt)
           })
         )),
         "length" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Num(v1.calc.asInstanceOf[Value.Str].value.length)
           })
         )),
         "lines" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1)) =>
             Value.Str(
               Materializer.apply(v1.calc).asInstanceOf[ujson.Js.Arr]
@@ -46,6 +51,7 @@ object Evaluator {
         )),
         "format" -> ((
           false,
+          ":",
           (self: Value.Obj, sup: Option[Value.Obj]) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
             val formatStr = v1.calc.asInstanceOf[Value.Str].value
 
@@ -255,11 +261,11 @@ object Evaluator {
       lazy val newSelf = Value.Obj(
         value.flatMap {
           case Member.Field(fieldName, plus, None, sep, rhs) =>
-            Some(visitFieldName(fieldName, scope) -> (plus, (self: Value.Obj, sup: Option[Value.Obj]) => {
+            Some(visitFieldName(fieldName, scope) -> (plus, sep, (self: Value.Obj, sup: Option[Value.Obj]) => {
               Ref(visitExpr(rhs, makeNewScope(self, sup)))
             }))
           case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-            Some(visitFieldName(fieldName, scope) -> (false, (self: Value.Obj, sup: Option[Value.Obj]) =>
+            Some(visitFieldName(fieldName, scope) -> (false, sep, (self: Value.Obj, sup: Option[Value.Obj]) =>
               Ref(visitMethod(makeNewScope(self, sup), rhs, argSpec))
             ))
 
@@ -294,7 +300,7 @@ object Evaluator {
         visitComp(first :: rest.toList, Seq(compScope))
           .map(s =>
             visitExpr(key, s).asInstanceOf[Value.Str].value ->
-              (false, (self: Value.Obj, sup: Option[Value.Obj]) => Ref(visitExpr(value, s)))
+              (false, ":", (self: Value.Obj, sup: Option[Value.Obj]) => Ref(visitExpr(value, s)))
           )
           .toMap,
         None

@@ -15,7 +15,7 @@ object Value{
   case class Str(value: String) extends Value
   case class Num(value: Double) extends Value
   case class Arr(value: Seq[Ref]) extends Value
-  case class Obj(value0: Map[String, (Boolean, (Obj, Option[Obj]) => Ref)],
+  case class Obj(value0: Map[String, (Boolean, String, (Obj, Option[Obj]) => Ref)],
                  `super`: Option[Obj]) extends Value{
     val valueCache = collection.mutable.Map.empty[(String, Obj), Ref]
     def value(k: String, self: Obj = this) = valueCache.getOrElseUpdate(
@@ -23,7 +23,7 @@ object Value{
       {
         def rec(current: Obj, acc: List[Ref]): Ref = {
           current.value0.get(k) match{
-            case Some((add, ref)) =>
+            case Some((add, _, ref)) =>
               if (!add) {
                 Ref(acc.iterator.map(_.calc).foldLeft(ref(self, current.`super`).calc){
                   case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)

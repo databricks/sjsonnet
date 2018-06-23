@@ -88,6 +88,31 @@ object EvaluatorTests extends TestSuite{
           ujson.read("""{ "x": 3, "y": 1, "z": 2 }""")
       }
     }
+    'hidden - {
+      Materializer(eval("{i::1 }")) ==>
+        ujson.read("""{}""")
+
+      Materializer(eval("{i:: 1} + {i: 2}")) ==>
+        ujson.read("""{}""")
+
+      Materializer(eval("{i: 1} + {i:: 2}")) ==>
+        ujson.read("""{}""")
+
+      Materializer(eval("{i:: 1} + {i:: 2}")) ==>
+        ujson.read("""{}""")
+
+      Materializer(eval("{i:::1} + {i::2}")) ==>
+        ujson.read("""{}""")
+
+      Materializer(eval("{i::1} + {i:::2}")) ==>
+        ujson.read("""{"i": 2}""")
+
+      Materializer(eval("{i:1} + {i:::2}")) ==>
+        ujson.read("""{"i": 2}""")
+
+      Materializer(eval("local M = {x+: self.i, i :: 1}; { x: 1 } + M")) ==>
+        ujson.read("""{ "x": 2 }""")
+    }
 
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
