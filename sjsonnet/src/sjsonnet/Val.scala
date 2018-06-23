@@ -1,25 +1,25 @@
 package sjsonnet
 
 object Ref{
-  def apply(calc0: => Value) = new Ref(calc0)
+  def apply(calc0: => Val) = new Ref(calc0)
 }
-class Ref(calc0: => Value){
+class Ref(calc0: => Val){
   lazy val calc = calc0
-  def force(self: Option[Value.Obj]): Value = calc
+  def force(self: Option[Val.Obj]): Val = calc
 }
-sealed trait Value
-object Value{
-  case object True extends Value
-  case object False extends Value
-  case object Null extends Value
-  case class Str(value: String) extends Value
-  case class Num(value: Double) extends Value
-  case class Arr(value: Seq[Ref]) extends Value
+sealed trait Val
+object Val{
+  case object True extends Val
+  case object False extends Val
+  case object Null extends Val
+  case class Str(value: String) extends Val
+  case class Num(value: Double) extends Val
+  case class Arr(value: Seq[Ref]) extends Val
   case class Obj(value0: Map[String, (Boolean, String, (Obj, Option[Obj]) => Ref)],
-                 `super`: Option[Obj]) extends Value{
+                 `super`: Option[Obj]) extends Val{
 
     def getVisibleKeys() = {
-      def rec(current: Value.Obj): Seq[(String, String)] = {
+      def rec(current: Val.Obj): Seq[(String, String)] = {
         current.`super`.toSeq.flatMap(rec) ++ current.value0.map{case (k, (add, sep, f)) => (k, sep)}.toSeq
       }
 
@@ -45,15 +45,15 @@ object Value{
             case Some((add, _, ref)) =>
               if (!add) {
                 Ref(acc.iterator.map(_.calc).foldLeft(ref(self, current.`super`).calc){
-                  case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
-                  case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
+                  case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
+                  case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
                 })
               }
               else {
                 current.`super` match{
                   case None => Ref(acc.iterator.map(_.calc).foldLeft(ref(self, current.`super`).calc){
-                    case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
-                    case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
+                    case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
+                    case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
                   })
                   case Some(s) => rec(s, ref(self, current.`super`) :: acc)
                 }
@@ -68,5 +68,5 @@ object Value{
       }
     )
   }
-  case class Func(value: Seq[(Option[String], Ref)] => Value) extends Value
+  case class Func(value: Seq[(Option[String], Ref)] => Val) extends Val
 }
