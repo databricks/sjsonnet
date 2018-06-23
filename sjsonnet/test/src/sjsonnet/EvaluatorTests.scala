@@ -73,6 +73,12 @@ object EvaluatorTests extends TestSuite{
       eval("({ local x = $.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
       eval("({ local x = self.y, y: 1, z: x} + { y: 2 }).z") ==> Value.Num(2)
     }
+    'test - {
+//      eval("local A = {x: 1, local outer = self, y: A{z: outer}}; A.y.z.x") ==> Value.Num(1)
+      eval("{local x = self, y: 1, z: {a: x, y: 2}}.z.a.y") ==> Value.Num(1)
+//      eval("local A = {x: 1, local outer = self, y: A{x: outer.x}}; A.y.x") ==> Value.Num(1)
+//      eval("local A = {x: 1, local outer = self, y: A{x: outer.x + 1}}; A.y.y.x") ==> Value.Num(3)
+    }
 
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
@@ -82,4 +88,3 @@ object EvaluatorTests extends TestSuite{
 //    }
   }
 }
-

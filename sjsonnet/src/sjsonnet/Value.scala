@@ -15,6 +15,9 @@ object Value{
   case class Str(value: String) extends Value
   case class Num(value: Double) extends Value
   case class Arr(value: Seq[Ref]) extends Value
-  case class Obj(value: Map[String, (Boolean, Obj => Ref)]) extends Value
+  case class Obj(value0: Map[String, (Boolean, Obj => Ref)]) extends Value{
+    val valueCache = collection.mutable.Map.empty[String, Ref]
+    def value(k: String) = valueCache.getOrElseUpdate(k, value0(k)._2(this))
+  }
   case class Func(value: Seq[(Option[String], Ref)] => Value) extends Value
 }

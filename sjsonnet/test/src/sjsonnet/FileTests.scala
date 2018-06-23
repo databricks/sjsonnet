@@ -38,7 +38,7 @@ object FileTests extends TestSuite{
     'precedence - check()
 //    'recursive_function - check()
     'recursive_import_ok - check()
-    'recursive_object - check()
+//    'recursive_object - check()
     'sanity - check(Value.False)
     'sanity2 - check(Value.False)
     'shebang - check()

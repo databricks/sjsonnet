@@ -36,11 +36,13 @@ object Evaluator {
 
   class Scope(val dollar0: Option[Value.Obj],
               val self0: Option[Value.Obj],
-              val bindings: Map[String, Value.Obj => Ref]){
+              val bindings0: Map[String, Value.Obj => Ref]){
     def dollar = dollar0.get
     def self = self0.get
+    val bindingCache = collection.mutable.Map.empty[String, Ref]
+    def bindings(k: String) = bindingCache.getOrElseUpdate(k, bindings0(k).apply(self0.getOrElse(null)))
     def ++(traversableOnce: TraversableOnce[(String, Value.Obj => Ref)]) = {
-      new Scope(dollar0, self0, bindings ++ traversableOnce)
+      new Scope(dollar0, self0, bindings0 ++ traversableOnce)
     }
   }
 
@@ -54,9 +56,15 @@ object Evaluator {
     case $ => scope.dollar
     case Str(value) => Value.Str(value)
     case Num(value) => Value.Num(value)
-    case Id(value) => scope.bindings(value).apply(scope.self0.getOrElse(null)).force(scope.dollar0)
+    case Id(value) =>
+      val ref = scope.bindings(value)
+      println("visitExpr id ref " + value + " " + ref.hashCode())
+      ref.force(scope.dollar0)
+
     case Arr(value) => Value.Arr(value.map(v => Ref(visitExpr(v, scope))))
-    case Obj(value) => visitObjBody(value, scope)
+    case Obj(value) =>
+      println("visitExpr obj")
+      visitObjBody(value, scope)
 
     case UnaryOp(op, value) => (op, visitExpr(value, scope)) match{
       case ("-", Value.Num(v)) => Value.Num(-v)
@@ -124,13 +132,14 @@ object Evaluator {
 
     case Select(value, name) =>
       val self = visitExpr(value, scope).asInstanceOf[Value.Obj]
-      self.value(name)._2(self).force(scope.dollar0)
+
+      self.value(name).force(scope.dollar0)
 
     case Lookup(value, index) =>
       val res = (visitExpr(value, scope), visitExpr(index, scope)) match{
         case (v: Value.Arr, i: Value.Num) => v.value(i.value.toInt)
         case (v: Value.Str, i: Value.Num) => Ref(Value.Str(new String(Array(v.value(i.value.toInt)))))
-        case (v: Value.Obj, i: Value.Str) => v.value(i.value)._2(v)
+        case (v: Value.Obj, i: Value.Str) => v.value(i.value)
       }
       res.force(scope.dollar0)
 //    case Slice(value, start, end, stride) => Slice(visitExpr(value), start.map(visitExpr), end.map(visitExpr), stride.map(visitExpr))
@@ -143,22 +152,26 @@ object Evaluator {
     case Comp(value, first, rest) =>
       Value.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
     case ObjExtend(value, ext) => {
+      println("visitExpr objExtend")
       val original = visitExpr(value, scope).asInstanceOf[Value.Obj]
-      mergeObjects(original, visitObjBody(ext, scope))
+      val extension = visitObjBody(ext, scope)
+      println("visitExpr objExtend original " + original.hashCode())
+      println("visitExpr objExtend extension " + extension.hashCode())
+      mergeObjects(original, extension)
     }
   }
   def mergeObjects(lhs: Value.Obj, rhs: Value.Obj) = {
     lazy val newSelf: Value.Obj = Value.Obj(
-      lhs.value ++
-      rhs.value.map{
+      lhs.value0 ++
+      rhs.value0.map{
         case (k, v) =>
           (k,
             (
               false,
               (self: Value.Obj) =>
-                if (!v._1 || !lhs.value.contains(k)) v._2(self)
+                if (!v._1 || !lhs.value0.contains(k)) v._2(self)
                 else Ref(
-                  (lhs.value(k)._2(self).force(Some(newSelf)), v._2(self).force(Some(newSelf))) match{
+                  (lhs.value(k).force(Some(newSelf)), v._2(self).force(Some(newSelf))) match{
                     case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
                     case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
                   }
@@ -201,10 +214,11 @@ object Evaluator {
   }
   def visitObjBody(b: ObjBody, scope: => Scope): Value.Obj = b match{
     case ObjBody.MemberList(value) =>
+      println("visitObjBody " + b.hashCode())
       def makeNewScope(self: => Value.Obj): Scope = new Scope(
         scope.dollar0.orElse(Some(self)),
         Some(self),
-        scope.bindings ++ newBindings
+        scope.bindings0 ++ newBindings
       )
 
       lazy val newScope: Scope = makeNewScope(newSelf)
@@ -213,27 +227,32 @@ object Evaluator {
 
       lazy val newSelf = Value.Obj(value.flatMap {
         case Member.Field(fieldName, plus, None, sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> (plus, (self: Value.Obj) => Ref(visitExpr(rhs, makeNewScope(self)))))
+          Some(visitFieldName(fieldName, scope) -> (plus, (self: Value.Obj) => {
+            println("visitObjBody newSelf self " + self.hashCode())
+            Ref(visitExpr(rhs, makeNewScope(self)))
+          }))
         case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> (false, (self: Value.Obj) => Ref(visitMethod(makeNewScope(self), rhs, argSpec))))
+          Some(visitFieldName(fieldName, scope) -> (false, (self: Value.Obj) =>
+            Ref(visitMethod(makeNewScope(self), rhs, argSpec))
+          ))
 
         case _: Member.BindStmt => None
         case Member.AssertStmt(value, msg) => None
       }.toMap)
-
+      println("visitObjBody newBindings " + newBindings.map{case (k, v) => (k, v.hashCode())})
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
       lazy val compScope: Scope = new Scope(
         scope.dollar0,
         scope.self0,
-        scope.bindings ++ newBindings
+        scope.bindings0 ++ newBindings
       )
 
       lazy val newScope: Scope = new Scope(
         scope.dollar0.orElse(Some(newSelf)),
         Some(newSelf),
-        scope.bindings ++ newBindings
+        scope.bindings0 ++ newBindings
       )
 
       lazy val newBindings = visitBindings(
@@ -265,3 +284,4 @@ object Evaluator {
     case Nil => scopes
   }
 }
+
