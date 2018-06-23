@@ -77,6 +77,10 @@ object EvaluatorTests extends TestSuite{
       eval("local A = {x: 1, local outer = self, y: A{x: outer.x}}; A.y.x") ==> Value.Num(1)
       eval("local A = {x: 1, local outer = self, y: A{x: outer.x + 1}}; A.y.y.x") ==> Value.Num(3)
     }
+    'super2 - {
+      Materializer(eval("{ x: 1, y: self.x } + { x: 2, y: super.y + 1, z: super.y }")) ==>
+        ujson.read("""{ "x": 2, "y": 3, "z": 2 }""")
+    }
 
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")

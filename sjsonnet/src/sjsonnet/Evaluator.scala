@@ -56,7 +56,8 @@ object Evaluator {
             Value.Str(Format.format(formatStr, items))
           })
         ))
-      )
+      ),
+      None
     )
   }
 
@@ -78,7 +79,7 @@ object Evaluator {
     case True => Value.True
     case False => Value.False
     case Self => scope.self
-    case Super => ???
+    case Super => scope.self.`super`.get
     case $ => scope.dollar
     case Str(value) => Value.Str(value)
     case Num(value) => Value.Num(value)
@@ -127,11 +128,11 @@ object Evaluator {
             case (Value.Num(l), ">=", Value.Num(r)) => if (l >= r) Value.True else Value.False
             case (l, "==", r) => if (Materializer(l) == Materializer(r)) Value.True else Value.False
             case (l, "!=", r) => if (Materializer(l) != Materializer(r)) Value.True else Value.False
-            case (Value.Str(l), "in", Value.Obj(r)) => if (r.contains(l)) Value.True else Value.False
+            case (Value.Str(l), "in", Value.Obj(r, _)) => if (r.contains(l)) Value.True else Value.False
             case (Value.Num(l), "&", Value.Num(r)) => Value.Num(l.toLong & r.toLong)
             case (Value.Num(l), "^", Value.Num(r)) => Value.Num(l.toLong ^ r.toLong)
             case (Value.Num(l), "|", Value.Num(r)) => Value.Num(l.toLong | r.toLong)
-            case (Value.Obj(l), "+", Value.Obj(r)) => mergeObjects(Value.Obj(l), Value.Obj(r))
+            case (l: Value.Obj, "+", r: Value.Obj) => mergeObjects(l, r)
             case (Value.Arr(l), "+", Value.Arr(r)) => Value.Arr(l ++ r)
           }
         }
@@ -180,26 +181,13 @@ object Evaluator {
     }
   }
   def mergeObjects(lhs: Value.Obj, rhs: Value.Obj) = {
-    lazy val newSelf: Value.Obj = Value.Obj(
-      lhs.value0 ++
-      rhs.value0.map{
-        case (k, v) =>
-          (k,
-            (
-              false,
-              (self: Value.Obj) =>
-                if (!v._1 || !lhs.value0.contains(k)) v._2(self)
-                else Ref(
-                  (lhs.value(k).force(Some(newSelf)), v._2(self).force(Some(newSelf))) match{
-                    case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
-                    case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
-                  }
-                )
-            )
-          )
+    def rec(current: Value.Obj): Value.Obj = {
+      current.`super` match{
+        case None => Value.Obj(current.value0, Some(lhs))
+        case Some(x) => Value.Obj(current.value0, Some(rec(x)))
       }
-    )
-    newSelf
+    }
+    rec(rhs)
   }
 
 
@@ -239,23 +227,25 @@ object Evaluator {
         scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(self))}
       )
 
-      lazy val newScope: Scope = makeNewScope(newSelf)
 
       lazy val newBindings = visitBindings(value.collect{case Member.BindStmt(b) => b}, self => makeNewScope(self))
 
-      lazy val newSelf = Value.Obj(value.flatMap {
-        case Member.Field(fieldName, plus, None, sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> (plus, (self: Value.Obj) => {
-            Ref(visitExpr(rhs, makeNewScope(self)))
-          }))
-        case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-          Some(visitFieldName(fieldName, scope) -> (false, (self: Value.Obj) =>
-            Ref(visitMethod(makeNewScope(self), rhs, argSpec))
-          ))
+      lazy val newSelf = Value.Obj(
+        value.flatMap {
+          case Member.Field(fieldName, plus, None, sep, rhs) =>
+            Some(visitFieldName(fieldName, scope) -> (plus, (self: Value.Obj) => {
+              Ref(visitExpr(rhs, makeNewScope(self)))
+            }))
+          case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
+            Some(visitFieldName(fieldName, scope) -> (false, (self: Value.Obj) =>
+              Ref(visitMethod(makeNewScope(self), rhs, argSpec))
+            ))
 
-        case _: Member.BindStmt => None
-        case Member.AssertStmt(value, msg) => None
-      }.toMap)
+          case _: Member.BindStmt => None
+          case Member.AssertStmt(value, msg) => None
+        }.toMap,
+        None
+      )
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
@@ -281,7 +271,8 @@ object Evaluator {
           .map(s =>
             visitExpr(key, s).asInstanceOf[Value.Str].value -> (false, (self: Value.Obj) => Ref(visitExpr(value, s)))
           )
-          .toMap
+          .toMap,
+        None
       )
 
       newSelf

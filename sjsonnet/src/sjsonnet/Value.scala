@@ -15,9 +15,39 @@ object Value{
   case class Str(value: String) extends Value
   case class Num(value: Double) extends Value
   case class Arr(value: Seq[Ref]) extends Value
-  case class Obj(value0: Map[String, (Boolean, Obj => Ref)]) extends Value{
+  case class Obj(value0: Map[String, (Boolean, Obj => Ref)],
+                 `super`: Option[Obj]) extends Value{
     val valueCache = collection.mutable.Map.empty[String, Ref]
-    def value(k: String) = valueCache.getOrElseUpdate(k, value0(k)._2(this))
+    def value(k: String) = valueCache.getOrElseUpdate(
+      k,
+      {
+        def rec(current: Obj, acc: List[Ref]): Ref = {
+          current.value0.get(k) match{
+            case Some((add, ref)) =>
+              if (!add) {
+                Ref(acc.iterator.map(_.calc).foldLeft(ref(this).calc){
+                  case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
+                  case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
+                })
+              }
+              else {
+                current.`super` match{
+                  case None => Ref(acc.iterator.map(_.calc).foldLeft(ref(this).calc){
+                    case (Value.Str(l), Value.Str(r)) => Value.Str(l + r)
+                    case (Value.Num(l), Value.Num(r)) => Value.Num(l + r)
+                  })
+                  case Some(s) => rec(s, ref(this) :: acc)
+                }
+              }
+            case None => current.`super` match{
+              case None => ???
+              case Some(s) => rec(s, acc)
+            }
+          }
+        }
+        rec(this, Nil)
+      }
+    )
   }
   case class Func(value: Seq[(Option[String], Ref)] => Value) extends Value
 }

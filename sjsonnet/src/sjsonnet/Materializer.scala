@@ -8,6 +8,12 @@ object Materializer {
     case Value.Num(n) => Js.Num(n)
     case Value.Str(s) => Js.Str(s)
     case Value.Arr(xs) => Js.Arr.from(xs.map(x => apply(x.calc)))
-    case obj @ Value.Obj(kvs) => Js.Obj.from(kvs.mapValues(x => apply(x._2(obj).calc)))
+    case obj: Value.Obj =>
+
+      def rec(current: Value.Obj): Seq[String] = {
+        current.value0.keys.toSeq ++ current.`super`.toSeq.flatMap(rec)
+      }
+      val allKeys = rec(obj).distinct
+      Js.Obj.from(allKeys.map{k => k -> apply(obj.value(k).calc)})
   }
 }
