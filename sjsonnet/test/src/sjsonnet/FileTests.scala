@@ -44,7 +44,7 @@ object FileTests extends TestSuite{
     'sanity - check(ujson.Js.False)
     'sanity2 - check(ujson.Js.False)
     'shebang - check()
-//    "slice.sugar" - check()
+    "slice.sugar" - check()
     'std_all_hidden - check()
 //    'stdlib - check()
     'text_block - check()

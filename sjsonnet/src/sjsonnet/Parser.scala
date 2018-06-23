@@ -191,7 +191,7 @@ object Parser{
   val fieldname = P( id.map(Expr.FieldName.Fixed) | string.map(Expr.FieldName.Fixed) | "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]" )
   val assertStmt = P( "assert" ~/ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
   val bind = P( id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
-  val args = P( ((id ~ "=").? ~ expr).rep(sep = ","~/) ~ ",".? ).map(Expr.Args)
+  val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).map(Expr.Args)
 
   val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).map(Expr.Params)
 
