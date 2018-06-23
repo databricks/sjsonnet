@@ -168,18 +168,21 @@ class Evaluator(originalScope: Scope) {
   }
 
   def visitMethod(scope: Scope, rhs: Expr, argSpec: Params) = {
-    Val.Func { args =>
-      lazy val newScope: Scope =
-        scope ++
-        argSpec.args.collect{
-          case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(default, newScope)))
-        } ++
-        args.zipWithIndex.map{
-          case ((Some(name), v), _) => (name, (self: Val.Obj, sup: Option[Val.Obj]) => v)
-          case ((None, v), i) => (argSpec.args(i)._1, (self: Val.Obj, sup: Option[Val.Obj]) => v)
-        }
-      visitExpr(rhs, newScope)
-    }
+    Val.Func (
+      argSpec.args.length,
+      { args =>
+        lazy val newScope: Scope =
+          scope ++
+          argSpec.args.collect{
+            case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(default, newScope)))
+          } ++
+          args.zipWithIndex.map{
+            case ((Some(name), v), _) => (name, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+            case ((None, v), i) => (argSpec.args(i)._1, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+          }
+        visitExpr(rhs, newScope)
+      }
+    )
   }
   def visitBindings(bindings: Seq[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
 

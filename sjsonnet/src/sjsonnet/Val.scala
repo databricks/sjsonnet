@@ -68,5 +68,5 @@ object Val{
       }
     )
   }
-  case class Func(value: Seq[(Option[String], Ref)] => Val) extends Val
+  case class Func(length: Int, value: Seq[(Option[String], Ref)] => Val) extends Val
 }
