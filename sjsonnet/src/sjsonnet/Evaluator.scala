@@ -1,7 +1,9 @@
 package sjsonnet
 import Expr._
 object Evaluator {
+
   object Scope{
+
     val Std = Value.Obj(
       Map(
         "assertEqual" -> ((
@@ -19,6 +21,18 @@ object Evaluator {
             Value.Str(Materializer.apply(v1.calc).transform(new Renderer()).toString)
           })
         )),
+        "codepoint" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Num(v1.calc.asInstanceOf[Value.Str].value.charAt(0).toInt)
+          })
+        )),
+        "length" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
+            Value.Num(v1.calc.asInstanceOf[Value.Str].value.length)
+          })
+        )),
         "lines" -> ((
           false,
           (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1)) =>
@@ -28,6 +42,18 @@ object Evaluator {
                 .map{case ujson.Js.Str(s) => s + "\n"}
                 .mkString
             )
+          })
+        )),
+        "format" -> ((
+          false,
+          (self: Value.Obj) => Ref(Value.Func{case Seq((None, v1), (None, v2)) =>
+            val formatStr = v1.calc.asInstanceOf[Value.Str].value
+
+            val items = Materializer(v2.calc) match{
+              case x: ujson.Js.Arr => x.value
+              case x => Seq(x)
+            }
+            Value.Str(Format.format(formatStr, items))
           })
         ))
       )
@@ -84,6 +110,7 @@ object Evaluator {
             case (Value.Num(l), "/", Value.Num(r)) => Value.Num(l / r)
             case (Value.Num(l), "%", Value.Num(r)) => Value.Num(l % r)
             case (Value.Num(l), "+", Value.Num(r)) => Value.Num(l + r)
+            case (Value.Str(l), "%", r) => Value.Str(Format.format(l, Materializer.apply(r)))
             case (Value.Str(l), "+", Value.Str(r)) => Value.Str(l + r)
             case (Value.Str(l), "<", Value.Str(r)) => if (l < r) Value.True else Value.False
             case (Value.Str(l), ">", Value.Str(r)) => if (l > r) Value.True else Value.False

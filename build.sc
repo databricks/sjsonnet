@@ -6,7 +6,8 @@ object sjsonnet extends ScalaModule{
     ivy"com.lihaoyi::fastparse:1.0.0",
     ivy"com.lihaoyi::pprint:0.5.3",
     ivy"com.lihaoyi::ammonite-ops:1.1.2",
-    ivy"com.lihaoyi::ujson:0.6.6"
+    ivy"com.lihaoyi::ujson:0.6.6",
+    ivy"org.python:jython-standalone:2.7.1b3"
   )
   object test extends Tests{
     def ivyDeps = Agg(ivy"com.lihaoyi::utest:0.6.4")
