@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.io.StringWriter
+import java.util.Base64
 
 import ammonite.ops.Path
 
@@ -575,6 +576,110 @@ object Scope{
               .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
               .mkString
           )
+        }))
+      )),
+      "manifestXmlJsonml" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          import scalatags.Text.all._
+
+
+          def rec(v: ujson.Js): Frag = {
+            v match {
+              case ujson.Js.Str(s) => s
+              case ujson.Js.Arr(Seq(ujson.Js.Str(t), attrs: ujson.Js.Obj, children@_*)) =>
+                tag(t)(
+                  attrs.value.map { case (k, ujson.Js.Str(v)) => attr(k) := v }.toSeq,
+                  children.map(rec)
+                )
+              case ujson.Js.Arr(Seq(ujson.Js.Str(t), children@_*)) =>
+                tag(t)(children.map(rec))
+            }
+          }
+
+          Val.Str(rec(Materializer(v0.calc)).render)
+        }))
+      )),
+
+      "base64" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          Val.Str(
+            v0.calc match{
+              case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
+              case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.calc.asInstanceOf[Val.Num].value.toByte).toArray)
+            }
+          )
+        }))
+      )),
+      "base64Decode" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          Val.Str(
+            v0.calc match{
+              case Val.Str(value) => new String(Base64.getDecoder().decode(value))
+            }
+          )
+        }))
+      )),
+      "base64DecodeBytes" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          v0.calc match{
+            case Val.Str(value) =>
+              Val.Arr(Base64.getDecoder().decode(value).map(i => Ref(Val.Num(i))))
+          }
+        }))
+      )),
+      "sort" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val Val.Arr(vs0) = v0.calc
+          val vs = vs0.map(_.calc)
+          Val.Arr(
+
+            if (vs.forall(_.isInstanceOf[Val.Str])){
+              vs.map(_.asInstanceOf[Val.Str]).sortBy(_.value).map(Ref(_))
+            }else if (vs.forall(_.isInstanceOf[Val.Num])){
+              vs.map(_.asInstanceOf[Val.Num]).sortBy(_.value).map(Ref(_))
+            }else {
+              ???
+            }
+          )
+        }))
+      )),
+      "uniq" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val ujson.Js.Arr(vs) = Materializer(v0.calc)
+          val out = collection.mutable.Buffer.empty[ujson.Js]
+          for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+          Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
+        }))
+      )),
+      "set" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val ujson.Js.Arr(vs0) = Materializer(v0.calc)
+          val vs =
+            if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+              vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+            }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+              vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+            }else ???
+
+          val out = collection.mutable.Buffer.empty[ujson.Js]
+          for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+          Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
         }))
       )),
     ),
