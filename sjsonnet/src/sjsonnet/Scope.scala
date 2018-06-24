@@ -1,5 +1,7 @@
 package sjsonnet
 
+import java.io.StringWriter
+
 import ammonite.ops.Path
 
 
@@ -502,7 +504,7 @@ object Scope{
       "flattenArrays" -> ((
         false,
         "::",
-        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, xs)) =>
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, xs)) =>
           val out = collection.mutable.Buffer.empty[Ref]
           for(x <- xs.calc.asInstanceOf[Val.Arr].value){
             x.calc match{
@@ -516,7 +518,7 @@ object Scope{
       "manifestIni" -> ((
         false,
         "::",
-        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, v0)) =>
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
           val v = Materializer(v0.calc)
           def sect(x: ujson.Js.Obj) = {
             x.value.flatMap{
@@ -529,6 +531,50 @@ object Scope{
               x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
             )
           Val.Str(lines.flatMap(Seq(_, "\n")).mkString)
+        }))
+      )),
+      "escapeStringJson" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val v = v0.calc.asInstanceOf[Val.Str].value
+          val out = new StringWriter()
+          ujson.Renderer.escape(out, v, unicode = true)
+          Val.Str(out.toString)
+        }))
+      )),
+      "escapeStringBash" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val v = v0.calc.asInstanceOf[Val.Str].value
+          Val.Str("'" + v.replace("'", """'"'"'""") + "'")
+        }))
+      )),
+      "escapeStringDollars" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          val v = v0.calc.asInstanceOf[Val.Str].value
+          Val.Str(v.replace("$", "$$"))
+        }))
+      )),
+      "manifestPython" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          Val.Str(Materializer(v0.calc).transform(new PythonRenderer()).toString)
+        }))
+      )),
+      "manifestPythonVars" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v0)) =>
+          Val.Str(
+            Materializer(v0.calc).obj
+              .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
+              .mkString
+          )
         }))
       )),
     ),

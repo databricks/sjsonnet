@@ -3,6 +3,36 @@ import java.io.StringWriter
 
 import ujson.{ArrVisitor, BaseRenderer, ObjVisitor, Renderer}
 
+class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
+                     indent: Int = -1) extends BaseRenderer(out, indent){
+
+  override def visitNull(index: Int) = {
+    flushBuffer()
+    out.append("None")
+    out
+  }
+
+  override def visitFalse(index: Int) = {
+    flushBuffer()
+    out.append("False")
+    out
+  }
+
+  override def visitTrue(index: Int) = {
+    flushBuffer()
+    out.append("True")
+    out
+  }
+
+  override val colonSnippet = ": "
+  override def flushBuffer() = {
+    if (commaBuffered) {
+      commaBuffered = false
+      out.append(", ")
+      renderIndent()
+    }
+  }
+}
 class Renderer(out: StringWriter = new java.io.StringWriter(),
                indent: Int = -1) extends BaseRenderer(out, indent){
   override def visitNumRaw(d: Double, index: Int) = {
