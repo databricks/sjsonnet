@@ -115,6 +115,7 @@ object Scope{
           Val.Str(
             Materializer.apply(v1.calc).asInstanceOf[ujson.Js.Arr]
               .value
+              .filter(_ != ujson.Js.Null)
               .map{case ujson.Js.Str(s) => s + "\n"}
               .mkString
           )
@@ -139,7 +140,20 @@ object Scope{
         (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(3, {case Seq((None, func), (None, cases), (None, start)) =>
           var current = start.calc
           for(item <- cases.calc.asInstanceOf[Val.Arr].value){
-            current = func.calc.asInstanceOf[Val.Func].value(Seq((None, Ref(current)), (None, item)))
+            val c = current
+            current = func.calc.asInstanceOf[Val.Func].value(Seq((None, Ref(c)), (None, item)))
+          }
+          current
+        }))
+      )),
+      "foldr" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(3, {case Seq((None, func), (None, cases), (None, start)) =>
+          var current = start.calc
+          for(item <- cases.calc.asInstanceOf[Val.Arr].value.reverse){
+            val c = current
+            current = func.calc.asInstanceOf[Val.Func].value(Seq((None, item), (None, Ref(c))))
           }
           current
         }))
@@ -407,10 +421,10 @@ object Scope{
         "::",
         (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, f1), (None, f2), (None, arr)) =>
           Val.Arr(
-            arr.calc.asInstanceOf[Val.Arr].value.filter{i =>
-              f1.calc.asInstanceOf[Val.Func].value(Seq(None -> i)) == Val.True
-            }.map{i =>
-              Ref(f2.calc.asInstanceOf[Val.Func].value(Seq(None -> i)))
+            arr.calc.asInstanceOf[Val.Arr].value.flatMap { i =>
+              val x = i.calc
+              if (f1.calc.asInstanceOf[Val.Func].value(Seq(None -> Ref(x))) != Val.True) None
+              else Some(Ref(f2.calc.asInstanceOf[Val.Func].value(Seq(None -> Ref(x)))))
             }
           )
         }))
@@ -462,6 +476,59 @@ object Scope{
               b.calc.asInstanceOf[Val.Str].value
             )
           )
+        }))
+      )),
+      "join" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, sep), (None, xs)) =>
+          sep.calc match{
+            case Val.Str(s) =>
+              Val.Str(xs.calc.asInstanceOf[Val.Arr].value.map(_.calc).filter(_ != Val.Null).map{case Val.Str(x) => x}.mkString(s))
+            case Val.Arr(sep) =>
+              val out = collection.mutable.Buffer.empty[Ref]
+              for(x <- xs.calc.asInstanceOf[Val.Arr].value){
+                x.calc match{
+                  case Val.Null => // do nothing
+                  case Val.Arr(v) =>
+                    if (out.nonEmpty) out.appendAll(sep)
+                    out.appendAll(v)
+                }
+              }
+              Val.Arr(out)
+          }
+        }))
+      )),
+      "flattenArrays" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, xs)) =>
+          val out = collection.mutable.Buffer.empty[Ref]
+          for(x <- xs.calc.asInstanceOf[Val.Arr].value){
+            x.calc match{
+              case Val.Null => // do nothing
+              case Val.Arr(v) => out.appendAll(v)
+            }
+          }
+          Val.Arr(out)
+        }))
+      )),
+      "manifestIni" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(2, {case Seq((None, v0)) =>
+          val v = Materializer(v0.calc)
+          def sect(x: ujson.Js.Obj) = {
+            x.value.flatMap{
+              case (k, ujson.Js.Str(v)) => Seq(k + " = " + v)
+              case (k, ujson.Js.Arr(vs)) => vs.map{case ujson.Js.Str(v) => k + " = " + v}
+            }
+          }
+          val lines = v.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Js.Obj])) ++
+            v.obj.get("sections").fold(Iterable[String]())(x =>
+              x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
+            )
+          Val.Str(lines.flatMap(Seq(_, "\n")).mkString)
         }))
       )),
     ),
