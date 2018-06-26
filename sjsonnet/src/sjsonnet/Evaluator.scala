@@ -248,7 +248,7 @@ class Evaluator(originalScope: Scope) {
       )
 
       lazy val newBindings = visitBindings(
-        preLocals.collect{ case Member.BindStmt(b) => b},
+        (preLocals ++ postLocals).collect{ case Member.BindStmt(b) => b},
         (self, sup) => newScope
       )
 
@@ -257,7 +257,13 @@ class Evaluator(originalScope: Scope) {
           .flatMap(s =>
             visitExpr(key, s) match{
               case Val.Str(k) =>
-                Some(k -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(value, s)))))
+                Some(k -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) =>
+                  Ref(visitExpr(
+                    value,
+                    s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
+                    newBindings
+                  ))
+                )))
               case Val.Null => None
             }
 

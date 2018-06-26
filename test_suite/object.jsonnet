@@ -47,9 +47,9 @@ std.assertEqual(local t = { a: 1, b: 2, c: null, d: 4 }; { [x]: t[x] for x in [y
 // Comprehension object
 std.assertEqual(local x = 10; { ["" + x]: x for x in [x, x + 1, x + 2] }, { "10": 10, "11": 11, "12": 12 }) &&
 std.assertEqual(local x = "foo"; { local x = "bar", [x]: 1 }, { foo: 1 }) &&
-//std.assertEqual({ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }, { "1": 1, "2": 3, "3": 4 }) &&
+std.assertEqual({ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }, { "1": 1, "2": 3, "3": 4 }) &&
 
-//std.assertEqual(local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }, { foo: "bar" }) &&
+std.assertEqual(local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }, { foo: "bar" }) &&
 
 
 std.assertEqual({ f: "foo", g: { [self.f]: 7 } }, { f: "foo", g: { foo: 7 } }) &&
@@ -61,7 +61,7 @@ std.assertEqual({ [null]: "test" }, {}) &&
 std.assertEqual({ ["" + k]: k for k in [1, 2, 3] }, { "1": 1, "2": 2, "3": 3 }) &&
 std.assertEqual({ ["" + (k + 1)]: (k + 1) for k in [0, 1, 2] }, { ["" + k]: k for k in [1, 2, 3] }) &&
 std.assertEqual({ ["" + k]: k for k in [1, 2, 3] }, { "1": 1, "2": 2, "3": 3 }) &&
-//std.assertEqual({ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }, { "1": 4, "2": 5, "3": 6 }) &&
+std.assertEqual({ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }, { "1": 4, "2": 5, "3": 6 }) &&
 
 
 local obj = {

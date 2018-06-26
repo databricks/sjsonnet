@@ -113,6 +113,19 @@ object EvaluatorTests extends TestSuite{
       Materializer(eval("local M = {x+: self.i, i :: 1}; { x: 1 } + M")) ==>
         ujson.read("""{ "x": 2 }""")
     }
+    'evaluator2 - {
+      eval("""{local x = 1, [x]: x, for x in ["foo"]}.foo""") ==> Val.Num(1)
+      eval("""{[x]: x, local x = 1, for x in ["foo"]}.foo""") ==> Val.Num(1)
+
+      Materializer(eval("""{ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }""")) ==>
+        ujson.read("""{ "1": 1, "2": 3, "3": 4 }""")
+
+      Materializer(eval("""local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }""")) ==>
+        ujson.read("""{ "foo": "bar" }""")
+
+      Materializer(eval("""{ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }""")) ==>
+        ujson.read("""{ "1": 4, "2": 5, "3": 6 }""")
+    }
 
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
