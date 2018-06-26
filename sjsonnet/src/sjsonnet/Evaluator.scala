@@ -235,7 +235,7 @@ class Evaluator(originalScope: Scope) {
         scope.dollar0,
         scope.self0,
         None,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))},
+        scope.bindings0,
         scope.cwd
       )
 

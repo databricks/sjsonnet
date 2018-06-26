@@ -116,6 +116,8 @@ object EvaluatorTests extends TestSuite{
     'evaluator2 - {
       eval("""{local x = 1, [x]: x, for x in ["foo"]}.foo""") ==> Val.Num(1)
       eval("""{[x]: x, local x = 1, for x in ["foo"]}.foo""") ==> Val.Num(1)
+      eval("""local foo = ["foo"]; {local foo = 1, [x]: x, for x in foo}.foo""") ==> Val.Str("foo")
+      eval("""local foo = ["foo"]; {[x]: x, local foo = 2, for x in foo}.foo""") ==> Val.Str("foo")
 
       Materializer(eval("""{ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }""")) ==>
         ujson.read("""{ "1": 1, "2": 3, "3": 4 }""")
