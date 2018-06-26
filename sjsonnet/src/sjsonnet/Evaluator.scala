@@ -162,8 +162,11 @@ class Evaluator(originalScope: Scope) {
 
   def visitFieldName(fieldName: FieldName, scope: => Scope) = {
     fieldName match{
-      case FieldName.Fixed(s) => s
-      case FieldName.Dyn(k) => visitExpr(k, scope).asInstanceOf[Val.Str].value
+      case FieldName.Fixed(s) => Some(s)
+      case FieldName.Dyn(k) => visitExpr(k, scope) match{
+        case Val.Str(k1) => Some(k1)
+        case Val.Null => None
+      }
     }
   }
 
@@ -212,11 +215,11 @@ class Evaluator(originalScope: Scope) {
       lazy val newSelf = Val.Obj(
         value.flatMap {
           case Member.Field(fieldName, plus, None, sep, rhs) =>
-            Some(visitFieldName(fieldName, scope) -> (plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+            visitFieldName(fieldName, scope).map(_ -> (plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
               Ref(visitExpr(rhs, makeNewScope(self, sup)))
             }))
           case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-            Some(visitFieldName(fieldName, scope) -> (false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
+            visitFieldName(fieldName, scope).map(_ -> (false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
               Ref(visitMethod(makeNewScope(self, sup), rhs, argSpec))
             ))
 
@@ -251,9 +254,13 @@ class Evaluator(originalScope: Scope) {
 
       lazy val newSelf = Val.Obj(
         visitComp(first :: rest.toList, Seq(compScope))
-          .map(s =>
-            visitExpr(key, s).asInstanceOf[Val.Str].value ->
-              (false, ":", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(value, s)))
+          .flatMap(s =>
+            visitExpr(key, s) match{
+              case Val.Str(k) =>
+                Some(k -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(value, s)))))
+              case Val.Null => None
+            }
+
           )
           .toMap,
         None

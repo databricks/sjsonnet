@@ -47,6 +47,7 @@ object Val{
                 Ref(acc.iterator.map(_.calc).foldLeft(ref(self, current.`super`).calc){
                   case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
                   case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
+                  case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
                 })
               }
               else {
@@ -54,6 +55,7 @@ object Val{
                   case None => Ref(acc.iterator.map(_.calc).foldLeft(ref(self, current.`super`).calc){
                     case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
                     case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
+                    case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
                   })
                   case Some(s) => rec(s, ref(self, current.`super`) :: acc)
                 }
