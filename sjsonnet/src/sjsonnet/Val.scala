@@ -61,7 +61,13 @@ object Val{
                 }
               }
             case None => current.`super` match{
-              case None => throw new Exception("Unknown key: " + k)
+              case None =>
+                if (acc.isEmpty) throw new Exception("Unknown key: " + k)
+                else Ref(acc.iterator.map(_.calc).reduceLeft[Val]{
+                  case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
+                  case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
+                  case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+                })
               case Some(s) => rec(s, acc)
             }
           }
