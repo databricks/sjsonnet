@@ -74,8 +74,9 @@ object Format{
   }
   def format(s: String, values0: ujson.Js): String = synchronized{
     val values = values0 match{
-      case x: ujson.Js.Arr => x.arr
-      case x => ArrayBuffer(x)
+      case x: ujson.Js.Arr => x
+      case x: ujson.Js.Obj => x
+      case x => ujson.Js.Arr(x)
     }
     val (leading, chunks) = format.parse(s).get.value
     val output = new StringBuilder
@@ -85,7 +86,11 @@ object Format{
       val cooked0 = formatted.conversion match{
         case '%' => widenRaw(formatted, "%")
         case _ =>
-          val value = values(i)
+
+          val value = formatted.label match{
+            case None => values(i)
+            case Some(key) => values(key)
+          }
           i += 1
           value match{
             case Js.Str(s) => widenRaw(formatted, s)
