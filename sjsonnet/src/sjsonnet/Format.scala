@@ -169,6 +169,43 @@ object Format{
                     true, s > 0
                   )
 
+                case 'g' =>
+                  val precision = formatted.precision.getOrElse(6)
+                  val leadingPrecision = math.floor(math.log10(s)).toInt + 1
+                  val trailingPrecision = math.max(0, precision - leadingPrecision)
+                  if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
+                    widen(
+                      formatted,
+                      "", "",
+                      new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * (precision - 1) + "E00").format(s).replace("E", "E+").toLowerCase(),
+                      true, s > 0
+                    )
+                  else
+                    widen(
+                      formatted,
+                      "", "",
+                      new DecimalFormat("0" * leadingPrecision + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * trailingPrecision).format(s).replace("E", "E+").toLowerCase(),
+                      true, s > 0
+                    )
+
+                case 'G' =>
+                  val precision = formatted.precision.getOrElse(6)
+                  val leadingPrecision = math.floor(math.log10(s)).toInt + 1
+                  val trailingPrecision = math.max(0, precision - leadingPrecision)
+                  if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
+                    widen(
+                      formatted,
+                      "", "",
+                      new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * (precision - 1) + "E00").format(s).replace("E", "E+"),
+                      true, s > 0
+                    )
+                  else
+                    widen(
+                      formatted,
+                      "", "",
+                      new DecimalFormat("0" * leadingPrecision  + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#") * trailingPrecision).format(s).replace("E", "E+").toLowerCase(),
+                      true, s > 0
+                    )
                 case 'c' => widen(formatted, "", "", s.toChar.toString , false, false)
               }
             case Js.True => widen(formatted, "", "", "true", false, false)
