@@ -262,13 +262,13 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           .flatMap(s =>
             visitExpr(key, s) match{
               case Val.Str(k) =>
-                Some(k -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
+                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
                   Ref(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
                     newBindings
                   ))
-                )))
+                ))
               case Val.Null => None
             }
 

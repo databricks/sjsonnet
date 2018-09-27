@@ -3,11 +3,9 @@ package sjsonnet
 import utest._
 
 object FileTests extends TestSuite{
+  val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(s: String) = {
-    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)),
-      ammonite.ops.pwd / 'test_suite,
-      None
-    )
+    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), testSuiteRoot, None)
     val parser = new Parser
     new Evaluator(parser, scope).visitExpr(
       parser.expr.parse(s).get.value,
@@ -15,14 +13,12 @@ object FileTests extends TestSuite{
     )
   }
   def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
-    val res = Materializer(
-      eval(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / s"${tp.value.last}.jsonnet"))
-    )
+    val res = Materializer(eval(ammonite.ops.read(testSuiteRoot / s"${tp.value.last}.jsonnet")))
     assert(res == expected)
     res
   }
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
-    check(ujson.read(ammonite.ops.read(ammonite.ops.pwd / 'test_suite / s"${tp.value.last}.jsonnet.golden")))
+    check(ujson.read(ammonite.ops.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
   }
   def tests = Tests{
     'arith_bool - check()
