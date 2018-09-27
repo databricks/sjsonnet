@@ -27,7 +27,8 @@ object Val{
 
     def getVisibleKeys() = {
       def rec(current: Val.Obj): Seq[(String, Visibility)] = {
-        current.`super`.toSeq.flatMap(rec) ++ current.value0.map{case (k, m) => (k, m.visibility)}.toSeq
+        current.`super`.toSeq.flatMap(rec) ++
+        current.value0.map{case (k, m) => (k, m.visibility)}.toSeq
       }
 
       val mapping = collection.mutable.LinkedHashMap.empty[String, Boolean]
@@ -43,36 +44,36 @@ object Val{
       }
       mapping
     }
-    val valueCache = collection.mutable.Map.empty[(String, Obj), Option[Val]]
+    val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String, self: Obj = this) = {
-      Ref(value0(k, self).getOrElse(throw new Exception("Unknown key: " + k)))
+      Ref(
+        valueCache.getOrElseUpdate(
+          // It is very rare that self != this, so fast-path the common case
+          // where they are the same by avoiding tuple construction and hashing
+          if(self == this) k else (k, self),
+          valueRaw(k, self).getOrElse(throw new Exception("Unknown key: " + k))
+        )
+      )
     }
+
     def mergeMember(l: Val, r: Val) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
     }
-    def value0(k: String, self: Obj = this): Option[Val] = valueCache.getOrElseUpdate(
-      (k, self),
-      {
-        def rec(current: Obj): Option[Val] = {
-          current.value0.get(k) match{
-            case Some(m) =>
-              val localResult = m.invoke(self, current.`super`).calc
-              current.`super` match{
-                case Some(s) if m.add => Some(rec(s).fold(localResult)(mergeMember(_, localResult)))
-                case _ => Some(localResult)
-              }
 
-            case None => current.`super` match{
-              case None => None
-              case Some(s) => rec(s)
-            }
-          }
+    def valueRaw(k: String, self: Obj): Option[Val] = this.value0.get(k) match{
+      case Some(m) =>
+        val localResult = m.invoke(self, this.`super`).calc
+        this.`super` match{
+          case Some(s) if m.add =>
+            Some(s.valueRaw(k, self).fold(localResult)(mergeMember(_, localResult)))
+          case _ => Some(localResult)
         }
-        rec(this)
-      }
-    )
+
+      case None => this.`super`.flatMap(_.valueRaw(k, self))
+    }
   }
+
   case class Func(length: Int, value: Seq[(Option[String], Ref)] => Val) extends Val
 }

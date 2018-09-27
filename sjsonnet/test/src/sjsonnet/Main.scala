@@ -50,18 +50,18 @@ object Main {
     while(System.currentTimeMillis() - start < 10000){
       count += 1
       for((name, source0) <- sources){
-//        val source = java.nio.file.Files.readAllBytes(
-  //        java.nio.file.Paths.get(s"test_suite/$name.jsonnet")
-    //    )
-        import ammonite.ops._, ImplicitWd._
-        %("jsonnet", s"test_suite/$name.jsonnet")
+        val source = java.nio.file.Files.readAllBytes(
+          java.nio.file.Paths.get(s"test_suite/$name.jsonnet")
+        )
+//        import ammonite.ops._, ImplicitWd._
+//        %("jsonnet", s"test_suite/$name.jsonnet")
 //        println(name)
-    //    val parsed = parser.expr.parse(new String(source)).get.value
-      //  val emptyScope = new Scope(
-        //  None, None, None, Map("std" -> Ref(Scope.Std)), ammonite.ops.pwd / "test_suite", None
-//        )
+        val parsed = parser.expr.parse(new String(source)).get.value
+        val emptyScope = new Scope(
+          None, None, None, Map("std" -> Ref(Scope.Std)), ammonite.ops.pwd / "test_suite", None
+        )
 
-  //      val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)
+        val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)
       }
     }
     println(count)
