@@ -158,7 +158,28 @@ class Parser{
             else{
               remaining = remaining.tail
               val rhs = climb(prec + 1, next)
-              result = Expr.BinaryOp(offset, result, op, rhs)
+              val op1 = op match{
+                case "*" => Expr.BinaryOp.`*`
+                case "/" => Expr.BinaryOp.`/`
+                case "%" => Expr.BinaryOp.`%`
+                case "+" => Expr.BinaryOp.`+`
+                case "-" => Expr.BinaryOp.`-`
+                case "<<" => Expr.BinaryOp.`<<`
+                case ">>" => Expr.BinaryOp.`>>`
+                case "<" => Expr.BinaryOp.`<`
+                case ">" => Expr.BinaryOp.`>`
+                case "<=" => Expr.BinaryOp.`<=`
+                case ">=" => Expr.BinaryOp.`>=`
+                case "in" => Expr.BinaryOp.`in`
+                case "==" => Expr.BinaryOp.`==`
+                case "!=" => Expr.BinaryOp.`!=`
+                case "&" => Expr.BinaryOp.`&`
+                case "^" => Expr.BinaryOp.`^`
+                case "|" => Expr.BinaryOp.`|`
+                case "&&" => Expr.BinaryOp.`&&`
+                case "||" => Expr.BinaryOp.`||`
+              }
+              result = Expr.BinaryOp(offset, result, op1, rhs)
               true
             }
         }
@@ -196,7 +217,15 @@ class Parser{
     | (Index ~ "import" ~/ string).map(Expr.Import.tupled)
     | (Index ~ "error" ~/ expr).map(Expr.Error.tupled)
     | assertExpr
-    | (Index ~ unaryop ~/ expr1).map(Expr.UnaryOp.tupled)
+    | (Index ~ unaryop ~/ expr1).map{ case (i, k, e) =>
+      val k2 = k match{
+        case "+" => Expr.UnaryOp.`+`
+        case "-" => Expr.UnaryOp.`-`
+        case "~" => Expr.UnaryOp.`~`
+        case "!" => Expr.UnaryOp.`!`
+      }
+      Expr.UnaryOp(i, k2, e)
+    }
   )
 
   val objinside: P[Expr.ObjBody] = P(

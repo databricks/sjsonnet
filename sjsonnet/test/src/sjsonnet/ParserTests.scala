@@ -8,13 +8,13 @@ object ParserTests extends TestSuite{
       parse("true") ==> True(0)
 
       parse("123 + 456 + 789") ==>
-        BinaryOp(10, BinaryOp(4, Num(0, 123), "+", Num(6, 456)), "+", Num(12, 789))
+        BinaryOp(10, BinaryOp(4, Num(0, 123), BinaryOp.`+`, Num(6, 456)), BinaryOp.`+`, Num(12, 789))
 
       parse("1 * 2 + 3") ==>
-        BinaryOp(6, BinaryOp(2, Num(0, 1), "*", Num(4, 2)), "+", Num(8, 3))
+        BinaryOp(6, BinaryOp(2, Num(0, 1), BinaryOp.`*`, Num(4, 2)), BinaryOp.`+`, Num(8, 3))
 
       parse("1 + 2 * 3") ==>
-        BinaryOp(2, Num(0, 1), "+", BinaryOp(6, Num(4, 2), "*", Num(8, 3)))
+        BinaryOp(2, Num(0, 1), BinaryOp.`+`, BinaryOp(6, Num(4, 2), BinaryOp.`*`, Num(8, 3)))
 //
 //      parse("2 | 3 * 2 + 3 | 4") ==>
 //        BinaryOp(

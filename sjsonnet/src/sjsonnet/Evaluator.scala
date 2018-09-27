@@ -30,7 +30,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       val key = visitExpr(index, scope).asInstanceOf[Val.Str]
       scope.super0.get.value(key.value).calc
 
-    case BinaryOp(_, lhs, "in", Super(offset)) =>
+    case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
       val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
       if (scope.super0.get.value0.contains(key.value)) Val.True else Val.False
 
@@ -43,51 +43,51 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     case Obj(offset, value) => visitObjBody(value, scope)
 
     case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
-      case ("-", Val.Num(v)) => Val.Num(-v)
-      case ("+", Val.Num(v)) => Val.Num(v)
-      case ("~", Val.Num(v)) => Val.Num(~v.toLong)
-      case ("!", Val.True) => Val.False
-      case ("!", Val.False) => Val.True
+      case (Expr.UnaryOp.`-`, Val.Num(v)) => Val.Num(-v)
+      case (Expr.UnaryOp.`+`, Val.Num(v)) => Val.Num(v)
+      case (Expr.UnaryOp.`~`, Val.Num(v)) => Val.Num(~v.toLong)
+      case (Expr.UnaryOp.`!`, Val.True) => Val.False
+      case (Expr.UnaryOp.`!`, Val.False) => Val.True
     }
 
     case BinaryOp(offset, lhs, op, rhs) => {
       op match{
-        case "&&" | "||" =>
+        case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
           (visitExpr(lhs, scope), op) match {
-            case (Val.False, "&&") => Val.False
-            case (Val.True, "||") => Val.True
+            case (Val.False, Expr.BinaryOp.`&&`) => Val.False
+            case (Val.True, Expr.BinaryOp.`||`) => Val.True
             case _ => visitExpr(rhs, scope)
 
           }
         case _ =>
           (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
-            case (Val.Num(l), "*", Val.Num(r)) => Val.Num(l * r)
-            case (Val.Num(l), "/", Val.Num(r)) => Val.Num(l / r)
-            case (Val.Num(l), "%", Val.Num(r)) => Val.Num(l % r)
-            case (Val.Num(l), "+", Val.Num(r)) => Val.Num(l + r)
-            case (Val.Str(l), "%", r) => Val.Str(Format.format(l, Materializer.apply(r)))
-            case (Val.Str(l), "+", Val.Str(r)) => Val.Str(l + r)
-            case (Val.Str(l), "<", Val.Str(r)) => if (l < r) Val.True else Val.False
-            case (Val.Str(l), ">", Val.Str(r)) => if (l > r) Val.True else Val.False
-            case (Val.Str(l), "<=", Val.Str(r)) => if (l <= r) Val.True else Val.False
-            case (Val.Str(l), ">=", Val.Str(r)) => if (l >= r) Val.True else Val.False
-            case (Val.Str(l), "+", r) => Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-            case (l, "+", Val.Str(r)) => Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-            case (Val.Num(l), "-", Val.Num(r)) => Val.Num(l - r)
-            case (Val.Num(l), "<<", Val.Num(r)) => Val.Num(l.toLong << r.toLong)
-            case (Val.Num(l), ">>", Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
-            case (Val.Num(l), "<", Val.Num(r)) => if (l < r) Val.True else Val.False
-            case (Val.Num(l), ">", Val.Num(r)) => if (l > r) Val.True else Val.False
-            case (Val.Num(l), "<=", Val.Num(r)) => if (l <= r) Val.True else Val.False
-            case (Val.Num(l), ">=", Val.Num(r)) => if (l >= r) Val.True else Val.False
-            case (l, "==", r) => if (Materializer(l) == Materializer(r)) Val.True else Val.False
-            case (l, "!=", r) => if (Materializer(l) != Materializer(r)) Val.True else Val.False
-            case (Val.Str(l), "in", Val.Obj(r, _)) => if (r.contains(l)) Val.True else Val.False
-            case (Val.Num(l), "&", Val.Num(r)) => Val.Num(l.toLong & r.toLong)
-            case (Val.Num(l), "^", Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
-            case (Val.Num(l), "|", Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-            case (l: Val.Obj, "+", r: Val.Obj) => Evaluator.mergeObjects(l, r)
-            case (Val.Arr(l), "+", Val.Arr(r)) => Val.Arr(l ++ r)
+            case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
+            case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) => Val.Num(l / r)
+            case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
+            case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
+            case (Val.Str(l), Expr.BinaryOp.`%`, r) => Val.Str(Format.format(l, Materializer.apply(r)))
+            case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
+            case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => if (l < r) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => if (l > r) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => if (l <= r) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => if (l >= r) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`+`, r) => Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+            case (l, Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+            case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
+            case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
+            case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
+            case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => if (l < r) Val.True else Val.False
+            case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => if (l > r) Val.True else Val.False
+            case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => if (l <= r) Val.True else Val.False
+            case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => if (l >= r) Val.True else Val.False
+            case (l, Expr.BinaryOp.`==`, r) => if (Materializer(l) == Materializer(r)) Val.True else Val.False
+            case (l, Expr.BinaryOp.`!=`, r) => if (Materializer(l) != Materializer(r)) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => if (r.contains(l)) Val.True else Val.False
+            case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
+            case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
+            case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
+            case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+            case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
           }
         }
     }
