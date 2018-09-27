@@ -682,6 +682,87 @@ object Scope{
           Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
         }))
       )),
+      "setUnion" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v1), (None, v2)) =>
+
+          val ujson.Js.Arr(vs1) = Materializer(v1.calc)
+          val ujson.Js.Arr(vs2) = Materializer(v2.calc)
+          val vs0 = vs1 ++ vs2
+          val vs =
+            if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+              vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+            }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+              vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+            }else ???
+
+          val out = collection.mutable.Buffer.empty[ujson.Js]
+          for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+          Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
+        }))
+      )),
+      "setInter" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v1), (None, v2)) =>
+          val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
+          val ujson.Js.Arr(vs1) = Materializer(v1.calc)
+          val ujson.Js.Arr(vs2) = Materializer(v2.calc)
+
+
+          val vs0 = vs1.to[collection.mutable.LinkedHashSet]
+            .intersect(vs2.to[collection.mutable.LinkedHashSet])
+            .toSeq
+          val vs =
+            if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+              vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+            }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+              vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+            }else ???
+
+          val out = collection.mutable.Buffer.empty[ujson.Js]
+          for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+          Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
+        }))
+      )),
+      "setDiff" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v1), (None, v2)) =>
+          val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
+          val ujson.Js.Arr(vs1) = Materializer(v1.calc)
+          val ujson.Js.Arr(vs2) = Materializer(v2.calc)
+
+
+          val vs0 = vs1.to[collection.mutable.LinkedHashSet]
+            .diff(vs2.to[collection.mutable.LinkedHashSet])
+            .toSeq
+          val vs =
+            if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+              vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+            }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+              vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+            }else ???
+
+          val out = collection.mutable.Buffer.empty[ujson.Js]
+          for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+          Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
+        }))
+      )),
+      "setMember" -> ((
+        false,
+        "::",
+        (self: Val.Obj, sup: Option[Val.Obj]) => Ref(Val.Func(1, {case Seq((None, v1), (None, v2)) =>
+          val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
+          val vs1 = Materializer(v1.calc)
+          val ujson.Js.Arr(vs2) = Materializer(v2.calc)
+          if(vs2.contains(vs1)) Val.True else Val.False
+        }))
+      )),
     ),
     None
   )
