@@ -24,10 +24,17 @@ object Expr{
   sealed trait Member
 
   object Member{
+    sealed trait Visibility
+    object Visibility{
+
+      object Normal extends Visibility
+      object Hidden extends Visibility
+      object Unhide extends Visibility
+    }
     case class Field(fieldName: FieldName,
                      plus: Boolean,
                      args: Option[Params],
-                     sep: String,
+                     sep: Visibility,
                      rhs: Expr) extends Member
     case class BindStmt(value: Bind) extends Member
     case class AssertStmt(value: Expr, msg: Option[Expr]) extends Member

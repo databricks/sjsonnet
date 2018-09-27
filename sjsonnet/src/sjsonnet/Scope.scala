@@ -4,6 +4,7 @@ import java.io.StringWriter
 import java.util.Base64
 
 import ammonite.ops.Path
+import sjsonnet.Expr.Member.Visibility
 
 
 object Scope{
@@ -234,7 +235,7 @@ object Scope{
         val allKeys = arr.calc.asInstanceOf[Val.Obj].getVisibleKeys()
         Val.Obj(
           allKeys.map{ k =>
-            k._1 -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(
+            k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(
               f.calc.asInstanceOf[Val.Func].value(
                 Seq(None -> Ref(Val.Str(k._1)), None -> arr.calc.asInstanceOf[Val.Obj].value(k._1))
               )
@@ -497,7 +498,7 @@ object Scope{
   )
   val Std = Val.Obj(
     functions
-      .map{case (k, v) => (k, (false, "::", (self: Val.Obj, sup: Option[Val.Obj]) => Ref(v)))}
+      .map{case (k, v) => (k, Val.Obj.Member(false, Visibility.Hidden, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(v)))}
       .toMap,
     None
   )

@@ -1,4 +1,5 @@
 package sjsonnet
+import sjsonnet.Expr.Member.Visibility
 import ujson.Js
 object Materializer {
   def apply(v: Val): Js = v match{
@@ -25,7 +26,7 @@ object Materializer {
     case Js.Str(s) => Val.Str(s)
     case Js.Arr(xs) => Val.Arr(xs.map(x => Ref(reverse(x))))
     case Js.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, (false, ":", (_: Val.Obj, _: Option[Val.Obj]) => Ref(reverse(x._2))))).toMap, None
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Ref(reverse(x._2))))).toMap, None
     )
   }
 }

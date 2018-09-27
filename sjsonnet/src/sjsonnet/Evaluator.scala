@@ -1,6 +1,7 @@
 package sjsonnet
 import Expr._
 import ammonite.ops.{Path, RelPath}
+import sjsonnet.Expr.Member.Visibility
 object Evaluator {
   def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
     def rec(current: Val.Obj): Val.Obj = {
@@ -217,11 +218,11 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       lazy val newSelf = Val.Obj(
         value.flatMap {
           case Member.Field(fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> (plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
               Ref(visitExpr(rhs, makeNewScope(self, sup)))
             }))
           case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> (false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
               Ref(visitMethod(makeNewScope(self, sup), rhs, argSpec))
             ))
 
@@ -261,7 +262,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           .flatMap(s =>
             visitExpr(key, s) match{
               case Val.Str(k) =>
-                Some(k -> ((false, ":", (self: Val.Obj, sup: Option[Val.Obj]) =>
+                Some(k -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
                   Ref(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++

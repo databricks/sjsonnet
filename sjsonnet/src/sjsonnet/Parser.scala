@@ -1,6 +1,7 @@
 package sjsonnet
 
 import fastparse.{WhitespaceApi, core}
+import sjsonnet.Expr.Member.Visibility
 
 class Parser{
   val precedenceTable = Seq(
@@ -234,7 +235,7 @@ class Parser{
     case (exprs, None) => Expr.ObjBody.MemberList(exprs)
     case (exprs, Some(comps)) =>
       val preLocals = exprs.takeWhile(_.isInstanceOf[Expr.Member.BindStmt]).map(_.asInstanceOf[Expr.Member.BindStmt])
-      val Expr.Member.Field(Expr.FieldName.Dyn(lhs), false, None, ":", rhs) =
+      val Expr.Member.Field(Expr.FieldName.Dyn(lhs), false, None, Visibility.Normal, rhs) =
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
         .map(_.asInstanceOf[Expr.Member.BindStmt])
@@ -248,7 +249,11 @@ class Parser{
         Expr.Member.Field(name, plus.nonEmpty, p, h2, e)
     }
   )
-  val fieldKeySep = P( ":::" | "::" | ":" ).!
+  val fieldKeySep = P( ":::" | "::" | ":" ).!.map{
+    case ":" => Visibility.Normal
+    case "::" => Visibility.Hidden
+    case ":::" => Visibility.Unhide
+  }
   val objlocal = P( "local" ~/ bind ).map(Expr.Member.BindStmt)
   val compspec: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   val forspec = P( Index ~ "for" ~/ id ~ "in" ~ expr ).map(Expr.ForSpec.tupled)
