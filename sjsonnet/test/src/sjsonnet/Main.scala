@@ -50,7 +50,7 @@ object Main {
 //        println(name)
         val parsed = parser.expr.parse(source).get.value
         val emptyScope = new Scope(
-          None, None, None, Map("std" -> Ref(Scope.Std)), ammonite.ops.pwd / "test_suite"
+          None, None, None, Map("std" -> Ref(Scope.Std)), ammonite.ops.pwd / "test_suite", None
         )
 
         val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)

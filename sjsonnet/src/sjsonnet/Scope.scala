@@ -7,7 +7,7 @@ import ammonite.ops.Path
 
 
 object Scope{
-  val Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd)
+  val Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd, None)
   val functions = Seq[(String, Val.Func)](
     "assertEqual" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val x1 = Materializer(v1.calc)
@@ -503,22 +503,27 @@ object Scope{
   )
 }
 
-case class Scope(val dollar0: Option[Val.Obj],
-                 val self0: Option[Val.Obj],
-                 val super0: Option[Val.Obj],
-                 val bindings0: Map[String, Ref],
-                 val cwd: Path){
+case class Scope(dollar0: Option[Val.Obj],
+                 self0: Option[Val.Obj],
+                 super0: Option[Val.Obj],
+                 bindings0: Map[String, Ref],
+                 cwd: Path,
+                 delegate: Option[Scope]){
   def dollar = dollar0.get
   def self = self0.get
   val bindingCache = collection.mutable.Map.empty[String, Ref]
-  def bindings(k: String) = bindingCache.getOrElseUpdate(k, bindings0(k))
+  def bindings(k: String): Ref = bindingCache.getOrElseUpdate(
+    k,
+    bindings0.get(k).getOrElse(delegate.get.bindings(k))
+  )
   def ++(traversableOnce: TraversableOnce[(String, (Val.Obj, Option[Val.Obj]) => Ref)]) = {
     new Scope(
       dollar0,
       self0,
       super0,
-      bindings0 ++ traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))},
-      cwd
+      traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}.toMap,
+      cwd,
+      Some(this)
     )
   }
 }

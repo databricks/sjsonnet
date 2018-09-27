@@ -203,8 +203,9 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.dollar0.orElse(Some(self)),
         Some(self),
         sup,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(self, sup))},
-        scope.cwd
+        newBindings.map{case (k, v) => (k, v.apply(self, sup))}.toMap,
+        scope.cwd,
+        Some(scope)
       )
 
 
@@ -236,16 +237,18 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.dollar0,
         scope.self0,
         None,
-        scope.bindings0,
-        scope.cwd
+        Map(),
+        scope.cwd,
+        Some(scope)
       )
 
       lazy val newScope: Scope = new Scope(
         scope.dollar0.orElse(Some(newSelf)),
         Some(newSelf),
         None,
-        scope.bindings0 ++ newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))},
-        scope.cwd
+        newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
+        scope.cwd,
+        Some(scope)
       )
 
       lazy val newBindings = visitBindings(
