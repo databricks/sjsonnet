@@ -45,23 +45,51 @@ object Format{
   val plain = P( CharsWhile(_ != '%', min = 0).! )
   val format = P( plain ~ (("%" ~ formatSpec) ~ plain).rep ~ End)
 
-  def zeroPad(s: Double, r: String, precision: Option[Int]) = {
+  def zeroPad(lhs: String, rhs: String, precision: Option[Int]) = {
     precision match{
-      case None => r -> (s > 0)
+      case None => rhs
       case Some(p) =>
-        val shortage = p - r.length
-        pprint.log(shortage)
-        (if (shortage > 0) "0" * shortage + r else r) -> (s > 0)
+        val shortage = p - rhs.length
+        (if (shortage > 0) ("0" * shortage + rhs) else rhs)
     }
   }
 
+  def toDecimalString(s: Int, alternate: Boolean) = {
+    val r = math.abs(s).toString
+    (if (s < 0) "-" else "", r)
+  }
   def toOctalString(s: Int, alternate: Boolean) = {
     val r = math.abs(s).toOctalString
-    (if (s < 0) "-" else "") + (if (!alternate || r(0) == '0') r else "0" + r)
+    (if (s < 0) "-" else "", r)
   }
   def toHexString(s: Int, alternate: Boolean) = {
     val r = math.abs(s).toHexString
-    (if (s < 0) "-" else "") + (if (!alternate || r(0) == '0') r else "0x" + r)
+    (if (s < 0) "-" else "", r)
+  }
+  def widen(formatted: FormatSpec,
+            lhs: String,
+            mhs: String,
+            rhs: String,
+            numeric: Boolean,
+            signedConversion: Boolean) = {
+
+    val lhs2 =
+      if(signedConversion && formatted.blankBeforePositive) " " + lhs
+      else if(signedConversion && formatted.signCharacter) "+" + lhs
+      else lhs
+
+    val missingWidth = formatted.width.getOrElse(-1) - lhs2.length - mhs.length - rhs.length
+
+    if (missingWidth <= 0) lhs2 + mhs + rhs
+    else if (formatted.zeroPadded) {
+      if (numeric) lhs2 + mhs + "0" * missingWidth + rhs
+      else {
+        if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
+        else " " * missingWidth + lhs2 + mhs + rhs
+      }
+    }
+    else if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
+    else " " * missingWidth + lhs2 + mhs + rhs
   }
   def format(s: String, values0: ujson.Js): String = synchronized{
     val values = values0 match{
@@ -74,54 +102,63 @@ object Format{
     var i = 0
     for((formatted, literal) <- chunks){
       pprint.log(formatted)
-      val (cooked0, numeric, signedConversion) = formatted.conversion match{
-        case '%' => ("%", false, false)
+      val cooked0 = formatted.conversion match{
+        case '%' => widen(formatted, "", "", "%", false, false)
         case _ =>
           val value = values(i)
           i += 1
-          val (cooked, signedConversion) = value match{
-            case Js.Str(s) => s -> false
+          value match{
+            case Js.Str(s) => widen(formatted, "", "", s, false, false)
             case Js.Num(s) =>
               formatted.conversion match{
-                case 'd' | 'i' | 'u' => zeroPad(s, s.toInt.toString, formatted.precision)
-                case 'o' => zeroPad(s, toOctalString(s.toInt, formatted.alternate), formatted.precision)
-                case 'x' => zeroPad(s, toHexString(s.toInt, formatted.alternate), formatted.precision)
-                case 'X' => zeroPad(s, toHexString(s.toInt, formatted.alternate), formatted.precision)
+                case 'd' | 'i' | 'u' =>
+                  val (lhs, rhs) = toDecimalString(s.toInt, formatted.alternate)
+                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
+                  widen(
+                    formatted,
+                    lhs, "", rhs2,
+                    true, s > 0
+                  )
+                case 'o' =>
+                  val (lhs, rhs) = toOctalString(s.toInt, formatted.alternate)
+                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
+                  widen(
+                    formatted,
+                    lhs, (if (!formatted.alternate || rhs2(0) == '0') "" else "0"), rhs2,
+                    true, s > 0
+                  )
+                case 'x' =>
+                  val (lhs, rhs) = toHexString(s.toInt, formatted.alternate)
+                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
+                  widen(
+                    formatted,
+                    lhs, (if (!formatted.alternate) "" else "0x"), rhs2,
+                    true, s > 0
+                  )
+                case 'X' =>
+                  val (lhs, rhs) = toHexString(s.toInt, formatted.alternate)
+                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
+                  widen(
+                    formatted,
+                    lhs, (if (!formatted.alternate) "" else "0x"), rhs2,
+                    true, s > 0
+                  ).toUpperCase()
 
                 case 'e' => new DecimalFormat("0.#####E0").format(s).toLowerCase() -> false
                 case 'E' => new DecimalFormat("0.#####E0").format(s) -> false
 
                 case 'f' | 'F' => s.toString -> false
 
-//                case 'g' =>
-//                case 'G' =>
-
-                case 'c' => s.toChar.toString -> false
+                case 'c' => widen(formatted, "", "", s.toChar.toString , false, false)
               }
-            case Js.True => "true" -> false
-            case Js.False => "false" -> false
-            case v => v.toString -> false
+            case Js.True => widen(formatted, "", "", "true", false, false)
+            case Js.False => widen(formatted, "", "", "false", false, false)
+            case v => widen(formatted, "", "", v.toString, false, false)
           }
-          (cooked, value.isInstanceOf[Js.Num], signedConversion)
+
       }
 
-      val cooked =
-        if(signedConversion && formatted.blankBeforePositive) " " + cooked0
-        else if(signedConversion && formatted.signCharacter) "+" + cooked0
-        else cooked0
-      val missingWidth = formatted.width.getOrElse(-1) - cooked.length
-      val widened =
-        if (missingWidth <= 0) cooked
-        else if (formatted.zeroPadded) {
-          if (numeric) "0" * missingWidth + cooked
-          else {
-            if (formatted.leftAdjusted) cooked + " " * missingWidth
-            else " " * missingWidth + cooked
-          }
-        }
-        else if (formatted.leftAdjusted) cooked + " " * missingWidth
-        else " " * missingWidth + cooked
-      output.append(widened)
+      output.append(cooked0)
       output.append(literal)
 
 
