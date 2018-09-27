@@ -2,18 +2,18 @@ package sjsonnet
 
 sealed trait Expr
 object Expr{
-  case object Null extends Expr
-  case object True extends Expr
-  case object False extends Expr
-  case object Self extends Expr
-  case object Super extends Expr
-  case object $ extends Expr
+  case class Null(offset: Int) extends Expr
+  case class True(offset: Int) extends Expr
+  case class False(offset: Int) extends Expr
+  case class Self(offset: Int) extends Expr
+  case class Super(offset: Int) extends Expr
+  case class $(offset: Int) extends Expr
 
-  case class Str(value: String) extends Expr
-  case class Num(value: Double) extends Expr
-  case class Id(value: String) extends Expr
-  case class Arr(value: Seq[Expr]) extends Expr
-  case class Obj(value: ObjBody) extends Expr
+  case class Str(offset: Int, value: String) extends Expr
+  case class Num(offset: Int, value: Double) extends Expr
+  case class Id(offset: Int, value: String) extends Expr
+  case class Arr(offset: Int, value: Seq[Expr]) extends Expr
+  case class Obj(offset: Int, value: ObjBody) extends Expr
 
   sealed trait FieldName
 
@@ -34,35 +34,36 @@ object Expr{
   }
 
 
-  case class Parened(value: Expr) extends Expr
+  case class Parened(offset: Int, value: Expr) extends Expr
   case class Params(args: Seq[(String, Option[Expr])])
   case class Args(args: Seq[(Option[String], Expr)])
 
-  case class UnaryOp(op: String, value: Expr) extends Expr
-  case class BinaryOp(lhs: Expr, op: String, rhs: Expr) extends Expr
-  case class AssertExpr(asserted: Member.AssertStmt, returned: Expr) extends Expr
-  case class LocalExpr(bindings: Seq[Bind], returned: Expr) extends Expr
+  case class UnaryOp(offset: Int, op: String, value: Expr) extends Expr
+  case class BinaryOp(offset: Int, lhs: Expr, op: String, rhs: Expr) extends Expr
+  case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
+  case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
 
   case class Bind(name: String, args: Option[Params], rhs: Expr)
-  case class Import(value: String) extends Expr
-  case class ImportStr(value: String) extends Expr
-  case class Error(value: Expr) extends Expr
-  case class Apply(value: Expr, args: Args) extends Expr
-  case class Select(value: Expr, name: String) extends Expr
-  case class Lookup(value: Expr, index: Expr) extends Expr
-  case class Slice(value: Expr,
+  case class Import(offset: Int, value: String) extends Expr
+  case class ImportStr(offset: Int, value: String) extends Expr
+  case class Error(offset: Int, value: Expr) extends Expr
+  case class Apply(offset: Int, value: Expr, args: Args) extends Expr
+  case class Select(offset: Int, value: Expr, name: String) extends Expr
+  case class Lookup(offset: Int, value: Expr, index: Expr) extends Expr
+  case class Slice(offset: Int,
+                   value: Expr,
                    start: Option[Expr],
                    end: Option[Expr],
                    stride: Option[Expr]) extends Expr
-  case class Function(params: Params, body: Expr) extends Expr
-  case class IfElse(cond: Expr, then: Expr, `else`: Option[Expr]) extends Expr
+  case class Function(offset: Int, params: Params, body: Expr) extends Expr
+  case class IfElse(offset: Int, cond: Expr, then: Expr, `else`: Option[Expr]) extends Expr
 
   sealed trait CompSpec extends Expr
-  case class IfSpec(cond: Expr) extends CompSpec
-  case class ForSpec(name: String, cond: Expr) extends CompSpec
+  case class IfSpec(offset: Int, cond: Expr) extends CompSpec
+  case class ForSpec(offset: Int, name: String, cond: Expr) extends CompSpec
 
-  case class Comp(value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
-  case class ObjExtend(base: Expr, ext: ObjBody) extends Expr
+  case class Comp(offset: Int, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
+  case class ObjExtend(offset: Int, base: Expr, ext: ObjBody) extends Expr
 
   sealed trait ObjBody
   object ObjBody{

@@ -6,32 +6,32 @@ class Evaluator(originalScope: Scope) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: => Scope): Val = expr match{
-    case Null => Val.Null
-    case Parened(inner) => visitExpr(inner, scope)
-    case True => Val.True
-    case False => Val.False
-    case Self => scope.self
+    case Null(offset) => Val.Null
+    case Parened(offset, inner) => visitExpr(inner, scope)
+    case True(offset) => Val.True
+    case False(offset) => Val.False
+    case Self(offset) => scope.self
 
-    case Select(Super, name) =>
+    case Select(_, Super(offset), name) =>
       scope.super0.get.value(name, self = scope.self).calc
 
-    case Lookup(Super, index) =>
+    case Lookup(_, Super(offset), index) =>
       val key = visitExpr(index, scope).asInstanceOf[Val.Str]
       scope.super0.get.value(key.value).calc
 
-    case BinaryOp(lhs, "in", Super) =>
+    case BinaryOp(_, lhs, "in", Super(offset)) =>
       val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
       if (scope.super0.get.value0.contains(key.value)) Val.True else Val.False
 
-    case $ => scope.dollar
-    case Str(value) => Val.Str(value)
-    case Num(value) => Val.Num(value)
-    case Id(value) => scope.bindings(value).force(scope.dollar0)
+    case $(offset) => scope.dollar
+    case Str(offset, value) => Val.Str(value)
+    case Num(offset, value) => Val.Num(value)
+    case Id(offset, value) => scope.bindings(value).force(scope.dollar0)
 
-    case Arr(value) => Val.Arr(value.map(v => Ref(visitExpr(v, scope))))
-    case Obj(value) => visitObjBody(value, scope)
+    case Arr(offset, value) => Val.Arr(value.map(v => Ref(visitExpr(v, scope))))
+    case Obj(offset, value) => visitObjBody(value, scope)
 
-    case UnaryOp(op, value) => (op, visitExpr(value, scope)) match{
+    case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
       case ("-", Val.Num(v)) => Val.Num(-v)
       case ("+", Val.Num(v)) => Val.Num(v)
       case ("~", Val.Num(v)) => Val.Num(~v.toLong)
@@ -39,7 +39,7 @@ class Evaluator(originalScope: Scope) {
       case ("!", Val.False) => Val.True
     }
 
-    case BinaryOp(lhs, op, rhs) => {
+    case BinaryOp(offset, lhs, op, rhs) => {
       op match{
         case "&&" | "||" =>
           (visitExpr(lhs, scope), op) match {
@@ -80,17 +80,17 @@ class Evaluator(originalScope: Scope) {
           }
         }
     }
-    case AssertExpr(Member.AssertStmt(value, msg), returned) =>
+    case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
       if (visitExpr(value, scope) != Val.True) {
         throw new Exception(msg.fold("")(visitExpr(_, scope).asInstanceOf[Val.Str].value))
       }
       visitExpr(returned, scope)
 
-    case LocalExpr(bindings, returned) =>
+    case LocalExpr(offset, bindings, returned) =>
       lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
       visitExpr(returned, newScope)
 
-    case Import(value) =>
+    case Import(offset, value) =>
 
       val p = scope.cwd / RelPath(value)
       imports.getOrElseUpdate(
@@ -102,7 +102,7 @@ class Evaluator(originalScope: Scope) {
       )
 
 
-    case ImportStr(value) =>
+    case ImportStr(offset, value) =>
       val p = scope.cwd / RelPath(value)
       Val.Str(
         importStrs.getOrElseUpdate(
@@ -110,22 +110,22 @@ class Evaluator(originalScope: Scope) {
           ammonite.ops.read(p)
         )
       )
-    case Error(value) => throw new Exception(visitExpr(value, scope).asInstanceOf[Val.Str].value)
-    case Apply(value, Args(args)) =>
+    case Error(offset, value) => throw new Exception(visitExpr(value, scope).asInstanceOf[Val.Str].value)
+    case Apply(offset, value, Args(args)) =>
       visitExpr(value, scope).asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
 
-    case Select(value, name) =>
+    case Select(offset, value, name) =>
       val self = visitExpr(value, scope).asInstanceOf[Val.Obj]
       self.value(name).force(scope.dollar0)
 
-    case Lookup(value, index) =>
+    case Lookup(offset, value, index) =>
       val res = (visitExpr(value, scope), visitExpr(index, scope)) match{
         case (v: Val.Arr, i: Val.Num) => v.value(i.value.toInt)
         case (v: Val.Str, i: Val.Num) => Ref(Val.Str(new String(Array(v.value(i.value.toInt)))))
         case (v: Val.Obj, i: Val.Str) => v.value(i.value)
       }
       res.force(scope.dollar0)
-    case Slice(value, start, end, stride) =>
+    case Slice(offset, value, start, end, stride) =>
       visitExpr(value, scope) match{
         case Val.Arr(a) =>
 
@@ -135,15 +135,15 @@ class Evaluator(originalScope: Scope) {
           val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(s.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
           Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
       }
-    case Function(params, body) => visitMethod(scope, body, params)
-    case IfElse(cond, then, else0) =>
+    case Function(offset, params, body) => visitMethod(scope, body, params)
+    case IfElse(offset, cond, then, else0) =>
       visitExpr(cond, scope) match{
         case Val.True => visitExpr(then, scope)
         case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
       }
-    case Comp(value, first, rest) =>
+    case Comp(offset, value, first, rest) =>
       Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
-    case ObjExtend(value, ext) => {
+    case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
       val extension = visitObjBody(ext, scope)
       mergeObjects(original, extension)
@@ -276,7 +276,7 @@ class Evaluator(originalScope: Scope) {
   }
 
   def visitComp(f: List[CompSpec], scopes: Seq[Scope]): Seq[Scope] = f match{
-    case ForSpec(name, expr) :: rest =>
+    case ForSpec(offset, name, expr) :: rest =>
       visitComp(
         rest,
         for{
@@ -284,7 +284,7 @@ class Evaluator(originalScope: Scope) {
           e <- visitExpr(expr, s).asInstanceOf[Val.Arr].value
         } yield s ++ Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e))
       )
-    case IfSpec(expr) :: rest => visitComp(rest, scopes.filter(visitExpr(expr, _) == Val.True))
+    case IfSpec(offset, expr) :: rest => visitComp(rest, scopes.filter(visitExpr(expr, _) == Val.True))
     case Nil => scopes
   }
 }
