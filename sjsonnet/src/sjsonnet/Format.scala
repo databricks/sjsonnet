@@ -18,12 +18,12 @@ object Format{
                         precision: Option[Int],
                         conversion: Char)
   import fastparse.all._
-  val integer           = P( CharIn('1' to '9') ~ CharsWhileIn('0' to '9', min = 0) )
+  val integer           = P( CharIn('1' to '9') ~ CharsWhileIn('0' to '9', min = 0) | "0" )
 
   val label = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
   val flags = P( CharsWhileIn("#0- +", min = 0).! ).log()
   val width = P( (integer | "*").!.? )
-  val precision = P( ("." ~ integer.!).? )
+  val precision = P( ("." ~/ integer.!).? )
   val conversion = P( CharIn("diouxXeEfFgGcrsa%").! )
   val formatSpec = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
     case (label, flags, width, precision, conversion) =>
@@ -43,7 +43,7 @@ object Format{
 
 
   val plain = P( CharsWhile(_ != '%', min = 0).! )
-  val format = P( plain ~ (("%" ~ formatSpec) ~ plain).rep ~ End)
+  val format = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
   def zeroPad(lhs: String, rhs: String, precision: Option[Int]) = {
     precision match{
@@ -144,10 +144,30 @@ object Format{
                     true, s > 0
                   ).toUpperCase()
 
-                case 'e' => new DecimalFormat("0.#####E0").format(s).toLowerCase() -> false
-                case 'E' => new DecimalFormat("0.#####E0").format(s) -> false
+                case 'e' =>
+                  widen(
+                    formatted,
+                    "", "",
+                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6) + "E00").format(s).replace("E", "E+").toLowerCase(),
+                    true, s > 0
+                  )
 
-                case 'f' | 'F' => s.toString -> false
+                case 'E' =>
+                  widen(
+                    formatted,
+                    "", "",
+                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6) + "E00").format(s).replace("E", "E+"),
+                    true, s > 0
+                  )
+
+
+                case 'f' | 'F' =>
+                  widen(
+                    formatted,
+                    "", "",
+                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6)).format(s).replace("E", "E+").toLowerCase(),
+                    true, s > 0
+                  )
 
                 case 'c' => widen(formatted, "", "", s.toChar.toString , false, false)
               }
