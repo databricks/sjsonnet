@@ -43,35 +43,34 @@ object Val{
       }
       mapping
     }
-    val valueCache = collection.mutable.Map.empty[(String, Obj), Val]
-    def value(k: String, self: Obj = this) = Ref(value0(k, self))
-    def value0(k: String, self: Obj = this): Val = valueCache.getOrElseUpdate(
+    val valueCache = collection.mutable.Map.empty[(String, Obj), Option[Val]]
+    def value(k: String, self: Obj = this) = {
+      Ref(value0(k, self).getOrElse(throw new Exception("Unknown key: " + k)))
+    }
+    def mergeMember(l: Val, r: Val) = (l, r) match{
+      case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
+      case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
+      case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+    }
+    def value0(k: String, self: Obj = this): Option[Val] = valueCache.getOrElseUpdate(
       (k, self),
       {
-        def merge(l: Val, r: Val) = (l, r) match{
-          case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
-          case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
-          case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
-        }
-
-        def rec(current: Obj, acc: List[Val]): Val = {
+        def rec(current: Obj): Option[Val] = {
           current.value0.get(k) match{
             case Some(m) =>
               val localResult = m.invoke(self, current.`super`).calc
               current.`super` match{
-                case Some(s) if m.add => rec(s, localResult :: acc)
-                case _ => acc.iterator.foldLeft(localResult){merge}
+                case Some(s) if m.add => Some(rec(s).fold(localResult)(mergeMember(_, localResult)))
+                case _ => Some(localResult)
               }
 
             case None => current.`super` match{
-              case None =>
-                if (acc.isEmpty) throw new Exception("Unknown key: " + k)
-                else acc.iterator.reduceLeft[Val]{merge}
-              case Some(s) => rec(s, acc)
+              case None => None
+              case Some(s) => rec(s)
             }
           }
         }
-        rec(this, Nil)
+        rec(this)
       }
     )
   }
