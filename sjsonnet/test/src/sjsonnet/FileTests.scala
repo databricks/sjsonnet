@@ -57,9 +57,9 @@ object FileTests extends TestSuite{
     "slice.sugar" - check()
     'std_all_hidden - check()
     'stdlib - {
-      check()
-      // Lock in the existing progress fleshing out the stdlib
-//      intercept[Exception]{check()}.getMessage ==> "Unknown key: setUnion"
+//      check()
+//       Lock in the existing progress fleshing out the stdlib
+      intercept[Exception]{check()}.getMessage ==> "Unknown key: thisFile"
     }
     'text_block - check()
     'unicode - check()
