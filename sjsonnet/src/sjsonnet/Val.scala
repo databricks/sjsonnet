@@ -9,6 +9,7 @@ class Ref(calc0: => Val){
 }
 sealed trait Val
 object Val{
+  def bool(b: Boolean) = if (b) True else False
   case object True extends Val
   case object False extends Val
   case object Null extends Val

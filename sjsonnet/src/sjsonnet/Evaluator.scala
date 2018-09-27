@@ -32,7 +32,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
     case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
       val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
-      if (scope.super0.get.value0.contains(key.value)) Val.True else Val.False
+      Val.bool(scope.super0.get.value0.contains(key.value))
 
     case $(offset) => scope.dollar
     case Str(offset, value) => Val.Str(value)
@@ -67,22 +67,22 @@ class Evaluator(parser: Parser, originalScope: Scope) {
             case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
             case (Val.Str(l), Expr.BinaryOp.`%`, r) => Val.Str(Format.format(l, Materializer.apply(r)))
             case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
-            case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => if (l < r) Val.True else Val.False
-            case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => if (l > r) Val.True else Val.False
-            case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => if (l <= r) Val.True else Val.False
-            case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => if (l >= r) Val.True else Val.False
+            case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
+            case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
+            case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
+            case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
             case (Val.Str(l), Expr.BinaryOp.`+`, r) => Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
             case (l, Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
             case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
             case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
             case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => if (l < r) Val.True else Val.False
-            case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => if (l > r) Val.True else Val.False
-            case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => if (l <= r) Val.True else Val.False
-            case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => if (l >= r) Val.True else Val.False
-            case (l, Expr.BinaryOp.`==`, r) => if (Materializer(l) == Materializer(r)) Val.True else Val.False
-            case (l, Expr.BinaryOp.`!=`, r) => if (Materializer(l) != Materializer(r)) Val.True else Val.False
-            case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => if (r.contains(l)) Val.True else Val.False
+            case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => Val.bool(l < r)
+            case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => Val.bool(l > r)
+            case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => Val.bool(l <= r)
+            case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
+            case (l, Expr.BinaryOp.`==`, r) => Val.bool(Materializer(l) == Materializer(r))
+            case (l, Expr.BinaryOp.`!=`, r) => Val.bool(Materializer(l) != Materializer(r))
+            case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => Val.bool(r.contains(l))
             case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
             case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
             case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)

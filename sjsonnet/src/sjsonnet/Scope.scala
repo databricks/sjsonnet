@@ -192,22 +192,22 @@ object Scope{
         Val.Num(exponent)
     }),
     "isString" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc.isInstanceOf[Val.Str]) Val.True else Val.False
+      Val.bool(n.calc.isInstanceOf[Val.Str])
     }),
     "isBoolean" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc == Val.True || n.calc == Val.False) Val.True else Val.False
+      Val.bool(n.calc == Val.True || n.calc == Val.False)
     }),
     "isNumber" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc.isInstanceOf[Val.Num]) Val.True else Val.False
+      Val.bool(n.calc.isInstanceOf[Val.Num])
     }),
     "isObject" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc.isInstanceOf[Val.Obj]) Val.True else Val.False
+      Val.bool(n.calc.isInstanceOf[Val.Obj])
     }),
     "isArray" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc.isInstanceOf[Val.Arr]) Val.True else Val.False
+      Val.bool(n.calc.isInstanceOf[Val.Arr])
     }),
     "isFunction" -> Val.Func(1, {case Seq((None, n)) =>
-        if (n.calc.isInstanceOf[Val.Func]) Val.True else Val.False
+      Val.bool(n.calc.isInstanceOf[Val.Func])
     }),
     "count" -> Val.Func(2, {case Seq((None, arr), (None, v)) =>
         val items = arr.calc.asInstanceOf[Val.Arr].value
@@ -492,7 +492,7 @@ object Scope{
         val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
         val vs1 = Materializer(v1.calc)
         val ujson.Js.Arr(vs2) = Materializer(v2.calc)
-        if(vs2.contains(vs1)) Val.True else Val.False
+        Val.bool(vs2.contains(vs1))
     }),
   )
   val Std = Val.Obj(
