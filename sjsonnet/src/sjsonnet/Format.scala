@@ -21,13 +21,12 @@ object Format{
   val integer           = P( CharIn('1' to '9') ~ CharsWhileIn('0' to '9', min = 0) | "0" )
 
   val label = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
-  val flags = P( CharsWhileIn("#0- +", min = 0).! ).log()
+  val flags = P( CharsWhileIn("#0- +", min = 0).! )
   val width = P( (integer | "*").!.? )
   val precision = P( ("." ~/ integer.!).? )
   val conversion = P( CharIn("diouxXeEfFgGcrsa%").! )
   val formatSpec = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
     case (label, flags, width, precision, conversion) =>
-      pprint.log(flags)
       FormatSpec(
         label,
         flags.contains('#'),
@@ -45,27 +44,9 @@ object Format{
   val plain = P( CharsWhile(_ != '%', min = 0).! )
   val format = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
-  def zeroPad(lhs: String, rhs: String, precision: Option[Int]) = {
-    precision match{
-      case None => rhs
-      case Some(p) =>
-        val shortage = p - rhs.length
-        (if (shortage > 0) ("0" * shortage + rhs) else rhs)
-    }
-  }
 
-  def toDecimalString(s: Int, alternate: Boolean) = {
-    val r = math.abs(s).toString
-    (if (s < 0) "-" else "", r)
-  }
-  def toOctalString(s: Int, alternate: Boolean) = {
-    val r = math.abs(s).toOctalString
-    (if (s < 0) "-" else "", r)
-  }
-  def toHexString(s: Int, alternate: Boolean) = {
-    val r = math.abs(s).toHexString
-    (if (s < 0) "-" else "", r)
-  }
+
+  def widenRaw(formatted: FormatSpec, txt: String) = widen(formatted, "", "", txt, false, false)
   def widen(formatted: FormatSpec,
             lhs: String,
             mhs: String,
@@ -101,116 +82,29 @@ object Format{
     output.append(leading)
     var i = 0
     for((formatted, literal) <- chunks){
-      pprint.log(formatted)
       val cooked0 = formatted.conversion match{
-        case '%' => widen(formatted, "", "", "%", false, false)
+        case '%' => widenRaw(formatted, "%")
         case _ =>
           val value = values(i)
           i += 1
           value match{
-            case Js.Str(s) => widen(formatted, "", "", s, false, false)
+            case Js.Str(s) => widenRaw(formatted, s)
             case Js.Num(s) =>
               formatted.conversion match{
-                case 'd' | 'i' | 'u' =>
-                  val (lhs, rhs) = toDecimalString(s.toInt, formatted.alternate)
-                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
-                  widen(
-                    formatted,
-                    lhs, "", rhs2,
-                    true, s > 0
-                  )
-                case 'o' =>
-                  val (lhs, rhs) = toOctalString(s.toInt, formatted.alternate)
-                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
-                  widen(
-                    formatted,
-                    lhs, (if (!formatted.alternate || rhs2(0) == '0') "" else "0"), rhs2,
-                    true, s > 0
-                  )
-                case 'x' =>
-                  val (lhs, rhs) = toHexString(s.toInt, formatted.alternate)
-                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
-                  widen(
-                    formatted,
-                    lhs, (if (!formatted.alternate) "" else "0x"), rhs2,
-                    true, s > 0
-                  )
-                case 'X' =>
-                  val (lhs, rhs) = toHexString(s.toInt, formatted.alternate)
-                  val rhs2 = zeroPad(lhs, rhs, formatted.precision)
-                  widen(
-                    formatted,
-                    lhs, (if (!formatted.alternate) "" else "0x"), rhs2,
-                    true, s > 0
-                  ).toUpperCase()
-
-                case 'e' =>
-                  widen(
-                    formatted,
-                    "", "",
-                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6) + "E00").format(s).replace("E", "E+").toLowerCase(),
-                    true, s > 0
-                  )
-
-                case 'E' =>
-                  widen(
-                    formatted,
-                    "", "",
-                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6) + "E00").format(s).replace("E", "E+"),
-                    true, s > 0
-                  )
-
-
-                case 'f' | 'F' =>
-                  widen(
-                    formatted,
-                    "", "",
-                    new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + "0" * formatted.precision.getOrElse(6)).format(s).replace("E", "E+").toLowerCase(),
-                    true, s > 0
-                  )
-
-                case 'g' =>
-                  val precision = formatted.precision.getOrElse(6)
-                  val leadingPrecision = math.floor(math.log10(s)).toInt + 1
-                  val trailingPrecision = math.max(0, precision - leadingPrecision)
-                  if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
-                    widen(
-                      formatted,
-                      "", "",
-                      new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * (precision - 1) + "E00").format(s).replace("E", "E+").toLowerCase(),
-                      true, s > 0
-                    )
-                  else
-                    widen(
-                      formatted,
-                      "", "",
-                      new DecimalFormat("0" * leadingPrecision + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * trailingPrecision).format(s).replace("E", "E+").toLowerCase(),
-                      true, s > 0
-                    )
-
-                case 'G' =>
-                  val precision = formatted.precision.getOrElse(6)
-                  val leadingPrecision = math.floor(math.log10(s)).toInt + 1
-                  val trailingPrecision = math.max(0, precision - leadingPrecision)
-                  if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
-                    widen(
-                      formatted,
-                      "", "",
-                      new DecimalFormat("0" + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#")  * (precision - 1) + "E00").format(s).replace("E", "E+"),
-                      true, s > 0
-                    )
-                  else
-                    widen(
-                      formatted,
-                      "", "",
-                      new DecimalFormat("0" * leadingPrecision  + (if (formatted.precision.contains(0) && !formatted.alternate) "" else ".") + (if (formatted.alternate) "0" else "#") * trailingPrecision).format(s).replace("E", "E+").toLowerCase(),
-                      true, s > 0
-                    )
-                case 'c' => widen(formatted, "", "", s.toChar.toString , false, false)
+                case 'd' | 'i' | 'u' => formatInteger(formatted, s)
+                case 'o' => formatOctal(formatted, s)
+                case 'x' => formatHexadecimal(formatted, s)
+                case 'X' => formatHexadecimal(formatted, s).toUpperCase
+                case 'e' => formatExponent(formatted, s).toLowerCase
+                case 'E' => formatExponent(formatted, s)
+                case 'f' | 'F' => formatFloat(formatted, s)
+                case 'g' => formatGeneric(formatted, s).toLowerCase
+                case 'G' => formatGeneric(formatted, s)
+                case 'c' => widenRaw(formatted, s.toChar.toString)
               }
-            case Js.True => widen(formatted, "", "", "true", false, false)
-            case Js.False => widen(formatted, "", "", "false", false, false)
-            case v => widen(formatted, "", "", v.toString, false, false)
+            case Js.True => widenRaw(formatted, "true")
+            case Js.False => widenRaw(formatted, "false")
+            case v => widenRaw(formatted, v.toString)
           }
 
       }
@@ -222,5 +116,92 @@ object Format{
     }
 
     output.toString()
+  }
+
+  def formatInteger(formatted: FormatSpec, s: Double) = {
+    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toString)
+    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+    widen(
+      formatted,
+      lhs, "", rhs2,
+      true, s > 0
+    )
+  }
+
+  def formatFloat(formatted: FormatSpec, s: Double) = {
+    widenDecimalFormat(
+      formatted,
+      "0" + decimalPoint(formatted) + "0" * formatted.precision.getOrElse(6),
+      s
+    )
+  }
+
+  def formatOctal(formatted: FormatSpec, s: Double) = {
+    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toOctalString)
+    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+    widen(
+      formatted,
+      lhs, if (!formatted.alternate || rhs2(0) == '0') "" else "0", rhs2,
+      true, s > 0
+    )
+  }
+
+  def formatHexadecimal(formatted: FormatSpec, s: Double) = {
+    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toHexString)
+    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+    widen(
+      formatted,
+      lhs, if (!formatted.alternate) "" else "0x", rhs2,
+      true, s > 0
+    )
+  }
+
+  def precisionPad(lhs: String, rhs: String, precision: Option[Int]) = {
+    precision match{
+      case None => rhs
+      case Some(p) =>
+        val shortage = p - rhs.length
+        if (shortage > 0) "0" * shortage + rhs else rhs
+    }
+  }
+
+  def widenDecimalFormat(formatted: FormatSpec, template: String, s: Double) = {
+    widen(
+      formatted,
+      if (s < 0) "-" else "", "",
+      new DecimalFormat(template).format(math.abs(s)).replace("E", "E+"),
+      true, s > 0
+    )
+  }
+
+  def formatGeneric(formatted: FormatSpec, s: Double) = {
+    val precision = formatted.precision.getOrElse(6)
+    val leadingPrecision = math.floor(math.log10(s)).toInt + 1
+    val trailingPrecision = math.max(0, precision - leadingPrecision)
+    val trailingPlaceholders = if (formatted.alternate) "0" else "#"
+    if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
+      widenDecimalFormat(
+        formatted,
+        "0" + decimalPoint(formatted) + trailingPlaceholders * (precision - 1) + "E00",
+        s
+      )
+    else
+      widenDecimalFormat(
+        formatted,
+        "0" * leadingPrecision + decimalPoint(formatted) + trailingPlaceholders * trailingPrecision,
+        s
+      )
+  }
+
+  def formatExponent(formatted: FormatSpec, s: Double) = {
+    widenDecimalFormat(
+      formatted,
+      "0" + decimalPoint(formatted) + "0" * formatted.precision.getOrElse(6) + "E00",
+      s
+    )
+  }
+
+  def decimalPoint(formatted: FormatSpec) = {
+    if (formatted.precision.contains(0) && !formatted.alternate) "" else "."
   }
 }
