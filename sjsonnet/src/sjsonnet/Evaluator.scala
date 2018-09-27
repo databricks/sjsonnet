@@ -1,8 +1,19 @@
 package sjsonnet
 import Expr._
 import ammonite.ops.{Path, RelPath}
-object Evaluator extends Evaluator(Scope.Empty)
-class Evaluator(originalScope: Scope) {
+object Evaluator {
+  def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
+    def rec(current: Val.Obj): Val.Obj = {
+      current.`super` match{
+        case None => Val.Obj(current.value0, Some(lhs))
+        case Some(x) => Val.Obj(current.value0, Some(rec(x)))
+      }
+    }
+    rec(rhs)
+  }
+
+}
+class Evaluator(parser: Parser, originalScope: Scope) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: => Scope): Val = expr match{
@@ -75,7 +86,7 @@ class Evaluator(originalScope: Scope) {
             case (Val.Num(l), "&", Val.Num(r)) => Val.Num(l.toLong & r.toLong)
             case (Val.Num(l), "^", Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
             case (Val.Num(l), "|", Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-            case (l: Val.Obj, "+", r: Val.Obj) => mergeObjects(l, r)
+            case (l: Val.Obj, "+", r: Val.Obj) => Evaluator.mergeObjects(l, r)
             case (Val.Arr(l), "+", Val.Arr(r)) => Val.Arr(l ++ r)
           }
         }
@@ -96,7 +107,7 @@ class Evaluator(originalScope: Scope) {
       imports.getOrElseUpdate(
         p,
         visitExpr(
-          Parser.expr.parse(ammonite.ops.read(p)).get.value,
+          parser.expr.parse(ammonite.ops.read(p)).get.value,
           originalScope.copy(cwd = p / ammonite.ops.up)
         )
       )
@@ -146,19 +157,9 @@ class Evaluator(originalScope: Scope) {
     case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
       val extension = visitObjBody(ext, scope)
-      mergeObjects(original, extension)
+      Evaluator.mergeObjects(original, extension)
     }
   }
-  def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
-    def rec(current: Val.Obj): Val.Obj = {
-      current.`super` match{
-        case None => Val.Obj(current.value0, Some(lhs))
-        case Some(x) => Val.Obj(current.value0, Some(rec(x)))
-      }
-    }
-    rec(rhs)
-  }
-
 
   def visitFieldName(fieldName: FieldName, scope: => Scope) = {
     fieldName match{

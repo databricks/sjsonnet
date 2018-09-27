@@ -7,8 +7,9 @@ object FileTests extends TestSuite{
     val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)),
       ammonite.ops.pwd / 'test_suite
     )
-    new Evaluator(scope).visitExpr(
-      Parser.expr.parse(s).get.value,
+    val parser = new Parser
+    new Evaluator(parser, scope).visitExpr(
+      parser.expr.parse(s).get.value,
       scope
     )
   }

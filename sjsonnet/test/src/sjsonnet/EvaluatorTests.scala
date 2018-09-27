@@ -4,7 +4,9 @@ import utest._
 
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
-    Evaluator.visitExpr(Parser.expr.parse(s).get.value, Scope.Empty)
+    val emptyScope = new Scope(None, None, None, Map.empty, ammonite.ops.pwd)
+    val parser = new Parser()
+    new Evaluator(parser, emptyScope).visitExpr(parser.expr.parse(s).get.value, Scope.Empty)
   }
   def tests = Tests{
     'arithmetic - {

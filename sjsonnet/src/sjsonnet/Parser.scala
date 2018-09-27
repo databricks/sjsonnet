@@ -1,8 +1,8 @@
 package sjsonnet
 
-import fastparse.WhitespaceApi
+import fastparse.{WhitespaceApi, core}
 
-object Parser{
+class Parser{
   val precedenceTable = Seq(
     Seq("*", "/", "%"),
     Seq("+", "-"),
@@ -23,14 +23,47 @@ object Parser{
 
   val White = WhitespaceApi.Wrapper {
     import fastparse.all._
-    NoTrace(
-      (
-        CharsWhileIn(" \t\n", 1) |
-        "/*" ~ (!"*/" ~ AnyChar).rep ~ "*/"  |
-        "//" ~ CharsWhile(_ != '\n', 0) |
-        "#" ~ CharsWhile(_ != '\n', 0)
-      ).rep
-    )
+    // Custom parser for whitespace consumption, since this parser is used
+    // everywhere and thus dominates performance when written normally using
+    // combinators
+    new P[Unit]{
+      def parseRec(cfg: core.ParseCtx[Char, String], index: Int) = {
+        def rec(current: Int, state: Int): Mutable.Success[Unit] = {
+          if (current >= cfg.input.length) this.success(cfg.success, (), current, Set.empty, false)
+          else state match{
+            case 0 =>
+              cfg.input(current) match{
+                case ' ' | '\t' | '\n' => rec(current + 1, state)
+                case '#' => rec(current + 1, state = 1)
+                case '/' => rec(current + 1, state = 2)
+                case _ => this.success(cfg.success, (), current, Set.empty, false)
+              }
+            case 1 =>
+              cfg.input(current) match{
+                case '\n' => rec(current + 1, state = 0)
+                case _ => rec(current + 1, state)
+              }
+            case 2 =>
+              cfg.input(current) match{
+                case '/' => rec(current + 1, state = 1)
+                case '*' => rec(current + 1, state = 3)
+                case _ => this.success(cfg.success, (), current - 1, Set.empty, false)
+              }
+            case 3 =>
+              cfg.input(current) match{
+                case '*' => rec(current + 1, state = 4)
+                case _ => rec(current + 1, state)
+              }
+            case 4 =>
+              cfg.input(current) match{
+                case '/' => rec(current + 1, state = 0)
+                case _ => rec(current + 1, state)
+              }
+          }
+        }
+        rec(current = index, state = 0)
+      }
+    }
   }
   import fastparse.noApi._
   import White._
@@ -73,7 +106,7 @@ object Parser{
     "@\"".~/ ~~ (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"" |
     "@'".~/ ~~ (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" |
     "|||".~/ ~~ CharsWhileIn(" \t", 0) ~~ "\n" ~~ tripleBarStringHead.flatMap { case (pre, w, head) =>
-      tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
+      tripleBarCache.getOrElseUpdate(w, tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _))
     } ~~ "\n" ~~ CharsWhileIn(" \t", min=0) ~~ "|||"
   ).map(_.mkString).opaque()
 
@@ -83,6 +116,7 @@ object Parser{
     CharsWhile(_ != '\n').!
   )
   val tripleBarBlank = P( "\n" ~~ CharsWhileIn(" \t", min=0) ~~ &("\n").map(_ => "\n") )
+  val tripleBarCache = collection.mutable.Map.empty[String, P[Seq[String]]]
   def tripleBarStringBody(w: String) = P(
     (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
