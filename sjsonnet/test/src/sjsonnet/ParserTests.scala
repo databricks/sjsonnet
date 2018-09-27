@@ -43,5 +43,4 @@ object ParserTests extends TestSuite{
 //      parse("[1, [2, 3], 4]") ==> Arr(Seq(Num(1), Arr(Seq(Num(2), Num(3))), Num(4)))
     }
   }
-
 }
