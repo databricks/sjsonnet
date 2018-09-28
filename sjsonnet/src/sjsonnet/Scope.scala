@@ -501,6 +501,11 @@ object Scope{
         val ujson.Js.Arr(vs2) = Materializer(v2.calc)
         Val.bool(vs2.contains(vs1))
     }),
+    "split" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
+        val Val.Str(vs1) = v1.calc
+        val Val.Str(vs2) = v2.calc
+        Val.Arr(vs1.split(vs2).map(s => Ref(Val.Str(s))))
+    }),
   )
   val Std = Val.Obj(
     functions
