@@ -16,7 +16,7 @@ object ErrorTests extends TestSuite{
   }
   def check(expected: String)(implicit tp: utest.framework.TestPath) = {
     val res = intercept[Exception]{
-      Materializer(eval(testSuiteRoot / s"error.${tp.value.last}.jsonnet"))
+      Materializer(eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet"))
     }
     res match{
       case EvaluatorError(_, _, Some(e)) => e.printStackTrace()
@@ -180,5 +180,33 @@ object ErrorTests extends TestSuite{
         |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
         |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
     )
+    "invariant" - {
+      "avoid_output_change" - check(
+        """sjsonnet.EvaluatorError: foobar
+          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
+          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
+      )
+      "equality" - check(
+        """sjsonnet.EvaluatorError: Assertion failed
+          |.(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:10)""".stripMargin
+      )
+      "option" - check(
+        """sjsonnet.EvaluatorError: foobar
+          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
+          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
+      )
+      "simple" - check(
+        """sjsonnet.EvaluatorError: Assertion failed
+          |.(sjsonnet/test/resources/test_suite/error.invariant.simple.jsonnet:18:10)""".stripMargin
+      )
+      "simple2" - check(
+        """sjsonnet.EvaluatorError: Assertion failed: my error message
+          |.(sjsonnet/test/resources/test_suite/error.invariant.simple2.jsonnet:18:12)""".stripMargin
+      )
+      "simple3" - check(
+        """sjsonnet.EvaluatorError: my error message
+          |.(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)""".stripMargin
+      )
+    }
   }
 }

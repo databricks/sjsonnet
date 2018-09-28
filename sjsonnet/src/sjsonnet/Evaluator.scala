@@ -342,7 +342,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         (self, sup) => makeNewScope(self, sup)
       )
 
-      lazy val newSelf = Val.Obj(
+      lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
@@ -354,7 +354,15 @@ class Evaluator(parser: Parser, originalScope: Scope) {
             ))
 
           case _: Member.BindStmt => None
-          case Member.AssertStmt(value, msg) => None
+          case Member.AssertStmt(value, msg) =>
+            val newScope: Scope = scope//makeNewScope(newSelf, None)
+            if (visitExpr(value, newScope) != Val.True) {
+              msg match{
+                case None => Evaluator.fail("Assertion failed", scope.fileName, value.offset)
+                case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value, scope.fileName, value.offset)
+              }
+            }
+            None
         }.toMap,
         None
       )
