@@ -17,7 +17,13 @@ object Main {
                 System.exit(1)
               case Right((config, rest)) =>
                 val path = ammonite.ops.Path(file, ammonite.ops.pwd)
-                val interp = new Interpreter(new Parser, Scope.standard(path, Nil))
+                val interp = new Interpreter(
+                  new Parser,
+                  Scope.standard(
+                    path,
+                    config.jpaths.map(ammonite.ops.Path(_, ammonite.ops.pwd)).toList
+                  )
+                )
                 interp.interpret(path) match{
                   case Left(errMsg) =>
                     System.err.println(errMsg)
