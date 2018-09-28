@@ -18,6 +18,10 @@ object ErrorTests extends TestSuite{
     val res = intercept[Exception]{
       Materializer(eval(testSuiteRoot / s"error.${tp.value.last}.jsonnet"))
     }
+    res match{
+      case EvaluatorError(_, _, Some(e)) => e.printStackTrace()
+      case _ => //do nothing
+    }
     val err = res.toString + "\n" + res.getStackTrace.mkString("\n")
     assert(err == expected)
   }
@@ -110,6 +114,71 @@ object ErrorTests extends TestSuite{
     "field_not_exist" - check(
       """sjsonnet.EvaluatorError: Field does not exist: y
         |.(sjsonnet/test/resources/test_suite/error.field_not_exist.jsonnet:17:9)""".stripMargin
+    )
+//    "function_arg_positional_after_named" - check(
+//      """sjsonnet.EvaluatorError: Field does not exist: y
+//        |.(sjsonnet/test/resources/test_suite/error.field_not_exist.jsonnet:17:9)""".stripMargin
+//    )
+
+    "function_duplicate_arg" - check(
+      """sjsonnet.EvaluatorError: Parameter passed more than once: x
+        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
+        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)""".stripMargin
+    )
+//    "function_duplicate_param" - check(
+//      """sjsonnet.EvaluatorError: Parameter passed more than once: x
+//        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
+//        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)""".stripMargin
+//    )
+//    "function_infinite_default" - check(
+//      """sjsonnet.EvaluatorError: Parameter passed more than once: x
+//        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
+//        |.(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)""".stripMargin
+//    )
+    "function_too_many_args" - check(
+      """sjsonnet.EvaluatorError: Too many args, function has 2 parameter(s)
+        |.(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:17:7)
+        |.(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)""".stripMargin
+    )
+    "import_empty" - check(
+      """sjsonnet.EvaluatorError: Couldn't import file: ""
+        |.(sjsonnet/test/resources/test_suite/error.import_empty.jsonnet:17:1)""".stripMargin
+    )
+    "import_folder" - check(
+      """sjsonnet.EvaluatorError: Couldn't import file: "lib"
+        |.(sjsonnet/test/resources/test_suite/error.import_folder.jsonnet:17:1)""".stripMargin
+    )
+    "import_folder_slash" - check(
+      """sjsonnet.EvaluatorError: Couldn't import file: "lib/"
+        |.(sjsonnet/test/resources/test_suite/error.import_folder_slash.jsonnet:17:1)""".stripMargin
+    )
+    "import_static-check-failure" - check(
+      """sjsonnet.EvaluatorError: Unknown variable x
+        |.(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)""".stripMargin
+    )
+    "import_syntax-error" - check(
+      """sjsonnet.EvaluatorError: Imported file "lib/syntax_error.jsonnet" had syntax error string:1:1 ..."\"\n"
+        |.(sjsonnet/test/resources/test_suite/error.import_syntax-error.jsonnet:1:1)""".stripMargin
+    )
+    "inside_equals_array" - check(
+      """sjsonnet.EvaluatorError: foobar
+        |.(sjsonnet/test/resources/test_suite/error.inside_equals_array.jsonnet:18:18)
+        |.(sjsonnet/test/resources/test_suite/error.inside_equals_array.jsonnet:19:3)""".stripMargin
+    )
+    "inside_equals_object" - check(
+      """sjsonnet.EvaluatorError: foobar
+        |.(sjsonnet/test/resources/test_suite/error.inside_equals_object.jsonnet:18:22)
+        |.(sjsonnet/test/resources/test_suite/error.inside_equals_object.jsonnet:19:3)""".stripMargin
+    )
+    "inside_tostring_array" - check(
+      """sjsonnet.EvaluatorError: foobar
+        |.(sjsonnet/test/resources/test_suite/error.inside_tostring_array.jsonnet:17:8)
+        |.(sjsonnet/test/resources/test_suite/error.inside_tostring_array.jsonnet:17:24)""".stripMargin
+    )
+    "inside_tostring_object" - check(
+      """sjsonnet.EvaluatorError: foobar
+        |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
+        |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
     )
   }
 }

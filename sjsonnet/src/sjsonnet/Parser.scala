@@ -261,9 +261,23 @@ class Parser{
   val fieldname = P( id.map(Expr.FieldName.Fixed) | string.map(Expr.FieldName.Fixed) | "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]" )
   val assertStmt = P( "assert" ~/ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
   val bind = P( Index ~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
-  val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).map(Expr.Args)
+  val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMap{x =>
+    if (x.sliding(2).exists(t => t(0)._1.isDefined && t(1)._1.isEmpty)) {
+      Fail.opaque("no positional params after named params")
+    } else Pass.map(_ => Expr.Args(x))
+  }
 
-  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).map(Expr.Params)
+  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).flatMap{x =>
+    val seen = collection.mutable.Set.empty[String]
+    var overlap: String = null
+    for((k, v) <- x){
+      if (seen(k)) overlap = k
+      else seen.add(k)
+    }
+    if (overlap == null) Pass.map(_ => Expr.Params(x))
+    else Fail.opaque("no duplicate parameter: " + overlap)
+
+  }
 
   val binaryop = P( precedenceTable.flatten.sortBy(-_.length).map(LiteralStr).reduce(_ | _) ).!
   val unaryop	= P("-" | "+" | "!" | "~").!
