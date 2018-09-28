@@ -19,7 +19,7 @@ object Evaluator {
   def tryCatch[T](scope: Scope, offset: Int): PartialFunction[Throwable, Nothing] = {
       case e: Error => throw e
       case e: DelegateError =>
-        throw new Error(e.msg, Nil, Some(e))
+        throw new Error(e.msg, Nil, None)
           .addFrame(scope.fileName, offset)
       case e: Throwable =>
         throw new Error("Internal Error", Nil, Some(e))
@@ -28,7 +28,7 @@ object Evaluator {
   def tryCatch2[T](path: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(path, offset)
     case e: DelegateError =>
-      throw new Error(e.msg, Nil, Some(e))
+      throw new Error(e.msg, Nil, None)
         .addFrame(path, offset)
     case e: Throwable =>
       throw new Error("Internal Error", Nil, Some(e))

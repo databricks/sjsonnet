@@ -64,7 +64,7 @@ object FileTests extends TestSuite{
           |""".stripMargin
       )
     }
-//    'text_block - check()
+    'text_block - check()
     'unicode - check()
     'unix_line_endings - checkGolden()
     'unparse - checkGolden()

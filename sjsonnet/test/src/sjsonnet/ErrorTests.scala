@@ -122,7 +122,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "function_arg_positional_after_named" - check(
-      """Parse Error: no positional params after named params:19:11 ...")\n"""".stripMargin
+      """Parse Error: expected no positional params after named params:19:11 ...")\n"""".stripMargin
     )
 
     "function_duplicate_arg" - check(
@@ -132,7 +132,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "function_duplicate_param" - check(
-      """Parse Error: no duplicate parameter: x:17:14 ...") x\n"""".stripMargin
+      """Parse Error: expected no duplicate parameter: x:17:14 ...") x\n"""".stripMargin
     )
 //    "function_infinite_default" - check(
 //      """sjsonnet.Error: Parameter passed more than once: x

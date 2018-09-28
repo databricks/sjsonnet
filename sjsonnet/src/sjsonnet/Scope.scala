@@ -14,7 +14,7 @@ object Scope{
         val x1 = Materializer(v1.calc)
         val x2 = Materializer(v2.calc)
         if (x1 == x2) Val.True
-        else throw new Exception("assertEqual failed: " + x1 + " != " + x2)
+        else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
     }),
     "toString" -> Val.Func(1, {case Seq((None, v1)) =>
         v1.calc match{

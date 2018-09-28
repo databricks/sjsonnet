@@ -4,7 +4,10 @@ import utest._
 import ujson.Js
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
-    new Interpreter(new Parser(), Scope.empty).interpret(s).right.get
+    new Interpreter(new Parser(), Scope.empty).interpret(s) match{
+      case Right(x) => x
+      case Left(e) => throw new Exception(e)
+    }
   }
   def tests = Tests{
     'arithmetic - {
@@ -128,7 +131,20 @@ object EvaluatorTests extends TestSuite{
       eval("""{ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }""") ==>
         ujson.read("""{ "1": 4, "2": 5, "3": 6 }""")
     }
-
+    'shadowing - {
+      eval("local x = 1; local x = 2; x") ==> Js.Num(2)
+      eval("local x = 1; x + local x = 2; x") ==> Js.Num(3)
+      eval("""local str1 = |||
+             |        text
+             |    |||;
+             |
+             |local str1 = |||
+             |        \n
+             |    |||;
+             |
+             |(str1 == "\\n\n")
+             |""".stripMargin) ==> Js.True
+    }
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
 //      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")

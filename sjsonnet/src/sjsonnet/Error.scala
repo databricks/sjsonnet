@@ -11,15 +11,24 @@ case class Error(msg: String,
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
   def addFrame(fileName: Path, offset: Int) = {
-    val Array(line, col) = StringReprOps.prettyIndex(
-      new IndexedParserInput(ammonite.ops.read(fileName))(StringReprOps), offset
-    ).split(':')
+    val newFrame = if (ammonite.ops.exists(fileName)){
+      val Array(line, col) = StringReprOps.prettyIndex(
+        new IndexedParserInput(ammonite.ops.read(fileName))(StringReprOps), offset
+      ).split(':')
 
-    val newFrame = new StackTraceElement(
-      "", "",
-      fileName.relativeTo(ammonite.ops.pwd).toString + ":" + line,
-      col.toInt
-    )
+      new StackTraceElement(
+        "", "",
+        fileName.relativeTo(ammonite.ops.pwd).toString + ":" + line,
+        col.toInt
+      )
+    }else{
+      new StackTraceElement(
+        "", "",
+        fileName.relativeTo(ammonite.ops.pwd).toString + " offset:",
+        offset
+      )
+    }
+
 
     this.copy(stack = newFrame :: this.stack)
   }
