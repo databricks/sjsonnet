@@ -130,6 +130,7 @@ object EvaluatorTests extends TestSuite{
 
       eval("""{ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }""") ==>
         ujson.read("""{ "1": 4, "2": 5, "3": 6 }""")
+      eval("""{local y = x, [x]: y, for x in ["foo"]}.foo""") ==> Js.Str("foo")
     }
     'shadowing - {
       eval("local x = 1; local x = 2; x") ==> Js.Num(2)

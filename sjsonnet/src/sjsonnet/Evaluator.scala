@@ -374,37 +374,38 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(scope)
       )
 
-      lazy val newScope: Scope = new Scope(
-        scope.dollar0.orElse(Some(newSelf)),
-        Some(newSelf),
-        None,
-        newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
-        scope.fileName,
-        scope.searchRoots,
-        Some(scope)
-      )
-
-      lazy val newBindings = visitBindings(
-        (preLocals ++ postLocals).collect{ case Member.BindStmt(b) => b},
-        (self, sup) => newScope
-      )
-
-      lazy val newSelf = Val.Obj(
+      lazy val newSelf: Val.Obj = Val.Obj(
         visitComp(first :: rest.toList, Seq(compScope))
-          .flatMap(s =>
-            visitExpr(key, s) match{
+          .flatMap { s =>
+
+            lazy val newScope: Scope = new Scope(
+              scope.dollar0.orElse(Some(newSelf)),
+              Some(newSelf),
+              None,
+              newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
+              scope.fileName,
+              scope.searchRoots,
+              Some(s)
+            )
+
+            lazy val newBindings = visitBindings(
+              (preLocals ++ postLocals).collect{ case Member.BindStmt(b) => b},
+              (self, sup) => newScope
+            )
+
+            visitExpr(key, s) match {
               case Val.Str(k) =>
                 Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
                   Ref(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
-                    newBindings
+                      newBindings
                   ))
                 ))
               case Val.Null => None
             }
 
-          )
+          }
           .toMap,
         _ => (),
         None
