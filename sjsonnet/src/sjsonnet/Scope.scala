@@ -88,8 +88,9 @@ object Scope{
         val formatStr = v1.calc.asInstanceOf[Val.Str].value
 
         val items = Materializer(v2.calc) match{
-          case x: ujson.Js.Arr => x.value
-          case x => Seq(x)
+          case x: ujson.Js.Arr => x
+          case x: ujson.Js.Obj => x
+          case x => ujson.Js.Arr(x)
         }
         Val.Str(Format.format(formatStr, items))
     }),
