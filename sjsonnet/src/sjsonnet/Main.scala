@@ -11,19 +11,19 @@ object Main {
         leftover match{
           case List(file) =>
             val path = ammonite.ops.Path(file, ammonite.ops.pwd)
-            val parser = new Parser()
-            val parsed = parser.expr.parse(ammonite.ops.read(path)).get.value
-            val emptyScope = new Scope(
-              None, None, None, Map("std" -> Ref(Scope.Std)), path, Nil, None
-            )
-            val evaluator = new Evaluator(parser, emptyScope)
-            val value = evaluator.visitExpr(parsed, emptyScope)
-            val materialized = Materializer(value)
-            val str = materialized.render(indent = 4)
-            config.outputFile match{
-              case None => println(str)
-              case Some(f) => ammonite.ops.write(ammonite.ops.Path(f, ammonite.ops.pwd), str)
+            val interp = new Interpreter(new Parser, Scope.standard(path, Nil))
+            interp.interpret(path) match{
+              case Left(errMsg) =>
+                System.err.println(errMsg)
+                System.exit(1)
+              case Right(materialized) =>
+                val str = materialized.render(indent = 4)
+                config.outputFile match{
+                  case None => println(str)
+                  case Some(f) => ammonite.ops.write(ammonite.ops.Path(f, ammonite.ops.pwd), str)
+                }
             }
+
           case _ =>
             println(Cli.help)
             System.exit(1)

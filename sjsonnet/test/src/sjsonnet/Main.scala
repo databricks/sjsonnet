@@ -49,13 +49,8 @@ object Main {
 //        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
 //        println(name)
         val path = FileTests.testSuiteRoot / s"$name.jsonnet"
-        val source = ammonite.ops.read(path)
-        val parsed = parser.expr.parse(new String(source)).get.value
-        val emptyScope = new Scope(
-          None, None, None, Map("std" -> Ref(Scope.Std)), path, List(), None
-        )
-
-        val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)
+        val interp = new Interpreter(parser, Scope.standard(path, Nil))
+        interp.interpret(path)
       }
     }
     println(count)

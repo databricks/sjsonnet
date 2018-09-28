@@ -8,7 +8,7 @@ import sjsonnet.Expr.Member.Visibility
 
 
 object Scope{
-  def Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", List(), None)
+
   val functions = Seq[(String, Val.Func)](
     "assertEqual" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val x1 = Materializer(v1.calc)
@@ -504,6 +504,9 @@ object Scope{
     _ => (),
     None
   )
+
+  def empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", List(), None)
+  def standard(p: Path, s: List[Path]) = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), p, s, None)
 }
 
 case class Scope(dollar0: Option[Val.Obj],

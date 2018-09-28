@@ -5,17 +5,17 @@ import utest._
 object FileTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(p: ammonite.ops.Path) = {
-    val s = ammonite.ops.read(p)
-    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), p, Nil, None)
-    val parser = new Parser
-    new Evaluator(parser, scope).visitExpr(
-      parser.expr.parse(s).get.value,
-      scope
-    )
+    val interp = new Interpreter(new Parser, Scope.standard(p, Nil))
+    interp.interpret(p)
   }
   def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
-    val res = Materializer(eval(testSuiteRoot / s"${tp.value.last}.jsonnet"))
-    assert(res == expected)
+    val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
+    assert(res == Right(expected))
+    res
+  }
+  def checkFail(expected: String)(implicit tp: utest.framework.TestPath) = {
+    val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
+    assert(res == Left(expected))
     res
   }
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
@@ -58,7 +58,11 @@ object FileTests extends TestSuite{
     'stdlib - {
 //      check()
 //       Lock in the existing progress fleshing out the stdlib
-      intercept[Exception]{check()}.getMessage ==> "Field does not exist: thisFile"
+      checkFail(
+        """sjsonnet.Error: Field does not exist: thisFile
+          |    at .(sjsonnet/test/resources/test_suite/stdlib.jsonnet:378:9)
+          |""".stripMargin
+      )
     }
 //    'text_block - check()
     'unicode - check()
