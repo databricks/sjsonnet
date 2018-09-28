@@ -256,5 +256,8 @@ object FormatTests extends TestSuite{
       """{ "name": "foo", "id": 3991, "a": 17, "b": 18, "c": 17, "x": 100 }""",
       "foo[03991]-111211d"
     )
+
+    // apparently you can pass in positional parameters to named interpolations
+    check("XXX%(ignored_lols)sXXX %s", """[1.1, 2]""", "XXX1.1XXX 2")
   }
 }

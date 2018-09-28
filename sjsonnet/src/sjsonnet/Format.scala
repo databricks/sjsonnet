@@ -89,7 +89,10 @@ object Format{
 
           val value = formatted.label match{
             case None => values(i)
-            case Some(key) => values(key)
+            case Some(key) =>
+              if (values.isInstanceOf[ujson.Js.Arr]) values(i)
+              else if (values.isInstanceOf[ujson.Js.Obj]) values(key)
+              else ???
           }
           i += 1
           value match{
@@ -106,6 +109,9 @@ object Format{
                 case 'g' => formatGeneric(formatted, s).toLowerCase
                 case 'G' => formatGeneric(formatted, s)
                 case 'c' => widenRaw(formatted, s.toChar.toString)
+                case 's' =>
+                  if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
+                  else widenRaw(formatted, s.toString)
               }
             case Js.True => widenRaw(formatted, "true")
             case Js.False => widenRaw(formatted, "false")
