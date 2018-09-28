@@ -501,7 +501,7 @@ object Scope{
     "split" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val Val.Str(vs1) = v1.calc
         val Val.Str(vs2) = v2.calc
-        Val.Arr(vs1.split(vs2).map(s => Ref(Val.Str(s))))
+        Val.Arr(vs1.split(java.util.regex.Pattern.quote(vs2)).map(s => Ref(Val.Str(s))))
     }),
     "stringChars" -> Val.Func(2, {case Seq((None, v1)) =>
         val Val.Str(vs1) = v1.calc
