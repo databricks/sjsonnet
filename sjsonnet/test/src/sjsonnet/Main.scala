@@ -51,7 +51,7 @@ object Main {
         val source = ammonite.ops.read(FileTests.testSuiteRoot / s"$name.jsonnet")
         val parsed = parser.expr.parse(new String(source)).get.value
         val emptyScope = new Scope(
-          None, None, None, Map("std" -> Ref(Scope.Std)), FileTests.testSuiteRoot, None
+          None, None, None, Map("std" -> Ref(Scope.Std)), List(FileTests.testSuiteRoot), None
         )
 
         val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)

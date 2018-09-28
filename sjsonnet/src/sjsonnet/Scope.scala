@@ -8,7 +8,7 @@ import sjsonnet.Expr.Member.Visibility
 
 
 object Scope{
-  val Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd, None)
+  val Empty = new Scope(None, None, None, Map.empty, List(ammonite.ops.pwd), None)
   val functions = Seq[(String, Val.Func)](
     "assertEqual" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val x1 = Materializer(v1.calc)
@@ -508,7 +508,7 @@ case class Scope(dollar0: Option[Val.Obj],
                  self0: Option[Val.Obj],
                  super0: Option[Val.Obj],
                  bindings0: Map[String, Ref],
-                 cwd: Path,
+                 searchRoots: List[Path],
                  delegate: Option[Scope]){
   def dollar = dollar0.get
   def self = self0.get
@@ -523,7 +523,7 @@ case class Scope(dollar0: Option[Val.Obj],
       self0,
       super0,
       traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}.toMap,
-      cwd,
+      searchRoots,
       Some(this)
     )
   }

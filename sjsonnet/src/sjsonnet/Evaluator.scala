@@ -104,18 +104,19 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
     case Import(offset, value) =>
 
-      val p = scope.cwd / RelPath(value)
+      val p = scope.searchRoots.map(_  / RelPath(value)).find(ammonite.ops.exists).get
       imports.getOrElseUpdate(
         p,
         visitExpr(
           parser.expr.parse(ammonite.ops.read(p)).get.value,
-          originalScope.copy(cwd = p / ammonite.ops.up)
+          originalScope.copy(searchRoots = p / ammonite.ops.up :: scope.searchRoots.tail)
         )
       )
 
 
     case ImportStr(offset, value) =>
-      val p = scope.cwd / RelPath(value)
+
+      val p = scope.searchRoots.map(_  / RelPath(value)).find(ammonite.ops.exists).get
       Val.Str(
         importStrs.getOrElseUpdate(
           p,
@@ -205,7 +206,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(self),
         sup,
         newBindings.map{case (k, v) => (k, v.apply(self, sup))}.toMap,
-        scope.cwd,
+        scope.searchRoots,
         Some(scope)
       )
 
@@ -239,7 +240,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.self0,
         None,
         Map(),
-        scope.cwd,
+        scope.searchRoots,
         Some(scope)
       )
 
@@ -248,7 +249,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(newSelf),
         None,
         newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
-        scope.cwd,
+        scope.searchRoots,
         Some(scope)
       )
 

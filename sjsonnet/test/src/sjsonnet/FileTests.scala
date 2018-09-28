@@ -5,7 +5,7 @@ import utest._
 object FileTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(s: String) = {
-    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), testSuiteRoot, None)
+    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), List(testSuiteRoot), None)
     val parser = new Parser
     new Evaluator(parser, scope).visitExpr(
       parser.expr.parse(s).get.value,
