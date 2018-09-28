@@ -9,8 +9,8 @@ object Evaluator {
   def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
     def rec(current: Val.Obj): Val.Obj = {
       current.`super` match{
-        case None => Val.Obj(current.value0, Some(lhs))
-        case Some(x) => Val.Obj(current.value0, Some(rec(x)))
+        case None => Val.Obj(current.value0, _ => (), Some(lhs))
+        case Some(x) => Val.Obj(current.value0, _ => (), Some(rec(x)))
       }
     }
     rec(rhs)
@@ -39,7 +39,7 @@ object Evaluator {
 case class EvaluatorError(msg: String,
                           stack: List[StackTraceElement],
                           underlying: Option[Throwable])
-  extends Exception(msg){
+  extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
   def addFrame(fileName: Path, offset: Int) = {
     val Array(line, col) = StringReprOps.prettyIndex(
@@ -153,7 +153,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
                 Evaluator.tryCatch2(scope.fileName, offset) {
                   Val.bool(Materializer(l) != Materializer(r))
                 }
-              case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => Val.bool(r.contains(l))
+              case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
               case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
               case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
               case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
@@ -342,28 +342,44 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         (self, sup) => makeNewScope(self, sup)
       )
 
-      lazy val newSelf: Val.Obj = Val.Obj(
-        value.flatMap {
-          case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
-              Ref(visitExpr(rhs, makeNewScope(self, sup)))
-            }))
-          case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
-              Ref(visitMethod(makeNewScope(self, sup), rhs, argSpec, offset))
-            ))
+      var asserting: Boolean = false
+      def assertions(self: Val.Obj) = if (!asserting) {
+        asserting = true
+        val newScope: Scope = makeNewScope(self, self.`super`)
 
-          case _: Member.BindStmt => None
+        value.collect {
           case Member.AssertStmt(value, msg) =>
-            val newScope: Scope = scope//makeNewScope(newSelf, None)
+
             if (visitExpr(value, newScope) != Val.True) {
               msg match{
                 case None => Evaluator.fail("Assertion failed", scope.fileName, value.offset)
                 case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value, scope.fileName, value.offset)
               }
             }
-            None
+        }
+      }
+
+      lazy val newSelf: Val.Obj = Val.Obj(
+        value.flatMap {
+          case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+              Ref {
+                assertions(self)
+                visitExpr(rhs, makeNewScope(self, sup))
+              }
+            }))
+          case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+              Ref {
+                assertions(self)
+                visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
+              }
+            }))
+
+          case _: Member.BindStmt => None
+          case _: Member.AssertStmt => None
         }.toMap,
+        self => assertions(self),
         None
       )
       newSelf
@@ -411,6 +427,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
           )
           .toMap,
+        _ => (),
         None
       )
 

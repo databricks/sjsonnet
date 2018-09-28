@@ -262,7 +262,7 @@ class Parser{
   val assertStmt = P( "assert" ~/ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
   val bind = P( Index ~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
   val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMap{x =>
-    if (x.sliding(2).exists(t => t(0)._1.isDefined && t(1)._1.isEmpty)) {
+    if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
     } else Pass.map(_ => Expr.Args(x))
   }

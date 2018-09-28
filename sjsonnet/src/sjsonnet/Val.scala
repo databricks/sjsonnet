@@ -38,6 +38,7 @@ object Val{
     case class Member(add: Boolean, visibility: Visibility, invoke: (Obj, Option[Obj]) => Ref)
   }
   case class Obj(value0: Map[String, Obj.Member],
+                 triggerAsserts: Val.Obj => Unit,
                  `super`: Option[Obj]) extends Val{
     def prettyName = "object"
 

@@ -182,18 +182,17 @@ object ErrorTests extends TestSuite{
     )
     "invariant" - {
       "avoid_output_change" - check(
-        """sjsonnet.EvaluatorError: foobar
-          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
-          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
+        """sjsonnet.EvaluatorError: Assertion failed
+          |.(sjsonnet/test/resources/test_suite/error.invariant.avoid_output_change.jsonnet:18:15)""".stripMargin
       )
       "equality" - check(
         """sjsonnet.EvaluatorError: Assertion failed
-          |.(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:10)""".stripMargin
+          |.(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:10)
+          |.(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:24)""".stripMargin
       )
       "option" - check(
-        """sjsonnet.EvaluatorError: foobar
-          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
-          |.(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)""".stripMargin
+        """sjsonnet.EvaluatorError: Assertion failed: Option "d" not in ["a","b","c"].
+          |.(sjsonnet/test/resources/test_suite/error.invariant.option.jsonnet:19:57)""".stripMargin
       )
       "simple" - check(
         """sjsonnet.EvaluatorError: Assertion failed

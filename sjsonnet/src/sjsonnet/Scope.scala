@@ -241,6 +241,7 @@ object Scope{
               )
             )))
           }.toMap,
+          _ => (),
           None
         )
     }),
@@ -448,8 +449,10 @@ object Scope{
         Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
     }),
     "setInter" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
-        val ujson.Js.Arr(vs1) = Materializer(v1.calc)
+        val vs1 = Materializer(v1.calc) match{
+          case ujson.Js.Arr(vs1) => vs1
+          case x => Seq(x)
+        }
         val ujson.Js.Arr(vs2) = Materializer(v2.calc)
 
 
@@ -469,7 +472,6 @@ object Scope{
         Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
     }),
     "setDiff" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
         val ujson.Js.Arr(vs1) = Materializer(v1.calc)
         val ujson.Js.Arr(vs2) = Materializer(v2.calc)
 
@@ -490,7 +492,6 @@ object Scope{
         Val.Arr(out.map(v => Ref(Materializer.reverse(v))))
     }),
     "setMember" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val seen = collection.mutable.LinkedHashSet.empty[ujson.Js.Value]
         val vs1 = Materializer(v1.calc)
         val ujson.Js.Arr(vs2) = Materializer(v2.calc)
         Val.bool(vs2.contains(vs1))
@@ -500,6 +501,7 @@ object Scope{
     functions
       .map{case (k, v) => (k, Val.Obj.Member(false, Visibility.Hidden, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(v)))}
       .toMap,
+    _ => (),
     None
   )
 }

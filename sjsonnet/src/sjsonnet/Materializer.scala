@@ -10,6 +10,15 @@ object Materializer {
     case Val.Str(s) => Js.Str(s)
     case Val.Arr(xs) => Js.Arr.from(xs.map(x => apply(x.calc)))
     case obj: Val.Obj =>
+      def rec(x: Val.Obj): Unit = {
+        x.triggerAsserts(obj)
+        x.`super` match{
+          case Some(s) => rec(s)
+          case None => Unit
+        }
+      }
+      rec(obj)
+
       Js.Obj.from(
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
@@ -26,7 +35,9 @@ object Materializer {
     case Js.Str(s) => Val.Str(s)
     case Js.Arr(xs) => Val.Arr(xs.map(x => Ref(reverse(x))))
     case Js.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Ref(reverse(x._2))))).toMap, None
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Ref(reverse(x._2))))).toMap,
+      _ => (),
+      None
     )
   }
 }
