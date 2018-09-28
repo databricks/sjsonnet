@@ -267,7 +267,7 @@ class Parser{
     } else Pass.map(_ => Expr.Args(x))
   }
 
-  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).flatMap{x =>
+  val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMap{x =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     for((k, v) <- x){
