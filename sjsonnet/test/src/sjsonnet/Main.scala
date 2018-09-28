@@ -48,10 +48,11 @@ object Main {
         import ammonite.ops._, ImplicitWd._
 //        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
 //        println(name)
-        val source = ammonite.ops.read(FileTests.testSuiteRoot / s"$name.jsonnet")
+        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
+        val source = ammonite.ops.read(path)
         val parsed = parser.expr.parse(new String(source)).get.value
         val emptyScope = new Scope(
-          None, None, None, Map("std" -> Ref(Scope.Std)), List(FileTests.testSuiteRoot), None
+          None, None, None, Map("std" -> Ref(Scope.Std)), path, List(), None
         )
 
         val res = new Evaluator(parser, emptyScope).visitExpr(parsed, emptyScope)

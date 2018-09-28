@@ -142,7 +142,7 @@ class Parser{
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Seq(first) ++ rest)
   }
   val assertExpr: P[Expr] = P( Index ~ assertStmt ~/ ";" ~ expr ).map(Expr.AssertExpr.tupled)
-  val function: P[Expr] = P( "(" ~/ Index ~ params ~ ")" ~ expr ).map(Expr.Function.tupled)
+  val function: P[Expr] = P( Index ~ "function" ~ "(" ~/ params ~ ")" ~ expr ).map(Expr.Function.tupled)
   val ifElse: P[Expr] = P( Index ~ expr ~ "then" ~ expr ~ ("else" ~ expr).? ).map(Expr.IfElse.tupled)
   val localExpr: P[Expr] = P( Index ~ bind.rep(min=1, sep = ","~/) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
@@ -213,7 +213,7 @@ class Parser{
     | "local" ~/ localExpr
     | "(" ~/ (Index ~ expr).map(Expr.Parened.tupled) ~ ")"
     | "if" ~/ ifElse
-    | "function" ~/ function
+    | function
     | (Index ~ "importstr" ~/ string).map(Expr.ImportStr.tupled)
     | (Index ~ "import" ~/ string).map(Expr.Import.tupled)
     | (Index ~ "error" ~/ expr).map(Expr.Error.tupled)
@@ -230,12 +230,12 @@ class Parser{
   )
 
   val objinside: P[Expr.ObjBody] = P(
-    member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
+    Index ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
   ).map{
-    case (exprs, None) => Expr.ObjBody.MemberList(exprs)
-    case (exprs, Some(comps)) =>
+    case (offset, exprs, None) => Expr.ObjBody.MemberList(exprs)
+    case (offset, exprs, Some(comps)) =>
       val preLocals = exprs.takeWhile(_.isInstanceOf[Expr.Member.BindStmt]).map(_.asInstanceOf[Expr.Member.BindStmt])
-      val Expr.Member.Field(Expr.FieldName.Dyn(lhs), false, None, Visibility.Normal, rhs) =
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), false, None, Visibility.Normal, rhs) =
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
         .map(_.asInstanceOf[Expr.Member.BindStmt])
@@ -244,9 +244,9 @@ class Parser{
 
   val member: P[Expr.Member] = P( objlocal | assertStmt | field )
   val field = P(
-    (fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~ expr).map{
-      case (name, plus, p, h2, e) =>
-        Expr.Member.Field(name, plus.nonEmpty, p, h2, e)
+    (Index ~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~ expr).map{
+      case (offset, name, plus, p, h2, e) =>
+        Expr.Member.Field(offset, name, plus.nonEmpty, p, h2, e)
     }
   )
   val fieldKeySep = P( ":::" | "::" | ":" ).!.map{
@@ -260,7 +260,7 @@ class Parser{
   val ifspec = P( Index ~ "if" ~/ expr ).map(Expr.IfSpec.tupled)
   val fieldname = P( id.map(Expr.FieldName.Fixed) | string.map(Expr.FieldName.Fixed) | "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]" )
   val assertStmt = P( "assert" ~/ expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
-  val bind = P( id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+  val bind = P( Index ~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
   val args = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).map(Expr.Args)
 
   val params: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ","~/) ~ ",".? ).map(Expr.Params)

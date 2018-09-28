@@ -14,7 +14,7 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k).calc)
+        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", -1).calc)
       )
   }
 

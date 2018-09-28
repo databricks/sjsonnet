@@ -1,6 +1,8 @@
 package sjsonnet
 import Expr._
 import ammonite.ops.{Path, RelPath}
+import fastparse.StringReprOps
+import fastparse.utils.IndexedParserInput
 import sjsonnet.Expr.Member.Visibility
 object Evaluator {
   def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
@@ -13,156 +15,238 @@ object Evaluator {
     rec(rhs)
   }
 
+  def tryCatch[T](scope: Scope, offset: Int)(t: => T) = {
+    try t catch{
+      case e: EvaluatorError => throw e
+      case e: Throwable =>
+        throw new EvaluatorError("Internal Error", Nil, Some(e))
+          .addFrame(scope.fileName, offset)
+    }
+  }
+  def tryCatch2[T](path: Path, offset: Int)(t: => T) = {
+    try t catch{
+      case e: EvaluatorError => throw e.addFrame(path, offset)
+      case e: Throwable =>
+        throw new EvaluatorError("Internal Error", Nil, Some(e))
+          .addFrame(path, offset)
+    }
+  }
+  def fail(msg: String, path: Path, offset: Int) = {
+    throw new EvaluatorError(msg, Nil, None).addFrame(path, offset)
+  }
+}
+case class EvaluatorError(msg: String,
+                          stack: List[StackTraceElement],
+                          underlying: Option[Throwable])
+  extends Exception(msg){
+  setStackTrace(stack.toArray.reverse)
+  def addFrame(fileName: Path, offset: Int) = {
+    val Array(line, col) = StringReprOps.prettyIndex(
+      new IndexedParserInput(ammonite.ops.read(fileName))(StringReprOps), offset
+    ).split(':')
+
+    val newFrame = new StackTraceElement(
+      "", "",
+      fileName.relativeTo(ammonite.ops.pwd).toString + ":" + line,
+      col.toInt
+    )
+
+    this.copy(stack = newFrame :: this.stack)
+  }
 }
 class Evaluator(parser: Parser, originalScope: Scope) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
-  def visitExpr(expr: Expr, scope: => Scope): Val = expr match{
-    case Null(offset) => Val.Null
-    case Parened(offset, inner) => visitExpr(inner, scope)
-    case True(offset) => Val.True
-    case False(offset) => Val.False
-    case Self(offset) => scope.self
+  def visitExpr(expr: Expr, scope: => Scope): Val = Evaluator.tryCatch(scope, expr.offset){
+    expr match{
+      case Null(offset) => Val.Null
+      case Parened(offset, inner) => visitExpr(inner, scope)
+      case True(offset) => Val.True
+      case False(offset) => Val.False
+      case Self(offset) => scope.self
 
-    case Select(_, Super(offset), name) =>
-      scope.super0.get.value(name, self = scope.self).calc
+      case Select(_, Super(offset), name) =>
+        val ref = scope.super0.get.value(name, scope.fileName, offset, self = scope.self)
+        Evaluator.tryCatch2(scope.fileName, offset) {ref.calc}
 
-    case Lookup(_, Super(offset), index) =>
-      val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-      scope.super0.get.value(key.value).calc
+      case Lookup(_, Super(offset), index) =>
+        val key = visitExpr(index, scope).asInstanceOf[Val.Str]
+        scope.super0.get.value(key.value, scope.fileName, offset).calc
 
-    case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
-      val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
-      Val.bool(scope.super0.get.value0.contains(key.value))
+      case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
+        val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
+        Val.bool(scope.super0.get.value0.contains(key.value))
 
-    case $(offset) => scope.dollar
-    case Str(offset, value) => Val.Str(value)
-    case Num(offset, value) => Val.Num(value)
-    case Id(offset, value) => scope.bindings(value).force(scope.dollar0)
+      case $(offset) => scope.dollar
+      case Str(offset, value) => Val.Str(value)
+      case Num(offset, value) => Val.Num(value)
+      case Id(offset, value) =>
+        val ref = scope.bindings(value)
+          .getOrElse(Evaluator.fail("Unknown variable " + value, scope.fileName, offset))
 
-    case Arr(offset, value) => Val.Arr(value.map(v => Ref(visitExpr(v, scope))))
-    case Obj(offset, value) => visitObjBody(value, scope)
+        Evaluator.tryCatch2(scope.fileName, offset){ref.force(scope.dollar0)}
 
-    case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
-      case (Expr.UnaryOp.`-`, Val.Num(v)) => Val.Num(-v)
-      case (Expr.UnaryOp.`+`, Val.Num(v)) => Val.Num(v)
-      case (Expr.UnaryOp.`~`, Val.Num(v)) => Val.Num(~v.toLong)
-      case (Expr.UnaryOp.`!`, Val.True) => Val.False
-      case (Expr.UnaryOp.`!`, Val.False) => Val.True
-    }
+      case Arr(offset, value) => Val.Arr(value.map(v => Ref(visitExpr(v, scope))))
+      case Obj(offset, value) => visitObjBody(value, scope)
 
-    case BinaryOp(offset, lhs, op, rhs) => {
-      op match{
-        case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
-          (visitExpr(lhs, scope), op) match {
-            case (Val.False, Expr.BinaryOp.`&&`) => Val.False
-            case (Val.True, Expr.BinaryOp.`||`) => Val.True
-            case _ => visitExpr(rhs, scope)
+      case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
+        case (Expr.UnaryOp.`-`, Val.Num(v)) => Val.Num(-v)
+        case (Expr.UnaryOp.`+`, Val.Num(v)) => Val.Num(v)
+        case (Expr.UnaryOp.`~`, Val.Num(v)) => Val.Num(~v.toLong)
+        case (Expr.UnaryOp.`!`, Val.True) => Val.False
+        case (Expr.UnaryOp.`!`, Val.False) => Val.True
+      }
 
-          }
-        case _ =>
-          (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
-            case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
-            case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) => Val.Num(l / r)
-            case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
-            case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
-            case (Val.Str(l), Expr.BinaryOp.`%`, r) => Val.Str(Format.format(l, Materializer.apply(r)))
-            case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
-            case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
-            case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
-            case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
-            case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
-            case (Val.Str(l), Expr.BinaryOp.`+`, r) => Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-            case (l, Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-            case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
-            case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => Val.bool(l < r)
-            case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => Val.bool(l > r)
-            case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => Val.bool(l <= r)
-            case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
-            case (l, Expr.BinaryOp.`==`, r) => Val.bool(Materializer(l) == Materializer(r))
-            case (l, Expr.BinaryOp.`!=`, r) => Val.bool(Materializer(l) != Materializer(r))
-            case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => Val.bool(r.contains(l))
-            case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-            case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
-            case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
+      case BinaryOp(offset, lhs, op, rhs) => {
+        op match{
+          case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
+            (visitExpr(lhs, scope), op) match {
+              case (Val.False, Expr.BinaryOp.`&&`) => Val.False
+              case (Val.True, Expr.BinaryOp.`||`) => Val.True
+              case _ => visitExpr(rhs, scope)
+
+            }
+          case _ =>
+            (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
+              case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
+              case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
+                if (r == 0) Evaluator.fail("division by zero", scope.fileName, offset)
+                Val.Num(l / r)
+              case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
+              case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
+              case (Val.Str(l), Expr.BinaryOp.`%`, r) => Val.Str(Format.format(l, Materializer.apply(r)))
+              case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
+              case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
+              case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
+              case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
+              case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
+              case (Val.Str(l), Expr.BinaryOp.`+`, r) => Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+              case (l, Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+              case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
+              case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
+              case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
+              case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => Val.bool(l < r)
+              case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => Val.bool(l > r)
+              case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => Val.bool(l <= r)
+              case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
+              case (l, Expr.BinaryOp.`==`, r) =>
+                if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]){
+                  Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+                }
+                Val.bool(Materializer(l) == Materializer(r))
+              case (l, Expr.BinaryOp.`!=`, r) =>
+                if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]){
+                  Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+                }
+                Val.bool(Materializer(l) != Materializer(r))
+              case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _)) => Val.bool(r.contains(l))
+              case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
+              case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
+              case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
+              case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+              case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
+            }
+        }
+      }
+      case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
+        if (visitExpr(value, scope) != Val.True) {
+          msg match{
+            case None => Evaluator.fail("Assertion failed", scope.fileName, offset)
+            case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value, scope.fileName, offset)
           }
         }
-    }
-    case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
-      if (visitExpr(value, scope) != Val.True) {
-        throw new Exception(msg.fold("")(visitExpr(_, scope).asInstanceOf[Val.Str].value))
-      }
-      visitExpr(returned, scope)
+        visitExpr(returned, scope)
 
-    case LocalExpr(offset, bindings, returned) =>
-      lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
-      visitExpr(returned, newScope)
+      case LocalExpr(offset, bindings, returned) =>
+        lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
+        visitExpr(returned, newScope)
 
-    case Import(offset, value) =>
+      case Import(offset, value) =>
 
-      val p = scope.searchRoots.map(_  / RelPath(value)).find(ammonite.ops.exists).get
-      imports.getOrElseUpdate(
-        p,
-        visitExpr(
-          parser.expr.parse(ammonite.ops.read(p)).get.value,
-          originalScope.copy(searchRoots = p / ammonite.ops.up :: scope.searchRoots.tail)
-        )
-      )
-
-
-    case ImportStr(offset, value) =>
-
-      val p = scope.searchRoots.map(_  / RelPath(value)).find(ammonite.ops.exists).get
-      Val.Str(
-        importStrs.getOrElseUpdate(
+        val p = (scope.fileName/ammonite.ops.up :: scope.searchRoots).map(_  / RelPath(value)).find(ammonite.ops.exists).get
+        imports.getOrElseUpdate(
           p,
-          ammonite.ops.read(p)
+          visitExpr(
+            parser.expr.parse(ammonite.ops.read(p)).get.value,
+            originalScope.copy(fileName = p)
+          )
         )
-      )
-    case Error(offset, value) => throw new Exception(visitExpr(value, scope).asInstanceOf[Val.Str].value)
-    case Apply(offset, value, Args(args)) =>
-      visitExpr(value, scope).asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
 
-    case Select(offset, value, name) =>
-      val self = visitExpr(value, scope).asInstanceOf[Val.Obj]
-      self.value(name).force(scope.dollar0)
 
-    case Lookup(offset, value, index) =>
-      val res = (visitExpr(value, scope), visitExpr(index, scope)) match{
-        case (v: Val.Arr, i: Val.Num) => v.value(i.value.toInt)
-        case (v: Val.Str, i: Val.Num) => Ref(Val.Str(new String(Array(v.value(i.value.toInt)))))
-        case (v: Val.Obj, i: Val.Str) => v.value(i.value)
-      }
-      res.force(scope.dollar0)
-    case Slice(offset, value, start, end, stride) =>
-      visitExpr(value, scope) match{
-        case Val.Arr(a) =>
+      case ImportStr(offset, value) =>
 
-          val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(a.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
-          Val.Arr(range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
-        case Val.Str(s) =>
-          val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(s.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
-          Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+        val p = (scope.fileName/ammonite.ops.up :: scope.searchRoots).map(_  / RelPath(value)).find(ammonite.ops.exists).get
+        Val.Str(
+          importStrs.getOrElseUpdate(
+            p,
+            ammonite.ops.read(p)
+          )
+        )
+      case Error(offset, value) =>
+        Evaluator.fail(
+          visitExpr(value, scope) match{
+            case Val.Str(s) => s
+            case r => Materializer(r).toString()
+          },
+          scope.fileName, offset
+        )
+      case Apply(offset, value, Args(args)) =>
+        Evaluator.tryCatch2(scope.fileName, offset){
+          visitExpr(value, scope).asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
+        }
+
+      case Select(offset, value, name) =>
+        visitExpr(value, scope) match{
+          case obj: Val.Obj =>
+            val ref = obj.value(name, scope.fileName, offset)
+            Evaluator.tryCatch2(scope.fileName, offset) {ref.force(scope.dollar0)}
+          case r =>
+            Evaluator.fail(s"attemped to index a ${r.prettyName} with string ${name}", scope.fileName, offset)
+        }
+
+      case Lookup(offset, value, index) =>
+
+        (visitExpr(value, scope), visitExpr(index, scope)) match {
+          case (v: Val.Arr, i: Val.Num) =>
+            if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.fileName, offset)
+            val int = i.value.toInt
+            if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.fileName, offset)
+            Evaluator.tryCatch2(scope.fileName, offset) {
+              v.value(int).force(scope.dollar0)
+            }
+          case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
+          case (v: Val.Obj, i: Val.Str) =>
+            val ref = v.value(i.value, scope.fileName, offset)
+            Evaluator.tryCatch2(scope.fileName, offset) { ref.force(scope.dollar0) }
+          case (lhs, rhs) =>
+            Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.fileName, offset)
+        }
+
+      case Slice(offset, value, start, end, stride) =>
+        visitExpr(value, scope) match{
+          case Val.Arr(a) =>
+
+            val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(a.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
+            Val.Arr(range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
+          case Val.Str(s) =>
+            val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(s.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
+            Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+        }
+      case Function(offset, params, body) => visitMethod(scope, body, params)
+      case IfElse(offset, cond, then, else0) =>
+        visitExpr(cond, scope) match{
+          case Val.True => visitExpr(then, scope)
+          case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
+        }
+      case Comp(offset, value, first, rest) =>
+        Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
+      case ObjExtend(offset, value, ext) => {
+        val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
+        val extension = visitObjBody(ext, scope)
+        Evaluator.mergeObjects(original, extension)
       }
-    case Function(offset, params, body) => visitMethod(scope, body, params)
-    case IfElse(offset, cond, then, else0) =>
-      visitExpr(cond, scope) match{
-        case Val.True => visitExpr(then, scope)
-        case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
-      }
-    case Comp(offset, value, first, rest) =>
-      Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
-    case ObjExtend(offset, value, ext) => {
-      val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
-      val extension = visitObjBody(ext, scope)
-      Evaluator.mergeObjects(original, extension)
     }
   }
-
   def visitFieldName(fieldName: FieldName, scope: => Scope) = {
     fieldName match{
       case FieldName.Fixed(s) => Some(s)
@@ -174,7 +258,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
   }
 
   def visitMethod(scope: Scope, rhs: Expr, argSpec: Params) = {
-    Val.Func (
+    Val.Func(
       argSpec.args.length,
       { args =>
         lazy val newScope: Scope =
@@ -193,9 +277,9 @@ class Evaluator(parser: Parser, originalScope: Scope) {
   def visitBindings(bindings: Seq[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
 
     bindings.collect{
-      case Bind(fieldName, None, rhs) =>
+      case Bind(offset, fieldName, None, rhs) =>
         (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(rhs, scope(self, sup))))
-      case Bind(fieldName, Some(argSpec), rhs) =>
+      case Bind(offset, fieldName, Some(argSpec), rhs) =>
         (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitMethod(scope(self, sup), rhs, argSpec)))
     }
   }
@@ -206,6 +290,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(self),
         sup,
         newBindings.map{case (k, v) => (k, v.apply(self, sup))}.toMap,
+        scope.fileName,
         scope.searchRoots,
         Some(scope)
       )
@@ -218,11 +303,11 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
       lazy val newSelf = Val.Obj(
         value.flatMap {
-          case Member.Field(fieldName, plus, None, sep, rhs) =>
+          case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
               Ref(visitExpr(rhs, makeNewScope(self, sup)))
             }))
-          case Member.Field(fieldName, false, Some(argSpec), sep, rhs) =>
+          case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
             visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) =>
               Ref(visitMethod(makeNewScope(self, sup), rhs, argSpec))
             ))
@@ -240,6 +325,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.self0,
         None,
         Map(),
+        scope.fileName,
         scope.searchRoots,
         Some(scope)
       )
@@ -249,6 +335,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(newSelf),
         None,
         newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
+        scope.fileName,
         scope.searchRoots,
         Some(scope)
       )
@@ -287,7 +374,10 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         rest,
         for{
           s <- scopes
-          e <- visitExpr(expr, s).asInstanceOf[Val.Arr].value
+          e <- visitExpr(expr, s) match{
+            case Val.Arr(value) => value
+            case r => Evaluator.fail("In comprehension, can only iterate over array, not " + r.prettyName, s.fileName, expr.offset)
+          }
         } yield s ++ Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e))
       )
     case IfSpec(offset, expr) :: rest => visitComp(rest, scopes.filter(visitExpr(expr, _) == Val.True))

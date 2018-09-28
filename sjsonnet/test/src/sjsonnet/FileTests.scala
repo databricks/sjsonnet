@@ -4,8 +4,9 @@ import utest._
 
 object FileTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
-  def eval(s: String) = {
-    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), List(testSuiteRoot), None)
+  def eval(p: ammonite.ops.Path) = {
+    val s = ammonite.ops.read(p)
+    val scope = new Scope(None, None, None, Map("std" -> Ref(Scope.Std)), p, Nil, None)
     val parser = new Parser
     new Evaluator(parser, scope).visitExpr(
       parser.expr.parse(s).get.value,
@@ -13,7 +14,7 @@ object FileTests extends TestSuite{
     )
   }
   def check(expected: ujson.Js = ujson.Js.True)(implicit tp: utest.framework.TestPath) = {
-    val res = Materializer(eval(ammonite.ops.read(testSuiteRoot / s"${tp.value.last}.jsonnet")))
+    val res = Materializer(eval(testSuiteRoot / s"${tp.value.last}.jsonnet"))
     assert(res == expected)
     res
   }
@@ -57,7 +58,7 @@ object FileTests extends TestSuite{
     'stdlib - {
 //      check()
 //       Lock in the existing progress fleshing out the stdlib
-      intercept[Exception]{check()}.getMessage ==> "Unknown key: thisFile"
+      intercept[Exception]{check()}.getMessage ==> "Field does not exist: thisFile"
     }
 //    'text_block - check()
     'unicode - check()

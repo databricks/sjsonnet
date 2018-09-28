@@ -1,6 +1,9 @@
 package sjsonnet
 
-sealed trait Expr
+sealed trait Offsetted{
+  def offset: Int
+}
+sealed trait Expr extends Offsetted
 object Expr{
   case class Null(offset: Int) extends Expr
   case class True(offset: Int) extends Expr
@@ -31,7 +34,8 @@ object Expr{
       object Hidden extends Visibility
       object Unhide extends Visibility
     }
-    case class Field(fieldName: FieldName,
+    case class Field(offset: Int,
+                     fieldName: FieldName,
                      plus: Boolean,
                      args: Option[Params],
                      sep: Visibility,
@@ -79,7 +83,7 @@ object Expr{
   case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
 
-  case class Bind(name: String, args: Option[Params], rhs: Expr)
+  case class Bind(offset: Int, name: String, args: Option[Params], rhs: Expr) extends Offsetted
   case class Import(offset: Int, value: String) extends Expr
   case class ImportStr(offset: Int, value: String) extends Expr
   case class Error(offset: Int, value: Expr) extends Expr

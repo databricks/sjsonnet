@@ -8,7 +8,7 @@ import sjsonnet.Expr.Member.Visibility
 
 
 object Scope{
-  val Empty = new Scope(None, None, None, Map.empty, List(ammonite.ops.pwd), None)
+  def Empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", List(), None)
   val functions = Seq[(String, Val.Func)](
     "assertEqual" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val x1 = Materializer(v1.calc)
@@ -237,7 +237,7 @@ object Scope{
           allKeys.map{ k =>
             k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(
               f.calc.asInstanceOf[Val.Func].value(
-                Seq(None -> Ref(Val.Str(k._1)), None -> arr.calc.asInstanceOf[Val.Obj].value(k._1))
+                Seq(None -> Ref(Val.Str(k._1)), None -> arr.calc.asInstanceOf[Val.Obj].value(k._1, ammonite.ops.pwd / "(Unknown)", -1)),
               )
             )))
           }.toMap,
@@ -508,14 +508,15 @@ case class Scope(dollar0: Option[Val.Obj],
                  self0: Option[Val.Obj],
                  super0: Option[Val.Obj],
                  bindings0: Map[String, Ref],
+                 fileName: Path,
                  searchRoots: List[Path],
                  delegate: Option[Scope]){
   def dollar = dollar0.get
   def self = self0.get
-  val bindingCache = collection.mutable.Map.empty[String, Ref]
-  def bindings(k: String): Ref = bindingCache.getOrElseUpdate(
+  val bindingCache = collection.mutable.Map.empty[String, Option[Ref]]
+  def bindings(k: String): Option[Ref] = bindingCache.getOrElseUpdate(
     k,
-    bindings0.get(k).getOrElse(delegate.get.bindings(k))
+    bindings0.get(k).orElse(delegate.flatMap(_.bindings(k)))
   )
   def ++(traversableOnce: TraversableOnce[(String, (Val.Obj, Option[Val.Obj]) => Ref)]) = {
     new Scope(
@@ -523,6 +524,7 @@ case class Scope(dollar0: Option[Val.Obj],
       self0,
       super0,
       traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}.toMap,
+      fileName,
       searchRoots,
       Some(this)
     )

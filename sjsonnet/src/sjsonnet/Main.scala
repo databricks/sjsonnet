@@ -10,10 +10,11 @@ object Main {
       case Right((config, leftover)) =>
         leftover match{
           case List(file) =>
+            val path = ammonite.ops.Path(file, ammonite.ops.pwd)
             val parser = new Parser()
-            val parsed = parser.expr.parse(ammonite.ops.read(ammonite.ops.Path(file, ammonite.ops.pwd))).get.value
+            val parsed = parser.expr.parse(ammonite.ops.read(path)).get.value
             val emptyScope = new Scope(
-              None, None, None, Map("std" -> Ref(Scope.Std)), List(ammonite.ops.pwd), None
+              None, None, None, Map("std" -> Ref(Scope.Std)), path, Nil, None
             )
             val evaluator = new Evaluator(parser, emptyScope)
             val value = evaluator.visitExpr(parsed, emptyScope)
