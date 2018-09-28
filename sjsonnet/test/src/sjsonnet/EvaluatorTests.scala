@@ -25,6 +25,8 @@ object EvaluatorTests extends TestSuite{
     }
     'functions - {
       eval("(function(x) x)(1)") ==> Js.Num(1)
+      eval("function() 1") ==> Js.Num(1)
+      eval("function(a=1) a") ==> Js.Num(1)
     }
     'members - {
       eval("{local x = 1, x: x}['x']") ==> Js.Num(1)
