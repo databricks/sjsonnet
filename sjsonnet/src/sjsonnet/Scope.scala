@@ -353,6 +353,9 @@ object Scope{
     "manifestPython" -> Val.Func(1, {case Seq((None, v0)) =>
         Val.Str(Materializer(v0.calc).transform(new PythonRenderer()).toString)
     }),
+    "manifestJson" -> Val.Func(1, {case Seq((None, v0)) =>
+        Val.Str(Materializer(v0.calc).render(indent = 4))
+    }),
     "manifestPythonVars" -> Val.Func(1, {case Seq((None, v0)) =>
         Val.Str(
           Materializer(v0.calc).obj
