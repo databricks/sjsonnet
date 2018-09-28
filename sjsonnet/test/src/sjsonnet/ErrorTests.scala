@@ -78,11 +78,9 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
         |""".stripMargin
     )
-//    "array_recursive_manifest" - check(
-//      """sjsonnet.Error: array bounds error: 1.8446744073709552E19 not within [0, 3)
-//        |    at .(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
-//        |""".stripMargin
-//    )
+    "array_recursive_manifest" - check(
+      """Failed to materialize recursive value""".stripMargin
+    )
     "assert.fail1" - check(
       """sjsonnet.Error: Assertion failed
         |    at .(sjsonnet/test/resources/test_suite/error.assert.fail1.jsonnet:20:1)
@@ -123,11 +121,9 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.field_not_exist.jsonnet:17:9)
         |""".stripMargin
     )
-//    "function_arg_positional_after_named" - check(
-//      """sjsonnet.Error: Field does not exist: y
-//        |    at .(sjsonnet/test/resources/test_suite/error.field_not_exist.jsonnet:17:9)
-//        |""".stripMargin
-//    )
+    "function_arg_positional_after_named" - check(
+      """Parse Error: no positional params after named params:19:11 ...")\n"""".stripMargin
+    )
 
     "function_duplicate_arg" - check(
       """sjsonnet.Error: Parameter passed more than once: x
@@ -135,12 +131,9 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |""".stripMargin
     )
-//    "function_duplicate_param" - check(
-//      """sjsonnet.Error: Parameter passed more than once: x
-//        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
-//        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
-//        |""".stripMargin
-//    )
+    "function_duplicate_param" - check(
+      """Parse Error: no duplicate parameter: x:17:14 ...") x\n"""".stripMargin
+    )
 //    "function_infinite_default" - check(
 //      """sjsonnet.Error: Parameter passed more than once: x
 //        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
