@@ -511,16 +511,19 @@ object Scope{
     }),
     "stringChars" -> Val.Func(2, {case Seq((None, v1)) =>
         val Val.Str(vs1) = v1.calc
-      import ammonite.ops.ln.s
 
-      var offset = 0
-      val output = collection.mutable.Buffer.empty[String]
-      while (offset < vs1.length) {
-        val codepoint = vs1.codePointAt(offset)
-        output.append(new String(Character.toChars(codepoint)))
-        offset += Character.charCount(codepoint)
-      }
+        var offset = 0
+        val output = collection.mutable.Buffer.empty[String]
+        while (offset < vs1.length) {
+          val codepoint = vs1.codePointAt(offset)
+          output.append(new String(Character.toChars(codepoint)))
+          offset += Character.charCount(codepoint)
+        }
         Val.Arr(output.map(s => Ref(Val.Str(s))))
+    }),
+    "parseInt" -> Val.Func(2, {case Seq((None, v1)) =>
+        val Val.Str(vs1) = v1.calc
+        Val.Num(vs1.toInt)
     }),
   )
   val Std = Val.Obj(
