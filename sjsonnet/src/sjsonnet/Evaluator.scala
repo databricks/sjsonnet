@@ -100,7 +100,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
             case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
             case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
-              try Val.Str(Format.format(l, Materializer.apply(r)))
+              try Val.Str(Format.format(l, r, scope.fileName, offset))
               catch Evaluator.tryCatch2(scope.fileName, offset)
             case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
             case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)

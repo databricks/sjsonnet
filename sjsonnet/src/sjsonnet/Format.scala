@@ -3,6 +3,7 @@ package sjsonnet
 import java.io.StringWriter
 import java.text.DecimalFormat
 
+import ammonite.ops.Path
 import ujson.Js
 
 import scala.collection.mutable.ArrayBuffer
@@ -72,11 +73,11 @@ object Format{
     else if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
     else " " * missingWidth + lhs2 + mhs + rhs
   }
-  def format(s: String, values0: ujson.Js): String = synchronized{
+  def format(s: String, values0: Val, fileName: Path, offset: Int): String = synchronized{
     val values = values0 match{
-      case x: ujson.Js.Arr => x
-      case x: ujson.Js.Obj => x
-      case x => ujson.Js.Arr(x)
+      case x: Val.Arr => x
+      case x: Val.Obj => x
+      case x => Val.Arr(Seq(Ref(x)))
     }
     val (leading, chunks) = format.parse(s).get.value
     val output = new StringBuilder
@@ -88,11 +89,12 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => values(i)
+            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).calc)
             case Some(key) =>
-              if (values.isInstanceOf[ujson.Js.Arr]) values(i)
-              else if (values.isInstanceOf[ujson.Js.Obj]) values(key)
-              else ???
+              values match{
+                case v: Val.Arr => Materializer(v.value(i).calc)
+                case v: Val.Obj => Materializer(v.value(key, fileName, offset).calc)
+              }
           }
           i += 1
           value match{

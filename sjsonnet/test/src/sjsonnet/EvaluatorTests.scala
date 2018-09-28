@@ -117,6 +117,10 @@ object EvaluatorTests extends TestSuite{
 
       eval("local M = {x+: self.i, i :: 1}; { x: 1 } + M") ==>
         ujson.read("""{ "x": 2 }""")
+
+      eval("""("%(hello)s" % {hello::"world"})""") ==> Js.Str("world")
+
+      eval("""("%(hello)s" % {hello::"world", bad:: error "lol"})""") ==> Js.Str("world")
     }
     'evaluator2 - {
       eval("""{local x = 1, [x]: x, for x in ["foo"]}.foo""") ==> Js.Num(1)

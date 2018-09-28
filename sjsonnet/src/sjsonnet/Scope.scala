@@ -90,13 +90,7 @@ object Scope{
     }),
     "format" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
         val formatStr = v1.calc.asInstanceOf[Val.Str].value
-
-        val items = Materializer(v2.calc) match{
-          case x: ujson.Js.Arr => x
-          case x: ujson.Js.Obj => x
-          case x => ujson.Js.Arr(x)
-        }
-        Val.Str(Format.format(formatStr, items))
+        Val.Str(Format.format(formatStr, v2.calc, ammonite.ops.pwd / "(unknown)", -1))
     }),
     "foldl" -> Val.Func(3, {case Seq((None, func), (None, cases), (None, start)) =>
         var current = start.calc
