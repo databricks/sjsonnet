@@ -123,12 +123,12 @@ class Parser{
     (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
 
-  val `null` = P(Index ~ "null").map(Expr.Null)
-  val `true` = P(Index ~ "true").map(Expr.True)
-  val `false` = P(Index ~ "false").map(Expr.False)
-  val `self` = P(Index ~ "self").map(Expr.Self)
+  val `null` = P(Index ~ "null" ~~ break).map(Expr.Null)
+  val `true` = P(Index ~ "true" ~~ break).map(Expr.True)
+  val `false` = P(Index ~ "false" ~~ break).map(Expr.False)
+  val `self` = P(Index ~ "self" ~~ break).map(Expr.Self)
   val $ = P(Index ~ "$").map(Expr.$)
-  val `super` = P(Index ~ "super").map(Expr.Super)
+  val `super` = P(Index ~ "super" ~~ break).map(Expr.Super)
 
   val obj: P[Expr] = P( "{" ~/ (Index ~ objinside).map(Expr.Obj.tupled) ~ "}" )
   val arr: P[Expr] = P(
@@ -213,7 +213,7 @@ class Parser{
     | (Index ~ id).map(Expr.Id.tupled)
     | "local" ~~ break  ~/ localExpr
     | "(" ~/ (Index ~ expr).map(Expr.Parened.tupled) ~ ")"
-    | "if" ~/ ifElse
+    | "if" ~~ break ~/ ifElse
     | function
     | (Index ~ "importstr" ~/ string).map(Expr.ImportStr.tupled)
     | (Index ~ "import" ~/ string).map(Expr.Import.tupled)
