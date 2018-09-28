@@ -503,6 +503,19 @@ object Scope{
         val Val.Str(vs2) = v2.calc
         Val.Arr(vs1.split(vs2).map(s => Ref(Val.Str(s))))
     }),
+    "stringChars" -> Val.Func(2, {case Seq((None, v1)) =>
+        val Val.Str(vs1) = v1.calc
+      import ammonite.ops.ln.s
+
+      var offset = 0
+      val output = collection.mutable.Buffer.empty[String]
+      while (offset < vs1.length) {
+        val codepoint = vs1.codePointAt(offset)
+        output.append(new String(Character.toChars(codepoint)))
+        offset += Character.charCount(codepoint)
+      }
+        Val.Arr(output.map(s => Ref(Val.Str(s))))
+    }),
   )
   val Std = Val.Obj(
     functions
