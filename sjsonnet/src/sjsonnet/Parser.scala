@@ -58,7 +58,7 @@ class Parser{
             case 4 =>
               cfg.input(current) match{
                 case '/' => rec(current + 1, state = 0)
-                case _ => rec(current + 1, state)
+                case _ => rec(current + 1, state = 3)
               }
           }
         }
