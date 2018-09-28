@@ -50,16 +50,20 @@ object Scope{
         Val.Arr(
           v1.calc.asInstanceOf[Val.Obj]
             .getVisibleKeys()
-            .collect{case (k, false) => Ref(Val.Str(k))}
+            .collect{case (k, false) => k}
             .toSeq
+            .sorted
+            .map(k => Ref(Val.Str(k)))
         )
     }),
     "objectFieldsAll" -> Val.Func(1, {case Seq((None, v1)) =>
         Val.Arr(
           v1.calc.asInstanceOf[Val.Obj]
             .getVisibleKeys()
-            .collect{case (k, _) => Ref(Val.Str(k))}
+            .collect{case (k, _) => k}
             .toSeq
+            .sorted
+            .map(k => Ref(Val.Str(k)))
         )
     }),
     "type" -> Val.Func(1, {case Seq((None, v1)) =>
