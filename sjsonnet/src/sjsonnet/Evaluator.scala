@@ -49,13 +49,6 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     case False(offset) => Val.False
     case Self(offset) => scope.self
 
-    case Select(_, Super(offset), name) =>
-      val ref = scope.super0.get.value(name, scope.fileName, offset, self = scope.self)
-      try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
-
-    case Lookup(_, Super(offset), index) =>
-      val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-      scope.super0.get.value(key.value, scope.fileName, offset).force
 
     case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
       val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
@@ -82,64 +75,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     }
 
     case BinaryOp(offset, lhs, op, rhs) => {
-      op match{
-        case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
-          (visitExpr(lhs, scope), op) match {
-            case (Val.False, Expr.BinaryOp.`&&`) => Val.False
-            case (Val.True, Expr.BinaryOp.`||`) => Val.True
-            case _ => visitExpr(rhs, scope)
-
-          }
-        case _ =>
-          (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match{
-            case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
-            case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
-              if (r == 0) Evaluator.fail("division by zero", scope.fileName, offset)
-              Val.Num(l / r)
-            case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
-            case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
-            case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
-
-              try Val.Str(Format.format(l, r, scope.fileName, offset))
-              catch Evaluator.tryCatch2(scope.fileName, offset)
-            case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
-            case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
-            case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
-            case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
-            case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
-            case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
-              try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-              catch Evaluator.tryCatch2(scope.fileName, offset)
-            case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
-              try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-              catch Evaluator.tryCatch2(scope.fileName, offset)
-            case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
-            case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => Val.bool(l < r)
-            case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => Val.bool(l > r)
-            case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => Val.bool(l <= r)
-            case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
-            case (l, Expr.BinaryOp.`==`, r) =>
-              if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]){
-                Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
-              }
-              try Val.bool(Materializer(l) == Materializer(r))
-              catch Evaluator.tryCatch2(scope.fileName, offset)
-            case (l, Expr.BinaryOp.`!=`, r) =>
-              if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]){
-                Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
-              }
-              try Val.bool(Materializer(l) != Materializer(r))
-              catch Evaluator.tryCatch2(scope.fileName, offset)
-            case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
-            case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
-            case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-            case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
-            case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
-          }
-      }
+      visitBinaryOp(scope, offset, lhs, op, rhs)
     }
     case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
       if (visitExpr(value, scope) != Val.True) {
@@ -154,40 +90,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
       visitExpr(returned, newScope)
 
-    case Import(offset, value) =>
-
-
-
-      val p = (scope.fileName/ammonite.ops.up :: scope.searchRoots).map(_  / RelPath(value)).find(ammonite.ops.exists).get
-      imports.getOrElseUpdate(
-        p,
-        visitExpr(
-          parser.expr.parse(
-            try ammonite.ops.read(p)
-            catch{case e: Throwable =>
-              Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.fileName, offset)
-            }
-          )match{
-            case Parsed.Success(x, _) => x
-            case f @ Parsed.Failure(l, i, e) => Evaluator.fail("Imported file " + pprint.Util.literalize(value) + " had syntax error " + f.msg, scope.fileName, offset)
-          },
-          originalScope.copy(fileName = p)
-        )
-      )
-
-
-    case ImportStr(offset, value) =>
-
-      val p = (scope.fileName/ammonite.ops.up :: scope.searchRoots).map(_  / RelPath(value)).find(ammonite.ops.exists).get
-      Val.Str(
-        importStrs.getOrElseUpdate(
-          p,
-          try ammonite.ops.read(p)
-          catch{case e: Throwable =>
-            Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.fileName, offset)
-          }
-        )
-      )
+    case Import(offset, value) => visitImport(scope, offset, value)
+    case ImportStr(offset, value) => visitImportStr(scope, offset, value)
     case Expr.Error(offset, value) =>
       Evaluator.fail(
         visitExpr(value, scope) match{
@@ -204,7 +108,10 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       catch Evaluator.tryCatch2(scope.fileName, offset)
 
     case Select(offset, value, name) =>
-      visitExpr(value, scope) match{
+      if (value.isInstanceOf[Super]){
+        val ref = scope.super0.get.value(name, scope.fileName, offset, self = scope.self)
+        try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
+      }else visitExpr(value, scope) match{
         case obj: Val.Obj =>
           val ref = obj.value(name, scope.fileName, offset)
           try ref.force
@@ -214,8 +121,10 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       }
 
     case Lookup(offset, value, index) =>
-
-      (visitExpr(value, scope), visitExpr(index, scope)) match {
+      if (value.isInstanceOf[Super]){
+        val key = visitExpr(index, scope).asInstanceOf[Val.Str]
+        scope.super0.get.value(key.value, scope.fileName, offset).force
+      }else (visitExpr(value, scope), visitExpr(index, scope)) match {
         case (v: Val.Arr, i: Val.Num) =>
           if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.fileName, offset)
           val int = i.value.toInt
@@ -255,6 +164,102 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       Evaluator.mergeObjects(original, extension)
     }
   } catch Evaluator.tryCatch(scope, expr.offset)
+
+  def visitImportStr(scope: => Scope, offset: Int, value: String) = {
+    val p = resolveImport(scope, value)
+    Val.Str(
+      importStrs.getOrElseUpdate(
+        p,
+        importString(scope, offset, value, p)
+      )
+    )
+  }
+
+  def visitImport(scope: => Scope, offset: Int, value: String) = {
+    val p = resolveImport(scope, value)
+    imports.getOrElseUpdate(
+      p,
+      visitExpr(
+        parser.expr.parse(importString(scope, offset, value, p)) match {
+          case Parsed.Success(x, _) => x
+          case f@Parsed.Failure(l, i, e) => Evaluator.fail("Imported file " + pprint.Util.literalize(value) + " had syntax error " + f.msg, scope.fileName, offset)
+        },
+        originalScope.copy(fileName = p)
+      )
+    )
+  }
+
+  def resolveImport(scope: => Scope, value: String) = {
+    (scope.fileName / ammonite.ops.up :: scope.searchRoots).map(_ / RelPath(value)).find(ammonite.ops.exists).get
+  }
+  def importString(scope: => Scope, offset: Int, value: String, p: Path) = {
+    try ammonite.ops.read(p)
+    catch {
+      case e: Throwable =>
+        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.fileName, offset)
+    }
+  }
+
+  def visitBinaryOp(scope: => Scope, offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) = {
+    op match {
+      case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
+        (visitExpr(lhs, scope), op) match {
+          case (Val.False, Expr.BinaryOp.`&&`) => Val.False
+          case (Val.True, Expr.BinaryOp.`||`) => Val.True
+          case _ => visitExpr(rhs, scope)
+
+        }
+      case _ =>
+        (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match {
+          case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
+          case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
+            if (r == 0) Evaluator.fail("division by zero", scope.fileName, offset)
+            Val.Num(l / r)
+          case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
+          case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
+          case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
+
+            try Val.Str(Format.format(l, r, scope.fileName, offset))
+            catch Evaluator.tryCatch2(scope.fileName, offset)
+          case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
+          case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
+          case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
+          case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
+          case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
+          case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
+            try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+            catch Evaluator.tryCatch2(scope.fileName, offset)
+          case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
+            try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+            catch Evaluator.tryCatch2(scope.fileName, offset)
+          case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
+          case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
+          case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
+          case (Val.Num(l), Expr.BinaryOp.`<`, Val.Num(r)) => Val.bool(l < r)
+          case (Val.Num(l), Expr.BinaryOp.`>`, Val.Num(r)) => Val.bool(l > r)
+          case (Val.Num(l), Expr.BinaryOp.`<=`, Val.Num(r)) => Val.bool(l <= r)
+          case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
+          case (l, Expr.BinaryOp.`==`, r) =>
+            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
+              Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+            }
+            try Val.bool(Materializer(l) == Materializer(r))
+            catch Evaluator.tryCatch2(scope.fileName, offset)
+          case (l, Expr.BinaryOp.`!=`, r) =>
+            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
+              Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+            }
+            try Val.bool(Materializer(l) != Materializer(r))
+            catch Evaluator.tryCatch2(scope.fileName, offset)
+          case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
+          case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
+          case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
+          case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
+          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+          case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
+        }
+    }
+  }
 
   def visitFieldName(fieldName: FieldName, scope: => Scope) = {
     fieldName match{

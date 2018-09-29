@@ -45,9 +45,10 @@ object Main {
     while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- names){
+//        println(name)
+
 //        import ammonite.ops._, ImplicitWd._
 //        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
-//        println(name)
         val path = FileTests.testSuiteRoot / s"$name.jsonnet"
         val interp = new Interpreter(parser, Scope.standard(path, Nil))
         interp.interpret(path)
