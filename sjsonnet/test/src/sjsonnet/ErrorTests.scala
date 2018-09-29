@@ -127,7 +127,7 @@ object ErrorTests extends TestSuite{
 
     "function_duplicate_arg" - check(
       """sjsonnet.Error: Parameter passed more than once: x
-        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
+        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |""".stripMargin
     )
@@ -142,7 +142,7 @@ object ErrorTests extends TestSuite{
 //    )
     "function_too_many_args" - check(
       """sjsonnet.Error: Too many args, function has 2 parameter(s)
-        |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:17:7)
+        |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)
         |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)
         |""".stripMargin
     )

@@ -200,7 +200,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       )
     case Apply(offset, value, Args(args)) =>
       val lhs = visitExpr(value, scope)
-      try lhs.asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))})
+      try lhs.asInstanceOf[Val.Func].apply(args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))}, offset)
       catch Evaluator.tryCatch2(scope.fileName, offset)
 
     case Select(offset, value, name) =>
@@ -266,32 +266,13 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     }
   }
 
-  def visitMethod(scope: Scope, rhs: Expr, argSpec: Params, outerOffset: Int) = {
-    Val.Func(
-      argSpec.args.length,
-      { args =>
-        lazy val newScope1 =
-          argSpec.args.collect{
-            case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitExpr(default, newScope)))
-          }
-        lazy val newScope2 = try
-          args.zipWithIndex.map{
-            case ((Some(name), v), _) => (name, (self: Val.Obj, sup: Option[Val.Obj]) => v)
-            case ((None, v), i) => (argSpec.args(i)._1, (self: Val.Obj, sup: Option[Val.Obj]) => v)
-          }
-        catch{
-          case e: IndexOutOfBoundsException =>
-            Evaluator.fail("Too many args, function has " + argSpec.args.length + " parameter(s)", scope.fileName, outerOffset)
-        }
-        lazy val seen = collection.mutable.Set.empty[String]
-        for((k, v) <- newScope2){
-          if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.fileName, outerOffset)
-          else seen.add(k)
-        }
+  def visitMethod(scope: Scope, rhs: Expr, params: Params, outerOffset: Int) = {
 
-        lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
-        visitExpr(rhs, newScope)
-      }
+    Val.Func(
+      scope,
+      params,
+      scope => visitExpr(rhs, scope),
+      (default, scope) => visitExpr(default, scope)
     )
   }
   def visitBindings(bindings: Seq[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {

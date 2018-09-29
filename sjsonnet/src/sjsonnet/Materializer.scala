@@ -37,7 +37,7 @@ object Materializer {
       )
       seen.remove(v, ())
       res
-    case f: Val.Func => apply(f.value(Nil), seen)
+    case f: Val.Func => apply(f.apply(Nil, -1), seen)
   }
 
   def reverse(v: Js.Value): Val = v match{

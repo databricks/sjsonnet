@@ -5,526 +5,522 @@ import java.util.Base64
 
 import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.Expr.Params
 
 
 object Scope{
-
+  def builtin(name: String, params: String*)(eval: Seq[Val] => Val) = {
+    name -> Val.Func(
+      empty,
+      Params(params.map(_ -> None)),
+      {scope => eval(params.map(scope.bindings(_).get.force))}
+    )
+  }
   val functions = Seq[(String, Val.Func)](
-    "assertEqual" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val x1 = Materializer(v1.force)
-        val x2 = Materializer(v2.force)
-        if (x1 == x2) Val.True
-        else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
-    }),
-    "toString" -> Val.Func(1, {case Seq((None, v1)) =>
-        v1.force match{
-          case Val.Str(s) => Val.Str(s)
-          case v =>
-            Val.Str(Materializer.apply(v).transform(new Renderer()).toString)
+    builtin("assertEqual", "a", "b"){ case Seq(v1, v2) =>
+      val x1 = Materializer(v1)
+      val x2 = Materializer(v2)
+      if (x1 == x2) Val.True
+      else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
+    },
+    builtin("toString", "a"){ case Seq(v1) =>
+      v1 match{
+        case Val.Str(s) => Val.Str(s)
+        case v =>
+          Val.Str(Materializer.apply(v).transform(new Renderer()).toString)
+      }
+    },
+    builtin("codepoint", "str"){ case Seq(v1) =>
+      Val.Num(v1.asInstanceOf[Val.Str].value.charAt(0).toInt)
+    },
+    builtin("length", "x"){ case Seq(v1) =>
+      Val.Num(
+        v1 match{
+          case Val.Str(s) => s.length
+          case Val.Arr(s) => s.length
+          case o: Val.Obj => o.getVisibleKeys().count(!_._2)
+          case o: Val.Func => o.params.args.length
         }
-    }),
-    "codepoint" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Num(v1.force.asInstanceOf[Val.Str].value.charAt(0).toInt)
-    }),
-    "length" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Num(
-          v1.force match{
-            case Val.Str(s) => s.length
-            case Val.Arr(s) => s.length
-            case o: Val.Obj => o.getVisibleKeys().count(!_._2)
-            case o: Val.Func => o.length
-          }
-        )
-    }),
-    "objectHas" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        if (v1.force.asInstanceOf[Val.Obj].getVisibleKeys().get(v2.force.asInstanceOf[Val.Str].value) == Some(false)){
-          Val.True
-        } else Val.False
-    }),
-    "objectHasAll" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        if (v1.force.asInstanceOf[Val.Obj].getVisibleKeys().get(v2.force.asInstanceOf[Val.Str].value).isDefined){
-          Val.True
-        } else Val.False
-    }),
-    "objectFields" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Arr(
-          v1.force.asInstanceOf[Val.Obj]
-            .getVisibleKeys()
-            .collect{case (k, false) => k}
-            .toSeq
-            .sorted
-            .map(k => Lazy(Val.Str(k)))
-        )
-    }),
-    "objectFieldsAll" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Arr(
-          v1.force.asInstanceOf[Val.Obj]
-            .getVisibleKeys()
-            .collect{case (k, _) => k}
-            .toSeq
-            .sorted
-            .map(k => Lazy(Val.Str(k)))
-        )
-    }),
-    "type" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Str(
-          v1.force match{
-            case Val.True | Val.False => "boolean"
-            case Val.Null => "null"
-            case _: Val.Obj => "object"
-            case _: Val.Arr => "array"
-            case _: Val.Func => "function"
-            case _: Val.Num => "number"
-            case _: Val.Str => "string"
-          }
-        )
-    }),
-    "lines" -> Val.Func(1, {case Seq((None, v1)) =>
-        Val.Str(
-          Materializer.apply(v1.force).asInstanceOf[ujson.Js.Arr]
-            .value
-            .filter(_ != ujson.Js.Null)
-            .map{case ujson.Js.Str(s) => s + "\n"}
-            .mkString
-        )
-    }),
-    "format" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val formatStr = v1.force.asInstanceOf[Val.Str].value
-        Val.Str(Format.format(formatStr, v2.force, ammonite.ops.pwd / "(unknown)", -1))
-    }),
-    "foldl" -> Val.Func(3, {case Seq((None, func), (None, cases), (None, start)) =>
-        var current = start.force
-        for(item <- cases.force.asInstanceOf[Val.Arr].value){
-          val c = current
-          current = func.force.asInstanceOf[Val.Func].value(Seq((None, Lazy(c)), (None, item)))
+      )
+    },
+    builtin("objectHas", "o", "f"){ case Seq(v1: Val.Obj, v2: Val.Str) =>
+      Val.bool(v1.getVisibleKeys().get(v2.value) == Some(false))
+    },
+    builtin("objectHasAll", "o", "f"){ case Seq(v1: Val.Obj, v2: Val.Str) =>
+      Val.bool(v1.getVisibleKeys().get(v2.value).isDefined)
+    },
+    builtin("objectFields", "o"){ case Seq(v1: Val.Obj) =>
+      Val.Arr(
+        v1.asInstanceOf[Val.Obj]
+          .getVisibleKeys()
+          .collect{case (k, false) => k}
+          .toSeq
+          .sorted
+          .map(k => Lazy(Val.Str(k)))
+      )
+    },
+    builtin("objectFieldsAll", "o"){ case Seq(v1: Val.Obj) =>
+      Val.Arr(
+        v1.asInstanceOf[Val.Obj]
+          .getVisibleKeys()
+          .collect{case (k, _) => k}
+          .toSeq
+          .sorted
+          .map(k => Lazy(Val.Str(k)))
+      )
+    },
+    builtin("type", "x"){ case Seq(v1) =>
+      Val.Str(
+        v1 match{
+          case Val.True | Val.False => "boolean"
+          case Val.Null => "null"
+          case _: Val.Obj => "object"
+          case _: Val.Arr => "array"
+          case _: Val.Func => "function"
+          case _: Val.Num => "number"
+          case _: Val.Str => "string"
         }
-        current
-    }),
-    "foldr" -> Val.Func(3, {case Seq((None, func), (None, cases), (None, start)) =>
-        var current = start.force
-        for(item <- cases.force.asInstanceOf[Val.Arr].value.reverse){
-          val c = current
-          current = func.force.asInstanceOf[Val.Func].value(Seq((None, item), (None, Lazy(c))))
-        }
-        current
-    }),
-    "range" -> Val.Func(2, {case Seq((None, start), (None, end)) =>
-        Val.Arr(
-          (start.force.asInstanceOf[Val.Num].value.toInt to
-            end.force.asInstanceOf[Val.Num].value.toInt)
-            .map(i => Lazy(Val.Num(i))))
-    }),
-    "mergePatch" -> Val.Func(2, {case Seq((None, base), (None, patch)) =>
-        def rec(l: ujson.Js, r: ujson.Js): ujson.Js = {
-          (l, r) match{
-            case (l0, r: ujson.Js.Obj) =>
-              val l = l0 match{
-                case l: ujson.Js.Obj => l
-                case _ => ujson.Js.Obj()
-              }
-              for((k, v) <- r.value){
-                if (v == ujson.Js.Null) l.value.remove(k)
-                else if (l.value.contains(k)) l(k) = rec(l(k), r(k))
-                else l(k) = rec(ujson.Js.Obj(), r(k))
-              }
-              l
-            case (_, _) => r
-          }
-        }
-        Materializer.reverse(rec(Materializer(base.force), Materializer(patch.force)))
-    }),
-    "sqrt" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.sqrt(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "makeArray" -> Val.Func(2, {case Seq((None, n), (None, func)) =>
-        Val.Arr(
-          (0 until n.force.asInstanceOf[Val.Num].value.toInt).map(i =>
-            Lazy(func.force.asInstanceOf[Val.Func].value(Seq(None -> Lazy(Val.Num(i)))))
-          )
-        )
-    }),
-    "pow" -> Val.Func(2, {case Seq((None, n), (None, m)) =>
-        Val.Num(math.pow(n.force.asInstanceOf[Val.Num].value, m.force.asInstanceOf[Val.Num].value))
-    }),
-    "floor" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.floor(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "ceil" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.ceil(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "abs" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.abs(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "sin" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.sin(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "cos" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.cos(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "tan" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.tan(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "asin" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.asin(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "acos" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.acos(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "atan" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.atan(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "log" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.log(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "exp" -> Val.Func(1, {case Seq((None, n)) =>
-        Val.Num(math.exp(n.force.asInstanceOf[Val.Num].value))
-    }),
-    "mantissa" -> Val.Func(1, {case Seq((None, n)) =>
-        val value = n.force.asInstanceOf[Val.Num].value
-        val exponent = (Math.log(value) / Math.log(2)).toInt + 1
-        val mantissa = value * Math.pow(2.0, -exponent)
-        Val.Num(mantissa)
-    }),
-    "exponent" -> Val.Func(1, {case Seq((None, n)) =>
-        val value = n.force.asInstanceOf[Val.Num].value
-        val exponent = (Math.log(value) / Math.log(2)).toInt + 1
-        val mantissa = value * Math.pow(2.0, -exponent)
-        Val.Num(exponent)
-    }),
-    "isString" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force.isInstanceOf[Val.Str])
-    }),
-    "isBoolean" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force == Val.True || n.force == Val.False)
-    }),
-    "isNumber" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force.isInstanceOf[Val.Num])
-    }),
-    "isObject" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force.isInstanceOf[Val.Obj])
-    }),
-    "isArray" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force.isInstanceOf[Val.Arr])
-    }),
-    "isFunction" -> Val.Func(1, {case Seq((None, n)) =>
-      Val.bool(n.force.isInstanceOf[Val.Func])
-    }),
-    "count" -> Val.Func(2, {case Seq((None, arr), (None, v)) =>
-        val items = arr.force.asInstanceOf[Val.Arr].value
-        val res = items.count{i =>
-          Materializer(i.force) == Materializer(v.force)
-        }
-        Val.Num(res)
-    }),
-    "filter" -> Val.Func(2, {case Seq((None, f), (None, arr)) =>
-        Val.Arr(
-          arr.force.asInstanceOf[Val.Arr].value.filter{ i =>
-            f.force.asInstanceOf[Val.Func].value(Seq(None -> i)) == Val.True
-          }
-        )
-    }),
-    "map" -> Val.Func(2, {case Seq((None, f), (None, arr)) =>
-        Val.Arr(
-          arr.force.asInstanceOf[Val.Arr].value.map{ i =>
-            Lazy(f.force.asInstanceOf[Val.Func].value(Seq(None -> i)))
-          }
-        )
-    }),
-    "mapWithKey" -> Val.Func(2, {case Seq((None, f), (None, arr)) =>
-        val allKeys = arr.force.asInstanceOf[Val.Obj].getVisibleKeys()
-        Val.Obj(
-          allKeys.map{ k =>
-            k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(
-              f.force.asInstanceOf[Val.Func].value(
-                Seq(None -> Lazy(Val.Str(k._1)), None -> arr.force.asInstanceOf[Val.Obj].value(k._1, ammonite.ops.pwd / "(Unknown)", -1)),
-              )
-            )))
-          }.toMap,
-          _ => (),
-          None
-        )
-    }),
-    "mapWithIndex" -> Val.Func(2, {case Seq((None, f), (None, arr)) =>
-        Val.Arr(
-          arr.force.asInstanceOf[Val.Arr].value.zipWithIndex.map{ case (i, i2) =>
-            Lazy(f.force.asInstanceOf[Val.Func].value(Seq(None -> i, None -> Lazy(Val.Num(i2)))))
-          }
-        )
-    }),
-    "filterMap" -> Val.Func(2, {case Seq((None, f1), (None, f2), (None, arr)) =>
-        Val.Arr(
-          arr.force.asInstanceOf[Val.Arr].value.flatMap { i =>
-            val x = i.force
-            if (f1.force.asInstanceOf[Val.Func].value(Seq(None -> Lazy(x))) != Val.True) None
-            else Some(Lazy(f2.force.asInstanceOf[Val.Func].value(Seq(None -> Lazy(x)))))
-          }
-        )
-    }),
-    "substr" -> Val.Func(2, {case Seq((None, s), (None, start), (None, end)) =>
-        Val.Str(s.force.asInstanceOf[Val.Str].value.substring(
-          start.force.asInstanceOf[Val.Num].value.toInt,
-          end.force.asInstanceOf[Val.Num].value.toInt + 1
-        ))
-    }),
-    "startsWith" -> Val.Func(2, {case Seq((None, s), (None, snip)) =>
-        if (s.force.asInstanceOf[Val.Str].value.startsWith(snip.force.asInstanceOf[Val.Str].value))
-          Val.True
-        else
-          Val.False
-    }),
-    "endsWith" -> Val.Func(2, {case Seq((None, s), (None, snip)) =>
-        if (s.force.asInstanceOf[Val.Str].value.endsWith(snip.force.asInstanceOf[Val.Str].value))
-          Val.True
-        else
-          Val.False
-    }),
-    "char" -> Val.Func(2, {case Seq((None, c)) =>
-        Val.Str(c.force.asInstanceOf[Val.Num].value.toInt.toChar.toString)
-    }),
-    "strReplace" -> Val.Func(2, {case Seq((None, s), (None, a), (None, b)) =>
-        Val.Str(
-          s.force.asInstanceOf[Val.Str].value.replace(
-            a.force.asInstanceOf[Val.Str].value,
-            b.force.asInstanceOf[Val.Str].value
-          )
-        )
-    }),
-    "join" -> Val.Func(2, {case Seq((None, sep), (None, xs)) =>
-        sep.force match{
-          case Val.Str(s) =>
-            Val.Str(xs.force.asInstanceOf[Val.Arr].value.map(_.force).filter(_ != Val.Null).map{case Val.Str(x) => x}.mkString(s))
-          case Val.Arr(sep) =>
-            val out = collection.mutable.Buffer.empty[Lazy]
-            for(x <- xs.force.asInstanceOf[Val.Arr].value){
-              x.force match{
-                case Val.Null => // do nothing
-                case Val.Arr(v) =>
-                  if (out.nonEmpty) out.appendAll(sep)
-                  out.appendAll(v)
-              }
+      )
+    },
+    builtin("lines", "arr"){ case Seq(v1: Val.Arr) =>
+      Val.Str(
+        Materializer.apply(v1).asInstanceOf[ujson.Js.Arr]
+          .value
+          .filter(_ != ujson.Js.Null)
+          .map{case ujson.Js.Str(s) => s + "\n"}
+          .mkString
+      )
+    },
+    builtin("format", "str", "vals"){ case Seq(v1: Val.Str, v2) =>
+      val formatStr = v1.value
+      Val.Str(Format.format(formatStr, v2, ammonite.ops.pwd / "(unknown)", -1))
+    },
+    builtin("foldl", "func", "arr", "init"){ case Seq(func: Val.Func, arr: Val.Arr, init) =>
+      var current = init
+      for(item <- arr.value){
+        val c = current
+        current = func.apply(Seq((None, Lazy(c)), (None, item)), -1)
+      }
+      current
+    },
+    builtin("foldr", "func", "arr", "init"){ case Seq(func: Val.Func, arr: Val.Arr, init) =>
+      var current = init
+      for(item <- arr.value.reverse){
+        val c = current
+        current = func.apply(Seq((None, item), (None, Lazy(c))), -1)
+      }
+      current
+    },
+    builtin("range", "from", "to"){ case Seq(from: Val.Num, to: Val.Num) =>
+      Val.Arr(
+        (from.asInstanceOf[Val.Num].value.toInt to
+          to.asInstanceOf[Val.Num].value.toInt)
+          .map(i => Lazy(Val.Num(i)))
+      )
+    },
+    builtin("mergePatch", "target", "patch"){ case Seq(target, patch) =>
+      def rec(l: ujson.Js, r: ujson.Js): ujson.Js = {
+        (l, r) match{
+          case (l0, r: ujson.Js.Obj) =>
+            val l = l0 match{
+              case l: ujson.Js.Obj => l
+              case _ => ujson.Js.Obj()
             }
-            Val.Arr(out)
+            for((k, v) <- r.value){
+              if (v == ujson.Js.Null) l.value.remove(k)
+              else if (l.value.contains(k)) l(k) = rec(l(k), r(k))
+              else l(k) = rec(ujson.Js.Obj(), r(k))
+            }
+            l
+          case (_, _) => r
         }
-    }),
-    "flattenArrays" -> Val.Func(1, {case Seq((None, xs)) =>
-        val out = collection.mutable.Buffer.empty[Lazy]
-        for(x <- xs.force.asInstanceOf[Val.Arr].value){
-          x.force match{
-            case Val.Null => // do nothing
-            case Val.Arr(v) => out.appendAll(v)
-          }
-        }
-        Val.Arr(out)
-    }),
-    "manifestIni" -> Val.Func(1, {case Seq((None, v0)) =>
-        val v = Materializer(v0.force)
-        def sect(x: ujson.Js.Obj) = {
-          x.value.flatMap{
-            case (k, ujson.Js.Str(v)) => Seq(k + " = " + v)
-            case (k, ujson.Js.Arr(vs)) => vs.map{case ujson.Js.Str(v) => k + " = " + v}
-          }
-        }
-        val lines = v.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Js.Obj])) ++
-          v.obj.get("sections").fold(Iterable[String]())(x =>
-            x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
-          )
-        Val.Str(lines.flatMap(Seq(_, "\n")).mkString)
-    }),
-    "escapeStringJson" -> Val.Func(1, {case Seq((None, v0)) =>
-        val v = v0.force.asInstanceOf[Val.Str].value
-        val out = new StringWriter()
-        ujson.Renderer.escape(out, v, unicode = true)
-        Val.Str(out.toString)
-    }),
-    "escapeStringBash" -> Val.Func(1, {case Seq((None, v0)) =>
-        val v = v0.force.asInstanceOf[Val.Str].value
-        Val.Str("'" + v.replace("'", """'"'"'""") + "'")
-    }),
-    "escapeStringDollars" -> Val.Func(1, {case Seq((None, v0)) =>
-        val v = v0.force.asInstanceOf[Val.Str].value
-        Val.Str(v.replace("$", "$$"))
-    }),
-    "manifestPython" -> Val.Func(1, {case Seq((None, v0)) =>
-        Val.Str(Materializer(v0.force).transform(new PythonRenderer()).toString)
-    }),
-    "manifestJson" -> Val.Func(1, {case Seq((None, v0)) =>
-        Val.Str(Materializer(v0.force).render(indent = 4))
-    }),
-    "manifestPythonVars" -> Val.Func(1, {case Seq((None, v0)) =>
-        Val.Str(
-          Materializer(v0.force).obj
-            .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
-            .mkString
+      }
+      Materializer.reverse(rec(Materializer(target), Materializer(patch)))
+    },
+    builtin("sqrt", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.sqrt(x.asInstanceOf[Val.Num].value))
+    },
+
+    builtin("makeArray", "sz", "func"){ case Seq(sz: Val.Num, func: Val.Func) =>
+      Val.Arr(
+        (0 until sz.asInstanceOf[Val.Num].value.toInt).map(i =>
+          Lazy(func.asInstanceOf[Val.Func].apply(Seq(None -> Lazy(Val.Num(i))), -1))
         )
-    }),
-    "manifestXmlJsonml" -> Val.Func(1, {case Seq((None, v0)) =>
-        import scalatags.Text.all._
+      )
+    },
 
+    builtin("pow", "x", "n"){ case Seq(x: Val.Num, n: Val.Num) =>
+      Val.Num(math.pow(x.value, n.value))
+    },
 
-        def rec(v: ujson.Js): Frag = {
-          v match {
-            case ujson.Js.Str(s) => s
-            case ujson.Js.Arr(Seq(ujson.Js.Str(t), attrs: ujson.Js.Obj, children@_*)) =>
-              tag(t)(
-                attrs.value.map { case (k, ujson.Js.Str(v)) => attr(k) := v }.toSeq,
-                children.map(rec)
-              )
-            case ujson.Js.Arr(Seq(ujson.Js.Str(t), children@_*)) =>
-              tag(t)(children.map(rec))
-          }
+    builtin("floor", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.floor(x.value))
+    },
+    builtin("ceil", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.ceil(x.value))
+    },
+    builtin("abs", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.abs(x.value))
+    },
+    builtin("sin", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.sin(x.value))
+    },
+    builtin("cos", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.cos(x.value))
+    },
+    builtin("tan", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.tan(x.value))
+    },
+
+    builtin("asin", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.asin(x.value))
+    },
+    builtin("acos", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.acos(x.value))
+    },
+    builtin("atan", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.atan(x.value))
+    },
+    builtin("log", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.log(x.value))
+    },
+    builtin("exp", "x"){ case Seq(x: Val.Num) =>
+      Val.Num(math.exp(x.value))
+    },
+    builtin("mantissa", "x"){ case Seq(x: Val.Num) =>
+      val value = x.value
+      val exponent = (Math.log(value) / Math.log(2)).toInt + 1
+      val mantissa = value * Math.pow(2.0, -exponent)
+      Val.Num(mantissa)
+    },
+    builtin("exponent", "x"){ case Seq(x: Val.Num) =>
+      val value = x.value
+      val exponent = (Math.log(value) / Math.log(2)).toInt + 1
+      val mantissa = value * Math.pow(2.0, -exponent)
+      Val.Num(exponent)
+    },
+    builtin("isString", "v"){ case Seq(v) =>
+      Val.bool(v.isInstanceOf[Val.Str])
+    },
+    builtin("isBoolean", "v"){ case Seq(v) =>
+      Val.bool(v == Val.True || v == Val.False)
+    },
+    builtin("isNumber", "v"){ case Seq(v) =>
+      Val.bool(v.isInstanceOf[Val.Num])
+    },
+    builtin("isObject", "v"){ case Seq(v) =>
+      Val.bool(v.isInstanceOf[Val.Obj])
+    },
+    builtin("isArray", "v"){ case Seq(v) =>
+      Val.bool(v.isInstanceOf[Val.Arr])
+    },
+    builtin("isFunction", "v"){ case Seq(v) =>
+      Val.bool(v.isInstanceOf[Val.Func])
+    },
+    builtin("count", "arr", "x"){ case Seq(arr: Val.Arr, x) =>
+      val res =  arr.value.count{i =>
+        Materializer(i.force) == Materializer(x)
+      }
+      Val.Num(res)
+    },
+    builtin("filter", "func", "arr"){ case Seq(func: Val.Func, arr: Val.Arr) =>
+      Val.Arr(
+        arr.value.filter{ i =>
+          func.apply(Seq(None -> i), -1) == Val.True
         }
+      )
+    },
+    builtin("map", "func", "arr"){ case Seq(func: Val.Func, arr: Val.Arr) =>
+      Val.Arr(
+        arr.value.map{ i =>
+          Lazy(func.apply(Seq(None -> i), -1))
+        }
+      )
+    },
+    builtin("mapWithKey", "func", "obj"){ case Seq(func: Val.Func, obj: Val.Obj) =>
+      val allKeys = obj.getVisibleKeys()
+      Val.Obj(
+        allKeys.map{ k =>
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(
+            func.asInstanceOf[Val.Func].apply(
+              Seq(None -> Lazy(Val.Str(k._1)), None -> obj.value(k._1, ammonite.ops.pwd / "(Unknown)", -1)),
+              -1
+            )
+          )))
+        }.toMap,
+        _ => (),
+        None
+      )
+    },
+    builtin("mapWithIndex", "func", "arr"){ case Seq(func: Val.Func, arr: Val.Arr) =>
+      Val.Arr(
+        arr.value.zipWithIndex.map{ case (i, i2) =>
+          Lazy(func.apply(Seq(None -> i, None -> Lazy(Val.Num(i2))), -1))
+        }
+      )
+    },
+    builtin("filterMap", "filter_func", "map_func", "arr"){ case Seq(filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
+      Val.Arr(
+        arr.value.flatMap { i =>
+          val x = i.force
+          if (filter_func.apply(Seq(None -> Lazy(x)), -1) != Val.True) None
+          else Some(Lazy(map_func.apply(Seq(None -> Lazy(x)), -1)))
+        }
+      )
+    },
+    builtin("substr", "s", "from", "len"){ case Seq(s: Val.Str, from: Val.Num, len: Val.Num) =>
+      Val.Str(s.value.substring(
+        from.value.toInt,
+        len.value.toInt + 1
+      ))
+    },
+    builtin("startsWith", "a", "b"){ case Seq(a: Val.Str, b: Val.Str) =>
+      Val.bool(a.value.startsWith(b.value))
+    },
+    builtin("endsWith", "a", "b"){ case Seq(a: Val.Str, b: Val.Str) =>
+      Val.bool(a.value.endsWith(b.value))
+    },
+    builtin("char", "n"){ case Seq(n: Val.Num) =>
+      Val.Str(n.value.toInt.toChar.toString)
+    },
 
-        Val.Str(rec(Materializer(v0.force)).render)
-    }),
-
-    "base64" -> Val.Func(1, {case Seq((None, v0)) =>
-        Val.Str(
-          v0.force match{
-            case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
-            case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.asInstanceOf[Val.Num].value.toByte).toArray)
+    builtin("strReplace", "str", "from", "to"){ case Seq(str: Val.Str, from: Val.Str, to: Val.Str) =>
+      Val.Str(str.value.replace(from.value, to.value))
+    },
+    builtin("join", "sep", "arr"){ case Seq(sep, arr) =>
+      sep match{
+        case Val.Str(s) =>
+          Val.Str(arr.asInstanceOf[Val.Arr].value.map(_.force).filter(_ != Val.Null).map{case Val.Str(x) => x}.mkString(s))
+        case Val.Arr(sep) =>
+          val out = collection.mutable.Buffer.empty[Lazy]
+          for(x <- arr.asInstanceOf[Val.Arr].value){
+            x.force match{
+              case Val.Null => // do nothing
+              case Val.Arr(v) =>
+                if (out.nonEmpty) out.appendAll(sep)
+                out.appendAll(v)
+            }
           }
+          Val.Arr(out)
+      }
+
+    },
+    builtin("flattenArrays", "arrs"){ case Seq(arrs: Val.Arr) =>
+      val out = collection.mutable.Buffer.empty[Lazy]
+      for(x <- arrs.value){
+        x.force match{
+          case Val.Null => // do nothing
+          case Val.Arr(v) => out.appendAll(v)
+        }
+      }
+      Val.Arr(out)
+    },
+    builtin("manifestIni", "v"){ case Seq(v) =>
+      val materialized = Materializer(v)
+      def sect(x: ujson.Js.Obj) = {
+        x.value.flatMap{
+          case (k, ujson.Js.Str(v)) => Seq(k + " = " + v)
+          case (k, ujson.Js.Arr(vs)) => vs.map{case ujson.Js.Str(v) => k + " = " + v}
+        }
+      }
+      val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Js.Obj])) ++
+        materialized.obj.get("sections").fold(Iterable[String]())(x =>
+          x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
         )
-    }),
-    "base64Decode" -> Val.Func(1, {case Seq((None, v0)) =>
-        Val.Str(
-          v0.force match{
-            case Val.Str(value) => new String(Base64.getDecoder().decode(value))
-          }
-        )
-    }),
-    "base64DecodeBytes" -> Val.Func(1, {case Seq((None, v0)) =>
-        v0.force match{
-          case Val.Str(value) =>
-            Val.Arr(Base64.getDecoder().decode(value).map(i => Lazy(Val.Num(i))))
+      Val.Str(lines.flatMap(Seq(_, "\n")).mkString)
+    },
+    builtin("escapeStringJson", "str"){ case Seq(str: Val.Str) =>
+      val v = str.value
+      val out = new StringWriter()
+      ujson.Renderer.escape(out, v, unicode = true)
+      Val.Str(out.toString)
+    },
+    builtin("escapeStringBash", "str"){ case Seq(str: Val.Str) =>
+      val v = str.value
+      Val.Str("'" + v.replace("'", """'"'"'""") + "'")
+    },
+    builtin("escapeStringDollars", "str"){ case Seq(str: Val.Str) =>
+      val v = str.value
+      Val.Str(v.replace("$", "$$"))
+    },
+    builtin("manifestPython", "v"){ case Seq(v) =>
+      Val.Str(Materializer(v).transform(new PythonRenderer()).toString)
+    },
+    builtin("manifestJson", "v"){ case Seq(v) =>
+      Val.Str(Materializer(v).render(indent = 4))
+    },
+    builtin("manifestPythonVars", "v"){ case Seq(v: Val.Obj) =>
+      Val.Str(
+        Materializer(v).obj
+          .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
+          .mkString
+      )
+    },
+    builtin("manifestXmlJsonml", "value"){ case Seq(value) =>
+      import scalatags.Text.all.{value => _, _}
+
+
+      def rec(v: ujson.Js): Frag = {
+        v match {
+          case ujson.Js.Str(s) => s
+          case ujson.Js.Arr(Seq(ujson.Js.Str(t), attrs: ujson.Js.Obj, children@_*)) =>
+            tag(t)(
+              attrs.value.map { case (k, ujson.Js.Str(v)) => attr(k) := v }.toSeq,
+              children.map(rec)
+            )
+          case ujson.Js.Arr(Seq(ujson.Js.Str(t), children@_*)) =>
+            tag(t)(children.map(rec))
         }
-    }),
-    "sort" -> Val.Func(1, {case Seq((None, v0)) =>
-        val Val.Arr(vs0) = v0.force
-        val vs = vs0.map(_.force)
-        Val.Arr(
+      }
 
-          if (vs.forall(_.isInstanceOf[Val.Str])){
-            vs.map(_.asInstanceOf[Val.Str]).sortBy(_.value).map(Lazy(_))
-          }else if (vs.forall(_.isInstanceOf[Val.Num])){
-            vs.map(_.asInstanceOf[Val.Num]).sortBy(_.value).map(Lazy(_))
-          }else {
-            ???
-          }
-        )
-    }),
-    "uniq" -> Val.Func(1, {case Seq((None, v0)) =>
-        val ujson.Js.Arr(vs) = Materializer(v0.force)
-        val out = collection.mutable.Buffer.empty[ujson.Js]
-        for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+      Val.Str(rec(Materializer(value)).render)
 
-        Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
-    }),
-    "set" -> Val.Func(1, {case Seq((None, v0)) =>
-        val ujson.Js.Arr(vs0) = Materializer(v0.force)
-        val vs =
-          if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-            vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-          }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-            vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-          }else ???
-
-        val out = collection.mutable.Buffer.empty[ujson.Js]
-        for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-        Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
-    }),
-    "setUnion" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-
-        val ujson.Js.Arr(vs1) = Materializer(v1.force)
-        val ujson.Js.Arr(vs2) = Materializer(v2.force)
-        val vs0 = vs1 ++ vs2
-        val vs =
-          if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-            vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-          }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-            vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-          }else ???
-
-        val out = collection.mutable.Buffer.empty[ujson.Js]
-        for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-        Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
-    }),
-    "setInter" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val vs1 = Materializer(v1.force) match{
-          case ujson.Js.Arr(vs1) => vs1
-          case x => Seq(x)
+    },
+    builtin("base64", "v"){ case Seq(v) =>
+      Val.Str(
+        v match{
+          case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
+          case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.asInstanceOf[Val.Num].value.toByte).toArray)
         }
-        val ujson.Js.Arr(vs2) = Materializer(v2.force)
+      )
+    },
 
+    builtin("base64Decode", "s"){ case Seq(s: Val.Str) =>
+      Val.Str(
+        new String(Base64.getDecoder().decode(s.value))
+      )
+    },
+    builtin("base64DecodeBytes", "s"){ case Seq(s: Val.Str) =>
+      Val.Arr(Base64.getDecoder().decode(s.value).map(i => Lazy(Val.Num(i))))
+    },
+    builtin("sort", "arr"){ case Seq(arr: Val.Arr) =>
 
-        val vs0 = vs1.to[collection.mutable.LinkedHashSet]
-          .intersect(vs2.to[collection.mutable.LinkedHashSet])
-          .toSeq
-        val vs =
-          if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-            vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-          }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-            vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-          }else ???
+      val vs = arr.value
+      Val.Arr(
 
-        val out = collection.mutable.Buffer.empty[ujson.Js]
-        for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-        Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
-    }),
-    "setDiff" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val ujson.Js.Arr(vs1) = Materializer(v1.force)
-        val ujson.Js.Arr(vs2) = Materializer(v2.force)
-
-
-        val vs0 = vs1.to[collection.mutable.LinkedHashSet]
-          .diff(vs2.to[collection.mutable.LinkedHashSet])
-          .toSeq
-        val vs =
-          if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-            vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-          }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-            vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-          }else ???
-
-        val out = collection.mutable.Buffer.empty[ujson.Js]
-        for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-        Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
-    }),
-    "setMember" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val vs1 = Materializer(v1.force)
-        val ujson.Js.Arr(vs2) = Materializer(v2.force)
-        Val.bool(vs2.contains(vs1))
-    }),
-    "split" -> Val.Func(2, {case Seq((None, v1), (None, v2)) =>
-        val Val.Str(vs1) = v1.force
-        val Val.Str(vs2) = v2.force
-        Val.Arr(vs1.split(java.util.regex.Pattern.quote(vs2), -1).map(s => Lazy(Val.Str(s))))
-    }),
-    "splitLimit" -> Val.Func(2, {case Seq((None, v1), (None, v2), (None, v3)) =>
-        val Val.Str(vs1) = v1.force
-        val Val.Str(vs2) = v2.force
-        val Val.Num(vs3) = v3.force
-        Val.Arr(vs1.split(java.util.regex.Pattern.quote(vs2), vs3.toInt + 1).map(s => Lazy(Val.Str(s))))
-    }),
-    "stringChars" -> Val.Func(2, {case Seq((None, v1)) =>
-        val Val.Str(vs1) = v1.force
-
-        var offset = 0
-        val output = collection.mutable.Buffer.empty[String]
-        while (offset < vs1.length) {
-          val codepoint = vs1.codePointAt(offset)
-          output.append(new String(Character.toChars(codepoint)))
-          offset += Character.charCount(codepoint)
+        if (vs.forall(_.force.isInstanceOf[Val.Str])){
+          vs.map(_.force.asInstanceOf[Val.Str]).sortBy(_.value).map(Lazy(_))
+        }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
+          vs.map(_.force.asInstanceOf[Val.Num]).sortBy(_.value).map(Lazy(_))
+        }else {
+          ???
         }
-        Val.Arr(output.map(s => Lazy(Val.Str(s))))
-    }),
-    "parseInt" -> Val.Func(2, {case Seq((None, v1)) =>
-        val Val.Str(vs1) = v1.force
-        Val.Num(vs1.toInt)
-    }),
+      )
+    },
+    builtin("uniq", "arr"){ case Seq(arr: Val.Arr) =>
+      val ujson.Js.Arr(vs) = Materializer(arr)
+      val out = collection.mutable.Buffer.empty[ujson.Js]
+      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+    },
+    builtin("set", "arr"){ case Seq(arr: Val.Arr) =>
+      val ujson.Js.Arr(vs0) = Materializer(arr)
+      val vs =
+        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        }else ???
+
+      val out = collection.mutable.Buffer.empty[ujson.Js]
+      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+    },
+    builtin("setUnion", "a", "b"){ case Seq(a: Val.Arr, b: Val.Arr) =>
+
+      val ujson.Js.Arr(vs1) = Materializer(a)
+      val ujson.Js.Arr(vs2) = Materializer(b)
+      val vs0 = vs1 ++ vs2
+      val vs =
+        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        }else ???
+
+      val out = collection.mutable.Buffer.empty[ujson.Js]
+      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+    },
+    builtin("setInter", "a", "b"){ case Seq(a, b: Val.Arr) =>
+      val vs1 = Materializer(a) match{
+        case ujson.Js.Arr(vs1) => vs1
+        case x => Seq(x)
+      }
+      val ujson.Js.Arr(vs2) = Materializer(b)
+
+
+      val vs0 = vs1.to[collection.mutable.LinkedHashSet]
+        .intersect(vs2.to[collection.mutable.LinkedHashSet])
+        .toSeq
+      val vs =
+        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        }else ???
+
+      val out = collection.mutable.Buffer.empty[ujson.Js]
+      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+    },
+    builtin("setDiff", "a", "b"){ case Seq(a: Val.Arr, b: Val.Arr) =>
+      val ujson.Js.Arr(vs1) = Materializer(a)
+      val ujson.Js.Arr(vs2) = Materializer(b)
+
+
+      val vs0 = vs1.to[collection.mutable.LinkedHashSet]
+        .diff(vs2.to[collection.mutable.LinkedHashSet])
+        .toSeq
+      val vs =
+        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
+          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
+          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        }else ???
+
+      val out = collection.mutable.Buffer.empty[ujson.Js]
+      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
+
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+
+    },
+    builtin("setMember", "x", "arr"){ case Seq(x, arr: Val.Arr) =>
+      val vs1 = Materializer(x)
+      val ujson.Js.Arr(vs2) = Materializer(arr)
+      Val.bool(vs2.contains(vs1))
+    },
+    builtin("split", "str", "c"){ case Seq(str: Val.Str, c: Val.Str) =>
+      Val.Arr(str.value.split(java.util.regex.Pattern.quote(c.value), -1).map(s => Lazy(Val.Str(s))))
+    },
+    builtin("splitLimit", "str", "c", "maxSplits"){ case Seq(str: Val.Str, c: Val.Str, maxSplits: Val.Num) =>
+      Val.Arr(str.value.split(java.util.regex.Pattern.quote(c.value), maxSplits.value.toInt + 1).map(s => Lazy(Val.Str(s))))
+    },
+    builtin("stringChars", "str"){ case Seq(str: Val.Str) =>
+
+      var offset = 0
+      val output = collection.mutable.Buffer.empty[String]
+      while (offset < str.value.length) {
+        val codepoint = str.value.codePointAt(offset)
+        output.append(new String(Character.toChars(codepoint)))
+        offset += Character.charCount(codepoint)
+      }
+      Val.Arr(output.map(s => Lazy(Val.Str(s))))
+
+    },
+    builtin("parseInt", "str"){ case Seq(str: Val.Str) =>
+      Val.Num(str.value.toInt)
+    },
+    builtin("parseOctal", "str"){ case Seq(str: Val.Str) =>
+      Val.Num(Integer.parseInt(str.value, 8))
+    },
+    builtin("parseHex", "str"){ case Seq(str: Val.Str) =>
+      Val.Num(Integer.parseInt(str.value, 16))
+    },
   )
   val Std = Val.Obj(
     functions

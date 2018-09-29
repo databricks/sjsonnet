@@ -2,6 +2,7 @@ package sjsonnet
 
 import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.Expr.Params
 
 object Lazy{
   def apply(calc0: => Val) = new Lazy(calc0)
@@ -91,8 +92,34 @@ object Val{
     }
   }
 
-  case class Func(length: Int,
-                  value: Seq[(Option[String], Lazy)] => Val) extends Val{
+  case class Func(scope: Scope,
+                  params: Params,
+                  evalRhs: Scope => Val,
+                  evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
+    def apply(args: Seq[(Option[String], Lazy)], outerOffset: Int) = {
+      lazy val newScope1 =
+        params.args.collect{
+          case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
+        }
+
+      lazy val newScope2 = try
+        args.zipWithIndex.map{
+          case ((Some(name), v), _) => (name, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+          case ((None, v), i) => (params.args(i)._1, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+        }
+      catch{
+        case e: IndexOutOfBoundsException =>
+          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.fileName, outerOffset)
+      }
+      lazy val seen = collection.mutable.Set.empty[String]
+      for((k, v) <- newScope2){
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.fileName, outerOffset)
+        else seen.add(k)
+      }
+
+      lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
+      evalRhs(newScope)
+    }
   }
 }
