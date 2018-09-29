@@ -4,7 +4,7 @@ import utest._
 import ujson.Js
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
-    new Interpreter(new Parser(), Scope.empty).interpret(s) match{
+    new Interpreter(new Parser(), Scope.standard(ammonite.ops.pwd/"(memory)", Nil)).interpret(s) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }
@@ -151,6 +151,11 @@ object EvaluatorTests extends TestSuite{
              |
              |(str1 == "\\n\n")
              |""".stripMargin) ==> Js.True
+    }
+    'stdLib - {
+      eval("std.pow(2, 3)") ==> Js.Num(8)
+      eval("std.pow(x=2, n=3)") ==> Js.Num(8)
+      eval("std.pow(n=3, x=2)") ==> Js.Num(8)
     }
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")

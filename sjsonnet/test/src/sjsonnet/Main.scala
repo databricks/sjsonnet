@@ -45,7 +45,7 @@ object Main {
     while(System.currentTimeMillis() - start < 10000){
       count += 1
       for(name <- names){
-        import ammonite.ops._, ImplicitWd._
+//        import ammonite.ops._, ImplicitWd._
 //        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
 //        println(name)
         val path = FileTests.testSuiteRoot / s"$name.jsonnet"
