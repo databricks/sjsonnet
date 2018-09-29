@@ -42,7 +42,7 @@ object Main {
     val parser = new Parser()
     val start = System.currentTimeMillis()
     var count = 0
-    while(System.currentTimeMillis() - start < 10000){
+    while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- names){
 //        import ammonite.ops._, ImplicitWd._
