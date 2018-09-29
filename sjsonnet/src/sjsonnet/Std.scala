@@ -8,114 +8,128 @@ import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
 
 object Std {
-  sealed trait Read[T]{
+  sealed trait ReadWriter[T]{
     def apply(t: Val): Either[String, T]
+    def write(t: T): Val
   }
-  object Read{
-    implicit object StringRead extends Read[String]{
+  object ReadWriter{
+    implicit object StringRead extends ReadWriter[String]{
       def apply(t: Val) = t match{
         case Val.Str(s) => Right(s)
         case _ => Left("String")
       }
+      def write(t: String) = Val.Str(t)
     }
-    implicit object IntRead extends Read[Int]{
+    implicit object BooleanRead extends ReadWriter[Boolean]{
+      def apply(t: Val) = t match{
+        case Val.True => Right(true)
+        case Val.False => Right(false)
+        case _ => Left("Boolean")
+      }
+      def write(t: Boolean) = Val.bool(t)
+    }
+    implicit object IntRead extends ReadWriter[Int]{
       def apply(t: Val) = t match{
         case Val.Num(s) => Right(s.toInt)
         case _ => Left("Int")
       }
+      def write(t: Int) = Val.Num(t)
     }
-    implicit object DoubleRead extends Read[Double]{
+    implicit object DoubleRead extends ReadWriter[Double]{
       def apply(t: Val) = t match{
         case Val.Num(s) => Right(s)
         case _ => Left("Number")
       }
+      def write(t: Double) = Val.Num(t)
     }
-    implicit object ValRead extends Read[Val]{
+    implicit object ValRead extends ReadWriter[Val]{
       def apply(t: Val) = Right(t)
+      def write(t: Val) = t
     }
-    implicit object ObjRead extends Read[Val.Obj]{
+    implicit object ObjRead extends ReadWriter[Val.Obj]{
       def apply(t: Val) = t match{
         case v: Val.Obj => Right(v)
         case _ => Left("Object")
       }
+      def write(t: Val.Obj) = t
     }
-    implicit object ArrRead extends Read[Val.Arr]{
+    implicit object ArrRead extends ReadWriter[Val.Arr]{
       def apply(t: Val) = t match{
         case v: Val.Arr => Right(v)
         case _ => Left("Array")
       }
+      def write(t: Val.Arr) = t
     }
-    implicit object FuncRead extends Read[Val.Func]{
+    implicit object FuncRead extends ReadWriter[Val.Func]{
       def apply(t: Val) = t match{
         case v: Val.Func => Right(v)
         case _ => Left("Function")
       }
+      def write(t: Val.Func) = t
     }
   }
 
-  def validate(vs: Seq[Val], rs: Seq[Read[_]]) = {
+  def validate(vs: Seq[Val], rs: Seq[ReadWriter[_]]) = {
     for((v, r) <- vs.zip(rs)) yield r.apply(v) match{
       case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
       case Right(x) => x
     }
   }
 
-  def builtin[T1: Read](name: String, p1: String)
-                       (eval: T1 => Val): (String, Val.Func) = builtin0(name, p1){ vs =>
-    val Seq(v: T1) = validate(vs, Seq(implicitly[Read[T1]]))
+  def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
+                             (eval: T1 => R): (String, Val.Func) = builtin0(name, p1){ vs =>
+    val Seq(v: T1) = validate(vs, Seq(implicitly[ReadWriter[T1]]))
     eval(v)
   }
 
-  def builtin[T1: Read, T2: Read](name: String, p1: String, p2: String)
-                                 (eval: (T1, T2) => Val): (String, Val.Func) = builtin0(name, p1, p2){ vs =>
-    val Seq(v1: T1, v2: T2) = validate(vs, Seq(implicitly[Read[T1]], implicitly[Read[T2]]))
+  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
+                                             (eval: (T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ vs =>
+    val Seq(v1: T1, v2: T2) = validate(vs, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
     eval(v1, v2)
   }
 
-  def builtin[T1: Read, T2: Read, T3: Read](name: String, p1: String, p2: String, p3: String)
-                                           (eval: (T1, T2, T3)=> Val): (String, Val.Func) = builtin0(name, p1, p2, p3){ vs =>
-    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, Seq(implicitly[Read[T1]], implicitly[Read[T2]], implicitly[Read[T3]]))
+  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
+                                                             (eval: (T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ vs =>
+    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
     eval(v1, v2, v3)
   }
-  def builtin0(name: String, params: String*)(eval: Seq[Val] => Val) = {
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: Seq[Val] => R) = {
     name -> Val.Func(
       empty,
       Params(params.map(_ -> None)),
-      {scope => eval(params.map(scope.bindings(_).get.force))}
+      {scope => implicitly[ReadWriter[R]].write(eval(params.map(scope.bindings(_).get.force)))}
     )
   }
   val functions = Seq[(String, Val.Func)](
     builtin("assertEqual", "a", "b"){ (v1: Val, v2: Val) =>
       val x1 = Materializer(v1)
       val x2 = Materializer(v2)
-      if (x1 == x2) Val.True
+      if (x1 == x2) true
       else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
     },
     builtin("toString", "a"){ (v1: Val) =>
       v1 match{
-        case Val.Str(s) => Val.Str(s)
+        case Val.Str(s) => s
         case v =>
-          Val.Str(Materializer.apply(v).transform(new Renderer()).toString)
+          Materializer.apply(v).transform(new Renderer()).toString
       }
     },
     builtin("codepoint", "str"){ (v1: Val) =>
-      Val.Num(v1.asInstanceOf[Val.Str].value.charAt(0).toInt)
+      v1.asInstanceOf[Val.Str].value.charAt(0).toInt
     },
     builtin("length", "x"){ (v1: Val) =>
-      Val.Num(
-        v1 match{
-          case Val.Str(s) => s.length
-          case Val.Arr(s) => s.length
-          case o: Val.Obj => o.getVisibleKeys().count(!_._2)
-          case o: Val.Func => o.params.args.length
-        }
-      )
+      v1 match{
+        case Val.Str(s) => s.length
+        case Val.Arr(s) => s.length
+        case o: Val.Obj => o.getVisibleKeys().count(!_._2)
+        case o: Val.Func => o.params.args.length
+      }
     },
     builtin("objectHas", "o", "f"){ (v1: Val.Obj, v2: String) =>
-      Val.bool(v1.getVisibleKeys().get(v2) == Some(false))
+      v1.getVisibleKeys().get(v2) == Some(false)
     },
     builtin("objectHasAll", "o", "f"){ (v1: Val.Obj, v2: String) =>
-      Val.bool(v1.getVisibleKeys().get(v2).isDefined)
+      v1.getVisibleKeys().get(v2).isDefined
     },
     builtin("objectFields", "o"){ (v1: Val.Obj) =>
       Val.Arr(
@@ -138,29 +152,25 @@ object Std {
       )
     },
     builtin("type", "x"){ (v1: Val) =>
-      Val.Str(
-        v1 match{
-          case Val.True | Val.False => "boolean"
-          case Val.Null => "null"
-          case _: Val.Obj => "object"
-          case _: Val.Arr => "array"
-          case _: Val.Func => "function"
-          case _: Val.Num => "number"
-          case _: Val.Str => "string"
-        }
-      )
+      v1 match{
+        case Val.True | Val.False => "boolean"
+        case Val.Null => "null"
+        case _: Val.Obj => "object"
+        case _: Val.Arr => "array"
+        case _: Val.Func => "function"
+        case _: Val.Num => "number"
+        case _: Val.Str => "string"
+      }
     },
     builtin("lines", "arr"){ (v1: Val.Arr) =>
-      Val.Str(
-        Materializer.apply(v1).asInstanceOf[ujson.Js.Arr]
-          .value
-          .filter(_ != ujson.Js.Null)
-          .map{case ujson.Js.Str(s) => s + "\n"}
-          .mkString
-      )
+      Materializer.apply(v1).asInstanceOf[ujson.Js.Arr]
+        .value
+        .filter(_ != ujson.Js.Null)
+        .map{case ujson.Js.Str(s) => s + "\n"}
+        .mkString
     },
     builtin("format", "str", "vals"){ (v1: String, v2: Val) =>
-      Val.Str(Format.format(v1, v2, ammonite.ops.pwd / "(unknown)", -1))
+      Format.format(v1, v2, ammonite.ops.pwd / "(unknown)", -1)
     },
     builtin("foldl", "func", "arr", "init"){ (func: Val.Func, arr: Val.Arr, init: Val) =>
       var current = init
@@ -203,7 +213,7 @@ object Std {
       Materializer.reverse(rec(Materializer(target), Materializer(patch)))
     },
     builtin("sqrt", "x"){ (x: Double) =>
-      Val.Num(math.sqrt(x))
+      math.sqrt(x)
     },
 
     builtin("makeArray", "sz", "func"){ (sz: Int, func: Val.Func) =>
@@ -215,78 +225,78 @@ object Std {
     },
 
     builtin("pow", "x", "n"){ (x: Double, n: Double) =>
-      Val.Num(math.pow(x, n))
+      math.pow(x, n)
     },
 
     builtin("floor", "x"){ (x: Double) =>
-      Val.Num(math.floor(x))
+      math.floor(x)
     },
     builtin("ceil", "x"){ (x: Double) =>
-      Val.Num(math.ceil(x))
+      math.ceil(x)
     },
     builtin("abs", "x"){ (x: Double) =>
-      Val.Num(math.abs(x))
+      math.abs(x)
     },
     builtin("sin", "x"){ (x: Double) =>
-      Val.Num(math.sin(x))
+      math.sin(x)
     },
     builtin("cos", "x"){ (x: Double) =>
-      Val.Num(math.cos(x))
+      math.cos(x)
     },
     builtin("tan", "x"){ (x: Double) =>
-      Val.Num(math.tan(x))
+      math.tan(x)
     },
 
     builtin("asin", "x"){ (x: Double) =>
-      Val.Num(math.asin(x))
+      math.asin(x)
     },
     builtin("acos", "x"){ (x: Double) =>
-      Val.Num(math.acos(x))
+      math.acos(x)
     },
     builtin("atan", "x"){ (x: Double) =>
-      Val.Num(math.atan(x))
+      math.atan(x)
     },
     builtin("log", "x"){ (x: Double) =>
-      Val.Num(math.log(x))
+      math.log(x)
     },
     builtin("exp", "x"){ (x: Double) =>
-      Val.Num(math.exp(x))
+      math.exp(x)
     },
     builtin("mantissa", "x"){ (x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toInt + 1
       val mantissa = value * Math.pow(2.0, -exponent)
-      Val.Num(mantissa)
+      mantissa
     },
     builtin("exponent", "x"){ (x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toInt + 1
       val mantissa = value * Math.pow(2.0, -exponent)
-      Val.Num(exponent)
+      exponent
     },
     builtin("isString", "v"){ (v: Val) =>
-      Val.bool(v.isInstanceOf[Val.Str])
+      v.isInstanceOf[Val.Str]
     },
     builtin("isBoolean", "v"){ (v: Val) =>
-      Val.bool(v == Val.True || v == Val.False)
+      v == Val.True || v == Val.False
     },
     builtin("isNumber", "v"){ (v: Val) =>
-      Val.bool(v.isInstanceOf[Val.Num])
+      v.isInstanceOf[Val.Num]
     },
     builtin("isObject", "v"){ (v: Val) =>
-      Val.bool(v.isInstanceOf[Val.Obj])
+      v.isInstanceOf[Val.Obj]
     },
     builtin("isArray", "v"){ (v: Val) =>
-      Val.bool(v.isInstanceOf[Val.Arr])
+      v.isInstanceOf[Val.Arr]
     },
     builtin("isFunction", "v"){ (v: Val) =>
-      Val.bool(v.isInstanceOf[Val.Func])
+      v.isInstanceOf[Val.Func]
     },
     builtin("count", "arr", "x"){ (arr: Val.Arr, x: Val) =>
       val res =  arr.value.count{i =>
         Materializer(i.force) == Materializer(x)
       }
-      Val.Num(res)
+      res
     },
     builtin("filter", "func", "arr"){ (func: Val.Func, arr: Val.Arr) =>
       Val.Arr(
@@ -334,26 +344,23 @@ object Std {
       )
     },
     builtin("substr", "s", "from", "len"){ (s: String, from: Int, len: Int) =>
-      Val.Str(s.substring(
-        from,
-        len + 1
-      ))
+      s.substring(from, len + 1)
     },
     builtin("startsWith", "a", "b"){ (a: String, b: String) =>
-      Val.bool(a.startsWith(b))
+      a.startsWith(b)
     },
     builtin("endsWith", "a", "b"){ (a: String, b: String) =>
-      Val.bool(a.endsWith(b))
+      a.endsWith(b)
     },
     builtin("char", "n"){ (n: Double) =>
-      Val.Str(n.toInt.toChar.toString)
+      n.toInt.toChar.toString
     },
 
     builtin("strReplace", "str", "from", "to"){ (str: String, from: String, to: String) =>
-      Val.Str(str.replace(from, to))
+      str.replace(from, to)
     },
     builtin("join", "sep", "arr"){ (sep: Val, arr: Val.Arr) =>
-      sep match{
+      val res: Val = sep match{
         case Val.Str(s) =>
           Val.Str(arr.value.map(_.force).filter(_ != Val.Null).map{case Val.Str(x) => x}.mkString(s))
         case Val.Arr(sep) =>
@@ -368,7 +375,7 @@ object Std {
           }
           Val.Arr(out)
       }
-
+      res
     },
     builtin("flattenArrays", "arrs"){ (arrs: Val.Arr) =>
       val out = collection.mutable.Buffer.empty[Lazy]
@@ -392,31 +399,29 @@ object Std {
         materialized.obj.get("sections").fold(Iterable[String]())(x =>
           x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
         )
-      Val.Str(lines.flatMap(Seq(_, "\n")).mkString)
+      lines.flatMap(Seq(_, "\n")).mkString
     },
     builtin("escapeStringJson", "str"){ (str: String) =>
       val out = new StringWriter()
       ujson.Renderer.escape(out, str, unicode = true)
-      Val.Str(out.toString)
+      out.toString
     },
     builtin("escapeStringBash", "str"){ (str: String) =>
-      Val.Str("'" + str.replace("'", """'"'"'""") + "'")
+      "'" + str.replace("'", """'"'"'""") + "'"
     },
     builtin("escapeStringDollars", "str"){ (str: String) =>
-      Val.Str(str.replace("$", "$$"))
+      str.replace("$", "$$")
     },
     builtin("manifestPython", "v"){ (v: Val) =>
-      Val.Str(Materializer(v).transform(new PythonRenderer()).toString)
+      Materializer(v).transform(new PythonRenderer()).toString
     },
     builtin("manifestJson", "v"){ (v: Val) =>
-      Val.Str(Materializer(v).render(indent = 4))
+      Materializer(v).render(indent = 4)
     },
     builtin("manifestPythonVars", "v"){ (v: Val.Obj) =>
-      Val.Str(
-        Materializer(v).obj
-          .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
-          .mkString
-      )
+      Materializer(v).obj
+        .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
+        .mkString
     },
     builtin("manifestXmlJsonml", "value"){ (value: Val) =>
       import scalatags.Text.all.{value => _, _}
@@ -435,22 +440,18 @@ object Std {
         }
       }
 
-      Val.Str(rec(Materializer(value)).render)
+      rec(Materializer(value)).render
 
     },
     builtin("base64", "v"){ (v: Val) =>
-      Val.Str(
-        v match{
-          case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
-          case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.asInstanceOf[Val.Num].value.toByte).toArray)
-        }
-      )
+      v match{
+        case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
+        case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.asInstanceOf[Val.Num].value.toByte).toArray)
+      }
     },
 
     builtin("base64Decode", "s"){ (s: String) =>
-      Val.Str(
-        new String(Base64.getDecoder().decode(s))
-      )
+      new String(Base64.getDecoder().decode(s))
     },
     builtin("base64DecodeBytes", "s"){ (s: String) =>
       Val.Arr(Base64.getDecoder().decode(s).map(i => Lazy(Val.Num(i))))
@@ -554,7 +555,7 @@ object Std {
     builtin("setMember", "x", "arr"){ (x: Val, arr: Val.Arr) =>
       val vs1 = Materializer(x)
       val ujson.Js.Arr(vs2) = Materializer(arr)
-      Val.bool(vs2.contains(vs1))
+      vs2.contains(vs1)
     },
     builtin("split", "str", "c"){ (str: String, c: String) =>
       Val.Arr(str.split(java.util.regex.Pattern.quote(c), -1).map(s => Lazy(Val.Str(s))))
@@ -575,13 +576,13 @@ object Std {
 
     },
     builtin("parseInt", "str"){ (str: String) =>
-      Val.Num(str.toInt)
+      str.toInt
     },
     builtin("parseOctal", "str"){ (str: String) =>
-      Val.Num(Integer.parseInt(str, 8))
+      Integer.parseInt(str, 8)
     },
     builtin("parseHex", "str"){ (str: String) =>
-      Val.Num(Integer.parseInt(str, 16))
+      Integer.parseInt(str, 16)
     },
   )
   val Std = Val.Obj(
