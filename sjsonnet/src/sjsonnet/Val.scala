@@ -3,12 +3,11 @@ package sjsonnet
 import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
 
-object Ref{
-  def apply(calc0: => Val) = new Ref(calc0)
+object Lazy{
+  def apply(calc0: => Val) = new Lazy(calc0)
 }
-class Ref(calc0: => Val){
-  lazy val calc = calc0
-  def force(self: Option[Val.Obj]): Val = calc
+class Lazy(calc0: => Val){
+  lazy val force = calc0
 }
 sealed trait Val{
   def prettyName: String
@@ -30,12 +29,12 @@ object Val{
   case class Num(value: Double) extends Val{
     def prettyName = "number"
   }
-  case class Arr(value: Seq[Ref]) extends Val{
+  case class Arr(value: Seq[Lazy]) extends Val{
     def prettyName = "array"
   }
   object Obj{
 
-    case class Member(add: Boolean, visibility: Visibility, invoke: (Obj, Option[Obj]) => Ref)
+    case class Member(add: Boolean, visibility: Visibility, invoke: (Obj, Option[Obj]) => Lazy)
   }
   case class Obj(value0: Map[String, Obj.Member],
                  triggerAsserts: Val.Obj => Unit,
@@ -61,7 +60,7 @@ object Val{
       }
       mapping
     }
-    val valueCache = collection.mutable.Map.empty[Any, Ref]
+    val valueCache = collection.mutable.Map.empty[Any, Lazy]
     def value(k: String, fileName: Path, offset: Int,  self: Obj = this) = {
 
       valueCache.getOrElseUpdate(
@@ -79,13 +78,13 @@ object Val{
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
     }
 
-    def valueRaw(k: String, self: Obj): Option[Ref] = this.value0.get(k) match{
+    def valueRaw(k: String, self: Obj): Option[Lazy] = this.value0.get(k) match{
       case Some(m) =>
-        def localResult = m.invoke(self, this.`super`).calc
+        def localResult = m.invoke(self, this.`super`).force
         this.`super` match{
           case Some(s) if m.add =>
-            Some(Ref(s.valueRaw(k, self).fold(localResult)(x => mergeMember(x.calc, localResult))))
-          case _ => Some(Ref(localResult))
+            Some(Lazy(s.valueRaw(k, self).fold(localResult)(x => mergeMember(x.force, localResult))))
+          case _ => Some(Lazy(localResult))
         }
 
       case None => this.`super`.flatMap(_.valueRaw(k, self))
@@ -93,7 +92,7 @@ object Val{
   }
 
   case class Func(length: Int,
-                  value: Seq[(Option[String], Ref)] => Val) extends Val{
+                  value: Seq[(Option[String], Lazy)] => Val) extends Val{
     def prettyName = "function"
   }
 }

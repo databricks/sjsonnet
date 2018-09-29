@@ -14,7 +14,7 @@ object Materializer {
     case Val.Arr(xs) =>
       if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
       seen.put(v, ())
-      val res = Js.Arr.from(xs.map(x => apply(x.calc, seen)))
+      val res = Js.Arr.from(xs.map(x => apply(x.force, seen)))
       seen.remove(v, ())
       res
     case obj: Val.Obj =>
@@ -33,7 +33,7 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", -1).calc, seen)
+        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", -1).force, seen)
       )
       seen.remove(v, ())
       res
@@ -46,9 +46,9 @@ object Materializer {
     case Js.Null => Val.Null
     case Js.Num(n) => Val.Num(n)
     case Js.Str(s) => Val.Str(s)
-    case Js.Arr(xs) => Val.Arr(xs.map(x => Ref(reverse(x))))
+    case Js.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))))
     case Js.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Ref(reverse(x._2))))).toMap,
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Lazy(reverse(x._2))))).toMap,
       _ => (),
       None
     )

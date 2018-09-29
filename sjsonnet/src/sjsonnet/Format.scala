@@ -77,7 +77,7 @@ object Format{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(Seq(Ref(x)))
+      case x => Val.Arr(Seq(Lazy(x)))
     }
     val (leading, chunks) = format.parse(s).get.value
     val output = new StringBuilder
@@ -89,11 +89,11 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).calc)
+            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).force)
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).calc)
-                case v: Val.Obj => Materializer(v.value(key, fileName, offset).calc)
+                case v: Val.Arr => Materializer(v.value(i).force)
+                case v: Val.Obj => Materializer(v.value(key, fileName, offset).force)
               }
           }
           i += 1

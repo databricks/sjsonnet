@@ -51,11 +51,11 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
     case Select(_, Super(offset), name) =>
       val ref = scope.super0.get.value(name, scope.fileName, offset, self = scope.self)
-      try ref.calc catch Evaluator.tryCatch2(scope.fileName, offset)
+      try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
 
     case Lookup(_, Super(offset), index) =>
       val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-      scope.super0.get.value(key.value, scope.fileName, offset).calc
+      scope.super0.get.value(key.value, scope.fileName, offset).force
 
     case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
       val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
@@ -68,9 +68,9 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       val ref = scope.bindings(value)
         .getOrElse(Evaluator.fail("Unknown variable " + value, scope.fileName, offset))
 
-      try ref.force(scope.dollar0) catch Evaluator.tryCatch2(scope.fileName, offset)
+      try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
 
-    case Arr(offset, value) => Val.Arr(value.map(v => Ref(visitExpr(v, scope))))
+    case Arr(offset, value) => Val.Arr(value.map(v => Lazy(visitExpr(v, scope))))
     case Obj(offset, value) => visitObjBody(value, scope)
 
     case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
@@ -200,14 +200,14 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       )
     case Apply(offset, value, Args(args)) =>
       val lhs = visitExpr(value, scope)
-      try lhs.asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Ref(visitExpr(v, scope)))})
+      try lhs.asInstanceOf[Val.Func].value(args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))})
       catch Evaluator.tryCatch2(scope.fileName, offset)
 
     case Select(offset, value, name) =>
       visitExpr(value, scope) match{
         case obj: Val.Obj =>
           val ref = obj.value(name, scope.fileName, offset)
-          try ref.force(scope.dollar0)
+          try ref.force
           catch Evaluator.tryCatch2(scope.fileName, offset)
         case r =>
           Evaluator.fail(s"attemped to index a ${r.prettyName} with string ${name}", scope.fileName, offset)
@@ -220,12 +220,12 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.fileName, offset)
           val int = i.value.toInt
           if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.fileName, offset)
-          try v.value(int).force(scope.dollar0)
+          try v.value(int).force
           catch Evaluator.tryCatch2(scope.fileName, offset)
         case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
         case (v: Val.Obj, i: Val.Str) =>
           val ref = v.value(i.value, scope.fileName, offset)
-          try ref.force(scope.dollar0)
+          try ref.force
           catch Evaluator.tryCatch2(scope.fileName, offset)
         case (lhs, rhs) =>
           Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.fileName, offset)
@@ -248,7 +248,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
       }
     case Comp(offset, value, first, rest) =>
-      Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Ref(visitExpr(value, s))))
+      Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Lazy(visitExpr(value, s))))
     case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
       val extension = visitObjBody(ext, scope)
@@ -272,7 +272,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       { args =>
         lazy val newScope1 =
           argSpec.args.collect{
-            case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(default, newScope)))
+            case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitExpr(default, newScope)))
           }
         lazy val newScope2 = try
           args.zipWithIndex.map{
@@ -298,9 +298,9 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
     bindings.collect{
       case Bind(offset, fieldName, None, rhs) =>
-        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitExpr(rhs, scope(self, sup))))
+        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitExpr(rhs, scope(self, sup))))
       case Bind(offset, fieldName, Some(argSpec), rhs) =>
-        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Ref(visitMethod(scope(self, sup), rhs, argSpec, offset)))
+        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitMethod(scope(self, sup), rhs, argSpec, offset)))
     }
   }
   def visitObjBody(b: ObjBody, scope: => Scope): Val.Obj = b match{
@@ -342,14 +342,14 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
-              Ref {
+              Lazy {
                 assertions(self)
                 visitExpr(rhs, makeNewScope(self, sup))
               }
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
             visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
-              Ref {
+              Lazy {
                 assertions(self)
                 visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
               }
@@ -396,7 +396,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
             visitExpr(key, s) match {
               case Val.Str(k) =>
                 Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
-                  Ref(visitExpr(
+                  Lazy(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
                       newBindings
