@@ -56,13 +56,13 @@ object FileTests extends TestSuite{
     "slice.sugar" - check()
     'std_all_hidden - check()
     'stdlib - {
-//      check()
+      check()
 //       Lock in the existing progress fleshing out the stdlib
-      checkFail(
-        """sjsonnet.Error: Field does not exist: thisFile
-          |    at .(sjsonnet/test/resources/test_suite/stdlib.jsonnet:378:9)
-          |""".stripMargin
-      )
+//      checkFail(
+//        """sjsonnet.Error: Field does not exist: thisFile
+//          |    at .(sjsonnet/test/resources/test_suite/stdlib.jsonnet:378:9)
+//          |""".stripMargin
+//      )
     }
     'text_block - check()
     'unicode - check()

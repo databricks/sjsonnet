@@ -584,6 +584,10 @@ object Std {
     builtin("parseHex", "str"){ (str: String) =>
       Integer.parseInt(str, 16)
     },
+    builtin("trace", "str", "rest"){ (str: String, rest: Val) =>
+      println("TRACE: " + str)
+      rest
+    },
   )
   val Std = Val.Obj(
     functions

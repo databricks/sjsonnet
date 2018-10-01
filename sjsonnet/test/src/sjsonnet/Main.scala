@@ -33,7 +33,7 @@ object Main {
       "shebang",
       "slice.sugar",
       "std_all_hidden",
-//      "text_block",
+      "text_block",
       "unicode",
       "unix_line_endings",
       "unparse",
