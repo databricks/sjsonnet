@@ -320,23 +320,6 @@ class Evaluator(parser: Parser,
   }
   def visitObjBody(b: ObjBody, scope: Scope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
-      def makeNewScope(self: => Val.Obj, sup: => Option[Val.Obj]): Scope = new Scope(
-        scope.dollar0.orElse(Some(self)),
-        Some(self),
-        sup,
-        newBindings.map{case (k, v) => (k, v.apply(self, sup))}.toMap,
-        scope.currentFile,
-        scope.currentRoot,
-        scope.searchRoots,
-        Some(scope)
-      )
-
-
-      lazy val newBindings = visitBindings(
-        value.collect{case Member.BindStmt(b) => b},
-        (self, sup) => makeNewScope(self, sup)
-      )
-
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
         asserting = true
@@ -359,6 +342,34 @@ class Evaluator(parser: Parser,
             }
         }
       }
+
+      def makeNewScope0(self: Val.Obj, sup: Option[Val.Obj]): Scope = new Scope(
+        scope.dollar0.orElse(Some(self)),
+        Some(self),
+        sup,
+        if (newBindings.isEmpty) Map.empty
+        else newBindings.map { case (k, v) => (k, v.apply(self, sup)) }.toMap,
+        scope.currentFile,
+        scope.currentRoot,
+        scope.searchRoots,
+        Some(scope)
+      )
+
+      lazy val defaultScope = makeNewScope0(newSelf, newSelf.`super`)
+      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): Scope =
+        if ((self eq newSelf) &&
+            (sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) &&
+            (sup.isEmpty && newSelf.`super`.isEmpty)) {
+          // Fast path: in the common case where the `self` and `super` are
+          // unchanged by inheritence or other trickery, we can share the
+          // new scope between all members and sub-scopes.
+          defaultScope
+        }else makeNewScope0(self, sup)
+
+      lazy val newBindings = visitBindings(
+        value.collect{case Member.BindStmt(b) => b},
+        (self, sup) => makeNewScope(self, sup)
+      )
 
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
