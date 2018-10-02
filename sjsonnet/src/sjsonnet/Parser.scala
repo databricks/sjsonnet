@@ -1,9 +1,21 @@
 package sjsonnet
 
+import fastparse.core.Parsed
 import fastparse.{WhitespaceApi, core}
 import sjsonnet.Expr.Member.Visibility
 
 class Parser{
+  val parseCache = collection.mutable.Map.empty[String, fastparse.all.Parsed[Expr]]
+  def parse(s: String) = {
+    parseCache.get(s) match{
+      case Some(res) => res
+      case None =>
+        val res = expr.parse(s)
+        parseCache(s) = res
+        res
+    }
+  }
+
   val precedenceTable = Seq(
     Seq("*", "/", "%"),
     Seq("+", "-"),

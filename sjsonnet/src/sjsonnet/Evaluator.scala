@@ -202,7 +202,7 @@ class Evaluator(parser: Parser,
     imports.getOrElseUpdate(
       p,
       visitExpr(
-        parser.expr.parse(importString(scope, offset, value, p)) match {
+        parser.parse(importString(scope, offset, value, p)) match {
           case Parsed.Success(x, _) => x
           case f@Parsed.Failure(l, i, e) =>
             Evaluator.fail(

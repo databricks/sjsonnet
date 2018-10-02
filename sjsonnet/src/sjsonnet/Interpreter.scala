@@ -15,7 +15,7 @@ class Interpreter(parser: Parser, scope: Scope, extVars: Map[String, ujson.Js], 
   }
   def interpret(txt: String): Either[String, ujson.Js] = {
     for{
-      parsed <- parser.expr.parse(txt) match{
+      parsed <- parser.parse(txt) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse Error: expected " + f.msg)
         case Parsed.Success(r, index) => Right(r)
       }
