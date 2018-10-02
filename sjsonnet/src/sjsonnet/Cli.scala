@@ -22,7 +22,7 @@ object Cli{
                     varBinding: Map[String, ujson.Js] = Map())
 
 
-  val genericSignature = Seq(
+  def genericSignature(wd: Path) = Seq(
     Arg[Config, Unit](
       "interactive", Some('i'),
       "Run Mill in interactive mode, suitable for opening REPLs and taking user input",
@@ -51,7 +51,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, ammonite.ops.pwd)))))
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, wd)))))
       }
     ),
     Arg[Config, String](
@@ -67,7 +67,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, ammonite.ops.pwd)))))
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, wd)))))
       }
     )
   )
@@ -81,13 +81,13 @@ object Cli{
         arg.doc.lines.mkString("\n" + " " * leftMargin)
     }
   }
-  def help = {
-    val leftMargin = genericSignature.map(showArg(_).length).max + 2
+  def help(wd: Path) = {
+    val leftMargin = genericSignature(wd).map(showArg(_).length).max + 2
 
 
     s"""usage: sjsonnet [sjsonnet-options] script-file
        |
-       |${formatBlock(genericSignature, leftMargin).mkString("\n")}
+       |${formatBlock(genericSignature(wd), leftMargin).mkString("\n")}
     """.stripMargin
   }
 

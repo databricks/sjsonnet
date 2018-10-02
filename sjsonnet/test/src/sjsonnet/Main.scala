@@ -53,7 +53,8 @@ object Main {
         val interp = new Interpreter(
           parser,
           Scope.standard(path, FileTests.testSuiteRoot, Nil),
-          Map()
+          Map(),
+          ammonite.ops.pwd
         )
         interp.interpret(path)
       }

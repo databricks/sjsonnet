@@ -3,6 +3,8 @@ package sjsonnet
 import java.io._
 import java.net.Socket
 
+import ammonite.ops.Path
+
 import scala.collection.JavaConverters._
 import org.scalasbt.ipcsocket._
 import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util}
@@ -17,7 +19,8 @@ trait SjsonnetServerMain[T]{
             stdout: PrintStream,
             stderr: PrintStream,
             env : Map[String, String],
-            setIdle: Boolean => Unit): (Boolean, Option[T])
+            setIdle: Boolean => Unit,
+            wd: ammonite.ops.Path): (Boolean, Option[T])
 }
 
 object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
@@ -47,7 +50,8 @@ object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
             stdout: PrintStream,
             stderr: PrintStream,
             env : Map[String, String],
-            setIdle: Boolean => Unit) = {
+            setIdle: Boolean => Unit,
+            wd: ammonite.ops.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
       val p = new Parser
@@ -65,7 +69,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
         scala.Console.withIn(stdin){
           scala.Console.withOut(stdout){
             scala.Console.withErr(stderr){
-              sjsonnet.SjsonnetMain.main0(args, stateCache2, stdin, stdout, stderr) == 0
+              sjsonnet.SjsonnetMain.main0(args, stateCache2, stdin, stdout, stderr, wd) == 0
             }
           }
         }
@@ -139,6 +143,7 @@ class Server[T](lockBase: String,
       stdout.println(s"Sjsonnet version changed ($serverSjsonnetVersion -> $clientSjsonnetVersion), re-starting server")
       System.exit(0)
     }
+    val wd = Util.readString(argStream)
     val args = Util.parseArgs(argStream)
     val env = Util.parseMap(argStream)
     argStream.close()
@@ -155,7 +160,8 @@ class Server[T](lockBase: String,
           stdout,
           stderr,
           env.asScala.toMap,
-          idle = _
+          idle = _,
+          Path(wd)
         )
 
         sm.stateCache = newStateCache

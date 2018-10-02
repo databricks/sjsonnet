@@ -8,7 +8,8 @@ object FileTests extends TestSuite{
     val interp = new Interpreter(
       new Parser,
       Scope.standard(p, testSuiteRoot, Nil),
-      Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2))
+      Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
+      ammonite.ops.pwd
     )
     interp.interpret(p)
   }

@@ -16,30 +16,33 @@ object Evaluator {
     rec(rhs)
   }
 
-  def tryCatch[T](scope: Scope, offset: Int): PartialFunction[Throwable, Nothing] = {
+  def tryCatch[T](scope: Scope, wd: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
       case e: Error => throw e
       case e: DelegateError =>
         throw new Error(e.msg, Nil, None)
-          .addFrame(scope.currentFile, offset)
+          .addFrame(scope.currentFile, wd, offset)
       case e: Throwable =>
         throw new Error("Internal Error", Nil, Some(e))
-          .addFrame(scope.currentFile, offset)
+          .addFrame(scope.currentFile, wd, offset)
   }
-  def tryCatch2[T](path: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(path, offset)
+  def tryCatch2[T](path: Path, wd: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
+    case e: Error => throw e.addFrame(path, wd, offset)
     case e: DelegateError =>
       throw new Error(e.msg, Nil, None)
-        .addFrame(path, offset)
+        .addFrame(path, wd, offset)
     case e: Throwable =>
       throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(path, offset)
+        .addFrame(path, wd, offset)
   }
-  def fail(msg: String, path: Path, offset: Int) = {
-    throw new Error(msg, Nil, None).addFrame(path, offset)
+  def fail(msg: String, path: Path, offset: Int, wd: Path) = {
+    throw new Error(msg, Nil, None).addFrame(path, wd, offset)
   }
 }
 
-class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson.Js]) {
+class Evaluator(parser: Parser,
+                originalScope: Scope,
+                extVars: Map[String, ujson.Js],
+                wd: Path) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: => Scope): Val = try expr match{
@@ -59,9 +62,9 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
     case Num(offset, value) => Val.Num(value)
     case Id(offset, value) =>
       val ref = scope.bindings(value)
-        .getOrElse(Evaluator.fail("Unknown variable " + value, scope.currentFile, offset))
+        .getOrElse(Evaluator.fail("Unknown variable " + value, scope.currentFile, offset, wd))
 
-      try ref.force catch Evaluator.tryCatch2(scope.currentFile, offset)
+      try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
 
     case Arr(offset, value) => Val.Arr(value.map(v => Lazy(visitExpr(v, scope))))
     case Obj(offset, value) => visitObjBody(value, scope)
@@ -80,8 +83,14 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
     case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
       if (visitExpr(value, scope) != Val.True) {
         msg match{
-          case None => Evaluator.fail("Assertion failed", scope.currentFile, offset)
-          case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value, scope.currentFile, offset)
+          case None => Evaluator.fail("Assertion failed", scope.currentFile, offset, wd)
+          case Some(msg) =>
+            Evaluator.fail(
+              "Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value,
+              scope.currentFile,
+              offset,
+              wd
+            )
         }
       }
       visitExpr(returned, scope)
@@ -97,10 +106,12 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
         visitExpr(value, scope) match{
           case Val.Str(s) => s
           case r =>
-            try Materializer(r, extVars).toString()
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Materializer(r, extVars, wd).toString()
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         },
-        scope.currentFile, offset
+        scope.currentFile,
+        offset,
+        wd
       )
     case Apply(offset, value, Args(args)) =>
       val lhs = visitExpr(value, scope)
@@ -108,41 +119,47 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
         args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))},
         scope.currentFile.last,
         extVars,
-        offset
+        offset,
+        wd
       )
-      catch Evaluator.tryCatch2(scope.currentFile, offset)
+      catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
 
     case Select(offset, value, name) =>
       if (value.isInstanceOf[Super]){
-        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, self = scope.self)
-        try ref.force catch Evaluator.tryCatch2(scope.currentFile, offset)
+        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, self = scope.self)
+        try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       }else visitExpr(value, scope) match{
         case obj: Val.Obj =>
-          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset)
+          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, wd)
           try ref.force
-          catch Evaluator.tryCatch2(scope.currentFile, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case r =>
-          Evaluator.fail(s"attemped to index a ${r.prettyName} with string ${name}", scope.currentFile, offset)
+          Evaluator.fail(
+            s"attemped to index a ${r.prettyName} with string ${name}",
+            scope.currentFile,
+            offset,
+            wd
+          )
       }
 
     case Lookup(offset, value, index) =>
       if (value.isInstanceOf[Super]){
         val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset).force
+        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd).force
       }else (visitExpr(value, scope), visitExpr(index, scope)) match {
         case (v: Val.Arr, i: Val.Num) =>
-          if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset)
+          if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
           val int = i.value.toInt
-          if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.currentFile, offset)
+          if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.currentFile, offset, wd)
           try v.value(int).force
-          catch Evaluator.tryCatch2(scope.currentFile, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
         case (v: Val.Obj, i: Val.Str) =>
-          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset)
+          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, wd)
           try ref.force
-          catch Evaluator.tryCatch2(scope.currentFile, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case (lhs, rhs) =>
-          Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset)
+          Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset, wd)
       }
 
     case Slice(offset, value, start, end, stride) =>
@@ -168,7 +185,7 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
       val extension = visitObjBody(ext, scope)
       Evaluator.mergeObjects(original, extension)
     }
-  } catch Evaluator.tryCatch(scope, expr.offset)
+  } catch Evaluator.tryCatch(scope, wd, expr.offset)
 
   def visitImportStr(scope: => Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value)
@@ -192,7 +209,8 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
               "Imported file " + pprint.Util.literalize(value) +
               " had syntax error " + f.msg,
               scope.currentFile,
-              offset
+              offset,
+              wd
             )
         },
         originalScope.copy(currentFile = p)
@@ -207,7 +225,7 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
     try ammonite.ops.read(p)
     catch {
       case e: Throwable =>
-        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset)
+        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
     }
   }
 
@@ -224,25 +242,25 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
         (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match {
           case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
           case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
-            if (r == 0) Evaluator.fail("division by zero", scope.currentFile, offset)
+            if (r == 0) Evaluator.fail("division by zero", scope.currentFile, offset, wd)
             Val.Num(l / r)
           case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
-            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset, extVars))
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset, extVars, wd))
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
           case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
           case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
-            try Val.Str(l + Materializer.apply(r, extVars).transform(new Renderer()).toString)
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Val.Str(l + Materializer.apply(r, extVars, wd).transform(new Renderer()).toString)
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
-            try Val.Str(Materializer.apply(l, extVars).transform(new Renderer()).toString + r)
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Val.Str(Materializer.apply(l, extVars, wd).transform(new Renderer()).toString + r)
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
@@ -252,16 +270,16 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
           case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
           case (l, Expr.BinaryOp.`==`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
+              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset, wd)
             }
-            try Val.bool(Materializer(l, extVars) == Materializer(r, extVars))
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Val.bool(Materializer(l, extVars, wd) == Materializer(r, extVars, wd))
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
+              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset, wd)
             }
-            try Val.bool(Materializer(l, extVars) != Materializer(r, extVars))
-            catch Evaluator.tryCatch2(scope.currentFile, offset)
+            try Val.bool(Materializer(l, extVars, wd) != Materializer(r, extVars, wd))
+            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
@@ -287,7 +305,7 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
     Val.Func(
       scope,
       params,
-      (scope, thisFile, extVars, outerOffset) => visitExpr(rhs, scope),
+      (scope, thisFile, extVars, outerOffset, wd) => visitExpr(rhs, scope),
       (default, scope) => visitExpr(default, scope)
     )
   }
@@ -329,8 +347,14 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
 
             if (visitExpr(value, newScope) != Val.True) {
               msg match{
-                case None => Evaluator.fail("Assertion failed", scope.currentFile, value.offset)
-                case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value, scope.currentFile, value.offset)
+                case None => Evaluator.fail("Assertion failed", scope.currentFile, value.offset, wd)
+                case Some(msg) =>
+                  Evaluator.fail(
+                    "Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value,
+                    scope.currentFile,
+                    value.offset,
+                    wd
+                  )
               }
             }
         }
@@ -422,7 +446,12 @@ class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson
           s <- scopes
           e <- visitExpr(expr, s) match{
             case Val.Arr(value) => value
-            case r => Evaluator.fail("In comprehension, can only iterate over array, not " + r.prettyName, s.currentFile, expr.offset)
+            case r => Evaluator.fail(
+              "In comprehension, can only iterate over array, not " + r.prettyName,
+              s.currentFile,
+              expr.offset,
+              wd
+            )
           }
         } yield s ++ Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e))
       )

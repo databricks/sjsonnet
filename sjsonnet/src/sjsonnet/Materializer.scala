@@ -1,11 +1,13 @@
 package sjsonnet
 import java.util.IdentityHashMap
 
+import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
 import ujson.Js
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Js],
+            wd: Path,
             seen: IdentityHashMap[Val, Unit] = new IdentityHashMap[Val, Unit]): Js = v match{
     case Val.True => Js.True
     case Val.False => Js.False
@@ -15,7 +17,7 @@ object Materializer {
     case Val.Arr(xs) =>
       if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
       seen.put(v, ())
-      val res = Js.Arr.from(xs.map(x => apply(x.force, extVars, seen)))
+      val res = Js.Arr.from(xs.map(x => apply(x.force, extVars, wd, seen)))
       seen.remove(v, ())
       res
     case obj: Val.Obj =>
@@ -34,11 +36,11 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", ammonite.ops.pwd, -1).force, extVars, seen)
+        }yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd).force, extVars, wd, seen)
       )
       seen.remove(v, ())
       res
-    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1), extVars, seen)
+    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd, seen)
   }
 
   def reverse(v: Js.Value): Val = v match{

@@ -10,7 +10,7 @@ case class Error(msg: String,
                  underlying: Option[Throwable])
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
-  def addFrame(fileName: Path, offset: Int) = {
+  def addFrame(fileName: Path, wd: Path, offset: Int) = {
     val newFrame = if (ammonite.ops.exists(fileName)){
       val Array(line, col) = StringReprOps.prettyIndex(
         new IndexedParserInput(ammonite.ops.read(fileName))(StringReprOps), offset
@@ -18,13 +18,13 @@ case class Error(msg: String,
 
       new StackTraceElement(
         "", "",
-        fileName.relativeTo(ammonite.ops.pwd).toString + ":" + line,
+        fileName.relativeTo(wd).toString + ":" + line,
         col.toInt
       )
     }else{
       new StackTraceElement(
         "", "",
-        fileName.relativeTo(ammonite.ops.pwd).toString + " offset:",
+        fileName.relativeTo(wd).toString + " offset:",
         offset
       )
     }

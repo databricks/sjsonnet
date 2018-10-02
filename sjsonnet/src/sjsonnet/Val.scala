@@ -65,10 +65,10 @@ object Val{
       mapping
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
-    def value(k: String, fileName: Path, currentRoot: Path, offset: Int,  self: Obj = this) = {
+    def value(k: String, fileName: Path, currentRoot: Path, offset: Int, wd: Path, self: Obj = this) = {
 
       val (cached, lazyValue) =
-        valueRaw(k, self, fileName.relativeTo(currentRoot).toString()).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset))
+        valueRaw(k, self, fileName.relativeTo(currentRoot).toString()).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
       if (!cached) lazyValue
       else valueCache.getOrElseUpdate(
         // It is very rare that self != this, so fast-path the common case
@@ -102,13 +102,14 @@ object Val{
 
   case class Func(scope: Scope,
                   params: Params,
-                  evalRhs: (Scope, String, Map[String, ujson.Js], Int) => Val,
+                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, Path) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
               extVars: Map[String, ujson.Js],
-              outerOffset: Int) = {
+              outerOffset: Int,
+              wd: Path) = {
 
       lazy val newScope1 =
         params.args.collect{
@@ -122,16 +123,16 @@ object Val{
         }
       catch{
         case e: IndexOutOfBoundsException =>
-          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.currentFile, outerOffset)
+          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.currentFile, outerOffset, wd)
       }
       lazy val seen = collection.mutable.Set.empty[String]
       for((k, v) <- newScope2){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.currentFile, outerOffset)
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.currentFile, outerOffset, wd)
         else seen.add(k)
       }
 
       lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
-      evalRhs(newScope, thisFile, extVars, outerOffset)
+      evalRhs(newScope, thisFile, extVars, outerOffset, wd)
     }
   }
 }

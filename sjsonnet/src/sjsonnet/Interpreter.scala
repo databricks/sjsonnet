@@ -5,8 +5,8 @@ import java.io.{PrintWriter, StringWriter}
 import ammonite.ops.{Path, read}
 import fastparse.core.Parsed
 
-class Interpreter(parser: Parser, scope: Scope, extVars: Map[String, ujson.Js]) {
-  val evaluator = new Evaluator(parser, scope, extVars)
+class Interpreter(parser: Parser, scope: Scope, extVars: Map[String, ujson.Js], wd: Path) {
+  val evaluator = new Evaluator(parser, scope, extVars, wd)
   def interpret(p: Path): Either[String, ujson.Js] = {
     for{
       txt <- try Right(read(p)) catch{ case e: Throwable => Left(e.toString) }
@@ -29,7 +29,7 @@ class Interpreter(parser: Parser, scope: Scope, extVars: Map[String, ujson.Js]) 
           Left(s.toString.replace("\t", "    "))
         }
       json <-
-        try Right(Materializer(res, extVars))
+        try Right(Materializer(res, extVars, wd))
         catch{
           case DelegateError(msg) => Left(msg)
           case e: Throwable =>

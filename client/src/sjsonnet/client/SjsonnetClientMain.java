@@ -100,6 +100,7 @@ public class SjsonnetClientMain {
         try(FileOutputStream f = new FileOutputStream(lockBase + "/run")){
             f.write(System.console() != null ? 1 : 0);
             Util.writeString(f, System.getProperty("SJSONNET_VERSION"));
+            Util.writeString(f, java.nio.file.Paths.get("").toAbsolutePath().toString());
             Util.writeArgs(args, f);
             Util.writeMap(env, f);
         }
