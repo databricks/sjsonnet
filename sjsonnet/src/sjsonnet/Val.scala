@@ -82,6 +82,7 @@ object Val{
     def mergeMember(l: Val, r: Val) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
+      case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
     }
 
