@@ -47,7 +47,13 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
   var newlineBuffered = false
   override def visitNumRaw(d: Double, index: Int) = {
     flushBuffer()
-    out.append(new java.math.BigDecimal(d).toPlainString)
+    out.append(
+      if (d.toLong == d) d.toLong.toString
+      else if (d % 1 == 0) {
+        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+      }
+      else d.toString
+    )
     flushBuffer()
     out
   }
