@@ -9,7 +9,7 @@ object sjsonnet extends ScalaModule{
     ivy"com.lihaoyi::fastparse:1.0.0",
     ivy"com.lihaoyi::pprint:0.5.3",
     ivy"com.lihaoyi::ammonite-ops:1.1.2",
-    ivy"com.lihaoyi::ujson:0.6.6",
+    ivy"com.lihaoyi::ujson:0.6.7",
     ivy"com.lihaoyi::scalatags:0.6.7",
     ivy"com.github.scopt::scopt:3.5.0"
   )
