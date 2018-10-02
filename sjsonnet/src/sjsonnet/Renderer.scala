@@ -91,6 +91,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     }
     def visitEnd(index: Int) = {
       commaBuffered = false
+      newlineBuffered = false
       depth -= 1
 
       if (empty) out.append(' ')
@@ -120,6 +121,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     }
     def visitEnd(index: Int) = {
       commaBuffered = false
+      newlineBuffered = false
       depth -= 1
 
       if (empty) out.append(' ')

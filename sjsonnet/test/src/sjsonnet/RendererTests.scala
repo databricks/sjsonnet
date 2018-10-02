@@ -33,6 +33,16 @@ object RendererTests extends TestSuite{
           |   "b": 2
           |}""".stripMargin
     }
+    'nested - {
+      ujson.transform(
+        ujson.Js.Arr(ujson.Js.Obj("a" -> ujson.Js.Arr())),
+        new Renderer(indent = 3)).toString ==>
+          """[
+            |   {
+            |      "a": [ ]
+            |   }
+            |]""".stripMargin
+    }
 
   }
 
