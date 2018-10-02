@@ -189,7 +189,7 @@ class Evaluator(parser: Parser,
   } catch Evaluator.tryCatch(scope, wd, expr.offset)
 
   def visitImportStr(scope: Scope, offset: Int, value: String) = {
-    val p = resolveImport(scope, value)
+    val p = resolveImport(scope, value, offset)
     Val.Str(
       importStrs.getOrElseUpdate(
         p,
@@ -199,7 +199,7 @@ class Evaluator(parser: Parser,
   }
 
   def visitImport(scope: Scope, offset: Int, value: String) = {
-    val p = resolveImport(scope, value)
+    val p = resolveImport(scope, value, offset)
     imports.getOrElseUpdate(
       p,
       visitExpr(
@@ -219,8 +219,13 @@ class Evaluator(parser: Parser,
     )
   }
 
-  def resolveImport(scope: Scope, value: String) = {
-    (scope.currentFile / ammonite.ops.up :: scope.searchRoots).map(_ / RelPath(value)).find(ammonite.ops.exists).get
+  def resolveImport(scope: Scope, value: String, offset: Int) = {
+    (scope.currentFile / ammonite.ops.up :: scope.searchRoots).
+      map(_ / RelPath(value))
+      .find(ammonite.ops.exists)
+      .getOrElse(
+        Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
+      )
   }
   def importString(scope: Scope, offset: Int, value: String, p: Path) = {
     try ammonite.ops.read(p)
