@@ -1,6 +1,6 @@
 package sjsonnet
 
-object JsonnetTestMain {
+object SjsonnetTestMain {
   def main(args: Array[String]): Unit = {
     val names = Seq(
       "arith_bool",

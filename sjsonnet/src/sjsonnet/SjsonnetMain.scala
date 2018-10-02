@@ -53,7 +53,7 @@ object SjsonnetMain {
                     Scope.standard(
                       path,
                       wd,
-                      config.jpaths.map(ammonite.ops.Path(_, wd)).toList,
+                      config.jpaths.map(ammonite.ops.Path(_, wd)),
                     ),
                     config.varBinding,
                     wd

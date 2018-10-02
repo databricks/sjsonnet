@@ -68,3 +68,26 @@ those functions are implemented as intrinsics directly in the host language (in
 `Std.scala`). This allows both better error messages when the input types are
 wrong, as well as better performance for the more computationally-intense
 builtin functions.
+
+## Client-Server
+
+Sjsonnet comes with a build in thin-client and background server, to help
+mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
+down to 0.2-0.3s. For the simple non-client-server executable, you can use
+
+```bash
+mill show sjsonnet.assembly
+```
+
+To create the executable. For the client-server executable, you can use
+
+```bash
+mill show sjsonnet.server.assembly
+```
+
+By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
+minutes before shutting itself when inactive.
+
+Since the Sjsonnet client still has 0.2-0.3s of overhead, if using Sjsonnet
+heavily it is still better to include it in your JVM classpath and invoke it
+programmatically via `new Interpreter(...).interpret(...)`.
