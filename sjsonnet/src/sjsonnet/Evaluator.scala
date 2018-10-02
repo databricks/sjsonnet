@@ -39,7 +39,7 @@ object Evaluator {
   }
 }
 
-class Evaluator(parser: Parser, originalScope: Scope) {
+class Evaluator(parser: Parser, originalScope: Scope, extVars: Map[String, ujson.Js]) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: => Scope): Val = try expr match{
@@ -97,7 +97,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         visitExpr(value, scope) match{
           case Val.Str(s) => s
           case r =>
-            try Materializer(r).toString()
+            try Materializer(r, extVars).toString()
             catch Evaluator.tryCatch2(scope.currentFile, offset)
         },
         scope.currentFile, offset
@@ -107,6 +107,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       try lhs.asInstanceOf[Val.Func].apply(
         args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))},
         scope.currentFile.last,
+        extVars,
         offset
       )
       catch Evaluator.tryCatch2(scope.currentFile, offset)
@@ -229,7 +230,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
-            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset))
+            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset, extVars))
             catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
@@ -237,10 +238,10 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
-            try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+            try Val.Str(l + Materializer.apply(r, extVars).transform(new Renderer()).toString)
             catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
-            try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+            try Val.Str(Materializer.apply(l, extVars).transform(new Renderer()).toString + r)
             catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
@@ -253,13 +254,13 @@ class Evaluator(parser: Parser, originalScope: Scope) {
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
               Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
             }
-            try Val.bool(Materializer(l) == Materializer(r))
+            try Val.bool(Materializer(l, extVars) == Materializer(r, extVars))
             catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
               Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
             }
-            try Val.bool(Materializer(l) != Materializer(r))
+            try Val.bool(Materializer(l, extVars) != Materializer(r, extVars))
             catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
@@ -286,7 +287,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     Val.Func(
       scope,
       params,
-      (scope, thisFile, outerOffset) => visitExpr(rhs, scope),
+      (scope, thisFile, extVars, outerOffset) => visitExpr(rhs, scope),
       (default, scope) => visitExpr(default, scope)
     )
   }
@@ -369,7 +370,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.currentFile,
         scope.currentRoot,
         scope.searchRoots,
-        Some(scope)
+        Some(scope),
       )
 
       lazy val newSelf: Val.Obj = Val.Obj(
@@ -384,7 +385,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
               scope.currentFile,
               scope.currentRoot,
               scope.searchRoots,
-              Some(s)
+              Some(s),
             )
 
             lazy val newBindings = visitBindings(

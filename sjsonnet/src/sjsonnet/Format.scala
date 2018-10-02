@@ -73,7 +73,12 @@ object Format{
     else if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
     else " " * missingWidth + lhs2 + mhs + rhs
   }
-  def format(s: String, values0: Val, fileName: Path,currentRoot: Path, offset: Int): String = synchronized{
+  def format(s: String,
+             values0: Val,
+             fileName: Path,
+             currentRoot: Path,
+             offset: Int,
+             extVars: Map[String, ujson.Js]): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
@@ -89,11 +94,11 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).force)
+            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).force, extVars)
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).force)
-                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset).force)
+                case v: Val.Arr => Materializer(v.value(i).force, extVars)
+                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset).force, extVars)
               }
           }
           i += 1

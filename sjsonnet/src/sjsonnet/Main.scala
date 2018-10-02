@@ -22,8 +22,9 @@ object Main {
                   Scope.standard(
                     path,
                     ammonite.ops.pwd,
-                    config.jpaths.map(ammonite.ops.Path(_, ammonite.ops.pwd)).toList
-                  )
+                    config.jpaths.map(ammonite.ops.Path(_, ammonite.ops.pwd)).toList,
+                  ),
+                  config.varBinding
                 )
                 interp.interpret(path) match{
                   case Left(errMsg) =>

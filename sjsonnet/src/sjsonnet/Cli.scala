@@ -18,7 +18,7 @@ object Cli{
   }
   case class Config(jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
-                    varBinding: Map[String, String] = Map())
+                    varBinding: Map[String, ujson.Js] = Map())
 
 
   val genericSignature = Seq(
@@ -32,6 +32,38 @@ object Cli{
       "Write to the output file rather than stdout",
       (c, v) => c.copy(outputFile = Some(v))
     ),
+    Arg[Config, String](
+      "ext-str", Some('V'),
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(System.getenv(x))))
+        case Array(x, v) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(v)))
+      }
+    ),
+    Arg[Config, String](
+      "ext-str-file", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x, v) =>
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, ammonite.ops.pwd)))))
+      }
+    ),
+    Arg[Config, String](
+      "ext-code", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(System.getenv(x))))
+        case Array(x, v) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(v)))
+      }
+    ),
+    Arg[Config, String](
+      "ext-code-file", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x, v) =>
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, ammonite.ops.pwd)))))
+      }
+    )
   )
   def showArg(arg: Arg[_, _]) =
     "  " + arg.shortName.fold("")("-" + _ + ", ") + "--" + arg.name

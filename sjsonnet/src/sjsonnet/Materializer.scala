@@ -5,6 +5,7 @@ import sjsonnet.Expr.Member.Visibility
 import ujson.Js
 object Materializer {
   def apply(v: Val,
+            extVars: Map[String, ujson.Js],
             seen: IdentityHashMap[Val, Unit] = new IdentityHashMap[Val, Unit]): Js = v match{
     case Val.True => Js.True
     case Val.False => Js.False
@@ -14,7 +15,7 @@ object Materializer {
     case Val.Arr(xs) =>
       if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
       seen.put(v, ())
-      val res = Js.Arr.from(xs.map(x => apply(x.force, seen)))
+      val res = Js.Arr.from(xs.map(x => apply(x.force, extVars, seen)))
       seen.remove(v, ())
       res
     case obj: Val.Obj =>
@@ -33,11 +34,11 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", ammonite.ops.pwd, -1).force, seen)
+        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", ammonite.ops.pwd, -1).force, extVars, seen)
       )
       seen.remove(v, ())
       res
-    case f: Val.Func => apply(f.apply(Nil, "(memory)", -1), seen)
+    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1), extVars, seen)
   }
 
   def reverse(v: Js.Value): Val = v match{

@@ -102,10 +102,14 @@ object Val{
 
   case class Func(scope: Scope,
                   params: Params,
-                  evalRhs: (Scope, String, Int) => Val,
+                  evalRhs: (Scope, String, Map[String, ujson.Js], Int) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
-    def apply(args: Seq[(Option[String], Lazy)], thisFile: String, outerOffset: Int) = {
+    def apply(args: Seq[(Option[String], Lazy)],
+              thisFile: String,
+              extVars: Map[String, ujson.Js],
+              outerOffset: Int) = {
+
       lazy val newScope1 =
         params.args.collect{
           case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
@@ -127,7 +131,7 @@ object Val{
       }
 
       lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
-      evalRhs(newScope, thisFile, outerOffset)
+      evalRhs(newScope, thisFile, extVars, outerOffset)
     }
   }
 }

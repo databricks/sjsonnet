@@ -4,7 +4,11 @@ import utest._
 import ujson.Js
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
-    new Interpreter(new Parser(), Scope.standard(ammonite.ops.pwd/"(memory)", ammonite.ops.pwd, Nil)).interpret(s) match{
+    new Interpreter(
+      new Parser(),
+      Scope.standard(ammonite.ops.pwd/"(memory)", ammonite.ops.pwd, Nil),
+      Map()
+    ).interpret(s) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }
