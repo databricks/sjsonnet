@@ -429,6 +429,9 @@ object Std {
     builtin("manifestJson", "v"){ (extVars, v: Val) =>
       Materializer(v, extVars).render(indent = 4)
     },
+    builtin("manifestJsonEx", "value", "indent"){ (extVars, v: Val, i: String) =>
+      Materializer(v, extVars).render(indent = i.length)
+    },
     builtin("manifestPythonVars", "v"){ (extVars, v: Val.Obj) =>
       Materializer(v, extVars).obj
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
@@ -595,6 +598,37 @@ object Std {
     builtin("parseHex", "str"){ (extVars, str: String) =>
       Integer.parseInt(str, 16)
     },
+    builtin("md5", "s"){ (extVars, s: String) =>
+      java.security.MessageDigest.getInstance("MD5")
+        .digest(s.getBytes("UTF-8"))
+        .map{ b => String.format("%02x", new java.lang.Integer(b & 0xff))}
+        .mkString
+    },
+    builtin("prune", "x"){ (extVars, s: Val) =>
+      def filter(x: Val) = x match{
+        case c: Val.Arr if c.value.isEmpty => false
+        case c: Val.Obj if c.getVisibleKeys().count(_._2 == false) == 0 => false
+        case Val.Null => false
+        case _ => true
+      }
+      def rec(x: Val): Val = x match{
+        case o: Val.Obj =>
+          val bindings = for{
+            (k, hidden) <- o.getVisibleKeys()
+            if !hidden
+            v = rec(o.value(k, ammonite.ops.pwd/"(memory)", ammonite.ops.pwd, -1).force)
+            if filter(v)
+          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => Lazy(v)))
+          Val.Obj(bindings.toMap, _ => (), None)
+        case a: Val.Arr =>
+          Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Lazy(_)))
+        case _ => x
+      }
+      rec(s)
+    },
+
+    builtin("asciiUpper", "str"){ (extVars, str: String) => str.toUpperCase},
+    builtin("asciiLower", "str"){ (extVars, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
       empty,
       Params(Seq("str" -> None, "rest" -> None)),

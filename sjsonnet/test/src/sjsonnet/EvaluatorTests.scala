@@ -160,6 +160,8 @@ object EvaluatorTests extends TestSuite{
       eval("std.pow(2, 3)") ==> Js.Num(8)
       eval("std.pow(x=2, n=3)") ==> Js.Num(8)
       eval("std.pow(n=3, x=2)") ==> Js.Num(8)
+      eval("({a:: 1} + {a+:::2}).a") ==> Js.Num(3)
+      eval("(std.prune({a:: 1}) + {a+:::2}).a") ==> Js.Num(2)
     }
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
