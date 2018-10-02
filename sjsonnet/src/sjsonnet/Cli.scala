@@ -16,12 +16,18 @@ object Cli{
                       (implicit val reader: scopt.Read[V]){
     def runAction(t: T, s: String) = action(t, reader.reads(s))
   }
-  case class Config(jpaths: List[String] = Nil,
+  case class Config(interactive: Boolean = false,
+                    jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
                     varBinding: Map[String, ujson.Js] = Map())
 
 
   val genericSignature = Seq(
+    Arg[Config, Unit](
+      "interactive", Some('i'),
+      "Run Mill in interactive mode, suitable for opening REPLs and taking user input",
+      (c, v) => c.copy(interactive = true)
+    ),
     Arg[Config, String](
       "jpaths", Some('J'),
       "Specify an additional library search dir (right-most wins)",
@@ -79,8 +85,7 @@ object Cli{
     val leftMargin = genericSignature.map(showArg(_).length).max + 2
 
 
-    s"""sjsonnet
-       |usage: sjsonnet [ammonite-options] [script-file [script-options]]
+    s"""usage: sjsonnet [sjsonnet-options] script-file
        |
        |${formatBlock(genericSignature, leftMargin).mkString("\n")}
     """.stripMargin
