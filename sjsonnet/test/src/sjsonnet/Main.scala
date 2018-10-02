@@ -42,7 +42,7 @@ object Main {
     val parser = new Parser()
     val start = System.currentTimeMillis()
     var count = 0
-    while(System.currentTimeMillis() - start < 20000){
+    while(System.currentTimeMillis() - start < 2000000){
       count += 1
       for(name <- names){
 //        println(name)

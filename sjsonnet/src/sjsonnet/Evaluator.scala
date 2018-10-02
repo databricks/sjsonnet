@@ -45,7 +45,7 @@ class Evaluator(parser: Parser,
                 wd: Path) {
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
-  def visitExpr(expr: Expr, scope: => Scope): Val = try expr match{
+  def visitExpr(expr: Expr, scope: Scope): Val = try expr match{
     case Null(offset) => Val.Null
     case Parened(offset, inner) => visitExpr(inner, scope)
     case True(offset) => Val.True
@@ -187,7 +187,7 @@ class Evaluator(parser: Parser,
     }
   } catch Evaluator.tryCatch(scope, wd, expr.offset)
 
-  def visitImportStr(scope: => Scope, offset: Int, value: String) = {
+  def visitImportStr(scope: Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value)
     Val.Str(
       importStrs.getOrElseUpdate(
@@ -197,7 +197,7 @@ class Evaluator(parser: Parser,
     )
   }
 
-  def visitImport(scope: => Scope, offset: Int, value: String) = {
+  def visitImport(scope: Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value)
     imports.getOrElseUpdate(
       p,
@@ -218,10 +218,10 @@ class Evaluator(parser: Parser,
     )
   }
 
-  def resolveImport(scope: => Scope, value: String) = {
+  def resolveImport(scope: Scope, value: String) = {
     (scope.currentFile / ammonite.ops.up :: scope.searchRoots).map(_ / RelPath(value)).find(ammonite.ops.exists).get
   }
-  def importString(scope: => Scope, offset: Int, value: String, p: Path) = {
+  def importString(scope: Scope, offset: Int, value: String, p: Path) = {
     try ammonite.ops.read(p)
     catch {
       case e: Throwable =>
@@ -229,7 +229,7 @@ class Evaluator(parser: Parser,
     }
   }
 
-  def visitBinaryOp(scope: => Scope, offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) = {
+  def visitBinaryOp(scope: Scope, offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) = {
     op match {
       case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
         (visitExpr(lhs, scope), op) match {
@@ -290,7 +290,7 @@ class Evaluator(parser: Parser,
     }
   }
 
-  def visitFieldName(fieldName: FieldName, scope: => Scope) = {
+  def visitFieldName(fieldName: FieldName, scope: Scope) = {
     fieldName match{
       case FieldName.Fixed(s) => Some(s)
       case FieldName.Dyn(k) => visitExpr(k, scope) match{
@@ -318,7 +318,7 @@ class Evaluator(parser: Parser,
         (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitMethod(scope(self, sup), rhs, argSpec, offset)))
     }
   }
-  def visitObjBody(b: ObjBody, scope: => Scope): Val.Obj = b match{
+  def visitObjBody(b: ObjBody, scope: Scope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
       def makeNewScope(self: => Val.Obj, sup: => Option[Val.Obj]): Scope = new Scope(
         scope.dollar0.orElse(Some(self)),
