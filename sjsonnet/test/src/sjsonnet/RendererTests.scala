@@ -11,6 +11,7 @@ object RendererTests extends TestSuite{
     }
     'empty - {
       ujson.transform(ujson.Js.Arr(), new Renderer(indent = 3)).toString ==> "[ ]"
+      ujson.transform(ujson.Js.Obj(), new Renderer(indent = 3)).toString ==> "{ }"
     }
     'nonEmpty - {
       ujson.transform(ujson.Js.Arr(1), new Renderer(indent = 3)).toString ==>

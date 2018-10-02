@@ -63,7 +63,7 @@ object SjsonnetMain {
                       stderr.println(errMsg)
                       1
                     case Right(materialized) =>
-                      val str = materialized.render(indent = config.indent)
+                      val str = ujson.transform(materialized, new Renderer(indent = config.indent)).toString
                       config.outputFile match{
                         case None => stdout.println(str)
                         case Some(f) => ammonite.ops.write(ammonite.ops.Path(f, wd), str)
