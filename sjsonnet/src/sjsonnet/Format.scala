@@ -73,7 +73,7 @@ object Format{
     else if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
     else " " * missingWidth + lhs2 + mhs + rhs
   }
-  def format(s: String, values0: Val, fileName: Path, offset: Int): String = synchronized{
+  def format(s: String, values0: Val, fileName: Path,currentRoot: Path, offset: Int): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
@@ -93,7 +93,7 @@ object Format{
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force)
-                case v: Val.Obj => Materializer(v.value(key, fileName, offset).force)
+                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset).force)
               }
           }
           i += 1

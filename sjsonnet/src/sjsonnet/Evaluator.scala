@@ -20,10 +20,10 @@ object Evaluator {
       case e: Error => throw e
       case e: DelegateError =>
         throw new Error(e.msg, Nil, None)
-          .addFrame(scope.fileName, offset)
+          .addFrame(scope.currentFile, offset)
       case e: Throwable =>
         throw new Error("Internal Error", Nil, Some(e))
-          .addFrame(scope.fileName, offset)
+          .addFrame(scope.currentFile, offset)
   }
   def tryCatch2[T](path: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(path, offset)
@@ -59,9 +59,9 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     case Num(offset, value) => Val.Num(value)
     case Id(offset, value) =>
       val ref = scope.bindings(value)
-        .getOrElse(Evaluator.fail("Unknown variable " + value, scope.fileName, offset))
+        .getOrElse(Evaluator.fail("Unknown variable " + value, scope.currentFile, offset))
 
-      try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
+      try ref.force catch Evaluator.tryCatch2(scope.currentFile, offset)
 
     case Arr(offset, value) => Val.Arr(value.map(v => Lazy(visitExpr(v, scope))))
     case Obj(offset, value) => visitObjBody(value, scope)
@@ -80,8 +80,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
       if (visitExpr(value, scope) != Val.True) {
         msg match{
-          case None => Evaluator.fail("Assertion failed", scope.fileName, offset)
-          case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value, scope.fileName, offset)
+          case None => Evaluator.fail("Assertion failed", scope.currentFile, offset)
+          case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value, scope.currentFile, offset)
         }
       }
       visitExpr(returned, scope)
@@ -98,46 +98,50 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           case Val.Str(s) => s
           case r =>
             try Materializer(r).toString()
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
         },
-        scope.fileName, offset
+        scope.currentFile, offset
       )
     case Apply(offset, value, Args(args)) =>
       val lhs = visitExpr(value, scope)
-      try lhs.asInstanceOf[Val.Func].apply(args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))}, offset)
-      catch Evaluator.tryCatch2(scope.fileName, offset)
+      try lhs.asInstanceOf[Val.Func].apply(
+        args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))},
+        scope.currentFile.last,
+        offset
+      )
+      catch Evaluator.tryCatch2(scope.currentFile, offset)
 
     case Select(offset, value, name) =>
       if (value.isInstanceOf[Super]){
-        val ref = scope.super0.get.value(name, scope.fileName, offset, self = scope.self)
-        try ref.force catch Evaluator.tryCatch2(scope.fileName, offset)
+        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, self = scope.self)
+        try ref.force catch Evaluator.tryCatch2(scope.currentFile, offset)
       }else visitExpr(value, scope) match{
         case obj: Val.Obj =>
-          val ref = obj.value(name, scope.fileName, offset)
+          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset)
           try ref.force
-          catch Evaluator.tryCatch2(scope.fileName, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, offset)
         case r =>
-          Evaluator.fail(s"attemped to index a ${r.prettyName} with string ${name}", scope.fileName, offset)
+          Evaluator.fail(s"attemped to index a ${r.prettyName} with string ${name}", scope.currentFile, offset)
       }
 
     case Lookup(offset, value, index) =>
       if (value.isInstanceOf[Super]){
         val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-        scope.super0.get.value(key.value, scope.fileName, offset).force
+        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset).force
       }else (visitExpr(value, scope), visitExpr(index, scope)) match {
         case (v: Val.Arr, i: Val.Num) =>
-          if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.fileName, offset)
+          if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset)
           val int = i.value.toInt
-          if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.fileName, offset)
+          if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.currentFile, offset)
           try v.value(int).force
-          catch Evaluator.tryCatch2(scope.fileName, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, offset)
         case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
         case (v: Val.Obj, i: Val.Str) =>
-          val ref = v.value(i.value, scope.fileName, offset)
+          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset)
           try ref.force
-          catch Evaluator.tryCatch2(scope.fileName, offset)
+          catch Evaluator.tryCatch2(scope.currentFile, offset)
         case (lhs, rhs) =>
-          Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.fileName, offset)
+          Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset)
       }
 
     case Slice(offset, value, start, end, stride) =>
@@ -182,21 +186,27 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       visitExpr(
         parser.expr.parse(importString(scope, offset, value, p)) match {
           case Parsed.Success(x, _) => x
-          case f@Parsed.Failure(l, i, e) => Evaluator.fail("Imported file " + pprint.Util.literalize(value) + " had syntax error " + f.msg, scope.fileName, offset)
+          case f@Parsed.Failure(l, i, e) =>
+            Evaluator.fail(
+              "Imported file " + pprint.Util.literalize(value) +
+              " had syntax error " + f.msg,
+              scope.currentFile,
+              offset
+            )
         },
-        originalScope.copy(fileName = p)
+        originalScope.copy(currentFile = p)
       )
     )
   }
 
   def resolveImport(scope: => Scope, value: String) = {
-    (scope.fileName / ammonite.ops.up :: scope.searchRoots).map(_ / RelPath(value)).find(ammonite.ops.exists).get
+    (scope.currentFile / ammonite.ops.up :: scope.searchRoots).map(_ / RelPath(value)).find(ammonite.ops.exists).get
   }
   def importString(scope: => Scope, offset: Int, value: String, p: Path) = {
     try ammonite.ops.read(p)
     catch {
       case e: Throwable =>
-        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.fileName, offset)
+        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset)
     }
   }
 
@@ -213,14 +223,14 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         (visitExpr(lhs, scope), op, visitExpr(rhs, scope)) match {
           case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
           case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
-            if (r == 0) Evaluator.fail("division by zero", scope.fileName, offset)
+            if (r == 0) Evaluator.fail("division by zero", scope.currentFile, offset)
             Val.Num(l / r)
           case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
-            try Val.Str(Format.format(l, r, scope.fileName, offset))
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset))
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
           case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
@@ -228,10 +238,10 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
             try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
             try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
@@ -241,16 +251,16 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
           case (l, Expr.BinaryOp.`==`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
             }
             try Val.bool(Materializer(l) == Materializer(r))
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Evaluator.fail("cannot test equality of functions", scope.fileName, offset)
+              Evaluator.fail("cannot test equality of functions", scope.currentFile, offset)
             }
             try Val.bool(Materializer(l) != Materializer(r))
-            catch Evaluator.tryCatch2(scope.fileName, offset)
+            catch Evaluator.tryCatch2(scope.currentFile, offset)
           case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
@@ -276,7 +286,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
     Val.Func(
       scope,
       params,
-      scope => visitExpr(rhs, scope),
+      (scope, thisFile, outerOffset) => visitExpr(rhs, scope),
       (default, scope) => visitExpr(default, scope)
     )
   }
@@ -296,7 +306,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         Some(self),
         sup,
         newBindings.map{case (k, v) => (k, v.apply(self, sup))}.toMap,
-        scope.fileName,
+        scope.currentFile,
+        scope.currentRoot,
         scope.searchRoots,
         Some(scope)
       )
@@ -317,8 +328,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
             if (visitExpr(value, newScope) != Val.True) {
               msg match{
-                case None => Evaluator.fail("Assertion failed", scope.fileName, value.offset)
-                case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value, scope.fileName, value.offset)
+                case None => Evaluator.fail("Assertion failed", scope.currentFile, value.offset)
+                case Some(msg) => Evaluator.fail("Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value, scope.currentFile, value.offset)
               }
             }
         }
@@ -327,14 +338,14 @@ class Evaluator(parser: Parser, originalScope: Scope) {
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
               Lazy {
                 assertions(self)
                 visitExpr(rhs, makeNewScope(self, sup))
               }
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj]) => {
+            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
               Lazy {
                 assertions(self)
                 visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
@@ -355,7 +366,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
         scope.self0,
         None,
         Map(),
-        scope.fileName,
+        scope.currentFile,
+        scope.currentRoot,
         scope.searchRoots,
         Some(scope)
       )
@@ -369,7 +381,8 @@ class Evaluator(parser: Parser, originalScope: Scope) {
               Some(newSelf),
               None,
               newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
-              scope.fileName,
+              scope.currentFile,
+              scope.currentRoot,
               scope.searchRoots,
               Some(s)
             )
@@ -381,7 +394,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
 
             visitExpr(key, s) match {
               case Val.Str(k) =>
-                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) =>
+                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) =>
                   Lazy(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
@@ -408,7 +421,7 @@ class Evaluator(parser: Parser, originalScope: Scope) {
           s <- scopes
           e <- visitExpr(expr, s) match{
             case Val.Arr(value) => value
-            case r => Evaluator.fail("In comprehension, can only iterate over array, not " + r.prettyName, s.fileName, expr.offset)
+            case r => Evaluator.fail("In comprehension, can only iterate over array, not " + r.prettyName, s.currentFile, expr.offset)
           }
         } yield s ++ Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e))
       )

@@ -35,7 +35,10 @@ object Val{
   }
   object Obj{
 
-    case class Member(add: Boolean, visibility: Visibility, invoke: (Obj, Option[Obj]) => Lazy)
+    case class Member(add: Boolean,
+                      visibility: Visibility,
+                      invoke: (Obj, Option[Obj], String) => Lazy,
+                      cached: Boolean = true)
   }
   case class Obj(value0: Map[String, Obj.Member],
                  triggerAsserts: Val.Obj => Unit,
@@ -62,13 +65,16 @@ object Val{
       mapping
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
-    def value(k: String, fileName: Path, offset: Int,  self: Obj = this) = {
+    def value(k: String, fileName: Path, currentRoot: Path, offset: Int,  self: Obj = this) = {
 
-      valueCache.getOrElseUpdate(
+      val (cached, lazyValue) =
+        valueRaw(k, self, fileName.relativeTo(currentRoot).toString()).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset))
+      if (!cached) lazyValue
+      else valueCache.getOrElseUpdate(
         // It is very rare that self != this, so fast-path the common case
         // where they are the same by avoiding tuple construction and hashing
         if(self == this) k else (k, self),
-        valueRaw(k, self).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset))
+        lazyValue
       )
 
     }
@@ -79,25 +85,27 @@ object Val{
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
     }
 
-    def valueRaw(k: String, self: Obj): Option[Lazy] = this.value0.get(k) match{
+    def valueRaw(k: String, self: Obj, thisFile: String): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
-        def localResult = m.invoke(self, this.`super`).force
+        def localResult = m.invoke(self, this.`super`, thisFile).force
         this.`super` match{
           case Some(s) if m.add =>
-            Some(Lazy(s.valueRaw(k, self).fold(localResult)(x => mergeMember(x.force, localResult))))
-          case _ => Some(Lazy(localResult))
+            Some(m.cached -> Lazy(
+              s.valueRaw(k, self, thisFile).fold(localResult)(x => mergeMember(x._2.force, localResult))
+            ))
+          case _ => Some(m.cached -> Lazy(localResult))
         }
 
-      case None => this.`super`.flatMap(_.valueRaw(k, self))
+      case None => this.`super`.flatMap(_.valueRaw(k, self, thisFile))
     }
   }
 
   case class Func(scope: Scope,
                   params: Params,
-                  evalRhs: Scope => Val,
+                  evalRhs: (Scope, String, Int) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
-    def apply(args: Seq[(Option[String], Lazy)], outerOffset: Int) = {
+    def apply(args: Seq[(Option[String], Lazy)], thisFile: String, outerOffset: Int) = {
       lazy val newScope1 =
         params.args.collect{
           case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
@@ -110,16 +118,16 @@ object Val{
         }
       catch{
         case e: IndexOutOfBoundsException =>
-          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.fileName, outerOffset)
+          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.currentFile, outerOffset)
       }
       lazy val seen = collection.mutable.Set.empty[String]
       for((k, v) <- newScope2){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.fileName, outerOffset)
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.currentFile, outerOffset)
         else seen.add(k)
       }
 
       lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
-      evalRhs(newScope)
+      evalRhs(newScope, thisFile, outerOffset)
     }
   }
 }

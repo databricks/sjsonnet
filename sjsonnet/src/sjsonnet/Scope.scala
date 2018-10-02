@@ -6,15 +6,20 @@ import ammonite.ops.Path
 object Scope{
 
 
-  def empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", List(), None)
-  def standard(p: Path, s: List[Path]) = new Scope(None, None, None, Map("std" -> Lazy(Std.Std)), p, s, None)
+  def empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", ammonite.ops.pwd , List(), None)
+  def standard(p: Path,
+               currentRoot: Path,
+               s: List[Path]) = new Scope(
+    None, None, None, Map("std" -> Lazy(Std.Std)), p, currentRoot, s, None
+  )
 }
 
 case class Scope(dollar0: Option[Val.Obj],
                  self0: Option[Val.Obj],
                  super0: Option[Val.Obj],
                  bindings0: Map[String, Lazy],
-                 fileName: Path,
+                 currentFile: Path,
+                 currentRoot: Path,
                  searchRoots: List[Path],
                  delegate: Option[Scope]){
   def dollar = dollar0.get
@@ -30,7 +35,8 @@ case class Scope(dollar0: Option[Val.Obj],
       self0,
       super0,
       traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}.toMap,
-      fileName,
+      currentFile,
+      currentRoot,
       searchRoots,
       Some(this)
     )

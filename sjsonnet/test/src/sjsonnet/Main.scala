@@ -50,7 +50,7 @@ object Main {
 //        import ammonite.ops._, ImplicitWd._
 //        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
         val path = FileTests.testSuiteRoot / s"$name.jsonnet"
-        val interp = new Interpreter(parser, Scope.standard(path, Nil))
+        val interp = new Interpreter(parser, Scope.standard(path, FileTests.testSuiteRoot, Nil))
         interp.interpret(path)
       }
     }

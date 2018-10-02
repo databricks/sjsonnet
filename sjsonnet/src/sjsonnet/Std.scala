@@ -97,10 +97,10 @@ object Std {
     name -> Val.Func(
       empty,
       Params(params.map(_ -> None)),
-      {scope => implicitly[ReadWriter[R]].write(eval(params.map(scope.bindings(_).get.force)))}
+      {(scope, thisFile, outerOffset) => implicitly[ReadWriter[R]].write(eval(params.map(scope.bindings(_).get.force)))}
     )
   }
-  val functions = Seq[(String, Val.Func)](
+  val functions: Seq[(String, Val.Func)] = Seq(
     builtin("assertEqual", "a", "b"){ (v1: Val, v2: Val) =>
       val x1 = Materializer(v1)
       val x2 = Materializer(v2)
@@ -170,13 +170,13 @@ object Std {
         .mkString
     },
     builtin("format", "str", "vals"){ (v1: String, v2: Val) =>
-      Format.format(v1, v2, ammonite.ops.pwd / "(unknown)", -1)
+      Format.format(v1, v2, ammonite.ops.pwd / "(unknown)", ammonite.ops.pwd, -1)
     },
     builtin("foldl", "func", "arr", "init"){ (func: Val.Func, arr: Val.Arr, init: Val) =>
       var current = init
       for(item <- arr.value){
         val c = current
-        current = func.apply(Seq((None, Lazy(c)), (None, item)), -1)
+        current = func.apply(Seq((None, Lazy(c)), (None, item)), "(memory)", -1)
       }
       current
     },
@@ -184,7 +184,7 @@ object Std {
       var current = init
       for(item <- arr.value.reverse){
         val c = current
-        current = func.apply(Seq((None, item), (None, Lazy(c))), -1)
+        current = func.apply(Seq((None, item), (None, Lazy(c))), "(memory)", -1)
       }
       current
     },
@@ -219,7 +219,7 @@ object Std {
     builtin("makeArray", "sz", "func"){ (sz: Int, func: Val.Func) =>
       Val.Arr(
         (0 until sz).map(i =>
-          Lazy(func.apply(Seq(None -> Lazy(Val.Num(i))), -1))
+          Lazy(func.apply(Seq(None -> Lazy(Val.Num(i))), "(memory)", -1))
         )
       )
     },
@@ -301,14 +301,14 @@ object Std {
     builtin("filter", "func", "arr"){ (func: Val.Func, arr: Val.Arr) =>
       Val.Arr(
         arr.value.filter{ i =>
-          func.apply(Seq(None -> i), -1) == Val.True
+          func.apply(Seq(None -> i), "(memory)", -1) == Val.True
         }
       )
     },
     builtin("map", "func", "arr"){ (func: Val.Func, arr: Val.Arr) =>
       Val.Arr(
         arr.value.map{ i =>
-          Lazy(func.apply(Seq(None -> i), -1))
+          Lazy(func.apply(Seq(None -> i), "(memory)", -1))
         }
       )
     },
@@ -316,9 +316,13 @@ object Std {
       val allKeys = obj.getVisibleKeys()
       Val.Obj(
         allKeys.map{ k =>
-          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => Lazy(
             func.asInstanceOf[Val.Func].apply(
-              Seq(None -> Lazy(Val.Str(k._1)), None -> obj.value(k._1, ammonite.ops.pwd / "(Unknown)", -1)),
+              Seq(
+                None -> Lazy(Val.Str(k._1)),
+                None -> obj.value(k._1, ammonite.ops.pwd / "(memory)", ammonite.ops.pwd, -1)
+              ),
+              "(memory)",
               -1
             )
           )))
@@ -330,7 +334,7 @@ object Std {
     builtin("mapWithIndex", "func", "arr"){ (func: Val.Func, arr: Val.Arr) =>
       Val.Arr(
         arr.value.zipWithIndex.map{ case (i, i2) =>
-          Lazy(func.apply(Seq(None -> i, None -> Lazy(Val.Num(i2))), -1))
+          Lazy(func.apply(Seq(None -> i, None -> Lazy(Val.Num(i2))), "(memory)", -1))
         }
       )
     },
@@ -338,8 +342,8 @@ object Std {
       Val.Arr(
         arr.value.flatMap { i =>
           val x = i.force
-          if (filter_func.apply(Seq(None -> Lazy(x)), -1) != Val.True) None
-          else Some(Lazy(map_func.apply(Seq(None -> Lazy(x)), -1)))
+          if (filter_func.apply(Seq(None -> Lazy(x)), "(memory)", -1) != Val.True) None
+          else Some(Lazy(map_func.apply(Seq(None -> Lazy(x)), "(memory)", -1)))
         }
       )
     },
@@ -584,15 +588,40 @@ object Std {
     builtin("parseHex", "str"){ (str: String) =>
       Integer.parseInt(str, 16)
     },
-    builtin("trace", "str", "rest"){ (str: String, rest: Val) =>
-      println("TRACE: " + str)
-      rest
-    },
+    "trace" -> Val.Func(
+      empty,
+      Params(Seq("str" -> None, "rest" -> None)),
+      { (scope, thisFile, outerOffset) =>
+        val msg = scope.bindings("str").get.force
+        println(s"TRACE: $thisFile " + msg)
+        scope.bindings("rest").get.force
+      }
+    )
   )
   val Std = Val.Obj(
     functions
-      .map{case (k, v) => (k, Val.Obj.Member(false, Visibility.Hidden, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(v)))}
-      .toMap,
+      .map{
+        case (k, v) =>
+          (
+            k,
+            Val.Obj.Member(
+              false,
+              Visibility.Hidden,
+              (self: Val.Obj, sup: Option[Val.Obj],  thisFile: String) => Lazy(v)
+            )
+          )
+      }
+      .toMap ++ Seq(
+      (
+        "thisFile",
+        Val.Obj.Member(
+          false,
+          Visibility.Hidden,
+          { (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => Lazy(Val.Str(thisFile))},
+          cached = false
+        )
+      )
+    ),
     _ => (),
     None
   )

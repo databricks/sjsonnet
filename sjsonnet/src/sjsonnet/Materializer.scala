@@ -33,11 +33,11 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", -1).force, seen)
+        }yield k -> apply(obj.value(k, ammonite.ops.pwd / "(Unknown)", ammonite.ops.pwd, -1).force, seen)
       )
       seen.remove(v, ())
       res
-    case f: Val.Func => apply(f.apply(Nil, -1), seen)
+    case f: Val.Func => apply(f.apply(Nil, "(memory)", -1), seen)
   }
 
   def reverse(v: Js.Value): Val = v match{
@@ -48,7 +48,7 @@ object Materializer {
     case Js.Str(s) => Val.Str(s)
     case Js.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))))
     case Js.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj]) => Lazy(reverse(x._2))))).toMap,
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], thisFile: String) => Lazy(reverse(x._2))))).toMap,
       _ => (),
       None
     )

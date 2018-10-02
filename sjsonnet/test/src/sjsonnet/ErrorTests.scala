@@ -5,7 +5,7 @@ import utest._
 object ErrorTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(p: ammonite.ops.Path) = {
-    val interp = new Interpreter(new Parser, Scope.standard(p, Nil))
+    val interp = new Interpreter(new Parser, Scope.standard(p, testSuiteRoot, Nil))
     interp.interpret(p)
   }
   def check(expected: String)(implicit tp: utest.framework.TestPath) = {
