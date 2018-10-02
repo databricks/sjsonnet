@@ -99,7 +99,7 @@ object Format{
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force, extVars, wd)
-                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset, wd).force, extVars, wd)
+                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset, wd, extVars).force, extVars, wd)
               }
           }
           i += 1

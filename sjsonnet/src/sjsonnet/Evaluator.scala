@@ -37,6 +37,7 @@ object Evaluator {
   def fail(msg: String, path: Path, offset: Int, wd: Path) = {
     throw new Error(msg, Nil, None).addFrame(path, wd, offset)
   }
+
 }
 
 class Evaluator(parser: Parser,
@@ -126,11 +127,11 @@ class Evaluator(parser: Parser,
 
     case Select(offset, value, name) =>
       if (value.isInstanceOf[Super]){
-        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, self = scope.self)
+        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars, self = scope.self)
         try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       }else visitExpr(value, scope) match{
         case obj: Val.Obj =>
-          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, wd)
+          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars)
           try ref.force
           catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case r =>
@@ -145,7 +146,7 @@ class Evaluator(parser: Parser,
     case Lookup(offset, value, index) =>
       if (value.isInstanceOf[Super]){
         val key = visitExpr(index, scope).asInstanceOf[Val.Str]
-        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd).force
+        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd, extVars).force
       }else (visitExpr(value, scope), visitExpr(index, scope)) match {
         case (v: Val.Arr, i: Val.Num) =>
           if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
@@ -155,7 +156,7 @@ class Evaluator(parser: Parser,
           catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
         case (v: Val.Obj, i: Val.Str) =>
-          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, wd)
+          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, wd, extVars)
           try ref.force
           catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
         case (lhs, rhs) =>

@@ -36,7 +36,7 @@ object Materializer {
         for {
           (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
           if !hidden
-        }yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd).force, extVars, wd, seen)
+        }yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd, seen)
       )
       seen.remove(v, ())
       res

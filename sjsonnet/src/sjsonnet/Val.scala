@@ -65,10 +65,16 @@ object Val{
       mapping
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
-    def value(k: String, fileName: Path, currentRoot: Path, offset: Int, wd: Path, self: Obj = this) = {
+    def value(k: String,
+              fileName: Path,
+              currentRoot: Path,
+              offset: Int,
+              wd: Path,
+              extVars: Map[String, ujson.Js],
+              self: Obj = this) = {
 
       val (cached, lazyValue) =
-        valueRaw(k, self, fileName.relativeTo(currentRoot).toString()).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
+        valueRaw(k, self, fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
       if (!cached) lazyValue
       else valueCache.getOrElseUpdate(
         // It is very rare that self != this, so fast-path the common case
@@ -79,25 +85,43 @@ object Val{
 
     }
 
-    def mergeMember(l: Val, r: Val) = (l, r) match{
+    def mergeMember(l: Val,
+                    r: Val,
+                    extVars: Map[String, ujson.Js],
+                    wd: Path,
+                    currentFile: Path,
+                    offset: Int) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+      case (Val.Str(l), r) =>
+        try Val.Str(l + Materializer.apply(r, extVars, wd).transform(new Renderer()).toString)
+        catch Evaluator.tryCatch2(currentFile, wd, offset)
+      case (l, Val.Str(r)) =>
+        try Val.Str(Materializer.apply(l, extVars, wd).transform(new Renderer()).toString + r)
+        catch Evaluator.tryCatch2(currentFile, wd, offset)
     }
 
-    def valueRaw(k: String, self: Obj, thisFile: String): Option[(Boolean, Lazy)] = this.value0.get(k) match{
+    def valueRaw(k: String,
+                 self: Obj,
+                 thisFile: String,
+                 extVars: Map[String, ujson.Js],
+                 wd: Path,
+                 currentFile: Path, offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
         def localResult = m.invoke(self, this.`super`, thisFile).force
         this.`super` match{
           case Some(s) if m.add =>
             Some(m.cached -> Lazy(
-              s.valueRaw(k, self, thisFile).fold(localResult)(x => mergeMember(x._2.force, localResult))
+              s.valueRaw(k, self, thisFile, extVars, wd, currentFile, offset).fold(localResult)(x =>
+                mergeMember(x._2.force, localResult, extVars, wd, currentFile, offset)
+              )
             ))
           case _ => Some(m.cached -> Lazy(localResult))
         }
 
-      case None => this.`super`.flatMap(_.valueRaw(k, self, thisFile))
+      case None => this.`super`.flatMap(_.valueRaw(k, self, thisFile, extVars, wd, currentFile, offset))
     }
   }
 

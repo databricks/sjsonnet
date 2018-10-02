@@ -49,6 +49,9 @@ object EvaluatorTests extends TestSuite{
       eval("({x+: 1}{x+: 2}).x") ==> Js.Num(3)
       eval("({x+: 1} + {x+: 2}).x") ==> Js.Num(3)
       eval("(function(a, b) a + b)({x+: 1}, {x+: 2}).x") ==> Js.Num(3)
+      eval("""({a: [1]} + {a+: "1"}).a""") ==> Js.Str("[1]1")
+      eval("""({a: 1} + {a+: "1"}).a""") ==> Js.Str("11")
+      eval("""({a: "1"} + {a+: 1}).a""") ==> Js.Str("11")
     }
     'ifElse - {
       eval("if true then 1 else 0") ==> Js.Num(1)
