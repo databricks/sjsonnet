@@ -19,7 +19,8 @@ object Cli{
   case class Config(interactive: Boolean = false,
                     jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
-                    varBinding: Map[String, ujson.Js] = Map())
+                    varBinding: Map[String, ujson.Js] = Map(),
+                    indent: Int = 3)
 
 
   def genericSignature(wd: Path) = Seq(
@@ -27,6 +28,11 @@ object Cli{
       "interactive", Some('i'),
       "Run Mill in interactive mode, suitable for opening REPLs and taking user input",
       (c, v) => c.copy(interactive = true)
+    ),
+    Arg[Config, Int](
+      "indent", Some('n'),
+      "How much to indent your output JSON",
+      (c, v) => c.copy(indent = v)
     ),
     Arg[Config, String](
       "jpaths", Some('J'),
