@@ -46,7 +46,7 @@ class Parser{
           else state match{
             case 0 =>
               cfg.input(current) match{
-                case ' ' | '\t' | '\n' => rec(current + 1, state)
+                case ' ' | '\t' | '\n' | '\r' => rec(current + 1, state)
                 case '#' => rec(current + 1, state = 1)
                 case '/' => rec(current + 1, state = 2)
                 case _ => this.success(cfg.success, (), current, Set.empty, false)

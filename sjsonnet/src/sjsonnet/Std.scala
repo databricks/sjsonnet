@@ -8,6 +8,8 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
 
+import scala.annotation.switch
+
 object Std {
   sealed trait ReadWriter[T]{
     def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path): Either[String, T]
@@ -356,7 +358,7 @@ object Std {
       )
     },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) =>
-      s.substring(from, len + 1)
+      s.substring(from, from + len)
     },
     builtin("startsWith", "a", "b"){ (wd, extVars, a: String, b: String) =>
       a.startsWith(b)
@@ -415,7 +417,31 @@ object Std {
     },
     builtin("escapeStringJson", "str"){ (wd, extVars, str: String) =>
       val out = new StringWriter()
-      ujson.Renderer.escape(out, str, unicode = true)
+      // Fork of `ujson.Renderer.escape(out, str, unicode = true)`
+      // to improperly escape `~`, for bug-for-bug compatibility with google/jsonnet
+      def escape(sb: java.io.Writer, s: CharSequence, unicode: Boolean): Unit = {
+        sb.append('"')
+        var i = 0
+        val len = s.length
+        while (i < len) {
+          (s.charAt(i): @switch) match {
+            case '"' => sb.append("\\\"")
+            case '\\' => sb.append("\\\\")
+            case '\b' => sb.append("\\b")
+            case '\f' => sb.append("\\f")
+            case '\n' => sb.append("\\n")
+            case '\r' => sb.append("\\r")
+            case '\t' => sb.append("\\t")
+            case c =>
+              if (c < ' ' || (c >= '~' && unicode)) sb.append("\\u%04x" format c.toInt)
+              // if (c < ' ' || (c > '~' && unicode)) sb.append("\\u%04x" format c.toInt)
+              else sb.append(c)
+          }
+          i += 1
+        }
+        sb.append('"')
+      }
+      escape(out, str, unicode = true)
       out.toString
     },
     builtin("escapeStringBash", "str"){ (wd, extVars, str: String) =>
@@ -471,19 +497,21 @@ object Std {
     builtin("base64DecodeBytes", "s"){ (wd, extVars, s: String) =>
       Val.Arr(Base64.getDecoder().decode(s).map(i => Lazy(Val.Num(i))))
     },
-    builtin("sort", "arr"){ (wd, extVars, arr: Val.Arr) =>
+    builtin("sort", "arr"){ (wd, extVars, arr: Val) =>
+      arr match{
+        case Val.Arr(vs) =>
+          Val.Arr(
 
-      val vs = arr.value
-      Val.Arr(
-
-        if (vs.forall(_.force.isInstanceOf[Val.Str])){
-          vs.map(_.force.asInstanceOf[Val.Str]).sortBy(_.value).map(Lazy(_))
-        }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
-          vs.map(_.force.asInstanceOf[Val.Num]).sortBy(_.value).map(Lazy(_))
-        }else {
-          ???
-        }
-      )
+            if (vs.forall(_.force.isInstanceOf[Val.Str])){
+              vs.map(_.force.asInstanceOf[Val.Str]).sortBy(_.value).map(Lazy(_))
+            }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
+              vs.map(_.force.asInstanceOf[Val.Num]).sortBy(_.value).map(Lazy(_))
+            }else {
+              ???
+            }
+          )
+        case Val.Str(s) => Val.Arr(s.sorted.map(c => Lazy(Val.Str(c.toString))))
+      }
     },
     builtin("uniq", "arr"){ (wd, extVars, arr: Val.Arr) =>
       val ujson.Js.Arr(vs) = Materializer(arr, extVars, wd)
