@@ -1,6 +1,6 @@
 package sjsonnet
 import Expr._
-import ammonite.ops.{Path, RelPath}
+import ammonite.ops.{BasePath, FilePath, Path, RelPath}
 import fastparse.StringReprOps
 import fastparse.core.Parsed
 import fastparse.utils.IndexedParserInput
@@ -221,7 +221,10 @@ class Evaluator(parser: Parser,
 
   def resolveImport(scope: Scope, value: String, offset: Int) = {
     (scope.currentFile / ammonite.ops.up :: scope.searchRoots).
-      map(_ / RelPath(value))
+      map(base => FilePath(value) match{
+        case r: RelPath => base / r
+        case a: Path => a
+      })
       .find(ammonite.ops.exists)
       .getOrElse(
         Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
