@@ -2,6 +2,7 @@ package sjsonnet
 import java.util.IdentityHashMap
 
 import ammonite.ops.Path
+import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import ujson.Js
 object Materializer {
@@ -56,4 +57,21 @@ object Materializer {
       None
     )
   }
+
+  def toExpr(v: ujson.Js): Expr = v match{
+    case ujson.Js.True => Expr.True(0)
+    case ujson.Js.False => Expr.False(0)
+    case ujson.Js.Null => Expr.Null(0)
+    case ujson.Js.Num(n) => Expr.Num(0, n)
+    case ujson.Js.Str(s) => Expr.Str(0, s)
+    case ujson.Js.Arr(xs) => Expr.Arr(0, xs.map(toExpr))
+    case ujson.Js.Obj(kvs) =>
+      Expr.Obj(0,
+        ObjBody.MemberList(
+          for((k, v) <- kvs.toSeq)
+            yield Member.Field(0, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
+        )
+      )
+  }
+
 }

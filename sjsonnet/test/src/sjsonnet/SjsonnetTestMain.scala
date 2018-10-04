@@ -54,6 +54,7 @@ object SjsonnetTestMain {
           parser,
           Scope.standard(path, FileTests.testSuiteRoot, Nil),
           Map(),
+          Map(),
           ammonite.ops.pwd
         )
         interp.interpret(path)

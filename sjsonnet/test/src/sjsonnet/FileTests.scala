@@ -9,6 +9,7 @@ object FileTests extends TestSuite{
       new Parser,
       Scope.standard(p, testSuiteRoot, Nil),
       Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
+      Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
       ammonite.ops.pwd
     )
     interp.interpret(p)
@@ -70,6 +71,7 @@ object FileTests extends TestSuite{
 //      )
     }
     'text_block - check()
+    "tla.simple"- check()
     'unicode - check()
     'unix_line_endings - checkGolden()
     'unparse - checkGolden()

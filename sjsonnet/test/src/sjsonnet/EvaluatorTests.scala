@@ -8,6 +8,7 @@ object EvaluatorTests extends TestSuite{
       new Parser(),
       Scope.standard(ammonite.ops.pwd/"(memory)", ammonite.ops.pwd, Nil),
       Map(),
+      Map(),
       ammonite.ops.pwd
     ).interpret(s) match{
       case Right(x) => x

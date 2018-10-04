@@ -20,6 +20,7 @@ object Cli{
                     jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
                     varBinding: Map[String, ujson.Js] = Map(),
+                    tlaBinding: Map[String, ujson.Js] = Map(),
                     indent: Int = 3)
 
 
@@ -74,6 +75,38 @@ object Cli{
       (c, v) => v split('=') match{
         case Array(x, v) =>
           c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, wd)))))
+      }
+    ),
+    Arg[Config, String](
+      "tla-str", Some('A'),
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(System.getenv(x))))
+        case Array(x, v) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(v)))
+      }
+    ),
+    Arg[Config, String](
+      "tla-str-file", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x, v) =>
+          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, wd)))))
+      }
+    ),
+    Arg[Config, String](
+      "tla-code", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(System.getenv(x))))
+        case Array(x, v) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(v)))
+      }
+    ),
+    Arg[Config, String](
+      "tla-code-file", None,
+      "???",
+      (c, v) => v split('=') match{
+        case Array(x, v) =>
+          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, wd)))))
       }
     )
   )

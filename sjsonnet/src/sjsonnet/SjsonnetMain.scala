@@ -56,6 +56,7 @@ object SjsonnetMain {
                       config.jpaths.map(ammonite.ops.Path(_, wd)),
                     ),
                     config.varBinding,
+                    config.tlaBinding,
                     wd
                   )
                   interp.interpret(path) match{
