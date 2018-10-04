@@ -240,6 +240,8 @@ class Evaluator(parser: Parser,
 
   def visitBinaryOp(scope: Scope, offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) = {
     op match {
+      // && and || are handled specially because unlike the other operators,
+      // these short-circuit during evaluation in some cases when the LHS is known.
       case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
         (visitExpr(lhs, scope), op) match {
           case (Val.False, Expr.BinaryOp.`&&`) => Val.False
@@ -295,16 +297,19 @@ class Evaluator(parser: Parser,
           case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
           case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Evaluator.mergeObjects(l, r)
           case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
+          case (l, op, r) =>
+            Evaluator.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", scope.currentFile, offset, wd)
         }
     }
   }
 
-  def visitFieldName(fieldName: FieldName, scope: Scope) = {
+  def visitFieldName(fieldName: FieldName, scope: Scope, offset: Int) = {
     fieldName match{
       case FieldName.Fixed(s) => Some(s)
       case FieldName.Dyn(k) => visitExpr(k, scope) match{
         case Val.Str(k1) => Some(k1)
         case Val.Null => None
+        case x => Evaluator.fail(s"Field name must be string or null, not ${x.prettyName}", scope.currentFile, offset, wd)
       }
     }
   }
@@ -383,14 +388,14 @@ class Evaluator(parser: Parser,
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
+            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
               Lazy {
                 assertions(self)
                 visitExpr(rhs, makeNewScope(self, sup))
               }
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, scope).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
+            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
               Lazy {
                 assertions(self)
                 visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)

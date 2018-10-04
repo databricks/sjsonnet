@@ -52,33 +52,33 @@ object Expr{
   case class UnaryOp(offset: Int, op: UnaryOp.Op, value: Expr) extends Expr
   object UnaryOp{
     sealed trait Op
-    object `+` extends Op
-    object `-` extends Op
-    object `~` extends Op
-    object `!` extends Op
+    case object `+` extends Op
+    case object `-` extends Op
+    case object `~` extends Op
+    case object `!` extends Op
   }
   case class BinaryOp(offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
   object BinaryOp{
     sealed trait Op
-    object `*` extends Op
-    object `/` extends Op
-    object `%` extends Op
-    object `+` extends Op
-    object `-` extends Op
-    object `<<` extends Op
-    object `>>` extends Op
-    object `<` extends Op
-    object `>` extends Op
-    object `<=` extends Op
-    object `>=` extends Op
-    object `in` extends Op
-    object `==` extends Op
-    object `!=` extends Op
-    object `&` extends Op
-    object `^` extends Op
-    object `|` extends Op
-    object `&&` extends Op
-    object `||` extends Op
+    case object `*` extends Op
+    case object `/` extends Op
+    case object `%` extends Op
+    case object `+` extends Op
+    case object `-` extends Op
+    case object `<<` extends Op
+    case object `>>` extends Op
+    case object `<` extends Op
+    case object `>` extends Op
+    case object `<=` extends Op
+    case object `>=` extends Op
+    case object `in` extends Op
+    case object `==` extends Op
+    case object `!=` extends Op
+    case object `&` extends Op
+    case object `^` extends Op
+    case object `|` extends Op
+    case object `&&` extends Op
+    case object `||` extends Op
   }
   case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
