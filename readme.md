@@ -3,6 +3,70 @@
 A JVM implementation of the [Jsonnet](https://jsonnet.org/) configuration
 language.
 
+## Usage
+
+Sjsonnet can be used from Java:
+
+```xml
+<dependency>
+    <groupId>com.lihaoyi</groupId>
+    <artifactId>sjsonnet_2.12</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+```java
+sjsonnet.SjsonnetMain.main0(
+    new String[]{"foo.jsonnet"},
+    new sjsonnet.Parser(),
+    System.in,
+    System.out,
+    System.err,
+    ammonite.ops.Path.apply(
+        System.getProperty("user.dir"),  // working directory
+        ammonite.ops.PathConvertible.StringConvertible$.MODULE$
+    )
+);
+```
+
+From Scala:
+
+```scala
+"com.lihaoyi" %% "sjsonnet" % "0.1.0" // SBT
+ivy"com.lihaoyi::sjsonnet:0.1.0" // Mill
+```
+
+```scala
+sjsonnet.SjsonnetMain.main0(
+    new String[]{"foo.jsonnet"},
+    new sjsonnet.Parser(),
+    System.in,
+    System.out,
+    System.err,
+    ammonite.ops.pwd // working directory
+);
+```
+Or as a standalone executable assembly:
+
+- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.0/sjsonnet.jar
+
+```bash
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.0/sjsonnet.jar > sjsonnet
+
+$ chmod +x sjsonnet.jar
+
+$ ./sjsonnet.jar
+error: Need to pass in a jsonnet file to evaluate
+usage: sjsonnet [sjsonnet-options] script-file
+
+  -i, --interactive  Run Mill in interactive mode, suitable for opening REPLs and taking user input
+  -n, --indent       How much to indent your output JSON
+  -J, --jpath        Specify an additional library search dir (right-most wins)
+  -o, --output-file  Write to the output file rather than stdout
+  ...
+
+$ ./sjsonnet.jar foo.jsonnet
+```
+
 ## Architecture
 
 Sjsonnet is implementated as a straightforward AST interpreter. There are
@@ -39,6 +103,9 @@ Some notes on the values used in parts of the pipeline:
   raise an error because the first (erroneous) entry of the array is un-used and
   thus not evaluated.
 
+## Performance
+
+Due to pervasive caching, sjsonnet
 ## Laziness
 
 The Jsonnet language is *lazy*: expressions don't get evaluated unless their
