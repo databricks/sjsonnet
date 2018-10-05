@@ -37,7 +37,7 @@ ivy"com.lihaoyi::sjsonnet:0.1.0" // Mill
 
 ```scala
 sjsonnet.SjsonnetMain.main0(
-    new String[]{"foo.jsonnet"},
+    Array("foo.jsonnet"),
     new sjsonnet.Parser(),
     System.in,
     System.out,
