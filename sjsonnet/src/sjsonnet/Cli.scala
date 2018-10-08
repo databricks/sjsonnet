@@ -36,7 +36,7 @@ object Cli{
       (c, v) => c.copy(indent = v)
     ),
     Arg[Config, String](
-      "jpaths", Some('J'),
+      "jpath", Some('J'),
       "Specify an additional library search dir (right-most wins)",
       (c, v) => c.copy(jpaths = v :: c.jpaths)
     ),
