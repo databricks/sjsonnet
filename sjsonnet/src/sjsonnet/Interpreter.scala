@@ -3,16 +3,16 @@ package sjsonnet
 import java.io.{PrintWriter, StringWriter}
 
 import ammonite.ops.{Path, read}
-import fastparse.core.Parsed
+import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{FieldName, Member, ObjBody, Params}
 
-class Interpreter(parser: Parser,
+class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                   scope: Scope,
                   extVars: Map[String, ujson.Js],
                   tlaVars: Map[String, ujson.Js],
                   wd: Path) {
-  val evaluator = new Evaluator(parser, scope, extVars, wd)
+  val evaluator = new Evaluator(parseCache, scope, extVars, wd)
   def interpret(p: Path): Either[String, ujson.Js] = {
     for{
       txt <- try Right(read(p)) catch{ case e: Throwable => Left(e.toString) }
@@ -21,8 +21,8 @@ class Interpreter(parser: Parser,
   }
   def interpret(txt: String): Either[String, ujson.Js] = {
     for{
-      parsed <- parser.parse(txt) match{
-        case f @ Parsed.Failure(l, i, e) => Left("Parse Error: expected " + f.msg)
+      parsed <- fastparse.parse(txt, Parser.document(_)) match{
+        case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace)
         case Parsed.Success(r, index) => Right(r)
       }
       res0 <-

@@ -1,9 +1,7 @@
 package sjsonnet
 import Expr._
 import ammonite.ops.{BasePath, FilePath, Path, RelPath}
-import fastparse.StringReprOps
-import fastparse.core.Parsed
-import fastparse.utils.IndexedParserInput
+import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 object Evaluator {
   def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
@@ -40,7 +38,7 @@ object Evaluator {
 
 }
 
-class Evaluator(parser: Parser,
+class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
                 wd: Path) {
@@ -200,15 +198,19 @@ class Evaluator(parser: Parser,
 
   def visitImport(scope: Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value, offset)
+    val str = importString(scope, offset, value, p)
     imports.getOrElseUpdate(
       p,
       visitExpr(
-        parser.parse(importString(scope, offset, value, p)) match {
+        parseCache.getOrElseUpdate(
+          str,
+          fastparse.parse(str, Parser.document(_))
+        ) match {
           case Parsed.Success(x, _) => x
-          case f@Parsed.Failure(l, i, e) =>
+          case f @ Parsed.Failure(l, i, e) =>
             Evaluator.fail(
               "Imported file " + pprint.Util.literalize(value) +
-              " had syntax error " + f.msg,
+              " had Parse error " + f.trace,
               scope.currentFile,
               offset,
               wd

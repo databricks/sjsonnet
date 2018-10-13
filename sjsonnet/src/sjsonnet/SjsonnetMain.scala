@@ -5,13 +5,14 @@ import java.io.{InputStream, PrintStream}
 import ammonite.ops.Path
 
 object SjsonnetMain {
+  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
   def main(args: Array[String]): Unit = {
     val exitCode = main0(
       args match {
         case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
         case _ => args
       },
-      new Parser,
+      collection.mutable.Map[String, fastparse.Parsed[Expr]](),
       System.in,
       System.out,
       System.err,
@@ -20,7 +21,7 @@ object SjsonnetMain {
     System.exit(exitCode)
   }
   def main0(args: Array[String],
-            parser: Parser,
+            parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -49,7 +50,7 @@ object SjsonnetMain {
                 }else{
                   val path = ammonite.ops.Path(file, wd)
                   val interp = new Interpreter(
-                    parser,
+                    parseCache,
                     Scope.standard(
                       path,
                       wd,
