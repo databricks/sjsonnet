@@ -50,7 +50,7 @@ Or as a standalone executable assembly:
 - https://github.com/lihaoyi/sjsonnet/releases/download/0.1.0/sjsonnet.jar
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.0/sjsonnet.jar > sjsonnet
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.0/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
