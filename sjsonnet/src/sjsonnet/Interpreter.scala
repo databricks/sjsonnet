@@ -22,7 +22,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
   def interpret(txt: String): Either[String, ujson.Js] = {
     for{
       parsed <- fastparse.parse(txt, Parser.document(_)) match{
-        case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace)
+        case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.traceVerbose().msg)
         case Parsed.Success(r, index) => Right(r)
       }
       res0 <-

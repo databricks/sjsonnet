@@ -170,7 +170,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "import_syntax-error" - check(
-      """sjsonnet.Error: Imported file "lib/syntax_error.jsonnet" had Parse error Expected "\"":2:1, found ""
+      """sjsonnet.Error: Imported file "lib/syntax_error.jsonnet" had Parse error. Expected "\"":2:1, found ""
         |    at .(sjsonnet/test/resources/test_suite/error.import_syntax-error.jsonnet:1:1)
         |""".stripMargin
     )
