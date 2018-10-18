@@ -129,7 +129,7 @@ object Std {
       }
     },
     builtin("codepoint", "str"){ (wd, extVars, v1: Val) =>
-      v1.asInstanceOf[Val.Str].value.charAt(0).toInt
+      v1.cast[Val.Str].value.charAt(0).toInt
     },
     builtin("length", "x"){ (wd, extVars, v1: Val) =>
       v1 match{
@@ -137,6 +137,7 @@ object Std {
         case Val.Arr(s) => s.length
         case o: Val.Obj => o.getVisibleKeys().count(!_._2)
         case o: Val.Func => o.params.args.length
+        case _ => throw new DelegateError("Cannot get length of " + v1.prettyName)
       }
     },
     builtin("objectHas", "o", "f"){ (wd, extVars, v1: Val.Obj, v2: String) =>
@@ -147,8 +148,7 @@ object Std {
     },
     builtin("objectFields", "o"){ (wd, extVars, v1: Val.Obj) =>
       Val.Arr(
-        v1.asInstanceOf[Val.Obj]
-          .getVisibleKeys()
+        v1.getVisibleKeys()
           .collect{case (k, false) => k}
           .toSeq
           .sorted
@@ -157,8 +157,7 @@ object Std {
     },
     builtin("objectFieldsAll", "o"){ (wd, extVars, v1: Val.Obj) =>
       Val.Arr(
-        v1.asInstanceOf[Val.Obj]
-          .getVisibleKeys()
+        v1.getVisibleKeys()
           .collect{case (k, _) => k}
           .toSeq
           .sorted
@@ -177,10 +176,17 @@ object Std {
       }
     },
     builtin("lines", "arr"){ (wd, extVars, v1: Val.Arr) =>
+      v1.value.map(_.force).foreach{
+        case _: Val.Str | Val.Null => // donothing
+        case x => throw new DelegateError("Cannot call .lines on " + x.prettyName)
+      }
       Materializer.apply(v1, extVars, wd).asInstanceOf[ujson.Js.Arr]
         .value
         .filter(_ != ujson.Js.Null)
-        .map{case ujson.Js.Str(s) => s + "\n"}
+        .map{
+          case ujson.Js.Str(s) => s + "\n"
+          case _ => ??? /* we ensure it's all strings above */
+        }
         .mkString
     },
     builtin("format", "str", "vals"){ (wd, extVars, v1: String, v2: Val) =>
@@ -376,7 +382,16 @@ object Std {
     builtin("join", "sep", "arr"){ (wd, extVars, sep: Val, arr: Val.Arr) =>
       val res: Val = sep match{
         case Val.Str(s) =>
-          Val.Str(arr.value.map(_.force).filter(_ != Val.Null).map{case Val.Str(x) => x}.mkString(s))
+          Val.Str(
+            arr.value
+              .map(_.force)
+              .filter(_ != Val.Null)
+              .map{
+                case Val.Str(x) => x
+                case x => throw new DelegateError("Cannot join " + x.prettyName)
+              }
+              .mkString(s)
+          )
         case Val.Arr(sep) =>
           val out = collection.mutable.Buffer.empty[Lazy]
           for(x <- arr.value){
@@ -385,9 +400,11 @@ object Std {
               case Val.Arr(v) =>
                 if (out.nonEmpty) out.appendAll(sep)
                 out.appendAll(v)
+              case x => throw new DelegateError("Cannot join " + x.prettyName)
             }
           }
           Val.Arr(out)
+        case x => throw new DelegateError("Cannot join " + x.prettyName)
       }
       res
     },
@@ -397,6 +414,7 @@ object Std {
         x.force match{
           case Val.Null => // do nothing
           case Val.Arr(v) => out.appendAll(v)
+          case x => throw new DelegateError("Cannot call flattenArrays on " + x)
         }
       }
       Val.Arr(out)
@@ -406,7 +424,12 @@ object Std {
       def sect(x: ujson.Js.Obj) = {
         x.value.flatMap{
           case (k, ujson.Js.Str(v)) => Seq(k + " = " + v)
-          case (k, ujson.Js.Arr(vs)) => vs.map{case ujson.Js.Str(v) => k + " = " + v}
+          case (k, ujson.Js.Arr(vs)) =>
+            vs.map{
+              case ujson.Js.Str(v) => k + " = " + v
+              case x => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
+            }
+          case (k, x) => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
         }
       }
       val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Js.Obj])) ++
@@ -473,11 +496,16 @@ object Std {
           case ujson.Js.Str(s) => s
           case ujson.Js.Arr(Seq(ujson.Js.Str(t), attrs: ujson.Js.Obj, children@_*)) =>
             tag(t)(
-              attrs.value.map { case (k, ujson.Js.Str(v)) => attr(k) := v }.toSeq,
+              attrs.value.map {
+                case (k, ujson.Js.Str(v)) => attr(k) := v
+                case (k, v) => throw new DelegateError("Cannot call manifestXmlJsonml on " + v.getClass)
+              }.toSeq,
               children.map(rec)
             )
           case ujson.Js.Arr(Seq(ujson.Js.Str(t), children@_*)) =>
             tag(t)(children.map(rec))
+          case x =>
+            throw new DelegateError("Cannot call manifestXmlJsonml on " + x.getClass)
         }
       }
 
@@ -487,7 +515,8 @@ object Std {
     builtin("base64", "v"){ (wd, extVars, v: Val) =>
       v match{
         case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
-        case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.asInstanceOf[Val.Num].value.toByte).toArray)
+        case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
+        case x => throw new DelegateError("Cannot base64 encode " + x.prettyName)
       }
     },
 
@@ -503,14 +532,15 @@ object Std {
           Val.Arr(
 
             if (vs.forall(_.force.isInstanceOf[Val.Str])){
-              vs.map(_.force.asInstanceOf[Val.Str]).sortBy(_.value).map(Lazy(_))
+              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Lazy(_))
             }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
-              vs.map(_.force.asInstanceOf[Val.Num]).sortBy(_.value).map(Lazy(_))
+              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Lazy(_))
             }else {
               ???
             }
           )
         case Val.Str(s) => Val.Arr(s.sorted.map(c => Lazy(Val.Str(c.toString))))
+        case x => throw new DelegateError("Cannot sort " + x.prettyName)
       }
     },
     builtin("uniq", "arr"){ (wd, extVars, arr: Val.Arr) =>
@@ -527,7 +557,9 @@ object Std {
           vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
         }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
           vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-        }else ???
+        }else {
+          throw new DelegateError("Every element of the input must be of the same type, string or number")
+        }
 
       val out = collection.mutable.Buffer.empty[ujson.Js]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
@@ -544,7 +576,9 @@ object Std {
           vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
         }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
           vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-        }else ???
+        }else {
+          throw new DelegateError("Every element of the input must be of the same type, string or number")
+        }
 
       val out = collection.mutable.Buffer.empty[ujson.Js]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
@@ -567,7 +601,9 @@ object Std {
           vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
         }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
           vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-        }else ???
+        }else {
+          throw new DelegateError("Every element of the input must be of the same type, string or number")
+        }
 
       val out = collection.mutable.Buffer.empty[ujson.Js]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
@@ -587,7 +623,9 @@ object Std {
           vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
         }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
           vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
-        }else ???
+        }else {
+          throw new DelegateError("Every element of the input must be of the same type, string or number")
+        }
 
       val out = collection.mutable.Buffer.empty[ujson.Js]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)

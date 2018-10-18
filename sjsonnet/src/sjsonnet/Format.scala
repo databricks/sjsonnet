@@ -94,7 +94,7 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.asInstanceOf[Val.Arr].value(i).force, extVars, wd)
+            case None => Materializer(values.cast[Val.Arr].value(i).force, extVars, wd)
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force, extVars, wd)
