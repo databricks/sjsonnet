@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._
-val sjsonnetVersion = "0.1.0"
+val sjsonnetVersion = "0.1.1"
 
 trait SjsonnetJavaModule extends PublishModule{
   def publishVersion = sjsonnetVersion
