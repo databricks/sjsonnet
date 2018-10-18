@@ -25,7 +25,7 @@ trait SjsonnetScalaModule extends SjsonnetJavaModule with ScalaModule{
 object sjsonnet extends SjsonnetScalaModule{
   def mainClass = Some("sjsonnet.SjsonnetMain")
   def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse:2.0.0",
+    ivy"com.lihaoyi::fastparse:2.0.1",
     ivy"com.lihaoyi::pprint:0.5.3",
     ivy"com.lihaoyi::ammonite-ops:1.1.2",
     ivy"com.lihaoyi::ujson:0.6.7",

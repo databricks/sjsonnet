@@ -71,7 +71,7 @@ object Parser{
     P( (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" )
 
   def tripleBarStringLines[_: P]: P[Seq[String]] = P(
-    tripleBarStringHead.flatMap { case (pre, w, head) =>
+    tripleBarStringHead.flatMapX { case (pre, w, head) =>
       tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
     }
   )
@@ -81,10 +81,10 @@ object Parser{
     CharsWhileIn(" \t", 0) ~~ "|||"
   )
   def string[_: P]: P[String] = P(
-    SingleChar.flatMap{
+    SingleChar.flatMapX{
       case '\"' => doubleString
       case '\'' => singleString
-      case '@' => SingleChar./.flatMap{
+      case '@' => SingleChar./.flatMapX{
         case '\"' => literalDoubleString
         case '\'' => literalSingleString
         case _ => Fail
@@ -184,20 +184,20 @@ object Parser{
   }
 
   def exprSuffix2[_: P]: P[Expr => Expr] = P(
-    for{
-      i <- Index
-      c <- CharIn(".[({")./.!.map(_(0))
-      r <- (c: @switch) match{
-        case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
-        case '[' => Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map{
-          case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
-          case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
+    Index.flatMapX{i =>
+      CharIn(".[({")./.!.map(_(0)).flatMapX{ c =>
+        (c: @switch) match{
+          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
+          case '[' => Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map{
+            case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
+            case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
+          }
+          case '(' => Pass ~ (args ~ ")").map(x => Expr.Apply(i, _: Expr, x))
+          case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
+          case _ => Fail
         }
-        case '(' => Pass ~ (args ~ ")").map(x => Expr.Apply(i, _: Expr, x))
-        case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
-        case _ => Fail
       }
-    } yield r
+    }
   )
 
   def local[_: P] = P( localExpr )
@@ -222,45 +222,45 @@ object Parser{
   def constructString(index: Int, lines: Seq[String]) = Expr.Str(index, lines.mkString)
   // Any `expr` that isn't naively left-recursive
   def expr2[_: P]: P[Expr] = P(
-    for{
-      index <- Index
-      c <- SingleChar
-      r <- (c: @switch) match {
-        case '{' => Pass ~ obj ~ "}"
-        case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(index, c)
-        case '[' => Pass ~ arr ~ "]"
-        case '(' => Pass ~ parened ~ ")"
-        case '\"' => doubleString.map(constructString(index, _))
-        case '\'' => singleString.map(constructString(index, _))
-        case '@' => SingleChar./.flatMap{
-          case '\"' => literalDoubleString.map(constructString(index, _))
-          case '\'' => literalSingleString.map(constructString(index, _))
+    Index.flatMapX{ index =>
+      SingleChar.flatMapX{ c =>
+        (c: @switch) match {
+          case '{' => Pass ~ obj ~ "}"
+          case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(index, c)
+          case '[' => Pass ~ arr ~ "]"
+          case '(' => Pass ~ parened ~ ")"
+          case '\"' => doubleString.map(constructString(index, _))
+          case '\'' => singleString.map(constructString(index, _))
+          case '@' => SingleChar./.flatMapX{
+            case '\"' => literalDoubleString.map(constructString(index, _))
+            case '\'' => literalSingleString.map(constructString(index, _))
+            case _ => Fail
+          }
+          case '|' => tripleBarString.map(constructString(index, _))
+          case '$' => Pass(Expr.$(index))
+          case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
+            P.current.index = index; number
+          case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
+            x + y match {
+              case "null"      => Pass(Expr.Null(index))
+              case "true"      => Pass(Expr.True(index))
+              case "false"     => Pass(Expr.False(index))
+              case "self"      => Pass(Expr.Self(index))
+              case "super"     => Pass(Expr.Super(index))
+              case "if"        => Pass ~ ifElse(index)
+              case "function"  => Pass ~ function(index)
+              case "importstr" => Pass ~ importStr(index)
+              case "import"    => Pass ~ `import`(index)
+              case "error"     => Pass ~ error(index)
+              case "assert"    => Pass ~ assertExpr(index)
+              case "local"     => Pass ~ local
+              case x           => Pass(Expr.Id(index, x))
+            }
+          }
           case _ => Fail
         }
-        case '|' => tripleBarString.map(constructString(index, _))
-        case '$' => Pass(Expr.$(index))
-        case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-          P.current.index = index; number
-        case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMap { y =>
-          x + y match {
-            case "null"      => Pass(Expr.Null(index))
-            case "true"      => Pass(Expr.True(index))
-            case "false"     => Pass(Expr.False(index))
-            case "self"      => Pass(Expr.Self(index))
-            case "super"     => Pass(Expr.Super(index))
-            case "if"        => Pass ~ ifElse(index)
-            case "function"  => Pass ~ function(index)
-            case "importstr" => Pass ~ importStr(index)
-            case "import"    => Pass ~ `import`(index)
-            case "error"     => Pass ~ error(index)
-            case "assert"    => Pass ~ assertExpr(index)
-            case "local"     => Pass ~ local
-            case x           => Pass(Expr.Id(index, x))
-          }
-        }
-        case _ => Fail
       }
-    } yield r
+    }
   )
 
   def objinside[_: P]: P[Expr.ObjBody] = P(
@@ -306,14 +306,14 @@ object Parser{
   def bind[_: P] =
     P( Index ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
-  def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMap{ x =>
+  def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       println("FAIL")
       Fail.opaque("no positional params after named params")
     } else Pass(Expr.Args(x))
   }
 
-  def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMap{ x =>
+  def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     for((k, v) <- x){
