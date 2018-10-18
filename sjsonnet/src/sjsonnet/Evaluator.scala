@@ -1,9 +1,7 @@
 package sjsonnet
 import Expr._
 import ammonite.ops.{BasePath, FilePath, Path, RelPath}
-import fastparse.StringReprOps
-import fastparse.core.Parsed
-import fastparse.utils.IndexedParserInput
+import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 object Evaluator {
   def mergeObjects(lhs: Val.Obj, rhs: Val.Obj) = {
@@ -40,7 +38,7 @@ object Evaluator {
 
 }
 
-class Evaluator(parser: Parser,
+class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
                 wd: Path) {
@@ -55,7 +53,7 @@ class Evaluator(parser: Parser,
 
 
     case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
-      val key = visitExpr(lhs, scope).asInstanceOf[Val.Str]
+      val key = visitExpr(lhs, scope).cast[Val.Str]
       Val.bool(scope.super0.get.value0.contains(key.value))
 
     case $(offset) => scope.dollar
@@ -87,7 +85,7 @@ class Evaluator(parser: Parser,
           case None => Evaluator.fail("Assertion failed", scope.currentFile, offset, wd)
           case Some(msg) =>
             Evaluator.fail(
-              "Assertion failed: " + visitExpr(msg, scope).asInstanceOf[Val.Str].value,
+              "Assertion failed: " + visitExpr(msg, scope).cast[Val.Str].value,
               scope.currentFile,
               offset,
               wd
@@ -116,7 +114,7 @@ class Evaluator(parser: Parser,
       )
     case Apply(offset, value, Args(args)) =>
       val lhs = visitExpr(value, scope)
-      try lhs.asInstanceOf[Val.Func].apply(
+      try lhs.cast[Val.Func].apply(
         args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))},
         scope.currentFile.last,
         extVars,
@@ -145,7 +143,7 @@ class Evaluator(parser: Parser,
 
     case Lookup(offset, value, index) =>
       if (value.isInstanceOf[Super]){
-        val key = visitExpr(index, scope).asInstanceOf[Val.Str]
+        val key = visitExpr(index, scope).cast[Val.Str]
         scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd, extVars).force
       }else (visitExpr(value, scope), visitExpr(index, scope)) match {
         case (v: Val.Arr, i: Val.Num) =>
@@ -167,22 +165,30 @@ class Evaluator(parser: Parser,
       visitExpr(value, scope) match{
         case Val.Arr(a) =>
 
-          val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(a.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
+          val range =
+            start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
+            end.fold(a.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
+            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
           Val.Arr(range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
         case Val.Str(s) =>
-          val range = start.fold(0)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) until end.fold(s.length)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt) by stride.fold(1)(visitExpr(_, scope).asInstanceOf[Val.Num].value.toInt)
+          val range =
+            start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
+            end.fold(s.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
+            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
           Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+        case x => Evaluator.fail("Can only slice array or string, not " + x.prettyName, scope.currentFile, offset, wd)
       }
     case Function(offset, params, body) => visitMethod(scope, body, params, offset)
     case IfElse(offset, cond, then, else0) =>
       visitExpr(cond, scope) match{
         case Val.True => visitExpr(then, scope)
         case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
+        case v => Evaluator.fail("Need boolean, found " + v.prettyName, scope.currentFile, offset, wd)
       }
     case Comp(offset, value, first, rest) =>
       Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Lazy(visitExpr(value, s))))
     case ObjExtend(offset, value, ext) => {
-      val original = visitExpr(value, scope).asInstanceOf[Val.Obj]
+      val original = visitExpr(value, scope).cast[Val.Obj]
       val extension = visitObjBody(ext, scope)
       Evaluator.mergeObjects(original, extension)
     }
@@ -200,15 +206,19 @@ class Evaluator(parser: Parser,
 
   def visitImport(scope: Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value, offset)
+    val str = importString(scope, offset, value, p)
     imports.getOrElseUpdate(
       p,
       visitExpr(
-        parser.parse(importString(scope, offset, value, p)) match {
+        parseCache.getOrElseUpdate(
+          str,
+          fastparse.parse(str, Parser.document(_))
+        ) match {
           case Parsed.Success(x, _) => x
-          case f@Parsed.Failure(l, i, e) =>
+          case f @ Parsed.Failure(l, i, e) =>
             Evaluator.fail(
               "Imported file " + pprint.Util.literalize(value) +
-              " had syntax error " + f.msg,
+              " had Parse error. " + f.trace().msg,
               scope.currentFile,
               offset,
               wd
@@ -347,7 +357,7 @@ class Evaluator(parser: Parser,
                 case None => Evaluator.fail("Assertion failed", scope.currentFile, value.offset, wd)
                 case Some(msg) =>
                   Evaluator.fail(
-                    "Assertion failed: " + visitExpr(msg, newScope).asInstanceOf[Val.Str].value,
+                    "Assertion failed: " + visitExpr(msg, newScope).cast[Val.Str].value,
                     scope.currentFile,
                     value.offset,
                     wd

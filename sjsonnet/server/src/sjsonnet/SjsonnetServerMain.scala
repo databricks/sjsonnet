@@ -23,7 +23,7 @@ trait SjsonnetServerMain[T]{
             wd: ammonite.ops.Path): (Boolean, Option[T])
 }
 
-object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
+object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[String, fastparse.Parsed[Expr]]]{
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
@@ -44,7 +44,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
     ).run()
   }
   def main0(args: Array[String],
-            stateCache: Option[sjsonnet.Parser],
+            stateCache: Option[collection.mutable.Map[String, fastparse.Parsed[Expr]]],
             mainInteractive: Boolean,
             stdin: InputStream,
             stdout: PrintStream,
@@ -54,7 +54,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[sjsonnet.Parser]{
             wd: ammonite.ops.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
-      val p = new Parser
+      val p = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
       this.stateCache = Some(p)
       p
     }

@@ -39,25 +39,27 @@ object SjsonnetTestMain {
       "unparse",
       "verbatim_strings"
     )
-    val parser = new Parser()
+
     val start = System.currentTimeMillis()
     var count = 0
     while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- names){
-//        println(name)
 
-//        import ammonite.ops._, ImplicitWd._
-//        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
-        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
-        val interp = new Interpreter(
-          parser,
-          Scope.standard(path, FileTests.testSuiteRoot, Nil),
-          Map(),
-          Map(),
-          ammonite.ops.pwd
-        )
-        interp.interpret(path)
+//        println(name)
+//
+        import ammonite.ops._, ImplicitWd._
+        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
+//        val parseCache = sjsonnet.SjsonnetMain.createParseCache()
+//        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
+//        val interp = new Interpreter(
+//          parseCache,
+//          Scope.standard(path, FileTests.testSuiteRoot, Nil),
+//          Map(),
+//          Map(),
+//          ammonite.ops.pwd
+//        )
+//        interp.interpret(path)
       }
     }
     println(count)

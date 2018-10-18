@@ -4,6 +4,8 @@ import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
+import scala.reflect.ClassTag
+
 object Lazy{
   def apply(calc0: => Val) = new Lazy(calc0)
 }
@@ -12,13 +14,33 @@ class Lazy(calc0: => Val){
 }
 sealed trait Val{
   def prettyName: String
+  def cast[T: ClassTag: PrettyNamed] =
+    if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
+    else throw new DelegateError(
+      "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
+    )
+}
+class PrettyNamed[T](val s: String)
+object PrettyNamed{
+  implicit def boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
+  implicit def nullName: PrettyNamed[Val.Null.type] = new PrettyNamed("null")
+  implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
+  implicit def numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
+  implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
+  implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
+  implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
 }
 object Val{
   def bool(b: Boolean) = if (b) True else False
-  case object True extends Val{
+  sealed trait Bool extends Val{
+    def value: Boolean
+  }
+  case object True extends Bool{
+    def value = true
     def prettyName = "boolean"
   }
-  case object False extends Val{
+  case object False extends Bool{
+    def value = false
     def prettyName = "boolean"
   }
   case object Null extends Val{

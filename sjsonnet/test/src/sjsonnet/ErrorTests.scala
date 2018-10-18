@@ -6,7 +6,8 @@ object ErrorTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(p: ammonite.ops.Path) = {
     val interp = new Interpreter(
-      new Parser, Scope.standard(p, testSuiteRoot, Nil), Map(), Map(), ammonite.ops.pwd
+      sjsonnet.SjsonnetMain.createParseCache(),
+      Scope.standard(p, testSuiteRoot, Nil), Map(), Map(), ammonite.ops.pwd
     )
     interp.interpret(p)
   }
@@ -124,7 +125,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "function_arg_positional_after_named" - check(
-      """Parse Error: expected no positional params after named params:19:11 ...")\n"""".stripMargin
+      """Parse error: Expected no positional params after named params:19:11, found ")\n"""".stripMargin
     )
 
     "function_duplicate_arg" - check(
@@ -134,7 +135,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "function_duplicate_param" - check(
-      """Parse Error: expected no duplicate parameter: x:17:14 ...") x\n"""".stripMargin
+      """Parse error: Expected no duplicate parameter: x:17:14, found ") x\n"""".stripMargin
     )
 //    "function_infinite_default" - check(
 //      """sjsonnet.Error: Parameter passed more than once: x
@@ -169,7 +170,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "import_syntax-error" - check(
-      """sjsonnet.Error: Imported file "lib/syntax_error.jsonnet" had syntax error string:1:1 ..."\"\n"
+      """sjsonnet.Error: Imported file "lib/syntax_error.jsonnet" had Parse error. Expected "\"":2:1, found ""
         |    at .(sjsonnet/test/resources/test_suite/error.import_syntax-error.jsonnet:1:1)
         |""".stripMargin
     )

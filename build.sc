@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._
-val sjsonnetVersion = "0.1.0"
+val sjsonnetVersion = "0.1.2"
 
 trait SjsonnetJavaModule extends PublishModule{
   def publishVersion = sjsonnetVersion
@@ -25,7 +25,7 @@ trait SjsonnetScalaModule extends SjsonnetJavaModule with ScalaModule{
 object sjsonnet extends SjsonnetScalaModule{
   def mainClass = Some("sjsonnet.SjsonnetMain")
   def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse:1.0.0",
+    ivy"com.lihaoyi::fastparse:2.0.4",
     ivy"com.lihaoyi::pprint:0.5.3",
     ivy"com.lihaoyi::ammonite-ops:1.1.2",
     ivy"com.lihaoyi::ujson:0.6.7",

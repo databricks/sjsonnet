@@ -6,7 +6,7 @@ object FileTests extends TestSuite{
   val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
   def eval(p: ammonite.ops.Path) = {
     val interp = new Interpreter(
-      new Parser,
+      sjsonnet.SjsonnetMain.createParseCache(),
       Scope.standard(p, testSuiteRoot, Nil),
       Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
       Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),

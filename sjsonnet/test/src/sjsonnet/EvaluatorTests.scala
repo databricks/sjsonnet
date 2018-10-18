@@ -5,7 +5,7 @@ import ujson.Js
 object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
     new Interpreter(
-      new Parser(),
+      collection.mutable.Map[String, fastparse.Parsed[Expr]](),
       Scope.standard(ammonite.ops.pwd/"(memory)", ammonite.ops.pwd, Nil),
       Map(),
       Map(),
@@ -62,7 +62,7 @@ object EvaluatorTests extends TestSuite{
     }
     'self - {
       eval("{x: 1, y: $.x + 10}.y") ==> Js.Num(11)
-      eval("{x: 1, y: self.x}.y'") ==> Js.Num(1)
+      eval("{x: 1, y: self.x}.y") ==> Js.Num(1)
       eval("{x: 1, y: {x: 2, z: $.x + 10}}.y.z") ==> Js.Num(11)
       eval("{x: 1, y: {x: 2, z: self.x + 10}}.y.z") ==> Js.Num(12)
       eval("{x: 1, y: {x: 0, y: self.x}.y}.y") ==> Js.Num(0)
