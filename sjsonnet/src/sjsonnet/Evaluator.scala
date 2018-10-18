@@ -210,7 +210,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
           case f @ Parsed.Failure(l, i, e) =>
             Evaluator.fail(
               "Imported file " + pprint.Util.literalize(value) +
-              " had Parse error. " + f.traceVerbose().msg,
+              " had Parse error. " + f.trace().msg,
               scope.currentFile,
               offset,
               wd

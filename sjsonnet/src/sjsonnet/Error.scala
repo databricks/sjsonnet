@@ -14,7 +14,6 @@ case class Error(msg: String,
     val newFrame = if (ammonite.ops.exists(fileName)){
       val Array(line, col) =
         new IndexedParserInput(ammonite.ops.read(fileName)).prettyIndex(offset).split(':')
-      println("addFrame " + offset + " " + line +":" + col)
 
       new StackTraceElement(
         "", "",
