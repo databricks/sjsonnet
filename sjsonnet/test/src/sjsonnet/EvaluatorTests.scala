@@ -168,6 +168,24 @@ object EvaluatorTests extends TestSuite{
       eval("({a:: 1} + {a+:::2}).a") ==> Js.Num(3)
       eval("(std.prune({a:: 1}) + {a+:::2}).a") ==> Js.Num(2)
     }
+    'unboundParam - {
+      val ex = intercept[Exception]{
+        eval(
+          """local newParams(x, y) = {
+            |  x: x,
+            |  y: y,
+            |};
+            |
+            |local params = newParams("a");
+            |
+            |params.y
+            |
+        """.stripMargin
+        )
+      }
+
+      assert(ex.getMessage.contains("Function parameter y not bound in call"))
+    }
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
 //      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")
