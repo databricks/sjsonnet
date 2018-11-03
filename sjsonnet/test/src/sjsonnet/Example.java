@@ -8,9 +8,9 @@ public class Example {
             System.in,
             System.out,
             System.err,
-            ammonite.ops.Path.apply(
+            os.Path.apply(
                 System.getProperty("user.dir"),  // working directory
-                ammonite.ops.PathConvertible.StringConvertible$.MODULE$
+                os.PathConvertible.StringConvertible$.MODULE$
             )
         );
     }

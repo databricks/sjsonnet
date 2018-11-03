@@ -3,14 +3,14 @@ package sjsonnet
 import utest._
 
 object FileTests extends TestSuite{
-  val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
-  def eval(p: ammonite.ops.Path) = {
+  val testSuiteRoot = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+  def eval(p: os.Path) = {
     val interp = new Interpreter(
       sjsonnet.SjsonnetMain.createParseCache(),
       Scope.standard(p, testSuiteRoot, Nil),
       Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
       Map("var1" -> "test", "var2" -> ujson.Js.Obj("x" -> 1, "y" -> 2)),
-      ammonite.ops.pwd
+      os.pwd
     )
     interp.interpret(p)
   }
@@ -25,7 +25,7 @@ object FileTests extends TestSuite{
     res
   }
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
-    check(ujson.read(ammonite.ops.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
+    check(ujson.read(os.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
   }
   def tests = Tests{
     'arith_bool - check()

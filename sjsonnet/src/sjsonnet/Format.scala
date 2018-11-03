@@ -3,7 +3,6 @@ package sjsonnet
 import java.io.StringWriter
 import java.text.DecimalFormat
 
-import ammonite.ops.Path
 import ujson.Js
 
 import scala.collection.mutable.ArrayBuffer
@@ -74,11 +73,11 @@ object Format{
   }
   def format(s: String,
              values0: Val,
-             fileName: Path,
-             currentRoot: Path,
+             fileName: os.Path,
+             currentRoot: os.Path,
              offset: Int,
              extVars: Map[String, ujson.Js],
-             wd: Path): String = synchronized{
+             wd: os.Path): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x

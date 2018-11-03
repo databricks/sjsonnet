@@ -2,7 +2,6 @@ package sjsonnet
 
 import java.io.{PrintWriter, StringWriter}
 
-import ammonite.ops.{Path, read}
 import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{FieldName, Member, ObjBody, Params}
@@ -11,11 +10,11 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
                   scope: Scope,
                   extVars: Map[String, ujson.Js],
                   tlaVars: Map[String, ujson.Js],
-                  wd: Path) {
+                  wd: os.Path) {
   val evaluator = new Evaluator(parseCache, scope, extVars, wd)
-  def interpret(p: Path): Either[String, ujson.Js] = {
+  def interpret(p: os.Path): Either[String, ujson.Js] = {
     for{
-      txt <- try Right(read(p)) catch{ case e: Throwable => Left(e.toString) }
+      txt <- try Right(os.read(p)) catch{ case e: Throwable => Left(e.toString) }
       json <- interpret(txt)
     } yield json
   }

@@ -2,8 +2,6 @@ package sjsonnet
 
 import java.io.{InputStream, PrintStream}
 
-import ammonite.ops.Path
-
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
   def main(args: Array[String]): Unit = {
@@ -16,7 +14,7 @@ object SjsonnetMain {
       System.in,
       System.out,
       System.err,
-      ammonite.ops.pwd
+      os.pwd
     )
     System.exit(exitCode)
   }
@@ -25,7 +23,7 @@ object SjsonnetMain {
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
-            wd: Path): Int = {
+            wd: os.Path): Int = {
 
     Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()) match{
       case Left(err) =>
@@ -48,13 +46,13 @@ object SjsonnetMain {
                   stderr.println("error: Unknown arguments: " + rest.mkString(" "))
                   1
                 }else{
-                  val path = ammonite.ops.Path(file, wd)
+                  val path = os.Path(file, wd)
                   val interp = new Interpreter(
                     parseCache,
                     Scope.standard(
                       path,
                       wd,
-                      config.jpaths.map(ammonite.ops.Path(_, wd)),
+                      config.jpaths.map(os.Path(_, wd)),
                     ),
                     config.varBinding,
                     config.tlaBinding,
@@ -68,7 +66,7 @@ object SjsonnetMain {
                       val str = ujson.transform(materialized, new Renderer(indent = config.indent)).toString
                       config.outputFile match{
                         case None => stdout.println(str)
-                        case Some(f) => ammonite.ops.write.over(ammonite.ops.Path(f, wd), str)
+                        case Some(f) => os.write.over(os.Path(f, wd), str)
                       }
                       0
                   }

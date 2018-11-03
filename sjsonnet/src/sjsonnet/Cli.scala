@@ -1,12 +1,7 @@
 package sjsonnet
 
 
-import ammonite.ops.Path
-
 import scala.annotation.tailrec
-
-
-
 
 object Cli{
   case class Arg[T, V](name: String,
@@ -24,7 +19,7 @@ object Cli{
                     indent: Int = 3)
 
 
-  def genericSignature(wd: Path) = Seq(
+  def genericSignature(wd: os.Path) = Seq(
     Arg[Config, Unit](
       "interactive", Some('i'),
       "Run Mill in interactive mode, suitable for opening REPLs and taking user input",
@@ -58,7 +53,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, wd)))))
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(os.read(os.Path(v, wd)))))
       }
     ),
     Arg[Config, String](
@@ -74,7 +69,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, wd)))))
+          c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd)))))
       }
     ),
     Arg[Config, String](
@@ -90,7 +85,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(ammonite.ops.read(Path(v, wd)))))
+          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(os.read(os.Path(v, wd)))))
       }
     ),
     Arg[Config, String](
@@ -106,7 +101,7 @@ object Cli{
       "???",
       (c, v) => v split('=') match{
         case Array(x, v) =>
-          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(ammonite.ops.read(Path(v, wd)))))
+          c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd)))))
       }
     )
   )
@@ -120,7 +115,7 @@ object Cli{
         arg.doc.lines.mkString("\n" + " " * leftMargin)
     }
   }
-  def help(wd: Path) = {
+  def help(wd: os.Path) = {
     val leftMargin = genericSignature(wd).map(showArg(_).length).max + 2
 
 

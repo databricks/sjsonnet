@@ -1,14 +1,13 @@
 package sjsonnet
 import java.util.IdentityHashMap
 
-import ammonite.ops.Path
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import ujson.Js
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Js],
-            wd: Path,
+            wd: os.Path,
             seen: IdentityHashMap[Val, Unit] = new IdentityHashMap[Val, Unit]): Js = v match{
     case Val.True => Js.True
     case Val.False => Js.False

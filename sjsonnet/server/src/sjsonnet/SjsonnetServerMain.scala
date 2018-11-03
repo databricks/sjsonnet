@@ -3,7 +3,6 @@ package sjsonnet
 import java.io._
 import java.net.Socket
 
-import ammonite.ops.Path
 
 import scala.collection.JavaConverters._
 import org.scalasbt.ipcsocket._
@@ -20,7 +19,7 @@ trait SjsonnetServerMain[T]{
             stderr: PrintStream,
             env : Map[String, String],
             setIdle: Boolean => Unit,
-            wd: ammonite.ops.Path): (Boolean, Option[T])
+            wd: os.Path): (Boolean, Option[T])
 }
 
 object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[String, fastparse.Parsed[Expr]]]{
@@ -51,7 +50,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[Stri
             stderr: PrintStream,
             env : Map[String, String],
             setIdle: Boolean => Unit,
-            wd: ammonite.ops.Path) = {
+            wd: os.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
       val p = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
@@ -161,7 +160,7 @@ class Server[T](lockBase: String,
           stderr,
           env.asScala.toMap,
           idle = _,
-          Path(wd)
+          os.Path(wd)
         )
 
         sm.stateCache = newStateCache

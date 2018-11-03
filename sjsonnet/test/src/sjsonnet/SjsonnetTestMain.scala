@@ -48,8 +48,7 @@ object SjsonnetTestMain {
 
 //        println(name)
 //
-        import ammonite.ops._, ImplicitWd._
-        %("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet")
+        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
 //        val parseCache = sjsonnet.SjsonnetMain.createParseCache()
 //        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
 //        val interp = new Interpreter(
@@ -57,7 +56,7 @@ object SjsonnetTestMain {
 //          Scope.standard(path, FileTests.testSuiteRoot, Nil),
 //          Map(),
 //          Map(),
-//          ammonite.ops.pwd
+//          os.pwd
 //        )
 //        interp.interpret(path)
       }

@@ -5,7 +5,7 @@ import utest._
 object FormatTests extends TestSuite{
   def check(fmt: String, jsonStr: String, expected: String) = {
     val json = ujson.read(jsonStr)
-    val formatted = Format.format(fmt, Materializer.reverse(json), ammonite.ops.pwd / "(unknown)", ammonite.ops.pwd , -1, Map(), ammonite.ops.pwd)
+    val formatted = Format.format(fmt, Materializer.reverse(json), os.pwd / "(unknown)", os.pwd , -1, Map(), os.pwd)
     assert(formatted == expected)
 
   }

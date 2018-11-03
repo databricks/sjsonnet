@@ -1,6 +1,5 @@
 package sjsonnet
 import Expr._
-import ammonite.ops.{BasePath, FilePath, Path, RelPath}
 import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 object Evaluator {
@@ -14,7 +13,7 @@ object Evaluator {
     rec(rhs)
   }
 
-  def tryCatch[T](scope: Scope, wd: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
+  def tryCatch[T](scope: Scope, wd: os.Path, offset: Int): PartialFunction[Throwable, Nothing] = {
       case e: Error => throw e
       case e: DelegateError =>
         throw new Error(e.msg, Nil, None)
@@ -23,7 +22,7 @@ object Evaluator {
         throw new Error("Internal Error", Nil, Some(e))
           .addFrame(scope.currentFile, wd, offset)
   }
-  def tryCatch2[T](path: Path, wd: Path, offset: Int): PartialFunction[Throwable, Nothing] = {
+  def tryCatch2[T](path: os.Path, wd: os.Path, offset: Int): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(path, wd, offset)
     case e: DelegateError =>
       throw new Error(e.msg, Nil, None)
@@ -32,7 +31,7 @@ object Evaluator {
       throw new Error("Internal Error", Nil, Some(e))
         .addFrame(path, wd, offset)
   }
-  def fail(msg: String, path: Path, offset: Int, wd: Path) = {
+  def fail(msg: String, path: os.Path, offset: Int, wd: os.Path) = {
     throw new Error(msg, Nil, None).addFrame(path, wd, offset)
   }
 
@@ -41,9 +40,9 @@ object Evaluator {
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
-                wd: Path) {
-  val imports = collection.mutable.Map.empty[Path, Val]
-  val importStrs = collection.mutable.Map.empty[Path, String]
+                wd: os.Path) {
+  val imports = collection.mutable.Map.empty[os.Path, Val]
+  val importStrs = collection.mutable.Map.empty[os.Path, String]
   def visitExpr(expr: Expr, scope: Scope): Val = try expr match{
     case Null(offset) => Val.Null
     case Parened(offset, inner) => visitExpr(inner, scope)
@@ -230,18 +229,18 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   }
 
   def resolveImport(scope: Scope, value: String, offset: Int) = {
-    (scope.currentFile / ammonite.ops.up :: scope.searchRoots).
-      map(base => FilePath(value) match{
-        case r: RelPath => base / r
-        case a: Path => a
+    (scope.currentFile / os.up :: scope.searchRoots).
+      map(base => os.FilePath(value) match{
+        case r: os.RelPath => base / r
+        case a: os.Path => a
       })
-      .find(ammonite.ops.exists)
+      .find(os.exists)
       .getOrElse(
         Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )
   }
-  def importString(scope: Scope, offset: Int, value: String, p: Path) = {
-    try ammonite.ops.read(p)
+  def importString(scope: Scope, offset: Int, value: String, p: os.Path) = {
+    try os.read(p)
     catch {
       case e: Throwable =>
         Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)

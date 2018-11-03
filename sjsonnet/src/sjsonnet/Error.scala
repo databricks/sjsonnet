@@ -1,7 +1,5 @@
 package sjsonnet
 
-import ammonite.ops.Path
-
 import fastparse.IndexedParserInput
 
 case class DelegateError(msg: String) extends Exception(msg)
@@ -10,10 +8,10 @@ case class Error(msg: String,
                  underlying: Option[Throwable])
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
-  def addFrame(fileName: Path, wd: Path, offset: Int) = {
-    val newFrame = if (ammonite.ops.exists(fileName)){
+  def addFrame(fileName: os.Path, wd: os.Path, offset: Int) = {
+    val newFrame = if (os.exists(fileName)){
       val Array(line, col) =
-        new IndexedParserInput(ammonite.ops.read(fileName)).prettyIndex(offset).split(':')
+        new IndexedParserInput(os.read(fileName)).prettyIndex(offset).split(':')
 
       new StackTraceElement(
         "", "",

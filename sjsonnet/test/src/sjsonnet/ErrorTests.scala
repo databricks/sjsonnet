@@ -3,11 +3,11 @@ package sjsonnet
 import utest._
 
 object ErrorTests extends TestSuite{
-  val testSuiteRoot = ammonite.ops.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
-  def eval(p: ammonite.ops.Path) = {
+  val testSuiteRoot = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+  def eval(p: os.Path) = {
     val interp = new Interpreter(
       sjsonnet.SjsonnetMain.createParseCache(),
-      Scope.standard(p, testSuiteRoot, Nil), Map(), Map(), ammonite.ops.pwd
+      Scope.standard(p, testSuiteRoot, Nil), Map(), Map(), os.pwd
     )
     interp.interpret(p)
   }

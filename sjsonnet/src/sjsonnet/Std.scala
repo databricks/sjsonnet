@@ -3,7 +3,6 @@ package sjsonnet
 import java.io.StringWriter
 import java.util.Base64
 
-import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
@@ -12,19 +11,19 @@ import scala.annotation.switch
 
 object Std {
   sealed trait ReadWriter[T]{
-    def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path): Either[String, T]
+    def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path): Either[String, T]
     def write(t: T): Val
   }
   object ReadWriter{
     implicit object StringRead extends ReadWriter[String]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case Val.Str(s) => Right(s)
         case _ => Left("String")
       }
       def write(t: String) = Val.Str(t)
     }
     implicit object BooleanRead extends ReadWriter[Boolean]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case Val.True => Right(true)
         case Val.False => Right(false)
         case _ => Left("Boolean")
@@ -32,39 +31,39 @@ object Std {
       def write(t: Boolean) = Val.bool(t)
     }
     implicit object IntRead extends ReadWriter[Int]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case Val.Num(s) => Right(s.toInt)
         case _ => Left("Int")
       }
       def write(t: Int) = Val.Num(t)
     }
     implicit object DoubleRead extends ReadWriter[Double]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case Val.Num(s) => Right(s)
         case _ => Left("Number")
       }
       def write(t: Double) = Val.Num(t)
     }
     implicit object ValRead extends ReadWriter[Val]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = Right(t)
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = Right(t)
       def write(t: Val) = t
     }
     implicit object ObjRead extends ReadWriter[Val.Obj]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case v: Val.Obj => Right(v)
         case _ => Left("Object")
       }
       def write(t: Val.Obj) = t
     }
     implicit object ArrRead extends ReadWriter[Val.Arr]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case v: Val.Arr => Right(v)
         case _ => Left("Array")
       }
       def write(t: Val.Arr) = t
     }
     implicit object FuncRead extends ReadWriter[Val.Func]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case v: Val.Func => Right(v)
         case _ => Left("Function")
       }
@@ -72,18 +71,18 @@ object Std {
     }
 
     implicit object ApplyerRead extends ReadWriter[Applyer]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
         case v: Val.Func => Right(Applyer(v, extVars, wd))
         case _ => Left("Function")
       }
       def write(t: Applyer) = t.f
     }
   }
-  case class Applyer(f: Val.Func, extVars: Map[String, ujson.Js], wd: Path){
+  case class Applyer(f: Val.Func, extVars: Map[String, ujson.Js], wd: os.Path){
     def apply(args: Lazy*) = f.apply(args.map((None, _)), "(memory)", extVars, -1, wd)
   }
 
-  def validate(vs: Seq[Val], extVars: Map[String, ujson.Js], wd: Path, rs: Seq[ReadWriter[_]]) = {
+  def validate(vs: Seq[Val], extVars: Map[String, ujson.Js], wd: os.Path, rs: Seq[ReadWriter[_]]) = {
     for((v, r) <- vs.zip(rs)) yield r.apply(v, extVars, wd) match{
       case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
       case Right(x) => x
@@ -91,23 +90,23 @@ object Std {
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
-                             (eval: (Path, Map[String, ujson.Js], T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, extVars, wd) =>
+                             (eval:  (os.Path, Map[String, ujson.Js], T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, extVars, wd) =>
     val Seq(v: T1) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]]))
     eval(wd, extVars, v)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
-                                             (eval: (Path, Map[String, ujson.Js], T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, extVars, wd) =>
+                                             (eval:  (os.Path, Map[String, ujson.Js], T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, extVars, wd) =>
     val Seq(v1: T1, v2: T2) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
     eval(wd, extVars, v1, v2)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
-                                                             (eval: (Path, Map[String, ujson.Js], T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, extVars, wd) =>
+                                                             (eval:  (os.Path, Map[String, ujson.Js], T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, extVars, wd) =>
     val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
     eval(wd, extVars, v1, v2, v3)
   }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], Map[String, ujson.Js], Path) => R) = {
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], Map[String, ujson.Js], os.Path) => R) = {
     name -> Val.Func(
       empty,
       Params(params.map(_ -> None)),

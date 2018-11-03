@@ -1,15 +1,13 @@
 package sjsonnet
 
 
-import ammonite.ops.Path
-
 object Scope{
 
 
-  def empty = new Scope(None, None, None, Map.empty, ammonite.ops.pwd / "(memory)", ammonite.ops.pwd , List(), None)
-  def standard(p: Path,
-               currentRoot: Path,
-               s: List[Path]) = new Scope(
+  def empty = new Scope(None, None, None, Map.empty, os.pwd / "(memory)", os.pwd , List(), None)
+  def standard(p: os.Path,
+               currentRoot: os.Path,
+               s: List[os.Path]) = new Scope(
     None, None, None, Map("std" -> Lazy(Std.Std)), p, currentRoot, s, None
   )
 }
@@ -18,9 +16,9 @@ case class Scope(dollar0: Option[Val.Obj],
                  self0: Option[Val.Obj],
                  super0: Option[Val.Obj],
                  bindings0: Map[String, Lazy],
-                 currentFile: Path,
-                 currentRoot: Path,
-                 searchRoots: List[Path],
+                 currentFile: os.Path,
+                 currentRoot: os.Path,
+                 searchRoots: List[os.Path],
                  delegate: Option[Scope]){
   def dollar = dollar0.get
   def self = self0.get

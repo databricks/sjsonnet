@@ -21,9 +21,9 @@ sjsonnet.SjsonnetMain.main0(
     System.in,
     System.out,
     System.err,
-    ammonite.ops.Path.apply(
+    os.Path.apply(
         System.getProperty("user.dir"),  // working directory
-        ammonite.ops.PathConvertible.StringConvertible$.MODULE$
+        os.PathConvertible.StringConvertible$.MODULE$
     )
 );
 ```
@@ -42,7 +42,7 @@ sjsonnet.SjsonnetMain.main0(
     System.in,
     System.out,
     System.err,
-    ammonite.ops.pwd // working directory
+    os.pwd // working directory
 );
 ```
 Or as a standalone executable assembly:

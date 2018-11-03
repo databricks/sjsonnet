@@ -1,6 +1,5 @@
 package sjsonnet
 
-import ammonite.ops.Path
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
@@ -88,10 +87,10 @@ object Val{
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
     def value(k: String,
-              fileName: Path,
-              currentRoot: Path,
+              fileName: os.Path,
+              currentRoot: os.Path,
               offset: Int,
-              wd: Path,
+              wd: os.Path,
               extVars: Map[String, ujson.Js],
               self: Obj = this) = {
 
@@ -110,8 +109,8 @@ object Val{
     def mergeMember(l: Val,
                     r: Val,
                     extVars: Map[String, ujson.Js],
-                    wd: Path,
-                    currentFile: Path,
+                    wd: os.Path,
+                    currentFile: os.Path,
                     offset: Int) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
@@ -129,8 +128,8 @@ object Val{
                  self: Obj,
                  thisFile: String,
                  extVars: Map[String, ujson.Js],
-                 wd: Path,
-                 currentFile: Path, offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
+                 wd: os.Path,
+                 currentFile: os.Path, offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
         def localResult = m.invoke(self, this.`super`, thisFile).force
         this.`super` match{
@@ -149,14 +148,14 @@ object Val{
 
   case class Func(scope: Scope,
                   params: Params,
-                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, Path) => Val,
+                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, os.Path) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
               extVars: Map[String, ujson.Js],
               outerOffset: Int,
-              wd: Path) = {
+              wd: os.Path) = {
 
       lazy val newScope1 =
         params.args.collect{
