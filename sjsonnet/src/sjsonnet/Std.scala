@@ -234,6 +234,15 @@ object Std {
     builtin("sqrt", "x"){ (wd, extVars, x: Double) =>
       math.sqrt(x)
     },
+    builtin("max", "a", "b"){ (wd, extVars, a: Double, b: Double) =>
+      math.max(a, b)
+    },
+    builtin("min", "a", "b"){ (wd, extVars, a: Double, b: Double) =>
+      math.min(a, b)
+    },
+    builtin("mod", "a", "b"){ (wd, extVars, a: Int, b: Int) =>
+      a % b
+    },
 
     builtin("makeArray", "sz", "func"){ (wd, extVars, sz: Int, func: Applyer) =>
       Val.Arr(
