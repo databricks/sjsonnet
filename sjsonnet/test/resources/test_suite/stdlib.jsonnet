@@ -55,6 +55,9 @@ std.assertEqual(std.sqrt(16), 4) &&
 std.assertEqual(std.abs(33), 33) &&
 std.assertEqual(std.abs(-33), 33) &&
 std.assertEqual(std.abs(0), 0) &&
+std.assertEqual(std.mod(20, 10), 0) &&
+std.assertEqual(std.max(0, 1), 1) &&
+std.assertEqual(std.min(0, 1), 0) &&
 
 // Ordinary (non-test) code can define pi as 2*std.acos(0)
 local pi = 3.14159265359;
