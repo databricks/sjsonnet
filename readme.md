@@ -11,34 +11,31 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.12</artifactId>
-    <version>0.1.2</version>
+    <version>0.1.3</version>
 </dependency>
 ```
 ```java
 sjsonnet.SjsonnetMain.main0(
     new String[]{"foo.jsonnet"},
-    new sjsonnet.Parser(),
+    sjsonnet.SjsonnetMain.createParseCache(),
     System.in,
     System.out,
     System.err,
-    os.Path.apply(
-        System.getProperty("user.dir"),  // working directory
-        os.PathConvertible.StringConvertible$.MODULE$
-    )
+    os.package$.MODULE$.pwd()
 );
 ```
 
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.1.2" // SBT
-ivy"com.lihaoyi::sjsonnet:0.1.2" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.1.3" // SBT
+ivy"com.lihaoyi::sjsonnet:0.1.3" // Mill
 ```
 
 ```scala
 sjsonnet.SjsonnetMain.main0(
     Array("foo.jsonnet"),
-    new sjsonnet.Parser(),
+    sjsonnet.SjsonnetMain.createParseCache(),
     System.in,
     System.out,
     System.err,
@@ -47,10 +44,10 @@ sjsonnet.SjsonnetMain.main0(
 ```
 Or as a standalone executable assembly:
 
-- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.2/sjsonnet.jar
+- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.3/sjsonnet.jar
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.2/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.3/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 

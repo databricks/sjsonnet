@@ -8,10 +8,7 @@ public class Example {
             System.in,
             System.out,
             System.err,
-            os.Path.apply(
-                System.getProperty("user.dir"),  // working directory
-                os.PathConvertible.StringConvertible$.MODULE$
-            )
+            os.package$.MODULE$.pwd()
         );
     }
 }
