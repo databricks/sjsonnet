@@ -1,4 +1,7 @@
 import mill._, scalalib._, publish._
+import $file.m2
+import m2.PublishM2Module
+
 val sjsonnetVersion = "0.1.3"
 
 trait SjsonnetJavaModule extends PublishModule{
@@ -22,7 +25,7 @@ trait SjsonnetScalaModule extends SjsonnetJavaModule with ScalaModule{
 //  def scalacOptions = Seq("-P:acyclic:force")
 //  def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.1.7")
 }
-object sjsonnet extends SjsonnetScalaModule{
+object sjsonnet extends SjsonnetScalaModule with PublishM2Module {
   def mainClass = Some("sjsonnet.SjsonnetMain")
   def ivyDeps = Agg(
     ivy"com.lihaoyi::fastparse:2.0.5",
