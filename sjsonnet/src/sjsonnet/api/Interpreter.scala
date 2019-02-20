@@ -9,7 +9,7 @@ import sjsonnet._
 
 object Interpreter {
   type Variables = Map[String, ujson.Js]
-  val Variables: Map.type = Map
+  lazy val Variables: Map.type = Map
 
   def parse(text: String): Expr = {
     val result = fastparse.parse(text, Parser.document(_))
@@ -22,6 +22,8 @@ object Interpreter {
   def parseVariables(s: String): Variables = {
     ujson.read(s).obj.toMap
   }
+
+  def emptyVariables: Variables = Variables()
 
   def substitute(value: Val, vars: Variables): Val = {
     value match{
