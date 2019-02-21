@@ -346,7 +346,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
         asserting = true
-        val newScope: Scope = makeNewScope(self, self.`super`)
+        lazy val newScope: Scope = makeNewScope(self, self.`super`)
 
         value.collect {
           case Member.AssertStmt(value, msg) =>
@@ -381,8 +381,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       lazy val defaultScope = makeNewScope0(newSelf, newSelf.`super`)
       def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): Scope =
         if ((self eq newSelf) &&
-            (sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) &&
-            (sup.isEmpty && newSelf.`super`.isEmpty)) {
+           ((sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) ||
+            (sup.isEmpty && newSelf.`super`.isEmpty))) {
           // Fast path: in the common case where the `self` and `super` are
           // unchanged by inheritence or other trickery, we can share the
           // new scope between all members and sub-scopes.
@@ -391,7 +391,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
 
       lazy val newBindings = visitBindings(
         value.collect{case Member.BindStmt(b) => b},
-        (self, sup) => makeNewScope(self, sup)
+        makeNewScope
       )
 
       lazy val newSelf: Val.Obj = Val.Obj(
