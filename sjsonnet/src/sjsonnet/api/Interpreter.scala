@@ -6,6 +6,8 @@ import fastparse.Parsed
 import sjsonnet.Expr.Params
 import sjsonnet._
 
+import scala.collection.JavaConverters
+
 
 object Interpreter {
   type Variables = Map[String, ujson.Js]
@@ -24,6 +26,7 @@ object Interpreter {
   }
 
   def emptyVariables: Variables = Variables()
+  def variables(m: java.util.Map[String, ujson.Js]): Variables = JavaConverters.mapAsScalaMap(m).toMap
 
   def substitute(value: Val, vars: Variables): Val = {
     value match{
