@@ -14,16 +14,19 @@ object SjsonnetMain {
       System.in,
       System.out,
       System.err,
-      os.pwd
+      os.pwd,
+      None
     )
     System.exit(exitCode)
   }
+
   def main0(args: Array[String],
             parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
-            wd: os.Path): Int = {
+            wd: os.Path,
+            allowedInputs: Option[Set[os.Path]] = None): Int = {
 
     Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()) match{
       case Left(err) =>
@@ -56,7 +59,8 @@ object SjsonnetMain {
                     ),
                     config.varBinding,
                     config.tlaBinding,
-                    wd
+                    wd,
+                    allowedInputs
                   )
                   interp.interpret(path) match{
                     case Left(errMsg) =>

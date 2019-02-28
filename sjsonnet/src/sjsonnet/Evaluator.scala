@@ -40,7 +40,8 @@ object Evaluator {
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
-                wd: os.Path) {
+                wd: os.Path,
+                allowedInputs: Option[Set[os.Path]]) {
   val imports = collection.mutable.Map.empty[os.Path, Val]
   val importStrs = collection.mutable.Map.empty[os.Path, String]
   def visitExpr(expr: Expr, scope: Scope): Val = try expr match{
@@ -235,6 +236,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         case a: os.Path => a
       })
       .find(os.exists)
+      .filter(allowedInputs.getOrElse(_ => true))
       .getOrElse(
         Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )

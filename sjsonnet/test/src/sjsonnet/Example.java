@@ -8,7 +8,8 @@ public class Example {
             System.in,
             System.out,
             System.err,
-            os.package$.MODULE$.pwd()
+            os.package$.MODULE$.pwd(),
+            scala.None$.empty()
         );
     }
 }

@@ -9,7 +9,8 @@ object EvaluatorTests extends TestSuite{
       Scope.standard(os.pwd/"(memory)", os.pwd, Nil),
       Map(),
       Map(),
-      os.pwd
+      os.pwd,
+      None
     ).interpret(s) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)

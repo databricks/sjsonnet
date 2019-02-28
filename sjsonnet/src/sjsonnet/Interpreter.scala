@@ -10,8 +10,9 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
                   scope: Scope,
                   extVars: Map[String, ujson.Js],
                   tlaVars: Map[String, ujson.Js],
-                  wd: os.Path) {
-  val evaluator = new Evaluator(parseCache, scope, extVars, wd)
+                  wd: os.Path,
+                  allowedInputs: Option[Set[os.Path]]) {
+  val evaluator = new Evaluator(parseCache, scope, extVars, wd, allowedInputs)
   def interpret(p: os.Path): Either[String, ujson.Js] = {
     for{
       txt <- try Right(os.read(p)) catch{ case e: Throwable => Left(e.toString) }
