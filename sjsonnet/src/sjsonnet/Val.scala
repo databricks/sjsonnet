@@ -176,13 +176,23 @@ object Val{
         if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.currentFile, outerOffset, wd)
         else seen.add(k)
       }
-      lazy val missing = params.args.collect{case (s, None) => s}.toSet -- seen
+
+      lazy val expectedParams = params.args.collect{case (s, None) => s}.toSet
+
+      lazy val missing = expectedParams -- seen
       if (missing.nonEmpty){
         Evaluator.fail(
           s"Function parameter${if (missing.size > 1) "s" else ""} ${missing.mkString(", ")} not bound in call" ,
           scope.currentFile, outerOffset, wd
         )
       }
+
+      lazy val unexpectedParams = seen -- expectedParams
+      if (unexpectedParams.nonEmpty) {
+        Evaluator.fail(s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
+          scope.currentFile, outerOffset, wd)
+      }
+
 
       lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
       evalRhs(newScope, thisFile, extVars, outerOffset, wd)
