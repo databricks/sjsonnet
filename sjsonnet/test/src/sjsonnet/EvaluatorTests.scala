@@ -205,6 +205,21 @@ object EvaluatorTests extends TestSuite{
       assert(ex.getMessage.contains("Function has no parameter hello"))
     }
 
+    'validParam - {
+      val res = eval(
+          """local Person(name='Alice') = {
+            |  name: name,
+            |  welcome: 'Hello ' + name + '!',
+            |};
+            |{
+            |  person2: Person(name='Bob'),
+            |}.person2.welcome
+        """.stripMargin
+      )
+
+      res ==> Js.Str("Hello Bob!")
+    }
+
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
 //      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")

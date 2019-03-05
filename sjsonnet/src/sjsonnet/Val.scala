@@ -177,9 +177,7 @@ object Val{
         else seen.add(k)
       }
 
-      lazy val expectedParams = params.args.collect{case (s, None) => s}.toSet
-
-      lazy val missing = expectedParams -- seen
+      lazy val missing = params.args.collect{case (s, None) => s}.toSet -- seen
       if (missing.nonEmpty){
         Evaluator.fail(
           s"Function parameter${if (missing.size > 1) "s" else ""} ${missing.mkString(", ")} not bound in call" ,
@@ -187,12 +185,11 @@ object Val{
         )
       }
 
-      lazy val unexpectedParams = seen -- expectedParams
+      lazy val unexpectedParams = seen -- params.args.collect{case (s, _) => s}.toSet
       if (unexpectedParams.nonEmpty) {
         Evaluator.fail(s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
           scope.currentFile, outerOffset, wd)
       }
-
 
       lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
       evalRhs(newScope, thisFile, extVars, outerOffset, wd)
