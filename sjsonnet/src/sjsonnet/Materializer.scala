@@ -51,7 +51,7 @@ object Materializer {
     case Js.Str(s) => Val.Str(s)
     case Js.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))))
     case Js.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], thisFile: String) => Lazy(reverse(x._2))))).toMap,
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], _) => Lazy(reverse(x._2))))).toMap,
       _ => (),
       None
     )

@@ -58,7 +58,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], String) => Lazy,
+                      invoke: (Obj, Option[Obj], () => String) => Lazy,
                       cached: Boolean = true)
   }
   case class Obj(value0: Map[String, Obj.Member],
@@ -95,7 +95,7 @@ object Val{
               self: Obj = this) = {
 
       val (cached, lazyValue) =
-        valueRaw(k, self, fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
+        valueRaw(k, self, () => fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
       if (!cached) lazyValue
       else valueCache.getOrElseUpdate(
         // It is very rare that self != this, so fast-path the common case
@@ -126,7 +126,7 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 thisFile: String,
+                 thisFile: () => String,
                  extVars: Map[String, ujson.Js],
                  wd: os.Path,
                  currentFile: os.Path, offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{

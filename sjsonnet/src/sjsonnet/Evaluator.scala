@@ -399,14 +399,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
+            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
               Lazy {
                 assertions(self)
                 visitExpr(rhs, makeNewScope(self, sup))
               }
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => {
+            visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
               Lazy {
                 assertions(self)
                 visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
@@ -455,7 +455,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
 
             visitExpr(key, s) match {
               case Val.Str(k) =>
-                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) =>
+                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
                   Lazy(visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++

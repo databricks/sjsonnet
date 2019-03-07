@@ -42,23 +42,24 @@ object SjsonnetTestMain {
 
     val start = System.currentTimeMillis()
     var count = 0
-    while(System.currentTimeMillis() - start < 20000){
+    val parseCache = sjsonnet.SjsonnetMain.createParseCache()
+    while(System.currentTimeMillis() - start < 20000000){
       count += 1
       for(name <- names){
 
 //        println(name)
 //
-        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
-//        val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-//        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
-//        val interp = new Interpreter(
-//          parseCache,
-//          Scope.standard(path, FileTests.testSuiteRoot, Nil),
-//          Map(),
-//          Map(),
-//          os.pwd
-//        )
-//        interp.interpret(path)
+//        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
+        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
+        val interp = new Interpreter(
+          parseCache,
+          Scope.standard(path, FileTests.testSuiteRoot, Nil),
+          Map(),
+          Map(),
+          os.pwd,
+          None
+        )
+        interp.interpret(path)
       }
     }
     println(count)
