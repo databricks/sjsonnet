@@ -82,7 +82,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "array_recursive_manifest" - check(
-      """Failed to materialize recursive value""".stripMargin
+      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
     )
     "assert.fail1" - check(
       """sjsonnet.Error: Assertion failed
@@ -251,10 +251,10 @@ object ErrorTests extends TestSuite{
       )
     }
     "obj_recursive" - check(
-      """Failed to materialize recursive value""".stripMargin
+      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
     )
     "obj_recursive_manifest" - check(
-      """Failed to materialize recursive value""".stripMargin
+      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
     )
 
 //    "overflow" - check(

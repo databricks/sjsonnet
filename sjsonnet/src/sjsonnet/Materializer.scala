@@ -7,40 +7,37 @@ import ujson.Js
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Js],
-            wd: os.Path,
-            seen: IdentityHashMap[Val, Unit] = new IdentityHashMap[Val, Unit]): Js = v match{
-    case Val.True => Js.True
-    case Val.False => Js.False
-    case Val.Null => Js.Null
-    case Val.Num(n) => Js.Num(n)
-    case Val.Str(s) => Js.Str(s)
-    case Val.Arr(xs) =>
-      if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
-      seen.put(v, ())
-      val res = Js.Arr.from(xs.map(x => apply(x.force, extVars, wd, seen)))
-      seen.remove(v, ())
-      res
-    case obj: Val.Obj =>
-      if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
-      seen.put(v, ())
-      def rec(x: Val.Obj): Unit = {
-        x.triggerAsserts(obj)
-        x.`super` match{
-          case Some(s) => rec(s)
-          case None => Unit
-        }
-      }
-      rec(obj)
+            wd: os.Path): Js = try {
+    v match {
+      case Val.True => Js.True
+      case Val.False => Js.False
+      case Val.Null => Js.Null
+      case Val.Num(n) => Js.Num(n)
+      case Val.Str(s) => Js.Str(s)
+      case Val.Arr(xs) => Js.Arr.from(xs.map(x => apply(x.force, extVars, wd)))
 
-      val res = Js.Obj.from(
-        for {
-          (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
-          if !hidden
-        }yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd, seen)
-      )
-      seen.remove(v, ())
-      res
-    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd, seen)
+      case obj: Val.Obj =>
+        def rec(x: Val.Obj): Unit = {
+          x.triggerAsserts(obj)
+          x.`super` match {
+            case Some(s) => rec(s)
+            case None => Unit
+          }
+        }
+
+        rec(obj)
+
+        Js.Obj.from(
+          for {
+            (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
+            if !hidden
+          } yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd)
+        )
+
+      case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd)
+    }
+  }catch {case e: StackOverflowError =>
+    throw new DelegateError("Stackoverflow while materializing, possibly due to recursive value")
   }
 
   def reverse(v: Js.Value): Val = v match{
