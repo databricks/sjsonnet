@@ -53,7 +53,6 @@ object Val{
   }
   case class Arr(value: Seq[Lazy]) extends Val{
     def prettyName = "array"
-    var observed: Boolean = false
   }
   object Obj{
 
@@ -66,7 +65,6 @@ object Val{
                  triggerAsserts: Val.Obj => Unit,
                  `super`: Option[Obj]) extends Val{
     def prettyName = "object"
-    var observed: Boolean = false
 
     def getVisibleKeys() = {
       def rec(current: Val.Obj): Seq[(String, Visibility)] = {

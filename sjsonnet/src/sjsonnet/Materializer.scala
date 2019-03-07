@@ -1,5 +1,4 @@
 package sjsonnet
-import java.lang.ThreadLocal
 import java.util.IdentityHashMap
 
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
@@ -8,58 +7,22 @@ import ujson.Js
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Js],
-            wd: os.Path): Js = {
-    val originalFastPath = useFastPath.get
-    useFastPath.set(false)
-    try {
-      val seen = if (originalFastPath) {
-        None
-      } else {
-        Some(new IdentityHashMap[Val, Unit]())
-      }
-      apply0(v, extVars, wd, seen)
-    } finally {
-      useFastPath.set(originalFastPath)
-    }
-  }
-
-  def apply0(v: Val,
-             extVars: Map[String, ujson.Js],
-             wd: os.Path,
-             seen: Option[IdentityHashMap[Val, Unit]]): Js = v match{
+            wd: os.Path,
+            seen: IdentityHashMap[Val, Unit] = new IdentityHashMap[Val, Unit]): Js = v match{
     case Val.True => Js.True
     case Val.False => Js.False
     case Val.Null => Js.Null
     case Val.Num(n) => Js.Num(n)
     case Val.Str(s) => Js.Str(s)
-    case arr @ Val.Arr(xs) =>
-      seen match {
-        case Some(seen) =>
-          if (seen.containsKey(arr)) throw new DelegateError("Failed to materialize recursive value")
-          seen.put(arr, ())
-        case None =>
-          if (arr.observed) throw new DelegateError("Failed to materialize recursive value")
-          arr.observed = true
-      }
-      try {
-        Js.Arr.from(xs.map(x => apply0(x.force, extVars, wd, seen)))
-      } finally {
-        seen match {
-          case Some(seen) => seen.remove(arr)
-          case None => arr.observed = false
-        }
-      }
+    case Val.Arr(xs) =>
+      if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
+      seen.put(v, ())
+      val res = Js.Arr.from(xs.map(x => apply(x.force, extVars, wd, seen)))
+      seen.remove(v, ())
+      res
     case obj: Val.Obj =>
-      seen match {
-        case Some(seen) =>
-          if (seen.containsKey(obj)) throw new DelegateError("Failed to materialize recursive value")
-          seen.put(obj, ())
-        case None =>
-          if (obj.observed) throw new DelegateError("Failed to materialize recursive value")
-          obj.observed = true
-      }
-
-      obj.observed = true
+      if (seen.containsKey(v)) throw new DelegateError("Failed to materialize recursive value")
+      seen.put(v, ())
       def rec(x: Val.Obj): Unit = {
         x.triggerAsserts(obj)
         x.`super` match{
@@ -67,22 +30,17 @@ object Materializer {
           case None => Unit
         }
       }
-      try {
-        rec(obj)
+      rec(obj)
 
-        Js.Obj.from(
-          for {
-            (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
-            if !hidden
-          }yield k -> apply0(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd, seen)
-        )
-      } finally {
-        seen match {
-          case Some(seen) => seen.remove(obj)
-          case None => obj.observed = false
-        }
-      }
-    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd)
+      val res = Js.Obj.from(
+        for {
+          (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
+          if !hidden
+        }yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd, seen)
+      )
+      seen.remove(v, ())
+      res
+    case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd, seen)
   }
 
   def reverse(v: Js.Value): Val = v match{
@@ -115,6 +73,4 @@ object Materializer {
       )
   }
 
-  val useFastPath = new ThreadLocal[Boolean]()
-  useFastPath.set(true)
 }
