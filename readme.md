@@ -21,7 +21,8 @@ sjsonnet.SjsonnetMain.main0(
     System.in,
     System.out,
     System.err,
-    os.package$.MODULE$.pwd()
+    os.package$.MODULE$.pwd(),
+    scala.None$.empty()
 );
 ```
 
@@ -40,7 +41,7 @@ sjsonnet.SjsonnetMain.main0(
     System.out,
     System.err,
     os.pwd, // working directory
-    scala.None$.empty()
+    None
 );
 ```
 Or as a standalone executable assembly:
