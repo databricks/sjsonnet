@@ -59,132 +59,35 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
     case $(offset) => scope.dollar
     case Str(offset, value) => Val.Str(value)
     case Num(offset, value) => Val.Num(value)
-    case Id(offset, value) =>
-      val ref = scope.bindings(value)
-        .getOrElse(Evaluator.fail("Unknown variable " + value, scope.currentFile, offset, wd))
-
-      try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+    case Id(offset, value) => visitId(scope, offset, value)
 
     case Arr(offset, value) => Val.Arr(value.map(v => Lazy(visitExpr(v, scope))))
     case Obj(offset, value) => visitObjBody(value, scope)
 
-    case UnaryOp(offset, op, value) => (op, visitExpr(value, scope)) match{
-      case (Expr.UnaryOp.`-`, Val.Num(v)) => Val.Num(-v)
-      case (Expr.UnaryOp.`+`, Val.Num(v)) => Val.Num(v)
-      case (Expr.UnaryOp.`~`, Val.Num(v)) => Val.Num(~v.toLong)
-      case (Expr.UnaryOp.`!`, Val.True) => Val.False
-      case (Expr.UnaryOp.`!`, Val.False) => Val.True
-    }
+    case UnaryOp(offset, op, value) => visitUnaryOp(scope, op, value)
 
     case BinaryOp(offset, lhs, op, rhs) => {
       visitBinaryOp(scope, offset, lhs, op, rhs)
     }
     case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
-      if (visitExpr(value, scope) != Val.True) {
-        msg match{
-          case None => Evaluator.fail("Assertion failed", scope.currentFile, offset, wd)
-          case Some(msg) =>
-            Evaluator.fail(
-              "Assertion failed: " + visitExpr(msg, scope).cast[Val.Str].value,
-              scope.currentFile,
-              offset,
-              wd
-            )
-        }
-      }
-      visitExpr(returned, scope)
+      visitAssert(scope, offset, value, msg, returned)
 
     case LocalExpr(offset, bindings, returned) =>
-      lazy val newScope: Scope = scope ++ visitBindings(bindings, (self, sup) => newScope)
+      lazy val newScope: Scope = scope ++ visitBindings(bindings.iterator, (self, sup) => newScope)
       visitExpr(returned, newScope)
 
     case Import(offset, value) => visitImport(scope, offset, value)
     case ImportStr(offset, value) => visitImportStr(scope, offset, value)
-    case Expr.Error(offset, value) =>
-      Evaluator.fail(
-        visitExpr(value, scope) match{
-          case Val.Str(s) => s
-          case r =>
-            try Materializer(r, extVars, wd).toString()
-            catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
-        },
-        scope.currentFile,
-        offset,
-        wd
-      )
-    case Apply(offset, value, Args(args)) =>
-      val lhs = visitExpr(value, scope)
-      try lhs.cast[Val.Func].apply(
-        args.map{case (k, v) => (k, Lazy(visitExpr(v, scope)))},
-        scope.currentFile.last,
-        extVars,
-        offset,
-        wd
-      )
-      catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+    case Expr.Error(offset, value) => visitError(scope, offset, value)
+    case Apply(offset, value, Args(args)) => visitApply(scope, offset, value, args)
 
-    case Select(offset, value, name) =>
-      if (value.isInstanceOf[Super]){
-        val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars, self = scope.self)
-        try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
-      }else visitExpr(value, scope) match{
-        case obj: Val.Obj =>
-          val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars)
-          try ref.force
-          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
-        case r =>
-          Evaluator.fail(
-            s"attemped to index a ${r.prettyName} with string ${name}",
-            scope.currentFile,
-            offset,
-            wd
-          )
-      }
+    case Select(offset, value, name) => visitSelect(scope, offset, value, name)
 
-    case Lookup(offset, value, index) =>
-      if (value.isInstanceOf[Super]){
-        val key = visitExpr(index, scope).cast[Val.Str]
-        scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd, extVars).force
-      }else (visitExpr(value, scope), visitExpr(index, scope)) match {
-        case (v: Val.Arr, i: Val.Num) =>
-          if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
-          val int = i.value.toInt
-          if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.currentFile, offset, wd)
-          try v.value(int).force
-          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
-        case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
-        case (v: Val.Obj, i: Val.Str) =>
-          val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, wd, extVars)
-          try ref.force
-          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
-        case (lhs, rhs) =>
-          Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset, wd)
-      }
+    case Lookup(offset, value, index) => visitLookup(scope, offset, value, index)
 
-    case Slice(offset, value, start, end, stride) =>
-      visitExpr(value, scope) match{
-        case Val.Arr(a) =>
-
-          val range =
-            start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
-            end.fold(a.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
-            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
-          Val.Arr(range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
-        case Val.Str(s) =>
-          val range =
-            start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
-            end.fold(s.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
-            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
-          Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
-        case x => Evaluator.fail("Can only slice array or string, not " + x.prettyName, scope.currentFile, offset, wd)
-      }
+    case Slice(offset, value, start, end, stride) => visitSlice(scope, offset, value, start, end, stride)
     case Function(offset, params, body) => visitMethod(scope, body, params, offset)
-    case IfElse(offset, cond, then, else0) =>
-      visitExpr(cond, scope) match{
-        case Val.True => visitExpr(then, scope)
-        case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
-        case v => Evaluator.fail("Need boolean, found " + v.prettyName, scope.currentFile, offset, wd)
-      }
+    case IfElse(offset, cond, then, else0) => visitIfElse(scope, offset, cond, then, else0)
     case Comp(offset, value, first, rest) =>
       Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Lazy(visitExpr(value, s))))
     case ObjExtend(offset, value, ext) => {
@@ -193,6 +96,132 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       Evaluator.mergeObjects(original, extension)
     }
   } catch Evaluator.tryCatch(scope, wd, expr.offset)
+
+  def visitId(scope: Scope, offset: Int, value: String): Val = {
+    val ref = scope.bindings(value)
+      .getOrElse(Evaluator.fail("Unknown variable " + value, scope.currentFile, offset, wd))
+
+    try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+  }
+
+  def visitIfElse(scope: Scope, offset: Int, cond: Expr, then: Expr, else0: Option[Expr]): Val = {
+    visitExpr(cond, scope) match {
+      case Val.True => visitExpr(then, scope)
+      case Val.False => else0.fold[Val](Val.Null)(visitExpr(_, scope))
+      case v => Evaluator.fail("Need boolean, found " + v.prettyName, scope.currentFile, offset, wd)
+    }
+  }
+
+  def visitError(scope: Scope, offset: Int, value: Expr): Nothing = {
+    Evaluator.fail(
+      visitExpr(value, scope) match {
+        case Val.Str(s) => s
+        case r =>
+          try Materializer(r, extVars, wd).toString()
+          catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+      },
+      scope.currentFile,
+      offset,
+      wd
+    )
+  }
+
+  def visitUnaryOp(scope: Scope, op: UnaryOp.Op, value: Expr): Val = {
+    (op, visitExpr(value, scope)) match {
+      case (Expr.UnaryOp.`-`, Val.Num(v)) => Val.Num(-v)
+      case (Expr.UnaryOp.`+`, Val.Num(v)) => Val.Num(v)
+      case (Expr.UnaryOp.`~`, Val.Num(v)) => Val.Num(~v.toLong)
+      case (Expr.UnaryOp.`!`, Val.True) => Val.False
+      case (Expr.UnaryOp.`!`, Val.False) => Val.True
+    }
+  }
+
+  private def visitApply(scope: Scope, offset: Int, value: Expr, args: Seq[(Option[String], Expr)]) = {
+    val lhs = visitExpr(value, scope)
+    try lhs.cast[Val.Func].apply(
+      args.map { case (k, v) => (k, Lazy(visitExpr(v, scope))) },
+      scope.currentFile.last,
+      extVars,
+      offset,
+      wd
+    )
+    catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+  }
+
+  def visitAssert(scope: Scope, offset: Int, value: Expr, msg: Option[Expr], returned: Expr): Val = {
+    if (visitExpr(value, scope) != Val.True) {
+      msg match {
+        case None => Evaluator.fail("Assertion failed", scope.currentFile, offset, wd)
+        case Some(msg) =>
+          Evaluator.fail(
+            "Assertion failed: " + visitExpr(msg, scope).cast[Val.Str].value,
+            scope.currentFile,
+            offset,
+            wd
+          )
+      }
+    }
+    visitExpr(returned, scope)
+  }
+
+  private def visitSlice(scope: Scope, offset: Int, value: Expr, start: Option[Expr], end: Option[Expr], stride: Option[Expr]) = {
+    visitExpr(value, scope) match {
+      case Val.Arr(a) =>
+
+        val range =
+          start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
+            end.fold(a.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
+            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
+        Val.Arr(range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
+      case Val.Str(s) =>
+        val range =
+          start.fold(0)(visitExpr(_, scope).cast[Val.Num].value.toInt) until
+            end.fold(s.length)(visitExpr(_, scope).cast[Val.Num].value.toInt) by
+            stride.fold(1)(visitExpr(_, scope).cast[Val.Num].value.toInt)
+        Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+      case x => Evaluator.fail("Can only slice array or string, not " + x.prettyName, scope.currentFile, offset, wd)
+    }
+  }
+
+  def visitLookup(scope: Scope, offset: Int, value: Expr, index: Expr): Val = {
+    if (value.isInstanceOf[Super]) {
+      val key = visitExpr(index, scope).cast[Val.Str]
+      scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, wd, extVars).force
+    } else (visitExpr(value, scope), visitExpr(index, scope)) match {
+      case (v: Val.Arr, i: Val.Num) =>
+        if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
+        val int = i.value.toInt
+        if (int != i.value) Evaluator.fail("array index was not integer: " + i.value, scope.currentFile, offset, wd)
+        try v.value(int).force
+        catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+      case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
+      case (v: Val.Obj, i: Val.Str) =>
+        val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, wd, extVars)
+        try ref.force
+        catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+      case (lhs, rhs) =>
+        Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset, wd)
+    }
+  }
+
+  def visitSelect(scope: Scope, offset: Int, value: Expr, name: String): Val = {
+    if (value.isInstanceOf[Super]) {
+      val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars, self = scope.self)
+      try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+    } else visitExpr(value, scope) match {
+      case obj: Val.Obj =>
+        val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars)
+        try ref.force
+        catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+      case r =>
+        Evaluator.fail(
+          s"attemped to index a ${r.prettyName} with string ${name}",
+          scope.currentFile,
+          offset,
+          wd
+        )
+    }
+  }
 
   def visitImportStr(scope: Scope, offset: Int, value: String) = {
     val p = resolveImport(scope, value, offset)
@@ -334,7 +363,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       (default, scope) => visitExpr(default, scope)
     )
   }
-  def visitBindings(bindings: Seq[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
+  def visitBindings(bindings: Iterator[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
 
     bindings.collect{
       case Bind(offset, fieldName, None, rhs) =>
@@ -373,7 +402,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         Some(self),
         sup,
         if (newBindings.isEmpty) Map.empty
-        else newBindings.map { case (k, v) => (k, v.apply(self, sup)) }.toMap,
+        else newBindings.iterator.map { case (k, v) => (k, v.apply(self, sup)) }.toMap,
         scope.currentFile,
         scope.currentRoot,
         scope.searchRoots,
@@ -392,9 +421,9 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         }else makeNewScope0(self, sup)
 
       lazy val newBindings = visitBindings(
-        value.collect{case Member.BindStmt(b) => b},
+        value.iterator.collect{case Member.BindStmt(b) => b},
         (self, sup) => makeNewScope(self, sup)
-      )
+      ).toArray
 
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
@@ -441,7 +470,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
               scope.dollar0.orElse(Some(newSelf)),
               Some(newSelf),
               None,
-              newBindings.map{case (k, v) => (k, v.apply(scope.self0.getOrElse(null), None))}.toMap,
+              newBindings.map{case (k, v) => (k, v.apply(scope.self0.orNull, None))}.toMap,
               scope.currentFile,
               scope.currentRoot,
               scope.searchRoots,
@@ -449,9 +478,9 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
             )
 
             lazy val newBindings = visitBindings(
-              (preLocals ++ postLocals).collect{ case Member.BindStmt(b) => b},
+              (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b},
               (self, sup) => newScope
-            )
+            ).toArray
 
             visitExpr(key, s) match {
               case Val.Str(k) =>
