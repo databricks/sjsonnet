@@ -344,7 +344,7 @@ object Std {
       val allKeys = obj.getVisibleKeys()
       Val.Obj(
         allKeys.map{ k =>
-          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => Lazy(
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) => Lazy(
             func.apply(
               Lazy(Val.Str(k._1)),
               obj.value(k._1, wd / "(memory)", wd, -1, wd, extVars)
@@ -736,7 +736,7 @@ object Std {
             Val.Obj.Member(
               false,
               Visibility.Hidden,
-              (self: Val.Obj, sup: Option[Val.Obj],  thisFile: String) => Lazy(v)
+              (self: Val.Obj, sup: Option[Val.Obj], _) => Lazy(v)
             )
           )
       }
@@ -746,7 +746,7 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], thisFile: String) => Lazy(Val.Str(thisFile))},
+          { (self: Val.Obj, sup: Option[Val.Obj], thisFile: () => String) => Lazy(Val.Str(thisFile()))},
           cached = false
         )
       )
