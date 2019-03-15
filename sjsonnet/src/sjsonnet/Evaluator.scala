@@ -1,4 +1,5 @@
 package sjsonnet
+
 import Expr._
 import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
@@ -35,13 +36,22 @@ object Evaluator {
     throw new Error(msg, Nil, None).addFrame(path, wd, offset)
   }
 
+  def fileImporter(scope: Scope, value: String): Option[os.Path] = {
+    (scope.currentFile / os.up :: scope.searchRoots).
+      map(base => os.FilePath(value) match {
+        case r: os.RelPath => base / r
+        case a: os.Path => a
+      })
+      .find(os.exists)
+  }
 }
 
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
                 wd: os.Path,
-                allowedInputs: Option[Set[os.Path]]) {
+                allowedInputs: Option[Set[os.Path]],
+                importer: Option[(Scope, String) => Option[os.Path]] = None) {
   val imports = collection.mutable.Map.empty[os.Path, Val]
   val importStrs = collection.mutable.Map.empty[os.Path, String]
   def visitExpr(expr: Expr, scope: Scope): Val = try expr match{
@@ -258,18 +268,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
     )
   }
 
-  def resolveImport(scope: Scope, value: String, offset: Int) = {
-    (scope.currentFile / os.up :: scope.searchRoots).
-      map(base => os.FilePath(value) match{
-        case r: os.RelPath => base / r
-        case a: os.Path => a
-      })
-      .find(os.exists)
-      .filter(allowedInputs.getOrElse(_ => true))
+  def resolveImport(scope: Scope, value: String, offset: Int): os.Path = {
+    importer.getOrElse(Evaluator.fileImporter(_, _))(scope, value)
+      .filter(allowedInputs.getOrElse((_: os.Path) => true))
       .getOrElse(
         Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )
   }
+
   def importString(scope: Scope, offset: Int, value: String, p: os.Path) = {
     try os.read(p)
     catch {

@@ -9,6 +9,7 @@ public class Example {
             System.out,
             System.err,
             os.package$.MODULE$.pwd(),
+            scala.None$.empty(),
             scala.None$.empty()
         );
     }

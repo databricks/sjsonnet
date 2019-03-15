@@ -26,7 +26,8 @@ object SjsonnetMain {
             stdout: PrintStream,
             stderr: PrintStream,
             wd: os.Path,
-            allowedInputs: Option[Set[os.Path]] = None): Int = {
+            allowedInputs: Option[Set[os.Path]] = None,
+            importer: Option[(Scope, String) => Option[os.Path]] = None): Int = {
 
     Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()) match{
       case Left(err) =>
@@ -60,7 +61,8 @@ object SjsonnetMain {
                     config.varBinding,
                     config.tlaBinding,
                     wd,
-                    allowedInputs
+                    allowedInputs,
+                    importer
                   )
                   interp.interpret(path) match{
                     case Left(errMsg) =>
