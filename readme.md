@@ -66,6 +66,20 @@ usage: sjsonnet [sjsonnet-options] script-file
 $ ./sjsonnet.jar foo.jsonnet
 ```
 
+### Running deeply recursive Jsonnet programs
+
+The depth of recursion is limited by JVM stack size. You can run Sjsonnet with increased 
+stack size as follows:
+```
+java -Xss100m -cp sjsonnet.jar sjsonnet.SjsonnetMain foo.jsonnet
+```
+
+The -Xss option above is responsible for JVM stack size. Please try this if you 
+ever run into `sjsonnet.Error: Internal Error ... Caused by: java.lang.StackOverflowError ...`. 
+
+There is no analog of `--max-stack`/`-s` option of [google/jsonnet](https://github.com/google/jsonnet).
+The only stack size limit is the one of the JVM.
+
 ## Architecture
 
 Sjsonnet is implementated as a straightforward AST interpreter. There are
