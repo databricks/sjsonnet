@@ -15,47 +15,52 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
                   importer: Option[(Scope, String) => Option[os.Path]] = None) {
   val evaluator = new Evaluator(parseCache, scope, extVars, wd, allowedInputs, importer)
   def interpret(p: os.Path): Either[String, ujson.Js] = {
-    for{
-      txt <- try Right(os.read(p)) catch{ case e: Throwable => Left(e.toString) }
-      json <- interpret(txt)
-    } yield json
+    val txt: Either[String, String] = try Right(os.read(p)) catch{ case e: Throwable => Left(e.toString) }
+    txt.right.flatMap(interpret)
   }
+
   def interpret(txt: String): Either[String, ujson.Js] = {
-    for{
-      parsed <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
-        case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
-        case Parsed.Success(r, index) => Right(r)
-      }
-      res0 <-
-        try Right(evaluator.visitExpr(parsed, scope))
-        catch{case e: Throwable =>
+    val parsed: Either[String, Expr] = parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
+      case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
+      case Parsed.Success(r, index) => Right(r)
+    }
+
+    val res0: Either[String, Val] = parsed.right.flatMap { result =>
+      try Right(evaluator.visitExpr(result, scope))
+      catch {
+        case e: Throwable =>
           val s = new StringWriter()
           val p = new PrintWriter(s)
           e.printStackTrace(p)
           p.close()
           Left(s.toString.replace("\t", "    "))
-        }
-      res = res0 match{
-        case f: Val.Func =>
-          f.copy(params = Params(f.params.args.map{ case (k, default) =>
-            (k, tlaVars.get(k) match{
-              case None => default
-              case Some(v) => Some(Materializer.toExpr(v))
-            })
-          }))
-        case x => x
       }
-      json <-
-        try Right(Materializer(res, extVars, wd))
-        catch{
-          case DelegateError(msg) => Left(msg)
-          case e: Throwable =>
-            val s = new StringWriter()
-            val p = new PrintWriter(s)
-            e.printStackTrace(p)
-            p.close()
-            Left(s.toString.replace("\t", "    "))
-        }
-    } yield json
+    }
+
+    val res: Either[String, Val] = res0.right.map {
+      case f: Val.Func =>
+        f.copy(params = Params(f.params.args.map{ case (k, default) =>
+          (k, tlaVars.get(k) match{
+            case None => default
+            case Some(v) => Some(Materializer.toExpr(v))
+          })
+        }))
+      case x => x
+    }
+
+    val json: Either[String, ujson.Js] = res.right.flatMap { result =>
+      try Right(Materializer(result, extVars, wd))
+      catch{
+        case DelegateError(msg) => Left(msg)
+        case e: Throwable =>
+          val s = new StringWriter()
+          val p = new PrintWriter(s)
+          e.printStackTrace(p)
+          p.close()
+          Left(s.toString.replace("\t", "    "))
+      }
+    }
+
+    json
   }
 }

@@ -56,7 +56,7 @@ object SjsonnetMain {
                     Scope.standard(
                       path,
                       wd,
-                      config.jpaths.map(os.Path(_, wd)),
+                      config.jpaths.map(os.Path(_, wd))
                     ),
                     config.varBinding,
                     config.tlaBinding,

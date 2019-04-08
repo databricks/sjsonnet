@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._
-val sjsonnetVersion = "0.1.3"
+val sjsonnetVersion = "0.1.3-OMG"
 
 trait SjsonnetJavaModule extends PublishModule{
   def publishVersion = sjsonnetVersion
@@ -17,7 +17,7 @@ trait SjsonnetJavaModule extends PublishModule{
 
 }
 trait SjsonnetScalaModule extends SjsonnetJavaModule with ScalaModule{
-  def scalaVersion = "2.12.6"
+  def scalaVersion = "2.11.8"
 //  def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.1.7")
 //  def scalacOptions = Seq("-P:acyclic:force")
 //  def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.1.7")
@@ -52,7 +52,7 @@ object sjsonnet extends SjsonnetScalaModule{
   }
 
   object server extends SjsonnetScalaModule{
-    def scalaVersion = "2.12.6"
+    def scalaVersion = "2.11.8"
     def moduleDeps = Seq(sjsonnet, client)
     def ivyDeps = Agg(
       ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(

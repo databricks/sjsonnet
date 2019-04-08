@@ -465,7 +465,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         scope.currentFile,
         scope.currentRoot,
         scope.searchRoots,
-        Some(scope),
+        Some(scope)
       )
 
       lazy val newSelf: Val.Obj = Val.Obj(
@@ -480,7 +480,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
               scope.currentFile,
               scope.currentRoot,
               scope.searchRoots,
-              Some(s),
+              Some(s)
             )
 
             lazy val newBindings = visitBindings(
