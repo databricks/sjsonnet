@@ -113,6 +113,22 @@ object Std {
       {(scope, thisFile, extVars, outerOffset, wd) => implicitly[ReadWriter[R]].write(eval(params.map(scope.bindings(_).get.force), extVars, wd))}
     )
   }
+  /**
+    * Helper function that can define a built-in function with default parameters
+    *
+    * Arguments of the eval function are (args, extVars, wd)
+    */
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], Map[String, ujson.Js], os.Path) => R): (String, Val.Func) = {
+    name -> Val.Func(
+      empty,
+      Params(params),
+      { (scope, thisFile, extVars, outerOffset, wd) =>
+        val args = params.map {case (k, v) => k -> scope.bindings(k).get.force }.toMap
+        implicitly[ReadWriter[R]].write(eval(args, extVars, wd))
+      },
+      { (expr, scope) => new Evaluator(scala.collection.mutable.Map(), scope, Map(), null, None).visitExpr(expr, scope)}
+    )
+  }
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin("assertEqual", "a", "b"){ (wd, extVars, v1: Val, v2: Val) =>
       val x1 = Materializer(v1, extVars, wd)
@@ -470,6 +486,29 @@ object Std {
     builtin("manifestJsonEx", "value", "indent"){ (wd, extVars, v: Val, i: String) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
       Materializer(v, extVars, wd).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
+    },
+    builtinWithDefaults("manifestYamlDoc", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, extVars, wd) =>
+      val v = args("v")
+      val indentArrayInObject = args("indent_array_in_object")  match {
+          case Val.False => false
+          case Val.True => true
+          case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
+        }
+      Materializer(v, extVars, wd).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString
+    },
+    builtinWithDefaults("manifestYamlStream", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, extVars, wd) =>
+      val v = args("v")
+      val indentArrayInObject = args("indent_array_in_object")  match {
+        case Val.False => false
+        case Val.True => true
+        case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
+      }
+      v match {
+        case Val.Arr(values) => values
+          .map { item => Materializer(item.force, extVars, wd).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString() }
+          .mkString("---\n", "\n---\n", "\n...\n")
+        case _ => throw new DelegateError("manifestYamlStream only takes arrays, got " + v.getClass)
+      }
     },
     builtin("manifestPythonVars", "v"){ (wd, extVars, v: Val.Obj) =>
       Materializer(v, extVars, wd).obj
