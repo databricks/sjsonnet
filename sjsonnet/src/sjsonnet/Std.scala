@@ -464,10 +464,12 @@ object Std {
       Materializer(v, extVars, wd).transform(new PythonRenderer()).toString
     },
     builtin("manifestJson", "v"){ (wd, extVars, v: Val) =>
-      Materializer(v, extVars, wd).render(indent = 4)
+      // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+      Materializer(v, extVars, wd).render(indent = 4).replaceAll("\n[ ]+\n", "\n\n")
     },
     builtin("manifestJsonEx", "value", "indent"){ (wd, extVars, v: Val, i: String) =>
-      Materializer(v, extVars, wd).render(indent = i.length)
+      // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
+      Materializer(v, extVars, wd).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
     },
     builtin("manifestPythonVars", "v"){ (wd, extVars, v: Val.Obj) =>
       Materializer(v, extVars, wd).obj

@@ -414,49 +414,49 @@ local some_json = {
   '"': null,
 };
 
-//std.assertEqual(
-//  std.manifestJsonEx(some_json, '    ') + '\n',
-//  |||
-//    {
-//        "\"": null,
-//        "arr": [
-//            [
-//                [
-//
-//                ]
-//            ]
-//        ],
-//        "emptyArray": [
-//
-//        ],
-//        "emptyObject": {
-//
-//        },
-//        "objectInArray": [
-//            {
-//                "f": 3
-//            }
-//        ],
-//        "x": [
-//            1,
-//            2,
-//            3,
-//            true,
-//            false,
-//            null,
-//            "string\nstring\n"
-//        ],
-//        "y": {
-//            "a": 1,
-//            "b": 2,
-//            "c": [
-//                1,
-//                2
-//            ]
-//        }
-//    }
-//  |||
-//) &&
+std.assertEqual(
+ std.manifestJsonEx(some_json, '    ') + '\n',
+ |||
+   {
+       "\"": null,
+       "arr": [
+           [
+               [
+
+               ]
+           ]
+       ],
+       "emptyArray": [
+
+       ],
+       "emptyObject": {
+
+       },
+       "objectInArray": [
+           {
+               "f": 3
+           }
+       ],
+       "x": [
+           1,
+           2,
+           3,
+           true,
+           false,
+           null,
+           "string\nstring\n"
+       ],
+       "y": {
+           "a": 1,
+           "b": 2,
+           "c": [
+               1,
+               2
+           ]
+       }
+   }
+ |||
+) &&
 //
 //std.assertEqual(
 //  std.manifestYamlDoc(some_json) + '\n',
