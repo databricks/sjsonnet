@@ -451,31 +451,7 @@ object Std {
     },
     builtin("escapeStringJson", "str"){ (wd, extVars, str: String) =>
       val out = new StringWriter()
-      // Fork of `ujson.Renderer.escape(out, str, unicode = true)`
-      // to improperly escape `~`, for bug-for-bug compatibility with google/jsonnet
-      def escape(sb: java.io.Writer, s: CharSequence, unicode: Boolean): Unit = {
-        sb.append('"')
-        var i = 0
-        val len = s.length
-        while (i < len) {
-          (s.charAt(i): @switch) match {
-            case '"' => sb.append("\\\"")
-            case '\\' => sb.append("\\\\")
-            case '\b' => sb.append("\\b")
-            case '\f' => sb.append("\\f")
-            case '\n' => sb.append("\\n")
-            case '\r' => sb.append("\\r")
-            case '\t' => sb.append("\\t")
-            case c =>
-              if (c < ' ' || (c >= '~' && unicode)) sb.append("\\u%04x" format c.toInt)
-              // if (c < ' ' || (c > '~' && unicode)) sb.append("\\u%04x" format c.toInt)
-              else sb.append(c)
-          }
-          i += 1
-        }
-        sb.append('"')
-      }
-      escape(out, str, unicode = true)
+      ujson.Renderer.escape(out, str, unicode = true)
       out.toString
     },
     builtin("escapeStringBash", "str"){ (wd, extVars, str: String) =>
