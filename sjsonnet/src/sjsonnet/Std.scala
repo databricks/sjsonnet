@@ -729,7 +729,7 @@ object Std {
       Params(Seq("str" -> None, "rest" -> None)),
       { (scope, thisFile, extVars, outerOffset, wd) =>
         val Val.Str(msg) = scope.bindings("str").get.force
-        println(s"TRACE: $thisFile " + msg)
+        System.err.println(s"TRACE: $thisFile " + msg)
         scope.bindings("rest").get.force
       }
     ),
