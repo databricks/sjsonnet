@@ -3,6 +3,9 @@ package sjsonnet
 import java.io.{InputStream, PrintStream}
 import java.nio.file.NoSuchFileException
 
+import ujson.Js
+
+import scala.collection.mutable
 import scala.util.Try
 
 object SjsonnetMain {
@@ -72,16 +75,38 @@ object SjsonnetMain {
                       stderr.println(errMsg)
                       1
                     case Right(materialized) =>
-                      val str = ujson.transform(materialized, new Renderer(indent = config.indent)).toString
-                      config.outputFile match{
-                        case None => stdout.println(str)
-                        case Some(f) =>
-                          Try(os.write.over(os.Path(f, wd), str, createFolders = config.createDirs))
-                            .recover {
-                              case e: NoSuchFileException =>
-                                stderr.println(s"open $f: no such file or directory")
-                              case e => throw e
+
+                      def writeFile(f: String, contents: String): Unit = {
+                        Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
+                          .recover {
+                            case e: NoSuchFileException =>
+                              stderr.println(s"open $f: no such file or directory")
+                            case e => throw e
+                          }
+                      }
+
+                      val output: String = config.multi match {
+                        case Some(multiPath) => materialized match {
+                          case obj: Js.Obj =>
+                            val files = mutable.ListBuffer[String]()
+                            obj.value.foreach { case (f, v) =>
+                              writeFile(f, ujson.transform(v, new Renderer(indent = config.indent)).toString)
+                              files += f
                             }
+                            files.mkString("\n")
+                          case _ =>
+                            stderr.println(
+                              """
+                                |error: multi mode: top-level object was a string, should be an object
+                                | whose keys are filenames and values hold the JSON for that file."""
+                              .stripMargin.stripLineEnd)
+                            return 1
+                        }
+                        case None => ujson.transform(materialized, new Renderer(indent = config.indent)).toString
+                      }
+                      config.outputFile match{
+                        case None => stdout.println(output)
+                        case Some(f) => writeFile(f, output)
                       }
                       0
                   }

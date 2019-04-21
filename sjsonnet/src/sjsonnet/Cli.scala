@@ -14,6 +14,7 @@ object Cli{
   case class Config(interactive: Boolean = false,
                     jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
+                    multi: Option[String] = None,
                     createDirs: Boolean = false,
                     varBinding: Map[String, ujson.Js] = Map(),
                     tlaBinding: Map[String, ujson.Js] = Map(),
@@ -40,6 +41,11 @@ object Cli{
       "output-file", Some('o'),
       "Write to the output file rather than stdout",
       (c, v) => c.copy(outputFile = Some(v))
+    ),
+    Arg[Config, String](
+      "multi", Some('m'),
+      "Write multiple files to the directory, list files on stdout",
+      (c, v) => c.copy(multi = Some(v))
     ),
     Arg[Config, Unit](
       "create-output-dirs", Some('c'),
