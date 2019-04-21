@@ -16,6 +16,7 @@ object Cli{
                     outputFile: Option[String] = None,
                     multi: Option[String] = None,
                     createDirs: Boolean = false,
+                    expectString: Boolean = false,
                     varBinding: Map[String, ujson.Js] = Map(),
                     tlaBinding: Map[String, ujson.Js] = Map(),
                     indent: Int = 3)
@@ -51,6 +52,11 @@ object Cli{
       "create-output-dirs", Some('c'),
       "Automatically creates all parent directories for files",
       (c, v) => c.copy(createDirs = true)
+    ),
+    Arg[Config, Unit](
+      "String", Some('S'),
+      "Expect a string, manifest as plain text",
+      (c, v) => c.copy(expectString = true)
     ),
     Arg[Config, String](
       "ext-str", Some('V'),

@@ -76,7 +76,19 @@ object SjsonnetMain {
                       1
                     case Right(materialized) =>
 
-                      def writeFile(f: String, contents: String): Unit = {
+                      def renderString(js: Js): Either[String, String] = {
+                        if (config.expectString) {
+                          js match {
+                            case Js.Str(s) => Right(s)
+                            case _ =>
+                              Left("expected string result, got: " + js.getClass)
+                          }
+                        } else {
+                          Right(ujson.transform(js, new Renderer(indent = config.indent)).toString)
+                        }
+                      }
+
+                      def writeFile(f: os.RelPath, contents: String): Unit = {
                         Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
                           .recover {
                             case e: NoSuchFileException =>
@@ -86,12 +98,16 @@ object SjsonnetMain {
                       }
 
                       val output: String = config.multi match {
-                        case Some(multiPath) => materialized match {
+                        case Some(multiPath) =>
+                          materialized match {
                           case obj: Js.Obj =>
-                            val files = mutable.ListBuffer[String]()
+                            val files = mutable.ListBuffer[os.RelPath]()
                             obj.value.foreach { case (f, v) =>
-                              writeFile(f, ujson.transform(v, new Renderer(indent = config.indent)).toString)
-                              files += f
+                              val rendered = renderString(v)
+                                .fold({ err => stderr.println(err); return 1 }, identity)
+                              val relPath = os.RelPath(multiPath) / os.RelPath(f)
+                              writeFile(relPath, rendered)
+                              files += relPath
                             }
                             files.mkString("\n")
                           case _ =>
@@ -102,11 +118,12 @@ object SjsonnetMain {
                               .stripMargin.stripLineEnd)
                             return 1
                         }
-                        case None => ujson.transform(materialized, new Renderer(indent = config.indent)).toString
+                        case None =>
+                          renderString(materialized).fold({ err => stderr.println(err); return 1 }, identity)
                       }
                       config.outputFile match{
                         case None => stdout.println(output)
-                        case Some(f) => writeFile(f, output)
+                        case Some(f) => writeFile(os.RelPath(f), output)
                       }
                       0
                   }
