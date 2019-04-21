@@ -1,6 +1,9 @@
 package sjsonnet
 
 import java.io.{InputStream, PrintStream}
+import java.nio.file.NoSuchFileException
+
+import scala.util.Try
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
@@ -72,7 +75,13 @@ object SjsonnetMain {
                       val str = ujson.transform(materialized, new Renderer(indent = config.indent)).toString
                       config.outputFile match{
                         case None => stdout.println(str)
-                        case Some(f) => os.write.over(os.Path(f, wd), str)
+                        case Some(f) =>
+                          Try(os.write.over(os.Path(f, wd), str, createFolders = config.createDirs))
+                            .recover {
+                              case e: NoSuchFileException =>
+                                stderr.println(s"open $f: no such file or directory")
+                              case e => throw e
+                            }
                       }
                       0
                   }
