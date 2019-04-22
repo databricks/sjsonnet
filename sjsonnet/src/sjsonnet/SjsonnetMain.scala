@@ -76,12 +76,14 @@ object SjsonnetMain {
                       1
                     case Right(materialized) =>
 
-                      def renderString(js: Js): Either[String, String] = {
+                      case class RenderError(msg: String)
+
+                      def renderString(js: Js): Either[RenderError, String] = {
                         if (config.expectString) {
                           js match {
                             case Js.Str(s) => Right(s)
                             case _ =>
-                              Left("expected string result, got: " + js.getClass)
+                              Left(RenderError("expected string result, got: " + js.getClass))
                           }
                         } else {
                           Right(ujson.transform(js, new Renderer(indent = config.indent)).toString)
@@ -104,7 +106,7 @@ object SjsonnetMain {
                             val files = mutable.ListBuffer[os.RelPath]()
                             obj.value.foreach { case (f, v) =>
                               val rendered = renderString(v)
-                                .fold({ err => stderr.println(err); return 1 }, identity)
+                                .fold({ err => stderr.println(err.msg); return 1 }, identity)
                               val relPath = os.RelPath(multiPath) / os.RelPath(f)
                               writeFile(relPath, rendered)
                               files += relPath
@@ -119,7 +121,8 @@ object SjsonnetMain {
                             return 1
                         }
                         case None =>
-                          renderString(materialized).fold({ err => stderr.println(err); return 1 }, identity)
+                          renderString(materialized)
+                            .fold({ err => stderr.println(err.msg); return 1 }, identity)
                       }
                       config.outputFile match{
                         case None => stdout.println(output)
