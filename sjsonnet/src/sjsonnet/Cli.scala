@@ -14,6 +14,9 @@ object Cli{
   case class Config(interactive: Boolean = false,
                     jpaths: List[String] = Nil,
                     outputFile: Option[String] = None,
+                    multi: Option[String] = None,
+                    createDirs: Boolean = false,
+                    expectString: Boolean = false,
                     varBinding: Map[String, ujson.Js] = Map(),
                     tlaBinding: Map[String, ujson.Js] = Map(),
                     indent: Int = 3)
@@ -41,8 +44,23 @@ object Cli{
       (c, v) => c.copy(outputFile = Some(v))
     ),
     Arg[Config, String](
+      "multi", Some('m'),
+      "Write multiple files to the directory, list files on stdout",
+      (c, v) => c.copy(multi = Some(v))
+    ),
+    Arg[Config, Unit](
+      "create-output-dirs", Some('c'),
+      "Automatically creates all parent directories for files",
+      (c, v) => c.copy(createDirs = true)
+    ),
+    Arg[Config, Unit](
+      "String", Some('S'),
+      "Expect a string, manifest as plain text",
+      (c, v) => c.copy(expectString = true)
+    ),
+    Arg[Config, String](
       "ext-str", Some('V'),
-      "???",
+      "<var>[=<val>] Provide 'external' variable as string. 'If <val> is omitted, get from environment var <var>",
       (c, v) => v split('=') match{
         case Array(x) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(System.getenv(x))))
         case Array(x, v) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(v)))
@@ -50,7 +68,7 @@ object Cli{
     ),
     Arg[Config, String](
       "ext-str-file", None,
-      "???",
+      "<var>=<file> Provide 'external' variable as string from the file",
       (c, v) => v split('=') match{
         case Array(x, v) =>
           c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.Js.Str(os.read(os.Path(v, wd)))))
@@ -58,7 +76,7 @@ object Cli{
     ),
     Arg[Config, String](
       "ext-code", None,
-      "???",
+      "<var>[=<code>] Provide 'external' variable as Jsonnet code. If <code> is omitted, get from environment var <var>",
       (c, v) => v split('=') match{
         case Array(x) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(System.getenv(x))))
         case Array(x, v) => c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(v)))
@@ -66,7 +84,7 @@ object Cli{
     ),
     Arg[Config, String](
       "ext-code-file", None,
-      "???",
+      "<var>=<file> Provide 'external' variable as Jsonnet code from the file",
       (c, v) => v split('=') match{
         case Array(x, v) =>
           c.copy(varBinding = c.varBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd)))))
@@ -74,7 +92,7 @@ object Cli{
     ),
     Arg[Config, String](
       "tla-str", Some('A'),
-      "???",
+      "<var>[=<val>] Provide top-level arguments as string. 'If <val> is omitted, get from environment var <var>",
       (c, v) => v split('=') match{
         case Array(x) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(System.getenv(x))))
         case Array(x, v) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(v)))
@@ -82,7 +100,7 @@ object Cli{
     ),
     Arg[Config, String](
       "tla-str-file", None,
-      "???",
+      "<var>=<file> Provide top-level arguments variable as string from the file",
       (c, v) => v split('=') match{
         case Array(x, v) =>
           c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.Js.Str(os.read(os.Path(v, wd)))))
@@ -90,7 +108,7 @@ object Cli{
     ),
     Arg[Config, String](
       "tla-code", None,
-      "???",
+      "<var>[=<val>] Provide top-level arguments as Jsonnet code. 'If <val> is omitted, get from environment var <var>",
       (c, v) => v split('=') match{
         case Array(x) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(System.getenv(x))))
         case Array(x, v) => c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(v)))
@@ -98,7 +116,7 @@ object Cli{
     ),
     Arg[Config, String](
       "tla-code-file", None,
-      "???",
+      "<var>=<file> Provide top-level arguments variable as Jsonnet code from the file",
       (c, v) => v split('=') match{
         case Array(x, v) =>
           c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd)))))

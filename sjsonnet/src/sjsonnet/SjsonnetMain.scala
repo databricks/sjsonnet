@@ -1,6 +1,12 @@
 package sjsonnet
 
 import java.io.{InputStream, PrintStream}
+import java.nio.file.NoSuchFileException
+
+import ujson.Js
+
+import scala.collection.mutable
+import scala.util.Try
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
@@ -69,10 +75,58 @@ object SjsonnetMain {
                       stderr.println(errMsg)
                       1
                     case Right(materialized) =>
-                      val str = ujson.transform(materialized, new Renderer(indent = config.indent)).toString
+
+                      case class RenderError(msg: String)
+
+                      def renderString(js: Js): Either[RenderError, String] = {
+                        if (config.expectString) {
+                          js match {
+                            case Js.Str(s) => Right(s)
+                            case _ =>
+                              Left(RenderError("expected string result, got: " + js.getClass))
+                          }
+                        } else {
+                          Right(ujson.transform(js, new Renderer(indent = config.indent)).toString)
+                        }
+                      }
+
+                      def writeFile(f: os.RelPath, contents: String): Unit = {
+                        Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
+                          .recover {
+                            case e: NoSuchFileException =>
+                              stderr.println(s"open $f: no such file or directory")
+                            case e => throw e
+                          }
+                      }
+
+                      val output: String = config.multi match {
+                        case Some(multiPath) =>
+                          materialized match {
+                          case obj: Js.Obj =>
+                            val files = mutable.ListBuffer[os.RelPath]()
+                            obj.value.foreach { case (f, v) =>
+                              val rendered = renderString(v)
+                                .fold({ err => stderr.println(err.msg); return 1 }, identity)
+                              val relPath = os.RelPath(multiPath) / os.RelPath(f)
+                              writeFile(relPath, rendered)
+                              files += relPath
+                            }
+                            files.mkString("\n")
+                          case _ =>
+                            stderr.println(
+                              """
+                                |error: multi mode: top-level object was a string, should be an object
+                                | whose keys are filenames and values hold the JSON for that file."""
+                              .stripMargin.stripLineEnd)
+                            return 1
+                        }
+                        case None =>
+                          renderString(materialized)
+                            .fold({ err => stderr.println(err.msg); return 1 }, identity)
+                      }
                       config.outputFile match{
-                        case None => stdout.println(str)
-                        case Some(f) => os.write.over(os.Path(f, wd), str)
+                        case None => stdout.println(output)
+                        case Some(f) => writeFile(os.RelPath(f), output)
                       }
                       0
                   }
