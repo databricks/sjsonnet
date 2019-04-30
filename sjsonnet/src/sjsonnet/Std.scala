@@ -7,7 +7,7 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
 
-import scala.annotation.switch
+import scala.collection.mutable.ArrayBuffer
 
 object Std {
   sealed trait ReadWriter[T]{
@@ -394,6 +394,18 @@ object Std {
           if Materializer(v.force, extVars, wd) == Materializer(value, extVars, wd)
         ) yield Lazy(Val.Num(i))
       )
+    },
+    builtin("findSubstr", "pat", "str") { (wd, extVars, pat: String, str: String) =>
+      if (pat.length == 0) Val.Arr(Seq())
+      else {
+        val indices = ArrayBuffer[Int]()
+        var matchIndex = str.indexOf(pat)
+        while (0 <= matchIndex && matchIndex < str.length) {
+          indices.append(matchIndex)
+          matchIndex = str.indexOf(pat, matchIndex + 1)
+        }
+        Val.Arr(indices.map(x => Lazy(Val.Num(x))))
+      }
     },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) => {
       val safeOffset = math.min(from, s.length - 1)

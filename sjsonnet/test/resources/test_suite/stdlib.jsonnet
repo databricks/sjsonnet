@@ -853,6 +853,14 @@ std.assertEqual(std.asciiLower('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()asdfghf
 
 //std.assertEqual(std.deepJoin(['a', ['b', 'c', [[], 'd', ['e'], 'f', 'g'], [], []], 'h']),
 //                'abcdefgh') &&
+
+std.assertEqual(std.findSubstr('', 'a'), []) &&
+std.assertEqual(std.findSubstr('aa', ''), []) &&
+std.assertEqual(std.findSubstr('aa', 'bb'), []) &&
+std.assertEqual(std.findSubstr('aa', 'a'), []) &&
+std.assertEqual(std.findSubstr('aa', 'aa'), [0]) &&
+std.assertEqual(std.findSubstr('aa', 'bbaabaaa'), [2, 5, 6]) &&
+
 std.assertEqual(std.find(null, [null]), [0]) &&
 std.assertEqual(std.find([], [[]]), [0]) &&
 std.assertEqual(std.find({}, [{}]), [0]) &&
