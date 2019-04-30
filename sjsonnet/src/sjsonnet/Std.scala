@@ -387,6 +387,14 @@ object Std {
         }
       )
     },
+    builtin("find", "value","arr"){ (wd, extVars, value: Val, arr: Val.Arr) =>
+      Val.Arr(
+        for (
+          (v, i) <- arr.value.zipWithIndex
+          if Materializer(v.force, extVars, wd) == Materializer(value, extVars, wd)
+        ) yield Lazy(Val.Num(i))
+      )
+    },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) => {
       val safeOffset = math.min(from, s.length - 1)
       val safeLength = math.min(len, s.length - 1 - safeOffset)
