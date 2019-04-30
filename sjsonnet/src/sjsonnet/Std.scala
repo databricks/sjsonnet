@@ -693,6 +693,28 @@ object Std {
     builtin("parseHex", "str"){ (wd, extVars, str: String) =>
       Integer.parseInt(str, 16)
     },
+    builtin("parseJson", "str") { (wd, extVars, str: String) =>
+
+      def recursiveTransform(js: ujson.Js): Val = {
+        js match {
+          case ujson.Js.Null => Val.Null
+          case ujson.Js.True => Val.True
+          case ujson.Js.False => Val.False
+          case ujson.Js.Num(value) => Val.Num(value)
+          case ujson.Js.Str(value) => Val.Str(value)
+          case ujson.Js.Arr(values) =>
+            val transformedValue: Seq[Lazy] = values.map( v => Lazy(recursiveTransform(v)))
+            Val.Arr(transformedValue)
+          case ujson.Js.Obj(valueMap) =>
+            val transformedValue = valueMap
+              .mapValues { v =>
+                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => Lazy(recursiveTransform(v)))
+              }.toMap
+            Val.Obj(transformedValue , (x: Val.Obj) => (), None)
+        }
+      }
+      recursiveTransform(ujson.read(str))
+    },
     builtin("md5", "s"){ (wd, extVars, s: String) =>
       java.security.MessageDigest.getInstance("MD5")
         .digest(s.getBytes("UTF-8"))

@@ -838,6 +838,16 @@ std.assertEqual(std.prune({ a: [[], {}, null], b: { a: [], b: {}, c: null } }), 
 std.assertEqual(std.prune([[[], {}, null], { a: [], b: {}, c: null }]), []) &&
 std.assertEqual(std.prune({ a: [{ b: true }] }), { a: [{ b: true }] }) &&
 
+std.assertEqual(std.parseJson('"foo"'), 'foo') &&
+std.assertEqual(std.parseJson('{}'), {}) &&
+std.assertEqual(std.parseJson('[]'), []) &&
+std.assertEqual(std.parseJson('null'), null) &&
+std.assertEqual(std.parseJson('12'), 12) &&
+std.assertEqual(std.parseJson('12.123'), 12.123) &&
+std.assertEqual(std.parseJson('{"a": 1}'), { a: 1}) &&
+std.assertEqual(std.parseJson('[5]'), [5]) &&
+std.assertEqual(std.parseJson('{"a": {"b": ["c", 42]}}'), { a: { b: ['c', 42] } }) &&
+
 std.assertEqual(std.asciiUpper('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()ASDFGHFGHJKL09876 ') &&
 std.assertEqual(std.asciiLower('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()asdfghfghjkl09876 ') &&
 
