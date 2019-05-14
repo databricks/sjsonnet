@@ -7,7 +7,7 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
 
-import scala.annotation.switch
+import scala.collection.mutable.ArrayBuffer
 
 object Std {
   sealed trait ReadWriter[T]{
@@ -387,6 +387,26 @@ object Std {
         }
       )
     },
+    builtin("find", "value","arr"){ (wd, extVars, value: Val, arr: Val.Arr) =>
+      Val.Arr(
+        for (
+          (v, i) <- arr.value.zipWithIndex
+          if Materializer(v.force, extVars, wd) == Materializer(value, extVars, wd)
+        ) yield Lazy(Val.Num(i))
+      )
+    },
+    builtin("findSubstr", "pat", "str") { (wd, extVars, pat: String, str: String) =>
+      if (pat.length == 0) Val.Arr(Seq())
+      else {
+        val indices = ArrayBuffer[Int]()
+        var matchIndex = str.indexOf(pat)
+        while (0 <= matchIndex && matchIndex < str.length) {
+          indices.append(matchIndex)
+          matchIndex = str.indexOf(pat, matchIndex + 1)
+        }
+        Val.Arr(indices.map(x => Lazy(Val.Num(x))))
+      }
+    },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) => {
       val safeOffset = math.min(from, s.length - 1)
       val safeLength = math.min(len, s.length - 1 - safeOffset)
@@ -692,6 +712,28 @@ object Std {
     },
     builtin("parseHex", "str"){ (wd, extVars, str: String) =>
       Integer.parseInt(str, 16)
+    },
+    builtin("parseJson", "str") { (wd, extVars, str: String) =>
+
+      def recursiveTransform(js: ujson.Js): Val = {
+        js match {
+          case ujson.Js.Null => Val.Null
+          case ujson.Js.True => Val.True
+          case ujson.Js.False => Val.False
+          case ujson.Js.Num(value) => Val.Num(value)
+          case ujson.Js.Str(value) => Val.Str(value)
+          case ujson.Js.Arr(values) =>
+            val transformedValue: Seq[Lazy] = values.map( v => Lazy(recursiveTransform(v)))
+            Val.Arr(transformedValue)
+          case ujson.Js.Obj(valueMap) =>
+            val transformedValue = valueMap
+              .mapValues { v =>
+                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => Lazy(recursiveTransform(v)))
+              }.toMap
+            Val.Obj(transformedValue , (x: Val.Obj) => (), None)
+        }
+      }
+      recursiveTransform(ujson.read(str))
     },
     builtin("md5", "s"){ (wd, extVars, s: String) =>
       java.security.MessageDigest.getInstance("MD5")
