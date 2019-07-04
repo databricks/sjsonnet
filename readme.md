@@ -156,13 +156,13 @@ mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
 ```bash
-mill show sjsonnet.assembly
+./mill show sjsonnet.assembly
 ```
 
 To create the executable. For the client-server executable, you can use
 
 ```bash
-mill show sjsonnet.server.assembly
+./mill show sjsonnet.server.assembly
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5

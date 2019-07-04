@@ -1,7 +1,18 @@
 import mill._, scalalib._, publish._
-val sjsonnetVersion = "0.1.3"
+val sjsonnetVersion = "0.1.4"
 
-trait SjsonnetJavaModule extends PublishModule{
+object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
+class SjsonnetModule(val crossScalaVersion: String) extends CrossScalaModule with PublishModule {
+  def mainClass = Some("sjsonnet.SjsonnetMain")
+  def ivyDeps = Agg(
+    ivy"com.lihaoyi::fastparse:2.1.3",
+    ivy"com.lihaoyi::pprint:0.5.5",
+    ivy"com.lihaoyi::os-lib:0.3.0",
+    ivy"com.lihaoyi::ujson:0.7.5",
+    ivy"com.lihaoyi::scalatags:0.7.0",
+    ivy"com.github.scopt::scopt:3.7.1",
+    ivy"org.scala-lang.modules::scala-collection-compat:2.0.0"
+  )
   def publishVersion = sjsonnetVersion
 
   def pomSettings = PomSettings(
@@ -15,30 +26,13 @@ trait SjsonnetJavaModule extends PublishModule{
     )
   )
 
-}
-trait SjsonnetScalaModule extends SjsonnetJavaModule with ScalaModule{
-  def scalaVersion = "2.12.6"
-//  def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.1.7")
-//  def scalacOptions = Seq("-P:acyclic:force")
-//  def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.1.7")
-}
-object sjsonnet extends SjsonnetScalaModule{
-  def mainClass = Some("sjsonnet.SjsonnetMain")
-  def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse:2.0.5",
-    ivy"com.lihaoyi::pprint:0.5.3",
-    ivy"com.lihaoyi::os-lib:0.1.0",
-    ivy"com.lihaoyi::ujson:0.6.7",
-    ivy"com.lihaoyi::scalatags:0.6.7",
-    ivy"com.github.scopt::scopt:3.5.0"
-  )
   object test extends Tests{
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest:0.6.4")
+    def ivyDeps = Agg(ivy"com.lihaoyi::utest:0.7.1")
     def testFrameworks = Seq("utest.runner.Framework")
   }
 
 
-  object client extends SjsonnetJavaModule {
+  object client extends JavaModule {
     def ivyDeps = Agg(
       ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
         "net.java.dev.jna" -> "jna",
@@ -51,9 +45,9 @@ object sjsonnet extends SjsonnetScalaModule{
     }
   }
 
-  object server extends SjsonnetScalaModule{
-    def scalaVersion = "2.12.6"
-    def moduleDeps = Seq(sjsonnet, client)
+  object server extends ScalaModule{
+    def scalaVersion = crossScalaVersion
+    def moduleDeps = Seq(SjsonnetModule.this, client)
     def ivyDeps = Agg(
       ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
         "net.java.dev.jna" -> "jna",

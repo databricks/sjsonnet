@@ -8,22 +8,23 @@ import sjsonnet.Expr.Params
 import sjsonnet.Scope.empty
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.compat._
 
 object Std {
   sealed trait ReadWriter[T]{
-    def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path): Either[String, T]
+    def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path): Either[String, T]
     def write(t: T): Val
   }
   object ReadWriter{
     implicit object StringRead extends ReadWriter[String]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case Val.Str(s) => Right(s)
         case _ => Left("String")
       }
       def write(t: String) = Val.Str(t)
     }
     implicit object BooleanRead extends ReadWriter[Boolean]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case Val.True => Right(true)
         case Val.False => Right(false)
         case _ => Left("Boolean")
@@ -31,39 +32,39 @@ object Std {
       def write(t: Boolean) = Val.bool(t)
     }
     implicit object IntRead extends ReadWriter[Int]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case Val.Num(s) => Right(s.toInt)
         case _ => Left("Int")
       }
       def write(t: Int) = Val.Num(t)
     }
     implicit object DoubleRead extends ReadWriter[Double]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case Val.Num(s) => Right(s)
         case _ => Left("Number")
       }
       def write(t: Double) = Val.Num(t)
     }
     implicit object ValRead extends ReadWriter[Val]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = Right(t)
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = Right(t)
       def write(t: Val) = t
     }
     implicit object ObjRead extends ReadWriter[Val.Obj]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case v: Val.Obj => Right(v)
         case _ => Left("Object")
       }
       def write(t: Val.Obj) = t
     }
     implicit object ArrRead extends ReadWriter[Val.Arr]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case v: Val.Arr => Right(v)
         case _ => Left("Array")
       }
       def write(t: Val.Arr) = t
     }
     implicit object FuncRead extends ReadWriter[Val.Func]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case v: Val.Func => Right(v)
         case _ => Left("Function")
       }
@@ -71,18 +72,18 @@ object Std {
     }
 
     implicit object ApplyerRead extends ReadWriter[Applyer]{
-      def apply(t: Val, extVars: Map[String, ujson.Js], wd: os.Path) = t match{
+      def apply(t: Val, extVars: Map[String, ujson.Value], wd: os.Path) = t match{
         case v: Val.Func => Right(Applyer(v, extVars, wd))
         case _ => Left("Function")
       }
       def write(t: Applyer) = t.f
     }
   }
-  case class Applyer(f: Val.Func, extVars: Map[String, ujson.Js], wd: os.Path){
+  case class Applyer(f: Val.Func, extVars: Map[String, ujson.Value], wd: os.Path){
     def apply(args: Lazy*) = f.apply(args.map((None, _)), "(memory)", extVars, -1, wd)
   }
 
-  def validate(vs: Seq[Val], extVars: Map[String, ujson.Js], wd: os.Path, rs: Seq[ReadWriter[_]]) = {
+  def validate(vs: Seq[Val], extVars: Map[String, ujson.Value], wd: os.Path, rs: Seq[ReadWriter[_]]) = {
     for((v, r) <- vs.zip(rs)) yield r.apply(v, extVars, wd) match{
       case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
       case Right(x) => x
@@ -90,23 +91,23 @@ object Std {
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
-                             (eval:  (os.Path, Map[String, ujson.Js], T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, extVars, wd) =>
+                             (eval:  (os.Path, Map[String, ujson.Value], T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, extVars, wd) =>
     val Seq(v: T1) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]]))
     eval(wd, extVars, v)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
-                                             (eval:  (os.Path, Map[String, ujson.Js], T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, extVars, wd) =>
+                                             (eval:  (os.Path, Map[String, ujson.Value], T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, extVars, wd) =>
     val Seq(v1: T1, v2: T2) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
     eval(wd, extVars, v1, v2)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
-                                                             (eval:  (os.Path, Map[String, ujson.Js], T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, extVars, wd) =>
+                                                             (eval:  (os.Path, Map[String, ujson.Value], T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, extVars, wd) =>
     val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, extVars, wd, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
     eval(wd, extVars, v1, v2, v3)
   }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], Map[String, ujson.Js], os.Path) => R) = {
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], Map[String, ujson.Value], os.Path) => R) = {
     name -> Val.Func(
       empty,
       Params(params.map(_ -> None)),
@@ -118,7 +119,7 @@ object Std {
     *
     * Arguments of the eval function are (args, extVars, wd)
     */
-  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], Map[String, ujson.Js], os.Path) => R): (String, Val.Func) = {
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], Map[String, ujson.Value], os.Path) => R): (String, Val.Func) = {
     name -> Val.Func(
       empty,
       Params(params),
@@ -195,11 +196,11 @@ object Std {
         case _: Val.Str | Val.Null => // donothing
         case x => throw new DelegateError("Cannot call .lines on " + x.prettyName)
       }
-      Materializer.apply(v1, extVars, wd).asInstanceOf[ujson.Js.Arr]
+      Materializer.apply(v1, extVars, wd).asInstanceOf[ujson.Arr]
         .value
-        .filter(_ != ujson.Js.Null)
+        .filter(_ != ujson.Null)
         .map{
-          case ujson.Js.Str(s) => s + "\n"
+          case ujson.Str(s) => s + "\n"
           case _ => ??? /* we ensure it's all strings above */
         }
         .mkString
@@ -229,17 +230,17 @@ object Std {
       )
     },
     builtin("mergePatch", "target", "patch"){ (wd, extVars, target: Val, patch: Val) =>
-      def rec(l: ujson.Js, r: ujson.Js): ujson.Js = {
+      def rec(l: ujson.Value, r: ujson.Value): ujson.Value = {
         (l, r) match{
-          case (l0, r: ujson.Js.Obj) =>
+          case (l0, r: ujson.Obj) =>
             val l = l0 match{
-              case l: ujson.Js.Obj => l
-              case _ => ujson.Js.Obj()
+              case l: ujson.Obj => l
+              case _ => ujson.Obj()
             }
             for((k, v) <- r.value){
-              if (v == ujson.Js.Null) l.value.remove(k)
+              if (v == ujson.Null) l.value.remove(k)
               else if (l.value.contains(k)) l(k) = rec(l(k), r(k))
-              else l(k) = rec(ujson.Js.Obj(), r(k))
+              else l(k) = rec(ujson.Obj(), r(k))
             }
             l
           case (_, _) => r
@@ -404,7 +405,7 @@ object Std {
           indices.append(matchIndex)
           matchIndex = str.indexOf(pat, matchIndex + 1)
         }
-        Val.Arr(indices.map(x => Lazy(Val.Num(x))))
+        Val.Arr(indices.map(x => Lazy(Val.Num(x))).toSeq)
       }
     },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) => {
@@ -450,7 +451,7 @@ object Std {
               case x => throw new DelegateError("Cannot join " + x.prettyName)
             }
           }
-          Val.Arr(out)
+          Val.Arr(out.toSeq)
         case x => throw new DelegateError("Cannot join " + x.prettyName)
       }
       res
@@ -464,24 +465,24 @@ object Std {
           case x => throw new DelegateError("Cannot call flattenArrays on " + x)
         }
       }
-      Val.Arr(out)
+      Val.Arr(out.toSeq)
     },
     builtin("manifestIni", "v"){ (wd, extVars, v: Val) =>
       val materialized = Materializer(v, extVars, wd)
-      def sect(x: ujson.Js.Obj) = {
+      def sect(x: ujson.Obj) = {
         x.value.flatMap{
-          case (k, ujson.Js.Str(v)) => Seq(k + " = " + v)
-          case (k, ujson.Js.Arr(vs)) =>
+          case (k, ujson.Str(v)) => Seq(k + " = " + v)
+          case (k, ujson.Arr(vs)) =>
             vs.map{
-              case ujson.Js.Str(v) => k + " = " + v
+              case ujson.Str(v) => k + " = " + v
               case x => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
             }
           case (k, x) => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
         }
       }
-      val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Js.Obj])) ++
+      val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
         materialized.obj.get("sections").fold(Iterable[String]())(x =>
-          x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Js.Obj])}
+          x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
         )
       lines.flatMap(Seq(_, "\n")).mkString
     },
@@ -539,19 +540,19 @@ object Std {
       import scalatags.Text.all.{value => _, _}
 
 
-      def rec(v: ujson.Js): Frag = {
+      def rec(v: ujson.Value): Frag = {
         v match {
-          case ujson.Js.Str(s) => s
-          case ujson.Js.Arr(Seq(ujson.Js.Str(t), attrs: ujson.Js.Obj, children@_*)) =>
+          case ujson.Str(s) => s
+          case ujson.Arr(collection.mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
               attrs.value.map {
-                case (k, ujson.Js.Str(v)) => attr(k) := v
+                case (k, ujson.Str(v)) => attr(k) := v
                 case (k, v) => throw new DelegateError("Cannot call manifestXmlJsonml on " + v.getClass)
               }.toSeq,
               children.map(rec)
             )
-          case ujson.Js.Arr(Seq(ujson.Js.Str(t), children@_*)) =>
-            tag(t)(children.map(rec))
+          case ujson.Arr(collection.mutable.Seq(ujson.Str(t), children@_*)) =>
+            tag(t)(children.map(rec).toSeq)
           case x =>
             throw new DelegateError("Cannot call manifestXmlJsonml on " + x.getClass)
         }
@@ -592,98 +593,98 @@ object Std {
       }
     },
     builtin("uniq", "arr"){ (wd, extVars, arr: Val.Arr) =>
-      val ujson.Js.Arr(vs) = Materializer(arr, extVars, wd)
-      val out = collection.mutable.Buffer.empty[ujson.Js]
+      val ujson.Arr(vs) = Materializer(arr, extVars, wd)
+      val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("set", "arr"){ (wd, extVars, arr: Val.Arr) =>
-      val ujson.Js.Arr(vs0) = Materializer(arr, extVars, wd)
+      val ujson.Arr(vs0) = Materializer(arr, extVars, wd)
       val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        if (vs0.forall(_.isInstanceOf[ujson.Str])){
+          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
+          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
           throw new DelegateError("Every element of the input must be of the same type, string or number")
         }
 
-      val out = collection.mutable.Buffer.empty[ujson.Js]
+      val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("setUnion", "a", "b"){ (wd, extVars, a: Val.Arr, b: Val.Arr) =>
 
-      val ujson.Js.Arr(vs1) = Materializer(a, extVars, wd)
-      val ujson.Js.Arr(vs2) = Materializer(b, extVars, wd)
+      val ujson.Arr(vs1) = Materializer(a, extVars, wd)
+      val ujson.Arr(vs2) = Materializer(b, extVars, wd)
       val vs0 = vs1 ++ vs2
       val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        if (vs0.forall(_.isInstanceOf[ujson.Str])){
+          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
+          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
           throw new DelegateError("Every element of the input must be of the same type, string or number")
         }
 
-      val out = collection.mutable.Buffer.empty[ujson.Js]
+      val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("setInter", "a", "b"){ (wd, extVars, a: Val, b: Val.Arr) =>
       val vs1 = Materializer(a, extVars, wd) match{
-        case ujson.Js.Arr(vs1) => vs1
+        case ujson.Arr(vs1) => vs1
         case x => Seq(x)
       }
-      val ujson.Js.Arr(vs2) = Materializer(b, extVars, wd)
+      val ujson.Arr(vs2) = Materializer(b, extVars, wd)
 
 
-      val vs0 = vs1.to[collection.mutable.LinkedHashSet]
-        .intersect(vs2.to[collection.mutable.LinkedHashSet])
+      val vs0 = vs1.to(collection.mutable.LinkedHashSet)
+        .intersect(vs2.to(collection.mutable.LinkedHashSet))
         .toSeq
       val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        if (vs0.forall(_.isInstanceOf[ujson.Str])){
+          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
+          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
           throw new DelegateError("Every element of the input must be of the same type, string or number")
         }
 
-      val out = collection.mutable.Buffer.empty[ujson.Js]
+      val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("setDiff", "a", "b"){ (wd, extVars, a: Val.Arr, b: Val.Arr) =>
-      val ujson.Js.Arr(vs1) = Materializer(a, extVars, wd)
-      val ujson.Js.Arr(vs2) = Materializer(b, extVars, wd)
+      val ujson.Arr(vs1) = Materializer(a, extVars, wd)
+      val ujson.Arr(vs2) = Materializer(b, extVars, wd)
 
 
-      val vs0 = vs1.to[collection.mutable.LinkedHashSet]
-        .diff(vs2.to[collection.mutable.LinkedHashSet])
+      val vs0 = vs1.to(collection.mutable.LinkedHashSet)
+        .diff(vs2.to(collection.mutable.LinkedHashSet))
         .toSeq
       val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Js.Str])){
-          vs0.map(_.asInstanceOf[ujson.Js.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Js.Num])){
-          vs0.map(_.asInstanceOf[ujson.Js.Num]).sortBy(_.value)
+        if (vs0.forall(_.isInstanceOf[ujson.Str])){
+          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
+        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
+          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
           throw new DelegateError("Every element of the input must be of the same type, string or number")
         }
 
-      val out = collection.mutable.Buffer.empty[ujson.Js]
+      val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))))
+      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
 
     },
     builtin("setMember", "x", "arr"){ (wd, extVars, x: Val, arr: Val.Arr) =>
       val vs1 = Materializer(x, extVars, wd)
-      val ujson.Js.Arr(vs2) = Materializer(arr, extVars, wd)
+      val ujson.Arr(vs2) = Materializer(arr, extVars, wd)
       vs2.contains(vs1)
     },
     builtin("split", "str", "c"){ (wd, extVars, str: String, c: String) =>
@@ -701,7 +702,7 @@ object Std {
         output.append(new String(Character.toChars(codepoint)))
         offset += Character.charCount(codepoint)
       }
-      Val.Arr(output.map(s => Lazy(Val.Str(s))))
+      Val.Arr(output.map(s => Lazy(Val.Str(s))).toSeq)
 
     },
     builtin("parseInt", "str"){ (wd, extVars, str: String) =>
@@ -715,17 +716,17 @@ object Std {
     },
     builtin("parseJson", "str") { (wd, extVars, str: String) =>
 
-      def recursiveTransform(js: ujson.Js): Val = {
+      def recursiveTransform(js: ujson.Value): Val = {
         js match {
-          case ujson.Js.Null => Val.Null
-          case ujson.Js.True => Val.True
-          case ujson.Js.False => Val.False
-          case ujson.Js.Num(value) => Val.Num(value)
-          case ujson.Js.Str(value) => Val.Str(value)
-          case ujson.Js.Arr(values) =>
-            val transformedValue: Seq[Lazy] = values.map( v => Lazy(recursiveTransform(v)))
+          case ujson.Null => Val.Null
+          case ujson.True => Val.True
+          case ujson.False => Val.False
+          case ujson.Num(value) => Val.Num(value)
+          case ujson.Str(value) => Val.Str(value)
+          case ujson.Arr(values) =>
+            val transformedValue: Seq[Lazy] = values.map(v => Lazy(recursiveTransform(v))).toSeq
             Val.Arr(transformedValue)
-          case ujson.Js.Obj(valueMap) =>
+          case ujson.Obj(valueMap) =>
             val transformedValue = valueMap
               .mapValues { v =>
                 Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => Lazy(recursiveTransform(v)))

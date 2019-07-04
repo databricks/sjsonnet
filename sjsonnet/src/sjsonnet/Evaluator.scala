@@ -1,6 +1,6 @@
 package sjsonnet
 
-import Expr._
+import Expr.{Error => _, _}
 import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 object Evaluator {

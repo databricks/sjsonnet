@@ -2,8 +2,8 @@ package sjsonnet
 import java.io.StringWriter
 import java.util.regex.Pattern
 
-import ujson.{ArrVisitor, BaseRenderer, ObjVisitor}
-
+import upickle.core.{ArrVisitor, ObjVisitor}
+import ujson.BaseRenderer
 class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
                      indent: Int = -1) extends BaseRenderer(out, indent){
 
@@ -46,7 +46,7 @@ class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
 class Renderer(out: StringWriter = new java.io.StringWriter(),
                indent: Int = -1) extends BaseRenderer(out, indent){
   var newlineBuffered = false
-  override def visitNumRaw(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
     RenderUtils.renderDouble(out, d)
     out
@@ -70,7 +70,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     out.append('[')
@@ -95,19 +95,17 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     out.append('{')
     newlineBuffered = true
     depth += 1
     def subVisitor = Renderer.this
-    def visitKey(s: CharSequence, index: Int): Unit = {
+    def visitKey(index: Int) = Renderer.this
+    def visitKeyValue(v: Any): Unit = {
       empty = false
       flushBuffer()
-
-      ujson.Renderer.escape(out, s, true)
-
       out.append(colonSnippet)
     }
     def visitValue(v: StringWriter, index: Int): Unit = {
@@ -156,7 +154,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
       out
     }
   }
-  override def visitNumRaw(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
     RenderUtils.renderDouble(out, d)
     out
@@ -183,7 +181,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
     newlineBuffered = false
     dashBuffered = false
   }
-  override def visitArray(index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
 
@@ -213,7 +211,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
       out
     }
   }
-  override def visitObject(index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
@@ -222,10 +220,10 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
     if (afterKey) newlineBuffered = true
 
     def subVisitor = YamlRenderer.this
-    def visitKey(s: CharSequence, index: Int): Unit = {
+    def visitKey(index: Int) = YamlRenderer.this
+    def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
-      ujson.Renderer.escape(out, s, true)
       out.append(colonSnippet)
       afterKey = true
       newlineBuffered = false

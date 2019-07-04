@@ -130,7 +130,7 @@ object Cli{
 
     for(arg <- args) yield {
       showArg(arg).padTo(leftMargin, ' ').mkString +
-        arg.doc.lines.mkString("\n" + " " * leftMargin)
+        arg.doc.linesIterator.mkString("\n" + " " * leftMargin)
     }
   }
   def help(wd: os.Path) = {

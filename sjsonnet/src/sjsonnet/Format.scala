@@ -40,7 +40,7 @@ object Format{
   }
 
 
-  def plain[_: P] = P( CharsWhile(_ != '%', min = 0).! )
+  def plain[_: P] = P( CharsWhile(_ != '%', 0).! )
   def format[_: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
 
