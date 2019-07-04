@@ -10,8 +10,8 @@ Sjsonnet can be used from Java:
 ```xml
 <dependency>
     <groupId>com.lihaoyi</groupId>
-    <artifactId>sjsonnet_2.12</artifactId>
-    <version>0.1.3</version>
+    <artifactId>sjsonnet_2.13</artifactId>
+    <version>0.1.4</version>
 </dependency>
 ```
 ```java
@@ -29,8 +29,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.1.3" // SBT
-ivy"com.lihaoyi::sjsonnet:0.1.3" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.1.4" // SBT
+ivy"com.lihaoyi::sjsonnet:0.1.4" // Mill
 ```
 
 ```scala
@@ -46,10 +46,10 @@ sjsonnet.SjsonnetMain.main0(
 ```
 Or as a standalone executable assembly:
 
-- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.3/sjsonnet.jar
+- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.4/sjsonnet.jar
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.3/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.4/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -156,13 +156,13 @@ mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
 ```bash
-./mill show sjsonnet.assembly
+./mill show sjsonnet[2.13.0].assembly
 ```
 
 To create the executable. For the client-server executable, you can use
 
 ```bash
-./mill show sjsonnet.server.assembly
+./mill show sjsonnet[2.13.0].server.assembly
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
