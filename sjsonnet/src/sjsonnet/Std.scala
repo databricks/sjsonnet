@@ -374,8 +374,8 @@ object Std {
     },
     builtin("mapWithIndex", "func", "arr"){ (wd, extVars, func: Applyer, arr: Val.Arr) =>
       Val.Arr(
-        arr.value.zipWithIndex.map{ case (i, i2) =>
-          Lazy(func.apply(i, Lazy(Val.Num(i2))))
+        arr.value.zipWithIndex.map{ case (x, i) =>
+          Lazy(func.apply(Lazy(Val.Num(i)), x))
         }
       )
     },
