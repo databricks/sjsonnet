@@ -168,6 +168,7 @@ object EvaluatorTests extends TestSuite{
       eval("std.pow(n=3, x=2)") ==> Js.Num(8)
       eval("({a:: 1} + {a+:::2}).a") ==> Js.Num(3)
       eval("(std.prune({a:: 1}) + {a+:::2}).a") ==> Js.Num(2)
+      eval("std.toString(std.mapWithIndex(function(idx, elem) elem, [2,1,0]))") ==> Js.Str("[2, 1, 0]")
     }
     'unboundParam - {
       val ex = intercept[Exception]{
