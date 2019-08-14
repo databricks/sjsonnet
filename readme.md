@@ -151,7 +151,7 @@ builtin functions.
 
 ## Client-Server
 
-Sjsonnet comes with a build in thin-client and background server, to help
+Sjsonnet comes with a built in thin-client and background server, to help
 mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
