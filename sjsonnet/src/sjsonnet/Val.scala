@@ -21,8 +21,6 @@ sealed trait Val{
 }
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
-  implicit def boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
-  implicit def nullName: PrettyNamed[Val.Null.type] = new PrettyNamed("null")
   implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
   implicit def numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
   implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
@@ -32,14 +30,11 @@ object PrettyNamed{
 object Val{
   def bool(b: Boolean) = if (b) True else False
   sealed trait Bool extends Val{
-    def value: Boolean
   }
   case object True extends Bool{
-    def value = true
     def prettyName = "boolean"
   }
   case object False extends Bool{
-    def value = false
     def prettyName = "boolean"
   }
   case object Null extends Val{

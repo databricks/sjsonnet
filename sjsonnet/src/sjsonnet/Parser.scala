@@ -205,8 +205,7 @@ object Parser{
   def importStr[_: P](index: Int) = P( string.map(Expr.ImportStr(index, _)) )
   def `import`[_: P](index: Int) = P( string.map(Expr.Import(index, _)) )
   def error[_: P](index: Int) = P(expr.map(Expr.Error(index, _)) )
-  def strExpr[_: P] = P((Index ~~ string).map(Expr.Str.tupled))
-  def idExpr[_: P] = P( (Index ~~ id).map(Expr.Id.tupled) )
+
   def unaryOpExpr[_: P](index: Int, op: Char) = P(
     expr1.map{ e =>
       def k2 = op match{
@@ -332,8 +331,6 @@ object Parser{
     )
 
   ).!
-
-  def unaryop[_: P]	= P( CharIn("\\-+!~") ).!
 
   def document[_: P]: P[Expr] = P( expr ~ End )
 }
