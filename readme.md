@@ -118,7 +118,11 @@ Some notes on the values used in parts of the pipeline:
 
 ## Performance
 
-Due to pervasive caching, sjsonnet
+Due to pervasive caching, sjsonnet is much faster than google/jsonnet. See 
+this blog post for more details:
+
+- [Writing a Faster Jsonnet Compiler](https://databricks.com/blog/2018/10/12/writing-a-faster-jsonnet-compiler.html)
+
 ## Laziness
 
 The Jsonnet language is *lazy*: expressions don't get evaluated unless their
@@ -151,7 +155,7 @@ builtin functions.
 
 ## Client-Server
 
-Sjsonnet comes with a build in thin-client and background server, to help
+Sjsonnet comes with a built in thin-client and background server, to help
 mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
