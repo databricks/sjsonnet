@@ -162,6 +162,7 @@ std.assertEqual(std.substr('cookie', 1, 3), 'ook') &&
 std.assertEqual(std.substr('cookie', 1, 0), '') &&
 std.assertEqual(std.substr('cookie', 6, 2), '') &&
 std.assertEqual(std.substr('cookie', 6, 0), '') &&
+std.assertEqual(std.substr('cookie', 0, 6), 'cookie') &&
 
 std.assertEqual(std.startsWith('food', 'foo'), true) &&
 std.assertEqual(std.startsWith('food', 'food'), true) &&
