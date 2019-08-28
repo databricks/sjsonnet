@@ -37,10 +37,12 @@ object Evaluator {
   }
 
   def fileImporter(scope: Scope, value: String): Option[os.Path] = {
-    (scope.currentFile / os.up :: scope.searchRoots).
-      map(base => os.FilePath(value) match {
-        case r: os.RelPath => base / r
-        case a: os.Path => a
+    (scope.currentFile / os.up :: scope.searchRoots)
+      .flatMap(base => os.FilePath(value) match {
+        case r: os.RelPath =>
+          if (r.ups > base.segmentCount) None
+          else Some(base / r)
+        case a: os.Path => Some(a)
       })
       .find(os.exists)
   }

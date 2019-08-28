@@ -221,6 +221,9 @@ object EvaluatorTests extends TestSuite{
       res ==> Js.Str("Hello Bob!")
     }
 
+    'equalDollar - {
+      eval("local f(x) = x; {hello: 123, world: f(x=$.hello)}")
+    }
 //    'format - {
 //      eval("\"%s\" % \"world\"") ==> Value.Str("world")
 //      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")
