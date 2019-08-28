@@ -410,7 +410,7 @@ object Std {
     },
     builtin("substr", "s", "from", "len"){ (wd, extVars, s: String, from: Int, len: Int) => {
       val safeOffset = math.min(from, s.length - 1)
-      val safeLength = math.min(len, s.length - 1 - safeOffset)
+      val safeLength = math.min(len, s.length - safeOffset)
       s.substring(safeOffset, safeOffset + safeLength)
       }
     },
