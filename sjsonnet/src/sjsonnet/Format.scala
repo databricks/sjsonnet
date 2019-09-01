@@ -1,10 +1,5 @@
 package sjsonnet
 
-import java.io.StringWriter
-import java.text.DecimalFormat
-
-import scala.collection.mutable.ArrayBuffer
-
 object Format{
   case class FormatSpec(label: Option[String],
                         alternate: Boolean,
@@ -181,10 +176,11 @@ object Format{
   }
 
   def widenDecimalFormat(formatted: FormatSpec, template: String, s: Double) = {
+    val df = sjsonnet.DecimalFormat.format(template, math.abs(s))
     widen(
       formatted,
       if (s < 0) "-" else "", "",
-      new DecimalFormat(template).format(math.abs(s)).replace("E", "E+"),
+      df.replace("E", "E+"),
       true, s > 0
     )
   }

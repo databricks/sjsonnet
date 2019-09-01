@@ -45,9 +45,6 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
   object js extends SjsonnetCrossModule with ScalaJSModule{
     def scalaJSVersion = "0.6.28"
     def platformSegment = "js"
-    def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"io.github.cquiroz::scala-java-locales::0.5.5-cldr31"
-    )
     object test extends Tests with CrossTests
   }
   object jvm extends SjsonnetCrossModule {
