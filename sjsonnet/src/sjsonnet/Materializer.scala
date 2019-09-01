@@ -3,11 +3,10 @@ import java.util.IdentityHashMap
 
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
-import ujson.Js
 object Materializer {
   def apply(v: Val,
-            extVars: Map[String, ujson.Js],
-            wd: Path): Js = try {
+            extVars: Map[String, ujson.Value],
+            wd: Path): ujson.Value = try {
     v match {
       case Val.True => ujson.True
       case Val.False => ujson.False
@@ -54,7 +53,7 @@ object Materializer {
     )
   }
 
-  def toExpr(v: ujson.Js): Expr = v match{
+  def toExpr(v: ujson.Value): Expr = v match{
     case ujson.True => Expr.True(0)
     case ujson.False => Expr.False(0)
     case ujson.Null => Expr.Null(0)

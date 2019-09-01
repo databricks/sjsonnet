@@ -4,28 +4,28 @@ import utest._
 
 object YamlRendererTests extends TestSuite{
   def tests = Tests {
-    'empty - {
-      ujson.transform(ujson.Js.Arr(), new YamlRenderer()).toString ==> "[]"
-      ujson.transform(ujson.Js.Obj(), new YamlRenderer()).toString ==> "{}"
-      ujson.transform(ujson.Js.Obj("a" -> ujson.Js.Arr(), "b" -> ujson.Js.Obj()), new YamlRenderer()).toString ==>
+    test("empty") {
+      ujson.transform(ujson.Arr(), new YamlRenderer()).toString ==> "[]"
+      ujson.transform(ujson.Obj(), new YamlRenderer()).toString ==> "{}"
+      ujson.transform(ujson.Obj("a" -> ujson.Arr(), "b" -> ujson.Obj()), new YamlRenderer()).toString ==>
         """"a": []
           |"b": {}""".stripMargin
     }
-    'nonEmpty - {
-      ujson.transform(ujson.Js.Arr(1), new YamlRenderer()).toString ==>
+    test("nonEmpty") {
+      ujson.transform(ujson.Arr(1), new YamlRenderer()).toString ==>
         """- 1""".stripMargin
-      ujson.transform(ujson.Js.Arr(1, 2), new YamlRenderer()).toString ==>
+      ujson.transform(ujson.Arr(1, 2), new YamlRenderer()).toString ==>
         """- 1
           |- 2""".stripMargin
-      ujson.transform(ujson.Js.Obj("a" -> 1), new YamlRenderer()).toString ==>
+      ujson.transform(ujson.Obj("a" -> 1), new YamlRenderer()).toString ==>
         """"a": 1""".stripMargin
-      ujson.transform(ujson.Js.Obj("a" -> 1, "b" -> 2), new YamlRenderer()).toString ==>
+      ujson.transform(ujson.Obj("a" -> 1, "b" -> 2), new YamlRenderer()).toString ==>
         """"a": 1
           |"b": 2""".stripMargin
     }
-    'nested - {
+    test("nested") {
       ujson.transform(
-        ujson.Js.Arr(ujson.Js.Obj("a" -> ujson.Js.Arr(1))),
+        ujson.Arr(ujson.Obj("a" -> ujson.Arr(1))),
         new YamlRenderer()).toString ==>
         """- "a":
           |  - 1""".stripMargin

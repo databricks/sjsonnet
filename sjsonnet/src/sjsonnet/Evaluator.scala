@@ -46,7 +46,7 @@ object Evaluator {
 
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
-                extVars: Map[String, ujson.Js],
+                extVars: Map[String, ujson.Value],
                 wd: Path,
                 importer: (Scope, String) => Option[(Path, String)]) {
 
@@ -264,7 +264,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   def resolveImport(scope: Scope, value: String, offset: Int): (Path, String) = {
     importer(scope, value)
       .getOrElse(
-        Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
+        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )
   }
 

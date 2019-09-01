@@ -3,8 +3,6 @@ package sjsonnet
 import java.io.StringWriter
 import java.text.DecimalFormat
 
-import ujson.Js
-
 import scala.collection.mutable.ArrayBuffer
 
 object Format{
@@ -76,7 +74,7 @@ object Format{
              fileName: Path,
              currentRoot: Path,
              offset: Int,
-             extVars: Map[String, ujson.Js],
+             extVars: Map[String, ujson.Value],
              wd: Path): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
@@ -102,8 +100,8 @@ object Format{
           }
           i += 1
           value match{
-            case Js.Str(s) => widenRaw(formatted, s)
-            case Js.Num(s) =>
+            case ujson.Str(s) => widenRaw(formatted, s)
+            case ujson.Num(s) =>
               formatted.conversion match{
                 case 'd' | 'i' | 'u' => formatInteger(formatted, s)
                 case 'o' => formatOctal(formatted, s)
@@ -119,8 +117,8 @@ object Format{
                   if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
                   else widenRaw(formatted, s.toString)
               }
-            case Js.True => widenRaw(formatted, "true")
-            case Js.False => widenRaw(formatted, "false")
+            case ujson.True => widenRaw(formatted, "true")
+            case ujson.False => widenRaw(formatted, "false")
             case v => widenRaw(formatted, v.toString)
           }
 

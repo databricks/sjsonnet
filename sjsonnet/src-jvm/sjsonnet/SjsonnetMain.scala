@@ -3,13 +3,23 @@ package sjsonnet
 import java.io.{InputStream, PrintStream}
 import java.nio.file.NoSuchFileException
 
-import ujson.Js
 
 import scala.collection.mutable
 import scala.util.Try
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
+  def resolveImport(scope: Scope, str: String) = {
+    (scope.currentFile.parent() :: scope.searchRoots)
+      .flatMap(base => os.FilePath(str) match {
+        case r: os.RelPath =>
+          if (r.ups > base.segmentCount()) None
+          else Some(base.asInstanceOf[OsPath].p / r)
+        case a: os.Path => Some(a)
+      })
+      .find(os.exists)
+      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e => None})
+  }
   def main(args: Array[String]): Unit = {
     val exitCode = main0(
       args match {
@@ -67,17 +77,7 @@ object SjsonnetMain {
                     config.varBinding,
                     config.tlaBinding,
                     OsPath(wd),
-                    importer = (scope, str) => {
-                      (scope.currentFile.parent() :: scope.searchRoots)
-                        .flatMap(base => os.FilePath(str) match {
-                          case r: os.RelPath =>
-                            if (r.ups > base.segmentCount()) None
-                            else Some(base.asInstanceOf[OsPath].p / r)
-                          case a: os.Path => Some(a)
-                        })
-                        .find(os.exists)
-                        .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e => None})
-                    }
+                    importer = resolveImport
                   )
                   interp.interpret(OsPath(path)) match{
                     case Left(errMsg) =>
@@ -87,10 +87,10 @@ object SjsonnetMain {
 
                       case class RenderError(msg: String)
 
-                      def renderString(js: Js): Either[RenderError, String] = {
+                      def renderString(js: ujson.Value): Either[RenderError, String] = {
                         if (config.expectString) {
                           js match {
-                            case Js.Str(s) => Right(s)
+                            case ujson.Str(s) => Right(s)
                             case _ =>
                               Left(RenderError("expected string result, got: " + js.getClass))
                           }
@@ -111,7 +111,7 @@ object SjsonnetMain {
                       val output: String = config.multi match {
                         case Some(multiPath) =>
                           materialized match {
-                          case obj: Js.Obj =>
+                          case obj: ujson.Obj =>
                             val files = mutable.ListBuffer[os.RelPath]()
                             obj.value.foreach { case (f, v) =>
                               val rendered = renderString(v)

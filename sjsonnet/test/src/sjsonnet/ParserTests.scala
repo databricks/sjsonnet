@@ -4,7 +4,7 @@ import Expr._
 object ParserTests extends TestSuite{
   def parse(s: String) = fastparse.parse(s, Parser.document(_)).get.value
   def tests = Tests{
-    'hello - {
+    test("hello") {
       parse("true") ==> True(0)
 
       parse("123 + 456 + 789") ==>

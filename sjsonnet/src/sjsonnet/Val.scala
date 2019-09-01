@@ -86,7 +86,7 @@ object Val{
               currentRoot: Path,
               offset: Int,
               wd: Path,
-              extVars: Map[String, ujson.Js],
+              extVars: Map[String, ujson.Value],
               self: Obj = this) = {
 
       val (cached, lazyValue) =
@@ -104,7 +104,7 @@ object Val{
 
     def mergeMember(l: Val,
                     r: Val,
-                    extVars: Map[String, ujson.Js],
+                    extVars: Map[String, ujson.Value],
                     wd: Path,
                     currentFile: Path,
                     offset: Int) = (l, r) match{
@@ -123,7 +123,7 @@ object Val{
     def valueRaw(k: String,
                  self: Obj,
                  thisFile: () => String,
-                 extVars: Map[String, ujson.Js],
+                 extVars: Map[String, ujson.Value],
                  wd: Path,
                  currentFile: Path,
                  offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
@@ -145,12 +145,12 @@ object Val{
 
   case class Func(scope: Option[Scope],
                   params: Params,
-                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, Path) => Val,
+                  evalRhs: (Scope, String, Map[String, ujson.Value], Int, Path) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
-              extVars: Map[String, ujson.Js],
+              extVars: Map[String, ujson.Value],
               outerOffset: Int,
               wd: Path,
               callerPath: Path) = {

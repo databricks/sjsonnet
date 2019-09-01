@@ -8,8 +8,8 @@ import sjsonnet.Expr.{FieldName, Member, ObjBody, Params}
 
 class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                   scope: Scope,
-                  extVars: Map[String, ujson.Js],
-                  tlaVars: Map[String, ujson.Js],
+                  extVars: Map[String, ujson.Value],
+                  tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: (Scope, String) => Option[(Path, String)]) {
   val evaluator = new Evaluator(
@@ -20,14 +20,14 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
     importer
   )
 
-  def interpret(p: Path): Either[String, ujson.Js] = {
+  def interpret(p: Path): Either[String, ujson.Value] = {
     for{
       txt <- p.read().toRight(s"Failed to read file $p")
       json <- interpret(txt)
     } yield json
   }
 
-  def interpret(txt: String): Either[String, ujson.Js] = {
+  def interpret(txt: String): Either[String, ujson.Value] = {
     for{
       parsed <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)

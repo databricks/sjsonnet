@@ -421,11 +421,10 @@ object Std {
         Val.Arr(indices.map(x => Lazy(Val.Num(x))).toSeq)
       }
     },
-    builtin("substr", "s", "from", "len"){ (wd, extVars,  s: String, from: Int, len: Int) => {
-      val safeOffset = math.min(from, s.length - 1)
+    builtin("substr", "s", "from", "len"){ (wd, extVars,  s: String, from: Int, len: Int) =>
+      val safeOffset = math.min(from, s.length)
       val safeLength = math.min(len, s.length - safeOffset)
       s.substring(safeOffset, safeOffset + safeLength)
-      }
     },
     builtin("startsWith", "a", "b"){ (wd, extVars,  a: String, b: String) =>
       a.startsWith(b)
