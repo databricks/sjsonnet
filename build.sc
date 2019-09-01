@@ -11,7 +11,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     )
     def millSourcePath = super.millSourcePath / os.up
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
-    def mainClass = Some("sjsonnet.SjsonnetMain")
+
     def ivyDeps = Agg(
       ivy"com.lihaoyi::fastparse::2.1.3",
       ivy"com.lihaoyi::pprint::0.5.5",
@@ -48,6 +48,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     object test extends Tests with CrossTests
   }
   object jvm extends SjsonnetCrossModule {
+    def mainClass = Some("sjsonnet.SjsonnetMain")
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"com.lihaoyi::os-lib:0.3.0",

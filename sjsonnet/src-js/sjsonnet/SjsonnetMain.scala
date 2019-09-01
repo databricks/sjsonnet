@@ -2,16 +2,16 @@ package sjsonnet
 
 import scala.collection.mutable
 import scala.scalajs.js
-import scala.scalajs.js.annotation.JSExport
+import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
-@JSExport
-object Sjsonnet {
+@JSExportTopLevel("SjsonnetMain")
+object SjsonnetMain {
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
                 tlaVars: js.Any,
                 wd: Path,
-                importer: js.Function2[String, String, js.Array[String]]) = {
+                importer: js.Function2[String, String, js.Array[String]]): js.Any = {
     val interp = new Interpreter(
       mutable.Map.empty,
       Scope.standard(
@@ -28,7 +28,10 @@ object Sjsonnet {
         }
       }
     )
-    interp.interpret(text)
+    interp.interpret(text) match{
+      case Left(msg) => throw new js.JavaScriptException(msg)
+      case Right(v) => v.transform(ujson.WebJson.Builder)
+    }
   }
 }
 
