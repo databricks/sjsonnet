@@ -9,14 +9,15 @@ import scala.util.Try
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
-  def resolveImport(scope: Scope, str: String) = {
-    (scope.currentFile.parent() :: scope.searchRoots)
+  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
+    (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {
         case r: os.RelPath =>
           if (r.ups > base.segmentCount()) None
           else Some(base.asInstanceOf[OsPath].p / r)
         case a: os.Path => Some(a)
       })
+      .filter(p => allowedInputs.fold(true)(_(p)))
       .find(os.exists)
       .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e => None})
   }
@@ -43,7 +44,7 @@ object SjsonnetMain {
             stderr: PrintStream,
             wd: os.Path,
             allowedInputs: Option[Set[os.Path]] = None,
-            importer: Option[(Scope, String) => Option[os.Path]] = None): Int = {
+            importer: Option[(Seq[Path], String) => Option[os.Path]] = None): Int = {
 
     Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()) match{
       case Left(err) =>
@@ -71,15 +72,17 @@ object SjsonnetMain {
                     parseCache,
                     Scope.standard(
                       OsPath(path),
-                      OsPath(wd),
-                      config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
+                      OsPath(wd)
                     ),
                     config.varBinding,
                     config.tlaBinding,
                     OsPath(wd),
-                    importer = resolveImport
+                    importer = resolveImport(
+                      config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
+                      allowedInputs
+                    )
                   )
-                  interp.interpret(OsPath(path)) match{
+                  interp.interpret(os.read(path)) match{
                     case Left(errMsg) =>
                       stderr.println(errMsg)
                       1

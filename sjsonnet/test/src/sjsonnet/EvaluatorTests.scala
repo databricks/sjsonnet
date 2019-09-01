@@ -5,7 +5,7 @@ object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
     new Interpreter(
       collection.mutable.Map[String, fastparse.Parsed[Expr]](),
-      Scope.standard(DummyPath("(memory)"), DummyPath(), Nil),
+      Scope.standard(DummyPath("(memory)"), DummyPath()),
       Map(),
       Map(),
       DummyPath(),

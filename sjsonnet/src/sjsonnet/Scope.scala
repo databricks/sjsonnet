@@ -4,11 +4,10 @@ package sjsonnet
 object Scope{
 
 
-  def empty(root: Path) = new Scope(None, None, None, Map.empty,root / "(memory)", root , List(), None)
+  def empty(root: Path) = new Scope(None, None, None, Map.empty,root / "(memory)", root,  None)
   def standard(p: Path,
-               currentRoot: Path,
-               s: List[Path]) = new Scope(
-    None, None, None, Map("std" -> Lazy(Std.Std)), p, currentRoot, s, None
+               currentRoot: Path) = new Scope(
+    None, None, None, Map("std" -> Lazy(Std.Std)), p, currentRoot, None
   )
 }
 
@@ -18,7 +17,6 @@ case class Scope(dollar0: Option[Val.Obj],
                  bindings0: Map[String, Lazy],
                  currentFile: Path,
                  currentRoot: Path,
-                 searchRoots: List[Path],
                  delegate: Option[Scope]){
   def dollar = dollar0.get
   def self = self0.get
@@ -35,7 +33,6 @@ case class Scope(dollar0: Option[Val.Obj],
       traversableOnce.map{case (k, v) => (k, v.apply(self0.getOrElse(null), super0))}.toMap,
       currentFile,
       currentRoot,
-      searchRoots,
       Some(this)
     )
   }

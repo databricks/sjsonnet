@@ -3,17 +3,17 @@ package sjsonnet
 import utest._
 
 object ErrorTests extends TestSuite{
-  val testSuiteRoot = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path) = {
     val interp = new Interpreter(
       sjsonnet.SjsonnetMain.createParseCache(),
-      Scope.standard(OsPath(p), OsPath(testSuiteRoot), Nil),
+      Scope.standard(OsPath(p), OsPath(testSuiteRoot)),
       Map(),
       Map(),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport
+      importer = sjsonnet.SjsonnetMain.resolveImport(Nil),
     )
-    interp.interpret(OsPath(p))
+    interp.interpret(os.read(p))
   }
   def check(expected: String)(implicit tp: utest.framework.TestPath) = {
     val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet")

@@ -9,11 +9,11 @@ case class Error(msg: String,
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
   def addFrame(fileName: Path, wd: Path, offset: Int) = {
-    val newFrame = fileName.read() match{
+    val newFrame = fileName.debugRead() match{
       case None =>
         new StackTraceElement(
           "", "",
-          fileName.relativeTo(wd).toString + " offset:",
+          fileName.relativeToString(wd) + " offset:",
           offset
         )
       case Some(resolved) =>
@@ -22,7 +22,7 @@ case class Error(msg: String,
 
         new StackTraceElement(
           "", "",
-          fileName.relativeTo(wd).toString + ":" + line,
+          fileName.relativeToString(wd) + ":" + line,
           col.toInt
         )
     }

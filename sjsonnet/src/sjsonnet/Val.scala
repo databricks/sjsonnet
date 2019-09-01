@@ -90,7 +90,7 @@ object Val{
               self: Obj = this) = {
 
       val (cached, lazyValue) =
-        valueRaw(k, self, () => fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset)
+        valueRaw(k, self, () => fileName.relativeToString(currentRoot), extVars, wd, fileName, offset)
           .getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
       if (!cached) lazyValue
       else valueCache.getOrElseUpdate(

@@ -1,9 +1,9 @@
 package sjsonnet
 
 case class DummyPath(segments: String*) extends Path{
-  def relativeTo(p: Path): String = ""
+  def relativeToString(p: Path): String = ""
 
-  def read(): Option[String] = None
+  def debugRead(): Option[String] = None
 
   def parent(): Path = DummyPath(segments.dropRight(1):_*)
 

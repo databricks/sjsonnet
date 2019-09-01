@@ -3,17 +3,17 @@ package sjsonnet
 import utest._
 
 object FileTests extends TestSuite{
-  val testSuiteRoot = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path) = {
     val interp = new Interpreter(
       sjsonnet.SjsonnetMain.createParseCache(),
-      Scope.standard(OsPath(p), OsPath(testSuiteRoot), Nil),
+      Scope.standard(OsPath(p), OsPath(testSuiteRoot)),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport
+      importer = sjsonnet.SjsonnetMain.resolveImport(Nil),
     )
-    interp.interpret(OsPath(p))
+    interp.interpret(os.read(p))
   }
   def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath) = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")

@@ -48,7 +48,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
                 originalScope: Scope,
                 extVars: Map[String, ujson.Value],
                 wd: Path,
-                importer: (Scope, String) => Option[(Path, String)]) {
+                importer: (Path, String) => Option[(Path, String)]) {
 
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
@@ -262,7 +262,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   }
 
   def resolveImport(scope: Scope, value: String, offset: Int): (Path, String) = {
-    importer(scope, value)
+    importer(scope.currentFile.parent(), value)
       .getOrElse(
         Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )
@@ -400,7 +400,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         else newBindings.iterator.map { case (k, v) => (k, v.apply(self, sup)) }.toMap,
         scope.currentFile,
         scope.currentRoot,
-        scope.searchRoots,
         Some(scope)
       )
 
@@ -453,7 +452,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         Map(),
         scope.currentFile,
         scope.currentRoot,
-        scope.searchRoots,
         Some(scope),
       )
 
@@ -468,7 +466,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
               newBindings.map{case (k, v) => (k, v.apply(scope.self0.orNull, None))}.toMap,
               scope.currentFile,
               scope.currentRoot,
-              scope.searchRoots,
               Some(s),
             )
 
