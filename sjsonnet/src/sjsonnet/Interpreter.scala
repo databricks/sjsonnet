@@ -10,16 +10,23 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
                   scope: Scope,
                   extVars: Map[String, ujson.Js],
                   tlaVars: Map[String, ujson.Js],
-                  wd: os.Path,
-                  allowedInputs: Option[Set[os.Path]],
-                  importer: Option[(Scope, String) => Option[os.Path]] = None) {
-  val evaluator = new Evaluator(parseCache, scope, extVars, wd, allowedInputs, importer)
-  def interpret(p: os.Path): Either[String, ujson.Js] = {
+                  wd: Path,
+                  importer: (Scope, String) => Option[(Path, String)]) {
+  val evaluator = new Evaluator(
+    parseCache,
+    scope,
+    extVars,
+    wd,
+    importer
+  )
+
+  def interpret(p: Path): Either[String, ujson.Js] = {
     for{
-      txt <- try Right(os.read(p)) catch{ case e: Throwable => Left(e.toString) }
+      txt <- p.read().toRight(s"Failed to read file $p")
       json <- interpret(txt)
     } yield json
   }
+
   def interpret(txt: String): Either[String, ujson.Js] = {
     for{
       parsed <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{

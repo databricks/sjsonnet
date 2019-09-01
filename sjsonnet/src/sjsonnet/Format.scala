@@ -73,11 +73,11 @@ object Format{
   }
   def format(s: String,
              values0: Val,
-             fileName: os.Path,
-             currentRoot: os.Path,
+             fileName: Path,
+             currentRoot: Path,
              offset: Int,
              extVars: Map[String, ujson.Js],
-             wd: os.Path): String = synchronized{
+             wd: Path): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x

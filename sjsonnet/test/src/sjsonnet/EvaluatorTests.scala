@@ -6,11 +6,11 @@ object EvaluatorTests extends TestSuite{
   def eval(s: String) = {
     new Interpreter(
       collection.mutable.Map[String, fastparse.Parsed[Expr]](),
-      Scope.standard(os.pwd/"(memory)", os.pwd, Nil),
+      Scope.standard(DummyPath("(memory)"), DummyPath(), Nil),
       Map(),
       Map(),
-      os.pwd,
-      None
+      DummyPath(),
+      (_, _) => None
     ).interpret(s) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)

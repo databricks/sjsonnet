@@ -8,24 +8,24 @@ case class Error(msg: String,
                  underlying: Option[Throwable])
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
-  def addFrame(fileName: os.Path, wd: os.Path, offset: Int) = {
-    val newFrame = if (os.exists(fileName)){
-      val Array(line, col) =
-        new IndexedParserInput(os.read(fileName)).prettyIndex(offset).split(':')
+  def addFrame(fileName: Path, wd: Path, offset: Int) = {
+    val newFrame = fileName.read() match{
+      case None =>
+        new StackTraceElement(
+          "", "",
+          fileName.relativeTo(wd).toString + " offset:",
+          offset
+        )
+      case Some(resolved) =>
+        val Array(line, col) =
+          new IndexedParserInput(resolved).prettyIndex(offset).split(':')
 
-      new StackTraceElement(
-        "", "",
-        fileName.relativeTo(wd).toString + ":" + line,
-        col.toInt
-      )
-    }else{
-      new StackTraceElement(
-        "", "",
-        fileName.relativeTo(wd).toString + " offset:",
-        offset
-      )
+        new StackTraceElement(
+          "", "",
+          fileName.relativeTo(wd).toString + ":" + line,
+          col.toInt
+        )
     }
-
 
     this.copy(stack = newFrame :: this.stack)
   }

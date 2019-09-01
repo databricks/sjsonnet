@@ -7,7 +7,7 @@ import ujson.Js
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Js],
-            wd: os.Path): Js = try {
+            wd: Path): Js = try {
     v match {
       case Val.True => ujson.True
       case Val.False => ujson.False
@@ -34,10 +34,10 @@ object Materializer {
           } yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd)
         )
 
-      case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd), extVars, wd)
+      case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd, wd / "(memory)"), extVars, wd)
     }
   }catch {case e: StackOverflowError =>
-    throw new DelegateError("Stackoverflow while materializing, possibly due to recursive value")
+    throw DelegateError("Stackoverflow while materializing, possibly due to recursive value")
   }
 
   def reverse(v: ujson.Value): Val = v match{

@@ -1,36 +1,59 @@
-import mill._, scalalib._, publish._
+import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
 val sjsonnetVersion = "0.1.4"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
-class SjsonnetModule(val crossScalaVersion: String) extends CrossScalaModule with PublishModule {
-  def mainClass = Some("sjsonnet.SjsonnetMain")
-  def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse:2.1.3",
-    ivy"com.lihaoyi::pprint:0.5.5",
-    ivy"com.lihaoyi::os-lib:0.3.0",
-    ivy"com.lihaoyi::ujson:0.7.5",
-    ivy"com.lihaoyi::scalatags:0.7.0",
-    ivy"com.github.scopt::scopt:3.7.1",
-    ivy"org.scala-lang.modules::scala-collection-compat:2.0.0"
-  )
-  def publishVersion = sjsonnetVersion
-
-  def pomSettings = PomSettings(
-    description = artifactName(),
-    organization = "com.lihaoyi",
-    url = "https://github.com/lihaoyi/sjsonnet",
-    licenses = Seq(License.MIT),
-    versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
-    developers = Seq(
-      Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
+class SjsonnetModule(val crossScalaVersion: String) extends Module {
+  trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
+    def platformSegment: String
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / s"src-$platformSegment"
     )
-  )
+    def millSourcePath = super.millSourcePath / os.up
+    def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
+    def mainClass = Some("sjsonnet.SjsonnetMain")
+    def ivyDeps = Agg(
+      ivy"com.lihaoyi::fastparse::2.1.3",
+      ivy"com.lihaoyi::pprint::0.5.5",
+      ivy"com.lihaoyi::ujson::0.7.5",
+      ivy"com.lihaoyi::scalatags::0.7.0",
+      ivy"com.github.scopt::scopt::3.7.1",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.0.0"
+    )
+    def publishVersion = sjsonnetVersion
 
-  object test extends Tests{
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest:0.7.1")
-    def testFrameworks = Seq("utest.runner.Framework")
+    def pomSettings = PomSettings(
+      description = artifactName(),
+      organization = "com.lihaoyi",
+      url = "https://github.com/lihaoyi/sjsonnet",
+      licenses = Seq(License.MIT),
+      versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
+      developers = Seq(
+        Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
+      )
+    )
+    trait CrossTests extends ScalaModule with TestModule {
+      def platformSegment = SjsonnetCrossModule.this.platformSegment
+      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.1")
+      def testFrameworks = Seq("utest.runner.Framework")
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / s"src-$platformSegment"
+      )
+    }
   }
-
+  object js extends SjsonnetCrossModule with ScalaJSModule{
+    def scalaJSVersion = "0.6.28"
+    def platformSegment = "js"
+    object test extends Tests with CrossTests
+  }
+  object jvm extends SjsonnetCrossModule {
+    def platformSegment = "jvm"
+    def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"com.lihaoyi::os-lib:0.3.0",
+    )
+    object test extends Tests with CrossTests
+  }
 
   object client extends JavaModule {
     def ivyDeps = Agg(
@@ -47,7 +70,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends CrossScalaModule wit
 
   object server extends ScalaModule{
     def scalaVersion = crossScalaVersion
-    def moduleDeps = Seq(SjsonnetModule.this, client)
+    def moduleDeps = Seq(SjsonnetModule.this.jvm, client)
     def ivyDeps = Agg(
       ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
         "net.java.dev.jna" -> "jna",

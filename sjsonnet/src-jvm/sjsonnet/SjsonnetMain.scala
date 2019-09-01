@@ -60,17 +60,26 @@ object SjsonnetMain {
                   val interp = new Interpreter(
                     parseCache,
                     Scope.standard(
-                      path,
-                      wd,
-                      config.jpaths.map(os.Path(_, wd)),
+                      OsPath(path),
+                      OsPath(wd),
+                      config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
                     ),
                     config.varBinding,
                     config.tlaBinding,
-                    wd,
-                    allowedInputs,
-                    importer
+                    OsPath(wd),
+                    importer = (scope, str) => {
+                      (scope.currentFile.parent() :: scope.searchRoots)
+                        .flatMap(base => os.FilePath(str) match {
+                          case r: os.RelPath =>
+                            if (r.ups > base.segmentCount()) None
+                            else Some(base.asInstanceOf[OsPath].p / r)
+                          case a: os.Path => Some(a)
+                        })
+                        .find(os.exists)
+                        .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e => None})
+                    }
                   )
-                  interp.interpret(path) match{
+                  interp.interpret(OsPath(path)) match{
                     case Left(errMsg) =>
                       stderr.println(errMsg)
                       1

@@ -14,7 +14,9 @@ object Evaluator {
     rec(rhs)
   }
 
-  def tryCatch[T](scope: Scope, wd: os.Path, offset: Int): PartialFunction[Throwable, Nothing] = {
+  def tryCatch[T](scope: Scope,
+                  wd: Path,
+                  offset: Int): PartialFunction[Throwable, Nothing] = {
       case e: Error => throw e
       case e: DelegateError =>
         throw new Error(e.msg, Nil, None)
@@ -23,7 +25,9 @@ object Evaluator {
         throw new Error("Internal Error", Nil, Some(e))
           .addFrame(scope.currentFile, wd, offset)
   }
-  def tryCatch2[T](path: os.Path, wd: os.Path, offset: Int): PartialFunction[Throwable, Nothing] = {
+  def tryCatch2[T](path: Path,
+                   wd: Path,
+                   offset: Int): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(path, wd, offset)
     case e: DelegateError =>
       throw new Error(e.msg, Nil, None)
@@ -32,30 +36,22 @@ object Evaluator {
       throw new Error("Internal Error", Nil, Some(e))
         .addFrame(path, wd, offset)
   }
-  def fail(msg: String, path: os.Path, offset: Int, wd: os.Path) = {
-    throw new Error(msg, Nil, None).addFrame(path, wd, offset)
-  }
-
-  def fileImporter(scope: Scope, value: String): Option[os.Path] = {
-    (scope.currentFile / os.up :: scope.searchRoots)
-      .flatMap(base => os.FilePath(value) match {
-        case r: os.RelPath =>
-          if (r.ups > base.segmentCount) None
-          else Some(base / r)
-        case a: os.Path => Some(a)
-      })
-      .find(os.exists)
+  def fail(msg: String,
+           path: Path,
+           offset: Int,
+           wd: Path) = {
+    throw Error(msg, Nil, None).addFrame(path, wd, offset)
   }
 }
 
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
                 originalScope: Scope,
                 extVars: Map[String, ujson.Js],
-                wd: os.Path,
-                allowedInputs: Option[Set[os.Path]],
-                importer: Option[(Scope, String) => Option[os.Path]] = None) {
-  val imports = collection.mutable.Map.empty[os.Path, Val]
-  val importStrs = collection.mutable.Map.empty[os.Path, String]
+                wd: Path,
+                importer: (Scope, String) => Option[(Path, String)]) {
+
+  val imports = collection.mutable.Map.empty[Path, Val]
+  val importStrs = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr, scope: Scope): Val = try expr match{
     case Null(offset) => Val.Null
     case Parened(offset, inner) => visitExpr(inner, scope)
@@ -155,7 +151,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       scope.currentFile.last,
       extVars,
       offset,
-      wd
+      wd,
+      scope.currentFile
     )
     catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
   }
@@ -218,7 +215,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
 
   def visitSelect(scope: Scope, offset: Int, value: Expr, name: String): Val = {
     if (value.isInstanceOf[Super]) {
-      val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars, self = scope.self)
+      val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, wd, extVars, scope.self)
       try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
     } else visitExpr(value, scope) match {
       case obj: Val.Obj =>
@@ -236,18 +233,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   }
 
   def visitImportStr(scope: Scope, offset: Int, value: String) = {
-    val p = resolveImport(scope, value, offset)
-    Val.Str(
-      importStrs.getOrElseUpdate(
-        p,
-        importString(scope, offset, value, p)
-      )
-    )
+    val (p, str) = resolveImport(scope, value, offset)
+    Val.Str(importStrs.getOrElseUpdate(p, str))
   }
 
   def visitImport(scope: Scope, offset: Int, value: String) = {
-    val p = resolveImport(scope, value, offset)
-    val str = importString(scope, offset, value, p)
+    val (p, str) = resolveImport(scope, value, offset)
     imports.getOrElseUpdate(
       p,
       visitExpr(
@@ -270,20 +261,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
     )
   }
 
-  def resolveImport(scope: Scope, value: String, offset: Int): os.Path = {
-    importer.getOrElse(Evaluator.fileImporter(_, _))(scope, value)
-      .filter(allowedInputs.getOrElse((_: os.Path) => true))
+  def resolveImport(scope: Scope, value: String, offset: Int): (Path, String) = {
+    importer(scope, value)
       .getOrElse(
         Evaluator.fail("Couldn't resolve import: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
       )
-  }
-
-  def importString(scope: Scope, offset: Int, value: String, p: os.Path) = {
-    try os.read(p)
-    catch {
-      case e: Throwable =>
-        Evaluator.fail("Couldn't import file: " + pprint.Util.literalize(value), scope.currentFile, offset, wd)
-    }
   }
 
   def visitBinaryOp(scope: Scope, offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) = {
@@ -357,7 +339,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       case FieldName.Dyn(k) => visitExpr(k, scope) match{
         case Val.Str(k1) => Some(k1)
         case Val.Null => None
-        case x => Evaluator.fail(s"Field name must be string or null, not ${x.prettyName}", scope.currentFile, offset, wd)
+        case x => Evaluator.fail(
+          s"Field name must be string or null, not ${x.prettyName}",
+          scope.currentFile,
+          offset,
+          wd
+        )
       }
     }
   }
@@ -365,7 +352,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   def visitMethod(scope: Scope, rhs: Expr, params: Params, outerOffset: Int) = {
 
     Val.Func(
-      scope,
+      Some(scope),
       params,
       (scope, thisFile, extVars, outerOffset, wd) => visitExpr(rhs, scope),
       (default, scope) => visitExpr(default, scope)

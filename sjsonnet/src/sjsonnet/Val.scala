@@ -82,15 +82,16 @@ object Val{
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
     def value(k: String,
-              fileName: os.Path,
-              currentRoot: os.Path,
+              fileName: Path,
+              currentRoot: Path,
               offset: Int,
-              wd: os.Path,
+              wd: Path,
               extVars: Map[String, ujson.Js],
               self: Obj = this) = {
 
       val (cached, lazyValue) =
-        valueRaw(k, self, () => fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset).getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
+        valueRaw(k, self, () => fileName.relativeTo(currentRoot).toString(), extVars, wd, fileName, offset)
+          .getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, wd))
       if (!cached) lazyValue
       else valueCache.getOrElseUpdate(
         // It is very rare that self != this, so fast-path the common case
@@ -104,8 +105,8 @@ object Val{
     def mergeMember(l: Val,
                     r: Val,
                     extVars: Map[String, ujson.Js],
-                    wd: os.Path,
-                    currentFile: os.Path,
+                    wd: Path,
+                    currentFile: Path,
                     offset: Int) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
@@ -123,8 +124,9 @@ object Val{
                  self: Obj,
                  thisFile: () => String,
                  extVars: Map[String, ujson.Js],
-                 wd: os.Path,
-                 currentFile: os.Path, offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
+                 wd: Path,
+                 currentFile: Path,
+                 offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
         def localResult = m.invoke(self, this.`super`, thisFile).force
         this.`super` match{
@@ -141,16 +143,17 @@ object Val{
     }
   }
 
-  case class Func(scope: Scope,
+  case class Func(scope: Option[Scope],
                   params: Params,
-                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, os.Path) => Val,
+                  evalRhs: (Scope, String, Map[String, ujson.Js], Int, Path) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
               extVars: Map[String, ujson.Js],
               outerOffset: Int,
-              wd: os.Path) = {
+              wd: Path,
+              callerPath: Path) = {
 
       lazy val newScope1 =
         params.args.collect{
@@ -164,11 +167,16 @@ object Val{
         }
       catch{
         case e: IndexOutOfBoundsException =>
-          Evaluator.fail("Too many args, function has " + params.args.length + " parameter(s)", scope.currentFile, outerOffset, wd)
+          Evaluator.fail(
+            "Too many args, function has " + params.args.length + " parameter(s)",
+            callerPath,
+            outerOffset,
+            wd
+          )
       }
       lazy val seen = collection.mutable.Set.empty[String]
       for((k, v) <- newScope2){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, scope.currentFile, outerOffset, wd)
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, callerPath, outerOffset, wd)
         else seen.add(k)
       }
 
@@ -176,17 +184,22 @@ object Val{
       if (missing.nonEmpty){
         Evaluator.fail(
           s"Function parameter${if (missing.size > 1) "s" else ""} ${missing.mkString(", ")} not bound in call" ,
-          scope.currentFile, outerOffset, wd
+          callerPath, outerOffset, wd
         )
       }
 
       lazy val unexpectedParams = seen -- params.args.collect{case (s, _) => s}.toSet
       if (unexpectedParams.nonEmpty) {
-        Evaluator.fail(s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
-          scope.currentFile, outerOffset, wd)
+        Evaluator.fail(
+          s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
+          callerPath, outerOffset, wd
+        )
       }
 
-      lazy val newScope: Scope  = scope ++ newScope1 ++ newScope2
+      lazy val newScope: Scope  = scope match{
+        case None => Scope.empty(wd) ++ newScope1 ++ newScope2
+        case Some(s) => s ++ newScope1 ++ newScope2
+      }
       evalRhs(newScope, thisFile, extVars, outerOffset, wd)
     }
   }
