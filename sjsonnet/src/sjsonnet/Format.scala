@@ -139,11 +139,20 @@ object Format{
   }
 
   def formatFloat(formatted: FormatSpec, s: Double) = {
-    widenDecimalFormat(
+    widen(
       formatted,
-      "0" + decimalPoint(formatted) + "0" * formatted.precision.getOrElse(6),
-      s
+      if (s < 0) "-" else "", "",
+      sjsonnet.DecimalFormat.format(
+        1,
+        maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
+        None,
+        math.abs(s)
+      ).replace("E", "E+"),
+      true,
+      s > 0
     )
+
+
   }
 
   def formatOctal(formatted: FormatSpec, s: Double) = {
@@ -175,44 +184,57 @@ object Format{
     }
   }
 
-  def widenDecimalFormat(formatted: FormatSpec, template: String, s: Double) = {
-    val df = sjsonnet.DecimalFormat.format(template, math.abs(s))
-    widen(
-      formatted,
-      if (s < 0) "-" else "", "",
-      df.replace("E", "E+"),
-      true, s > 0
-    )
-  }
-
   def formatGeneric(formatted: FormatSpec, s: Double) = {
     val precision = formatted.precision.getOrElse(6)
     val leadingPrecision = math.floor(math.log10(s)).toInt + 1
     val trailingPrecision = math.max(0, precision - leadingPrecision)
-    val trailingPlaceholders = if (formatted.alternate) "0" else "#"
-    if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s)
-      widenDecimalFormat(
+    if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s) {
+      widen(
         formatted,
-        "0" + decimalPoint(formatted) + trailingPlaceholders * (precision - 1) + "E00",
-        s
+        if (s < 0) "-" else "", "",
+        sjsonnet.DecimalFormat.format(
+          1,
+          maybeDecimalPoint(formatted, if (formatted.alternate)(precision - 1, 0) else (0, precision - 1)),
+          Some(2),
+          math.abs(s)
+        ).replace("E", "E+"),
+        true,
+        s > 0
       )
-    else
-      widenDecimalFormat(
+    }
+    else {
+      widen(
         formatted,
-        "0" * leadingPrecision + decimalPoint(formatted) + trailingPlaceholders * trailingPrecision,
-        s
+        if (s < 0) "-" else "", "",
+        sjsonnet.DecimalFormat.format(
+          leadingPrecision,
+          maybeDecimalPoint(formatted, if (formatted.alternate) (trailingPrecision, 0) else (0, trailingPrecision)),
+          None,
+          math.abs(s)
+        ).replace("E", "E+"),
+        true,
+        s > 0
       )
+    }
+
   }
 
   def formatExponent(formatted: FormatSpec, s: Double) = {
-    widenDecimalFormat(
+    widen(
       formatted,
-      "0" + decimalPoint(formatted) + "0" * formatted.precision.getOrElse(6) + "E00",
-      s
+      if (s < 0) "-" else "", "",
+      sjsonnet.DecimalFormat.format(
+        1,
+        maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
+        Some(2),
+        math.abs(s)
+      ).replace("E", "E+"),
+      true,
+      s > 0
     )
   }
 
-  def decimalPoint(formatted: FormatSpec) = {
-    if (formatted.precision.contains(0) && !formatted.alternate) "" else "."
+  def maybeDecimalPoint(formatted: FormatSpec, fracLengths: (Int, Int)) = {
+    if (formatted.precision.contains(0) && !formatted.alternate) None else Some(fracLengths)
   }
 }

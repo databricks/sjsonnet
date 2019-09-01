@@ -1,9 +1,23 @@
 package sjsonnet
 
 import utest._
-import sjsonnet.DecimalFormat.format
 object DecimalFormatTests extends TestSuite{
-
+  def format(pattern: String, n: Double) = {
+    val (wholeStr, fracStrOpt, expStrOpt) = pattern.split("\\.", -1).map(_.split('E')) match{
+      case Array(Array(wholeStr: String)) =>
+        (wholeStr, None, None)
+      case Array(Array(wholeStr: String, expStr: String)) =>
+        (wholeStr, None, Some(expStr))
+      case Array(Array(wholeStr: String), Array(fracStr: String)) =>
+        (wholeStr, Some(fracStr), None)
+      case Array(Array(wholeStr: String), Array(fracStr: String, expStr: String)) =>
+        (wholeStr, Some(fracStr), Some(expStr))
+    }
+    val wholeLength = wholeStr.length
+    val fracLengthOpt = fracStrOpt.map(fracStr => (fracStr.count(_ == '0'), fracStr.count(_ == '#')))
+    val expLengthOpt = expStrOpt.map(_.length)
+    sjsonnet.DecimalFormat.format(wholeLength, fracLengthOpt, expLengthOpt, n)
+  }
   def tests = Tests{
 
     test - {format("0.000000E00",910) ==> "9.100000E02"}

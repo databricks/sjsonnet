@@ -33,21 +33,7 @@ object DecimalFormat {
       (n + "0" * (minWidth - nWidth)).take(maxWidth)
     }
   }
-  def format(pattern: String, number: Double): String = {
-    val (wholeStr, fracStrOpt, expStrOpt) = pattern.split("\\.", -1).map(_.split('E')) match{
-      case Array(Array(wholeStr: String)) =>
-        (wholeStr, None, None)
-      case Array(Array(wholeStr: String, expStr: String)) =>
-        (wholeStr, None, Some(expStr))
-      case Array(Array(wholeStr: String), Array(fracStr: String)) =>
-        (wholeStr, Some(fracStr), None)
-      case Array(Array(wholeStr: String), Array(fracStr: String, expStr: String)) =>
-        (wholeStr, Some(fracStr), Some(expStr))
-    }
-    val wholeLength = wholeStr.length
-    val fracLengthOpt = fracStrOpt.map(fracStr => (fracStr.count(_ == '0'), fracStr.count(_ == '#')))
-    val expLengthOpt = expStrOpt.map(_.length)
-
+  def format(wholeLength: Int, fracLengthOpt: Option[(Int, Int)], expLengthOpt: Option[Int], number: Double): String = {
 
     expLengthOpt match{
       case Some(expLength) =>
@@ -61,7 +47,7 @@ object DecimalFormat {
           else {
             val divided = (number / Math.pow(10, expNum - zeroes - hashes))
             val scaledFrac = divided % Math.pow(10, zeroes + hashes)
-            rightPad(Math.abs(Math.round(scaledFrac).toInt), zeroes, zeroes + hashes)
+            rightPad(Math.abs(Math.round(scaledFrac)), zeroes, zeroes + hashes)
           }
         }
 
@@ -73,7 +59,7 @@ object DecimalFormat {
       case None =>
         val prefix = leftPad(number.toInt, wholeLength)
         val fracFrag = fracLengthOpt.map { case (zeroes, hashes) =>
-          val fracNum = Math.round(number * math.pow(10, zeroes + hashes)).toLong % math.pow(10, zeroes + hashes).toLong
+          val fracNum = Math.round(number * math.pow(10, zeroes + hashes)) % math.pow(10, zeroes + hashes).toLong
           rightPad(fracNum, zeroes, zeroes + hashes)
         }
         fracFrag match{
