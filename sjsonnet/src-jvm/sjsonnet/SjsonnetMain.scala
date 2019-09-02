@@ -151,18 +151,13 @@ object SjsonnetMain {
             )
         }
       case None =>
+        val materialized = interp.interpret0(os.read(path), new Renderer(indent = config.indent))
         config.outputFile match{
-          case None =>
-            interp.interpret0(os.read(path), new Renderer(indent = config.indent))
-              .map(_.toString)
-
+          case None => materialized.map(_.toString)
           case Some(f) =>
             for{
-              materialized <- interp.interpret0(
-                os.read(path),
-                new Renderer(indent = config.indent)
-              )
-              _ <- writeFile(f, materialized.toString)
+              materializedStr <- materialized
+              _ <- writeFile(f, materializedStr.toString)
             } yield ""
 
         }
