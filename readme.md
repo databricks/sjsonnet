@@ -74,7 +74,7 @@ $ curl -L https://github.com/databricks/sjsonnet/releases/download/0.1.5/sjsonne
 
 $ node
  
-> require("sjsonnet.js")
+> require("./sjsonnet.js")
 
 > SjsonnetMain.interpret("local f = function(x) x * x; f(11)", {}, {}, "", (wd, imported) => null)
 121
