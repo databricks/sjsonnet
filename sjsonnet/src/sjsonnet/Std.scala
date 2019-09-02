@@ -373,12 +373,12 @@ object Std {
       val allKeys = obj.getVisibleKeys()
       Val.Obj(
         allKeys.map{ k =>
-          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) => Lazy(
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
             func.apply(
               Lazy(Val.Str(k._1)),
               obj.value(k._1, evaluator.memoryScope, -1, evaluator)
             )
-          )))
+          ))
         }.toMap,
         _ => (),
         None
@@ -740,7 +740,7 @@ object Std {
           case ujson.Obj(valueMap) =>
             val transformedValue = valueMap
               .mapValues { v =>
-                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => Lazy(recursiveTransform(v)))
+                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => recursiveTransform(v))
               }.toMap
             Val.Obj(transformedValue , (x: Val.Obj) => (), None)
         }
@@ -764,7 +764,7 @@ object Std {
             if !hidden
             v = rec(o.value(k, evaluator.memoryScope, -1, evaluator).force)
             if filter(v)
-          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => Lazy(v)))
+          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => v))
           Val.Obj(bindings.toMap, _ => (), None)
         case a: Val.Arr =>
           Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Lazy(_)))
@@ -807,7 +807,7 @@ object Std {
             Val.Obj.Member(
               false,
               Visibility.Hidden,
-              (self: Val.Obj, sup: Option[Val.Obj], _) => Lazy(v)
+              (self: Val.Obj, sup: Option[Val.Obj], _) => v
             )
           )
       }
@@ -818,7 +818,7 @@ object Std {
           false,
           Visibility.Hidden,
           { (self: Val.Obj, sup: Option[Val.Obj], scope: ScopeApi) =>
-            Lazy(Val.Str(scope.currentFile.relativeToString(scope.currentRoot)))
+            Val.Str(scope.currentFile.relativeToString(scope.currentRoot))
           },
           cached = false
         )

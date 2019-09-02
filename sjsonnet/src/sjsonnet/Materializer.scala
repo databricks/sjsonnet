@@ -74,7 +74,7 @@ object Materializer {
     case ujson.Str(s) => Val.Str(s)
     case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toSeq)
     case ujson.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], _) => Lazy(reverse(x._2))))).toMap,
+      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], _) => reverse(x._2)))).toMap,
       _ => (),
       None
     )

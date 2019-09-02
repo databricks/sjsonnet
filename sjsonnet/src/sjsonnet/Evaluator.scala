@@ -422,17 +422,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
-              Lazy {
-                assertions(self)
-                visitExpr(rhs, makeNewScope(self, sup))
-              }
+              assertions(self)
+              visitExpr(rhs, makeNewScope(self, sup))
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
             visitFieldName(fieldName, scope, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
-              Lazy {
-                assertions(self)
-                visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
-              }
+              assertions(self)
+              visitMethod(makeNewScope(self, sup), rhs, argSpec, offset)
             }))
 
           case _: Member.BindStmt => None
@@ -476,11 +472,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
             visitExpr(key, s) match {
               case Val.Str(k) =>
                 Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
-                  Lazy(visitExpr(
+                  visitExpr(
                     value,
                     s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
                       newBindings
-                  ))
+                  )
                 ))
               case Val.Null => None
             }

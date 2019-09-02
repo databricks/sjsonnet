@@ -53,7 +53,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], ScopeApi) => Lazy,
+                      invoke: (Obj, Option[Obj], ScopeApi) => Val,
                       cached: Boolean = true)
   }
   case class Obj(value0: Map[String, Obj.Member],
@@ -123,7 +123,7 @@ object Val{
                  evaluator: EvaluatorApi,
                  offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
-        def localResult = m.invoke(self, this.`super`, scope).force
+        def localResult = m.invoke(self, this.`super`, scope)
         this.`super` match{
           case Some(s) if m.add =>
             Some(m.cached -> Lazy(
