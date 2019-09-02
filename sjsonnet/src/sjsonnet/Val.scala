@@ -3,6 +3,7 @@ package sjsonnet
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 object Lazy{
@@ -80,23 +81,29 @@ object Val{
       }
       mapping
     }
-    val valueCache = collection.mutable.Map.empty[Any, Lazy]
+    val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String,
               scope: ScopeApi,
               offset: Int,
               evaluator: EvaluatorApi,
               self: Obj = this): Val = {
 
-      valueRaw(k, self, scope, evaluator, offset) match{
-        case None => Evaluator.fail("Field does not exist: " + k, scope.currentFile, offset, evaluator.wd)
-        case Some((cached, lazyValue)) =>
-          if (!cached) lazyValue.force
-          else valueCache.getOrElseUpdate(
-            // It is very rare that self != this, so fast-path the common case
-            // where they are the same by avoiding tuple construction and hashing
-            if(self eq this) k else (k, self),
-            lazyValue
-          ).force
+      val cacheKey = if(self eq this) k else (k, self)
+
+      val cacheLookuped =
+        if (value0.get(k).exists(_.cached == false)) None
+        else valueCache.get(cacheKey)
+
+      cacheLookuped match{
+        case Some(res) => res
+        case None =>
+          valueRaw(k, self, scope, evaluator, offset) match{
+            case Some(x) =>
+              valueCache(cacheKey) = x
+              x
+            case None =>
+              Evaluator.fail("Field does not exist: " + k, scope.currentFile, offset, evaluator.wd)
+          }
       }
     }
 
@@ -117,24 +124,44 @@ object Val{
         catch Evaluator.tryCatch2(currentFile, evaluator.wd, offset)
     }
 
+    @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
+      case Some(m) => Some(m.cached)
+
+      case None => this.`super` match{
+        case None => None
+        case Some(s) => s.valueCached(k)
+      }
+    }
+
     def valueRaw(k: String,
                  self: Obj,
                  scope: ScopeApi,
                  evaluator: EvaluatorApi,
-                 offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
+                 offset: Int): Option[Val] = this.value0.get(k) match{
       case Some(m) =>
-        def localResult = m.invoke(self, this.`super`, scope)
         this.`super` match{
           case Some(s) if m.add =>
-            Some(m.cached -> Lazy(
-              s.valueRaw(k, self, scope, evaluator, offset).fold(localResult)(x =>
-                mergeMember(x._2.force, localResult, evaluator, scope.currentFile, offset)
-              )
-            ))
-          case _ => Some(m.cached -> Lazy(localResult))
+            Some(
+              s.valueRaw(k, self, scope, evaluator, offset) match{
+                case None => m.invoke(self, this.`super`, scope)
+                case Some(x) =>
+                  mergeMember(
+                    x,
+                    m.invoke(self, this.`super`, scope),
+                    evaluator,
+                    scope.currentFile,
+                    offset
+                  )
+              }
+            )
+          case _ =>
+            Some(m.invoke(self, this.`super`, scope))
         }
 
-      case None => this.`super`.flatMap(_.valueRaw(k, self, scope, evaluator, offset))
+      case None => this.`super` match{
+        case None => None
+        case Some(s) => s.valueRaw(k, self, scope, evaluator, offset)
+      }
     }
   }
 
