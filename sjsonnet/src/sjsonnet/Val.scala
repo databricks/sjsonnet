@@ -85,18 +85,18 @@ object Val{
               scope: ScopeApi,
               offset: Int,
               evaluator: EvaluatorApi,
-              self: Obj = this) = {
+              self: Obj = this): Val = {
 
       valueRaw(k, self, scope, evaluator, offset) match{
         case None => Evaluator.fail("Field does not exist: " + k, scope.currentFile, offset, evaluator.wd)
         case Some((cached, lazyValue)) =>
-          if (!cached) lazyValue
+          if (!cached) lazyValue.force
           else valueCache.getOrElseUpdate(
             // It is very rare that self != this, so fast-path the common case
             // where they are the same by avoiding tuple construction and hashing
             if(self eq this) k else (k, self),
             lazyValue
-          )
+          ).force
       }
     }
 

@@ -88,7 +88,7 @@ object Format{
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force, evaluator)
-                case v: Val.Obj => Materializer(v.value(key, scope, offset, evaluator).force, evaluator)
+                case v: Val.Obj => Materializer(v.value(key, scope, offset, evaluator), evaluator)
               }
           }
           i += 1

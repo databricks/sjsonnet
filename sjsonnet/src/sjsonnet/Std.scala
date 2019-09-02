@@ -376,7 +376,7 @@ object Std {
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
             func.apply(
               Lazy(Val.Str(k._1)),
-              obj.value(k._1, evaluator.memoryScope, -1, evaluator)
+              Lazy(obj.value(k._1, evaluator.memoryScope, -1, evaluator))
             )
           ))
         }.toMap,
@@ -762,7 +762,7 @@ object Std {
           val bindings = for{
             (k, hidden) <- o.getVisibleKeys()
             if !hidden
-            v = rec(o.value(k, evaluator.memoryScope, -1, evaluator).force)
+            v = rec(o.value(k, evaluator.memoryScope, -1, evaluator))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => v))
           Val.Obj(bindings.toMap, _ => (), None)

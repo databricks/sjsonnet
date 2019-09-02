@@ -37,7 +37,6 @@ object ErrorTests extends TestSuite{
     test("03") - check(
       """sjsonnet.Error: foo
         |    at .(sjsonnet/test/resources/test_suite/error.03.jsonnet:17:21)
-        |    at .(sjsonnet/test/resources/test_suite/error.03.jsonnet:18:7)
         |""".stripMargin
     )
     test("04") - check(

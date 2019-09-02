@@ -194,7 +194,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   def visitLookup(scope: Scope, offset: Int, value: Expr, index: Expr): Val = {
     if (value.isInstanceOf[Super]) {
       val key = visitExpr(index, scope).cast[Val.Str]
-      scope.super0.get.value(key.value, scope, offset, this).force
+      scope.super0.get.value(key.value, scope, offset, this)
     } else (visitExpr(value, scope), visitExpr(index, scope)) match {
       case (v: Val.Arr, i: Val.Num) =>
         if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
@@ -205,7 +205,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
         val ref = v.value(i.value, scope, offset, this)
-        try ref.force
+        try ref
         catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       case (lhs, rhs) =>
         Evaluator.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", scope.currentFile, offset, wd)
@@ -215,11 +215,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   def visitSelect(scope: Scope, offset: Int, value: Expr, name: String): Val = {
     if (value.isInstanceOf[Super]) {
       val ref = scope.super0.get.value(name, scope, offset, this, scope.self)
-      try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
+      try ref catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
     } else visitExpr(value, scope) match {
       case obj: Val.Obj =>
         val ref = obj.value(name, scope, offset, this)
-        try ref.force
+        try ref
         catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       case r =>
         Evaluator.fail(
