@@ -8,8 +8,10 @@ object FormatTests extends TestSuite{
     val formatted = Format.format(
       fmt,
       Materializer.reverse(json),
-      DummyPath("(unknown)"),
-      DummyPath(),
+      new ScopeApi(
+        DummyPath("(unknown)"),
+        DummyPath()
+      ),
       -1,
       new EvaluatorApi(Map(), DummyPath())
     )

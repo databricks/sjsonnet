@@ -66,8 +66,7 @@ object Format{
   }
   def format(s: String,
              values0: Val,
-             fileName: Path,
-             currentRoot: Path,
+             scope: ScopeApi,
              offset: Int,
              evaluator: EvaluatorApi): String = synchronized{
     val values = values0 match{
@@ -89,7 +88,7 @@ object Format{
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force, evaluator)
-                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset, evaluator).force, evaluator)
+                case v: Val.Obj => Materializer(v.value(key, scope, offset, evaluator).force, evaluator)
               }
           }
           i += 1

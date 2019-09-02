@@ -45,7 +45,7 @@ object Materializer {
           objVisitor.visitKeyValue(k)
           objVisitor.visitValue(
             apply0(
-              obj.value(k, evaluator.wd / "(Unknown)", evaluator.wd, -1, evaluator).force,
+              obj.value(k, evaluator.memoryScope, -1, evaluator).force,
               evaluator,
               visitor
             ),

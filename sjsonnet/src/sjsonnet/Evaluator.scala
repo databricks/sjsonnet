@@ -194,7 +194,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
   def visitLookup(scope: Scope, offset: Int, value: Expr, index: Expr): Val = {
     if (value.isInstanceOf[Super]) {
       val key = visitExpr(index, scope).cast[Val.Str]
-      scope.super0.get.value(key.value, scope.currentFile, scope.currentRoot, offset, this).force
+      scope.super0.get.value(key.value, scope, offset, this).force
     } else (visitExpr(value, scope), visitExpr(index, scope)) match {
       case (v: Val.Arr, i: Val.Num) =>
         if (i.value > v.value.length) Evaluator.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", scope.currentFile, offset, wd)
@@ -204,7 +204,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
-        val ref = v.value(i.value, scope.currentFile, scope.currentRoot, offset, this)
+        val ref = v.value(i.value, scope, offset, this)
         try ref.force
         catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       case (lhs, rhs) =>
@@ -214,11 +214,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
 
   def visitSelect(scope: Scope, offset: Int, value: Expr, name: String): Val = {
     if (value.isInstanceOf[Super]) {
-      val ref = scope.super0.get.value(name, scope.currentFile, scope.currentRoot, offset, this, scope.self)
+      val ref = scope.super0.get.value(name, scope, offset, this, scope.self)
       try ref.force catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
     } else visitExpr(value, scope) match {
       case obj: Val.Obj =>
-        val ref = obj.value(name, scope.currentFile, scope.currentRoot, offset, this)
+        val ref = obj.value(name, scope, offset, this)
         try ref.force
         catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
       case r =>
@@ -288,7 +288,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
-            try Val.Str(Format.format(l, r, scope.currentFile, scope.currentRoot, offset, this))
+            try Val.Str(Format.format(l, r, scope, offset, this))
             catch Evaluator.tryCatch2(scope.currentFile, wd, offset)
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)

@@ -11,13 +11,14 @@ object Scope{
   )
 }
 
+class ScopeApi(val currentFile: Path, val currentRoot: Path)
 case class Scope(dollar0: Option[Val.Obj],
                  self0: Option[Val.Obj],
                  super0: Option[Val.Obj],
                  bindings0: Map[String, Lazy],
-                 currentFile: Path,
-                 currentRoot: Path,
-                 delegate: Option[Scope]){
+                 override val currentFile: Path,
+                 override val currentRoot: Path,
+                 delegate: Option[Scope]) extends ScopeApi(currentFile, currentRoot){
   def dollar = dollar0.get
   def self = self0.get
   val bindingCache = collection.mutable.Map.empty[String, Option[Lazy]]

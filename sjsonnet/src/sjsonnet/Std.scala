@@ -218,7 +218,7 @@ object Std {
         .mkString
     },
     builtin("format", "str", "vals"){ (evaluator, v1: String, v2: Val) =>
-      Format.format(v1, v2, evaluator.wd / "(unknown)", evaluator.wd, -1, evaluator)
+      Format.format(v1, v2, evaluator.memoryScope, -1, evaluator)
     },
     builtin("foldl", "func", "arr", "init"){ (evaluator, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
@@ -376,7 +376,7 @@ object Std {
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) => Lazy(
             func.apply(
               Lazy(Val.Str(k._1)),
-              obj.value(k._1, evaluator.wd / "(memory)", evaluator.wd, -1, evaluator)
+              obj.value(k._1, evaluator.memoryScope, -1, evaluator)
             )
           )))
         }.toMap,
@@ -762,7 +762,7 @@ object Std {
           val bindings = for{
             (k, hidden) <- o.getVisibleKeys()
             if !hidden
-            v = rec(o.value(k, evaluator.wd/"(memory)", evaluator.wd, -1, evaluator).force)
+            v = rec(o.value(k, evaluator.memoryScope, -1, evaluator).force)
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => Lazy(v)))
           Val.Obj(bindings.toMap, _ => (), None)
@@ -817,7 +817,9 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], thisFile: () => String) => Lazy(Val.Str(thisFile()))},
+          { (self: Val.Obj, sup: Option[Val.Obj], scope: ScopeApi) =>
+            Lazy(Val.Str(scope.currentFile.relativeToString(scope.currentRoot)))
+          },
           cached = false
         )
       )

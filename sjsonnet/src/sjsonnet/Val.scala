@@ -53,7 +53,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], () => String) => Lazy,
+                      invoke: (Obj, Option[Obj], ScopeApi) => Lazy,
                       cached: Boolean = true)
   }
   case class Obj(value0: Map[String, Obj.Member],
@@ -82,23 +82,22 @@ object Val{
     }
     val valueCache = collection.mutable.Map.empty[Any, Lazy]
     def value(k: String,
-              fileName: Path,
-              currentRoot: Path,
+              scope: ScopeApi,
               offset: Int,
               evaluator: EvaluatorApi,
               self: Obj = this) = {
 
-      val (cached, lazyValue) =
-        valueRaw(k, self, () => fileName.relativeToString(currentRoot), evaluator, fileName, offset)
-          .getOrElse(Evaluator.fail("Field does not exist: " + k, fileName, offset, evaluator.wd))
-      if (!cached) lazyValue
-      else valueCache.getOrElseUpdate(
-        // It is very rare that self != this, so fast-path the common case
-        // where they are the same by avoiding tuple construction and hashing
-        if(self == this) k else (k, self),
-        lazyValue
-      )
-
+      valueRaw(k, self, scope, evaluator, offset) match{
+        case None => Evaluator.fail("Field does not exist: " + k, scope.currentFile, offset, evaluator.wd)
+        case Some((cached, lazyValue)) =>
+          if (!cached) lazyValue
+          else valueCache.getOrElseUpdate(
+            // It is very rare that self != this, so fast-path the common case
+            // where they are the same by avoiding tuple construction and hashing
+            if(self eq this) k else (k, self),
+            lazyValue
+          )
+      }
     }
 
     def mergeMember(l: Val,
@@ -120,23 +119,22 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 thisFile: () => String,
+                 scope: ScopeApi,
                  evaluator: EvaluatorApi,
-                 currentFile: Path,
                  offset: Int): Option[(Boolean, Lazy)] = this.value0.get(k) match{
       case Some(m) =>
-        def localResult = m.invoke(self, this.`super`, thisFile).force
+        def localResult = m.invoke(self, this.`super`, scope).force
         this.`super` match{
           case Some(s) if m.add =>
             Some(m.cached -> Lazy(
-              s.valueRaw(k, self, thisFile, evaluator, currentFile, offset).fold(localResult)(x =>
-                mergeMember(x._2.force, localResult, evaluator, currentFile, offset)
+              s.valueRaw(k, self, scope, evaluator, offset).fold(localResult)(x =>
+                mergeMember(x._2.force, localResult, evaluator, scope.currentFile, offset)
               )
             ))
           case _ => Some(m.cached -> Lazy(localResult))
         }
 
-      case None => this.`super`.flatMap(_.valueRaw(k, self, thisFile, evaluator, currentFile, offset))
+      case None => this.`super`.flatMap(_.valueRaw(k, self, scope, evaluator, offset))
     }
   }
 
