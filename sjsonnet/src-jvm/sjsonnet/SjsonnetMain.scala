@@ -1,8 +1,9 @@
 package sjsonnet
 
-import java.io.{InputStream, PrintStream}
+import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter}
 import java.nio.file.NoSuchFileException
 
+import sjsonnet.Cli.Config
 
 import scala.collection.mutable
 import scala.util.Try
@@ -46,111 +47,125 @@ object SjsonnetMain {
             allowedInputs: Option[Set[os.Path]] = None,
             importer: Option[(Seq[Path], String) => Option[os.Path]] = None): Int = {
 
-    Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()) match{
-      case Left(err) =>
-        stderr.println(err)
-        stderr.println(Cli.help(wd))
-        1
-      case Right((config, leftover)) =>
+    val result = for{
+      t <- Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()).left.map{
+        err => err + "\n" + Cli.help(wd)
+      }
+      (config0, leftover) = t
+      t2 <- {
         leftover match{
-          case file :: rest =>
-            Cli.groupArgs(rest, Cli.genericSignature(wd), config) match{
-              case Left(err) =>
-                stderr.println(err)
-                stderr.println(Cli.help(wd))
-                1
-              case Right((config, rest)) =>
-                if (config.interactive){
-                  stderr.println("error: -i/--interactive must be passed in as the first argument")
-                  1
-                }else if (rest.nonEmpty) {
-                  stderr.println("error: Unknown arguments: " + rest.mkString(" "))
-                  1
-                }else{
-                  val path = os.Path(file, wd)
-                  val interp = new Interpreter(
-                    parseCache,
-                    Scope.standard(
-                      OsPath(path),
-                      OsPath(wd)
-                    ),
-                    config.varBinding,
-                    config.tlaBinding,
-                    OsPath(wd),
-                    importer = resolveImport(
-                      config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
-                      allowedInputs
-                    )
-                  )
-                  interp.interpret(os.read(path), ujson.Value) match{
-                    case Left(errMsg) =>
-                      stderr.println(errMsg)
-                      1
-                    case Right(materialized) =>
+          case file :: rest => Right((file, rest))
+          case _ => Left("error: Need to pass in a jsonnet file to evaluate\n" + Cli.help(wd))
+        }
+      }
+      (file, rest) = t2
+      t3 <- Cli.groupArgs(rest, Cli.genericSignature(wd), config0)
+      (config, leftover) = t3
+      outputStr <- {
+        if (config.interactive){
+          Left("error: -i/--interactive must be passed in as the first argument")
+        }else if (rest.nonEmpty) {
+          Left("error: Unknown arguments: " + rest.mkString(" "))
+        }else mainConfigured(
+          file, config, parseCache, stdin, stdout, stderr, wd, allowedInputs, importer
+        )
+      }
+    } yield outputStr
 
-                      case class RenderError(msg: String)
+    result match{
+      case Left(err) =>
+        System.err.println(err)
+        1
+      case Right(str) =>
+        System.out.println(str)
+        0
+    }
+  }
 
-                      def renderString(js: ujson.Value): Either[RenderError, String] = {
-                        if (config.expectString) {
-                          js match {
-                            case ujson.Str(s) => Right(s)
-                            case _ =>
-                              Left(RenderError("expected string result, got: " + js.getClass))
-                          }
-                        } else {
-                          Right(ujson.transform(js, new Renderer(indent = config.indent)).toString)
-                        }
-                      }
+  def mainConfigured(file: String,
+                     config: Config,
+                     parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
+                     stdin: InputStream,
+                     stdout: PrintStream,
+                     stderr: PrintStream,
+                     wd: os.Path,
+                     allowedInputs: Option[Set[os.Path]] = None,
+                     importer: Option[(Seq[Path], String) => Option[os.Path]] = None): Either[String, String] = {
+    val path = os.Path(file, wd)
+    val interp = new Interpreter(
+      parseCache,
+      Scope.standard(
+        OsPath(path),
+        OsPath(wd)
+      ),
+      config.varBinding,
+      config.tlaBinding,
+      OsPath(wd),
+      importer = resolveImport(
+        config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
+        allowedInputs
+      )
+    )
 
-                      def writeFile(f: os.RelPath, contents: String): Unit = {
-                        Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
-                          .recover {
-                            case e: NoSuchFileException =>
-                              stderr.println(s"open $f: no such file or directory")
-                            case e => throw e
-                          }
-                      }
+    def writeFile(f: os.RelPath, contents: String): Either[String, Unit] = {
+      Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
+        .toEither
+        .left
+        .map{
+          case e: NoSuchFileException => s"open $f: no such file or directory"
+          case e => e.toString
+        }
+    }
 
-                      val output: String = config.multi match {
-                        case Some(multiPath) =>
-                          materialized match {
-                          case obj: ujson.Obj =>
-                            val files = mutable.ListBuffer[os.RelPath]()
-                            obj.value.foreach { case (f, v) =>
-                              val rendered = renderString(v)
-                                .fold({ err => stderr.println(err.msg); return 1 }, identity)
-                              val relPath = os.RelPath(multiPath) / os.RelPath(f)
-                              writeFile(relPath, rendered)
-                              files += relPath
-                            }
-                            files.mkString("\n")
-                          case _ =>
-                            stderr.println(
-                              """
-                                |error: multi mode: top-level object was a string, should be an object
-                                | whose keys are filenames and values hold the JSON for that file."""
-                              .stripMargin.stripLineEnd)
-                            return 1
-                          }
-                        case None =>
-                          renderString(materialized)
-                            .fold({ err => stderr.println(err.msg); return 1 }, identity)
+    config.multi match {
+      case Some(multiPath) =>
+        interp.interpret0(os.read(path), ujson.Value).flatMap{
+          case obj: ujson.Obj =>
+            val renderedFiles: Seq[Either[String, os.RelPath]] =
+              obj.value.toSeq.map{case (f, v) =>
+                for{
+                  rendered <- {
+                    if (config.expectString) {
+                      v match {
+                        case ujson.Str(s) => Right(s)
+                        case _ => Left("expected string result, got: " + v.getClass)
                       }
-                      config.outputFile match{
-                        case None => stdout.println(output)
-                        case Some(f) => writeFile(os.RelPath(f), output)
-                      }
-                      0
+                    } else Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
                   }
-                }
+                  relPath = os.RelPath(multiPath) / os.RelPath(f)
+                  _ <- writeFile(relPath, rendered)
+                } yield relPath
+              }
+            renderedFiles.collect{case Left(err) => err} match{
+              case Nil =>
+                Right[String, String](renderedFiles.collect{case Right(path) => path}.mkString("\n"))
+              case errs =>
+                Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
             }
 
           case _ =>
-            stderr.println("error: Need to pass in a jsonnet file to evaluate")
-            stderr.println(Cli.help(wd))
-            1
+            Left(
+              """error: multi mode: top-level should be an object
+                | whose keys are filenames and values hold the JSON for that file."""
+                .stripMargin.stripLineEnd
+            )
         }
+      case None =>
+        config.outputFile match{
+          case None =>
+            interp.interpret0(os.read(path), new Renderer(indent = config.indent))
+              .map(_.toString)
 
+          case Some(f) =>
+            for{
+              materialized <- interp.interpret0(
+                os.read(path),
+                new Renderer(indent = config.indent)
+              )
+              _ <- writeFile(f, materialized.toString)
+            } yield ""
+
+        }
     }
   }
 }

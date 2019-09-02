@@ -39,7 +39,7 @@ object Materializer {
         }
 
         rec(obj)
-        val keys = obj.getVisibleKeys()
+        val keys = obj.getVisibleKeys().toSeq.sortBy(_._1)
         val objVisitor = visitor.visitObject(keys.size, -1)
 
         for((k, hidden) <- keys if !hidden){

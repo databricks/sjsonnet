@@ -20,7 +20,10 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
     importer,
   )
 
-  def interpret[T](txt: String, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+  def interpret(txt: String): Either[String, ujson.Value] = {
+    interpret0(txt, ujson.Value)
+  }
+  def interpret0[T](txt: String, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
       parsed <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
