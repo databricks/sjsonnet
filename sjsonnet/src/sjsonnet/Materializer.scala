@@ -6,12 +6,10 @@ import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
 object Materializer {
   def apply(v: Val,
-            extVars: Map[String, ujson.Value],
-            wd: Path): ujson.Value = apply0(v, extVars, wd, ujson.Value)
+            evaluator: EvaluatorApi): ujson.Value = apply0(v, evaluator, ujson.Value)
 
   def apply0[T](v: Val,
-                extVars: Map[String, ujson.Value],
-                wd: Path,
+                evaluator: EvaluatorApi,
                 visitor: Visitor[T, T]): T = try {
     v match {
       case Val.True => visitor.visitTrue(-1)
@@ -23,7 +21,7 @@ object Materializer {
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x.force, extVars, wd, visitor),
+            apply0(x.force, evaluator: EvaluatorApi, visitor),
             -1
           )
         }
@@ -47,9 +45,8 @@ object Materializer {
           objVisitor.visitKeyValue(k)
           objVisitor.visitValue(
             apply0(
-              obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force,
-              extVars,
-              wd,
+              obj.value(k, evaluator.wd / "(Unknown)", evaluator.wd, -1, evaluator).force,
+              evaluator,
               visitor
             ),
             -1
@@ -59,9 +56,8 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(Nil, "(memory)", extVars, -1, wd, wd / "(memory)"),
-          extVars,
-          wd,
+          f.apply(Nil, "(memory)", evaluator, -1, evaluator.wd / "(memory)"),
+          evaluator,
           visitor
         )
     }

@@ -11,8 +11,7 @@ object FormatTests extends TestSuite{
       DummyPath("(unknown)"),
       DummyPath(),
       -1,
-      Map(),
-      DummyPath()
+      new EvaluatorApi(Map(), DummyPath())
     )
     assert(formatted == expected)
   }

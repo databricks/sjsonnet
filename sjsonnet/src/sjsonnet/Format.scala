@@ -69,8 +69,7 @@ object Format{
              fileName: Path,
              currentRoot: Path,
              offset: Int,
-             extVars: Map[String, ujson.Value],
-             wd: Path): String = synchronized{
+             evaluator: EvaluatorApi): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
@@ -86,11 +85,11 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.cast[Val.Arr].value(i).force, extVars, wd)
+            case None => Materializer(values.cast[Val.Arr].value(i).force, evaluator)
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).force, extVars, wd)
-                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset, wd, extVars).force, extVars, wd)
+                case v: Val.Arr => Materializer(v.value(i).force, evaluator)
+                case v: Val.Obj => Materializer(v.value(key, fileName, currentRoot, offset, evaluator).force, evaluator)
               }
           }
           i += 1
