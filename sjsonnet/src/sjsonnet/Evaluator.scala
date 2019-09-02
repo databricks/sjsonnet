@@ -357,15 +357,18 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
       (default, scope) => visitExpr(default, scope)
     )
   }
-  def visitBindings(bindings: Iterator[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
 
-    bindings.collect{
-      case Bind(offset, fieldName, None, rhs) =>
-        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitExpr(rhs, scope(self, sup))))
-      case Bind(offset, fieldName, Some(argSpec), rhs) =>
-        (fieldName, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitMethod(scope(self, sup), rhs, argSpec, offset)))
+  def visitBindings(bindings: Iterator[Bind], scope: (Val.Obj, Option[Val.Obj]) => Scope) = {
+    bindings.map{ b: Bind =>
+      b.args match{
+        case None =>
+          (b.name, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitExpr(b.rhs, scope(self, sup))))
+        case Some(argSpec) =>
+          (b.name, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(visitMethod(scope(self, sup), b.rhs, argSpec, b.offset)))
+      }
     }
   }
+
   def visitObjBody(b: ObjBody, scope: Scope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
       var asserting: Boolean = false
@@ -444,7 +447,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
         scope.dollar0,
         scope.self0,
         None,
-        Map(),
+        Map.empty,
         scope.currentFile,
         scope.currentRoot,
         Some(scope),
@@ -458,7 +461,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr
               scope.dollar0.orElse(Some(newSelf)),
               Some(newSelf),
               None,
-              newBindings.map{case (k, v) => (k, v.apply(scope.self0.orNull, None))}.toMap,
+              newBindings.iterator.map{case (k, v) => (k, v.apply(scope.self0.orNull, None))}.toMap,
               scope.currentFile,
               scope.currentRoot,
               Some(s),
