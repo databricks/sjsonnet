@@ -28,9 +28,9 @@ object SjsonnetMain {
         }
       }
     )
-    interp.interpret(text) match{
+    interp.interpret(text, ujson.WebJson.Builder) match{
       case Left(msg) => throw new js.JavaScriptException(msg)
-      case Right(v) => v.transform(ujson.WebJson.Builder)
+      case Right(v) => v
     }
   }
 }

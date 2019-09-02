@@ -82,7 +82,7 @@ object SjsonnetMain {
                       allowedInputs
                     )
                   )
-                  interp.interpret(os.read(path)) match{
+                  interp.interpret(os.read(path), ujson.Value) match{
                     case Left(errMsg) =>
                       stderr.println(errMsg)
                       1
@@ -131,7 +131,7 @@ object SjsonnetMain {
                                 | whose keys are filenames and values hold the JSON for that file."""
                               .stripMargin.stripLineEnd)
                             return 1
-                        }
+                          }
                         case None =>
                           renderString(materialized)
                             .fold({ err => stderr.println(err.msg); return 1 }, identity)

@@ -3,17 +3,31 @@ import java.util.IdentityHashMap
 
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
+import upickle.core.Visitor
 object Materializer {
   def apply(v: Val,
             extVars: Map[String, ujson.Value],
-            wd: Path): ujson.Value = try {
+            wd: Path): ujson.Value = apply0(v, extVars, wd, ujson.Value)
+
+  def apply0[T](v: Val,
+                extVars: Map[String, ujson.Value],
+                wd: Path,
+                visitor: Visitor[T, T]): T = try {
     v match {
-      case Val.True => ujson.True
-      case Val.False => ujson.False
-      case Val.Null => ujson.Null
-      case Val.Num(n) => ujson.Num(n)
-      case Val.Str(s) => ujson.Str(s)
-      case Val.Arr(xs) => ujson.Arr.from(xs.map(x => apply(x.force, extVars, wd)))
+      case Val.True => visitor.visitTrue(-1)
+      case Val.False => visitor.visitFalse(-1)
+      case Val.Null => visitor.visitNull(-1)
+      case Val.Num(n) => visitor.visitFloat64(n, -1)
+      case Val.Str(s) => visitor.visitString(s, -1)
+      case Val.Arr(xs) =>
+        val arrVisitor = visitor.visitArray(xs.length, -1)
+        for(x <- xs) {
+          arrVisitor.visitValue(
+            apply0(x.force, extVars, wd, visitor),
+            -1
+          )
+        }
+        arrVisitor.visitEnd(-1)
 
       case obj: Val.Obj =>
         def rec(x: Val.Obj): Unit = {
@@ -25,16 +39,33 @@ object Materializer {
         }
 
         rec(obj)
+        val keys = obj.getVisibleKeys()
+        val objVisitor = visitor.visitObject(keys.size, -1)
 
-        ujson.Obj.from(
-          for {
-            (k, hidden) <- obj.getVisibleKeys().toSeq.sortBy(_._1)
-            if !hidden
-          } yield k -> apply(obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force, extVars, wd)
+        for((k, hidden) <- keys if !hidden){
+          objVisitor.visitKey(-1)
+          objVisitor.visitKeyValue(k)
+          objVisitor.visitValue(
+            apply0(
+              obj.value(k, wd / "(Unknown)", wd, -1, wd, extVars).force,
+              extVars,
+              wd,
+              visitor
+            ),
+            -1
+          )
+        }
+        objVisitor.visitEnd(-1)
+
+      case f: Val.Func =>
+        apply0(
+          f.apply(Nil, "(memory)", extVars, -1, wd, wd / "(memory)"),
+          extVars,
+          wd,
+          visitor
         )
-
-      case f: Val.Func => apply(f.apply(Nil, "(memory)", extVars, -1, wd, wd / "(memory)"), extVars, wd)
     }
+
   }catch {case e: StackOverflowError =>
     throw DelegateError("Stackoverflow while materializing, possibly due to recursive value")
   }
