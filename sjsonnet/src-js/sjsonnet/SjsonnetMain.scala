@@ -10,17 +10,17 @@ object SjsonnetMain {
   def interpret(text: String,
                 extVars: js.Any,
                 tlaVars: js.Any,
-                wd: Path,
+                wd0: String,
                 importer: js.Function2[String, String, js.Array[String]]): js.Any = {
     val interp = new Interpreter(
       mutable.Map.empty,
       Scope.standard(
-        DummyPath("(memory)"),
-        DummyPath()
+        JsVirtualPath("(memory)"),
+        JsVirtualPath("")
       ),
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap,
-      DummyPath(),
+      JsVirtualPath(wd0),
       importer = (wd, path) => {
         importer(wd.asInstanceOf[JsVirtualPath].path, path) match{
           case null => None

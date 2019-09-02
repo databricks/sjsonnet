@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.1.4</version>
+    <version>0.1.5</version>
 </dependency>
 ```
 ```java
@@ -29,8 +29,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.1.4" // SBT
-ivy"com.lihaoyi::sjsonnet:0.1.4" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.1.5" // SBT
+ivy"com.lihaoyi::sjsonnet:0.1.5" // Mill
 ```
 
 ```scala
@@ -44,12 +44,13 @@ sjsonnet.SjsonnetMain.main0(
     None
 );
 ```
-Or as a standalone executable assembly:
 
-- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.4/sjsonnet.jar
+As a standalone executable assembly:
+
+- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.5/sjsonnet.jar
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.4/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.5/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -65,6 +66,35 @@ usage: sjsonnet [sjsonnet-options] script-file
 
 $ ./sjsonnet.jar foo.jsonnet
 ```
+
+Or from Javascript:
+
+```javascript
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.1.5/sjsonnet.js > sjsonnet.js
+
+$ node
+ 
+> require("sjsonnet.js")
+
+> SjsonnetMain.interpret("local f = function(x) x * x; f(11)", {}, {}, "", (wd, imported) => null)
+121
+
+> SjsonnetMain.interpret(
+    "local f = import 'foo'; f + 'bar'", // code
+    {}, // extVars
+    {}, // tlaVars
+    "", // initial working directory
+
+    // import callback: receives a base directory and the imported path string,
+    // returns a 2-element array of the resolved file path and file contents
+    (wd, imported) => [wd + "/" + imported, "local bar = 123; bar + bar"])
+'246bar'
+```
+
+Note that since Javascript does not necessarily have access to the
+filesystem, you have to provide an explicit import callback that you can
+use to resolve imports yourself (whether through Node's `fs` module, or
+by emulating a filesystem in-memory)
 
 ### Running deeply recursive Jsonnet programs
 
@@ -175,3 +205,14 @@ minutes before shutting itself when inactive.
 Since the Sjsonnet client still has 0.2-0.3s of overhead, if using Sjsonnet
 heavily it is still better to include it in your JVM classpath and invoke it
 programmatically via `new Interpreter(...).interpret(...)`.
+
+## Publishing
+
+To publish, run the following commands:
+
+```bash
+./mill -i mill.scalalib.PublishModule/publishAll lihaoyi:$SONATYPE_PASSWORD $GPG_PASSWORD __.publishArtifacts --release true
+
+./mill -i show sjsonnet[2.13.0].js.fullOpt
+./mill -i show sjsonnet[2.13.0].jvm.assembly
+```
