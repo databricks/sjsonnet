@@ -3,14 +3,15 @@ val sjsonnetVersion = "0.1.5"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
+  def millSourcePath = super.millSourcePath / ammonite.ops.up
   trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
+
     def artifactName = "sjsonnet"
     def platformSegment: String
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / s"src-$platformSegment"
     )
-    def millSourcePath = super.millSourcePath / os.up
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(

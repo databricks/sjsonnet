@@ -38,6 +38,8 @@ object SjsonnetTestMain {
       "unix_line_endings",
       "unparse",
       "verbatim_strings"
+      // disabled because it spams the console a lot
+//      "stdlib"
     )
 
     val start = System.currentTimeMillis()
@@ -54,8 +56,8 @@ object SjsonnetTestMain {
         val interp = new Interpreter(
           parseCache,
           Scope.standard(OsPath(path), OsPath(FileTests.testSuiteRoot)),
-          Map(),
-          Map(),
+          Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
+          Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),
           SjsonnetMain.resolveImport(Nil, None)
         )

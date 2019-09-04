@@ -62,15 +62,7 @@ object FileTests extends TestSuite{
     test("shebang") - check()
     "slice.sugar" - check()
     test("std_all_hidden") - check()
-    test("stdlib") - {
-      check()
-//       Lock in the existing progress fleshing out the stdlib
-//      checkFail(
-//        """sjsonnet.Error: Field does not exist: thisFile
-//          |    at .(sjsonnet/test/resources/test_suite/stdlib.jsonnet:378:9)
-//          |""".stripMargin
-//      )
-    }
+    test("stdlib") - check()
     test("text_block") - check()
     "tla.simple"- check()
     test("unicode") - check()
