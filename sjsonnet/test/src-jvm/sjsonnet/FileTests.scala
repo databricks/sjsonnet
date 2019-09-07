@@ -9,10 +9,10 @@ object FileTests extends TestSuite{
       sjsonnet.SjsonnetMain.createParseCache(),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
-      OsPath(os.pwd),
+      OsPath(testSuiteRoot),
       importer = sjsonnet.SjsonnetMain.resolveImport(Seq(OsPath(testSuiteRoot))),
     )
-    interp.interpret(os.read(p))
+    interp.interpret(os.read(p), OsPath(p))
   }
   def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath) = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")

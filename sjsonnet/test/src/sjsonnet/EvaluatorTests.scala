@@ -9,7 +9,7 @@ object EvaluatorTests extends TestSuite{
       Map(),
       DummyPath(),
       (_, _) => None
-    ).interpret(s) match{
+    ).interpret(s, DummyPath("(memory)")) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }

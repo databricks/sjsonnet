@@ -60,7 +60,7 @@ object SjsonnetTestMain {
           OsPath(os.pwd),
           SjsonnetMain.resolveImport(Nil, None)
         )
-        interp.interpret(os.read(path))
+        interp.interpret(os.read(path), OsPath(path))
       }
     }
     println(count)

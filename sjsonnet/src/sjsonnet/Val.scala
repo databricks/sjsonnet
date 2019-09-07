@@ -219,7 +219,12 @@ object Val{
       }
       lazy val seen = collection.mutable.Set.empty[Int]
       for((k, v) <- passedArgsBindings){
-        if (seen(k)) Util.fail("Parameter passed more than once: " + k, outerOffset)
+        if (seen(k)) {
+          Util.fail(
+            "Parameter passed more than once: " + fileScope.indexNames(k),
+            outerOffset
+          )
+        }
         else seen.add(k)
       }
 

@@ -18,10 +18,12 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
     importer,
   )
 
-  def interpret(txt: String): Either[String, ujson.Value] = {
-    interpret0(txt, ujson.Value)
+  def interpret(txt: String, path: Path): Either[String, ujson.Value] = {
+    interpret0(txt, path, ujson.Value)
   }
-  def interpret0[T](txt: String, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+  def interpret0[T](txt: String,
+                    path: Path,
+                    visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
       res <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
@@ -32,7 +34,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         try Right(
           evaluator.visitExpr(parsed)(
             Std.scope(nameIndices.size + 1),
-            new FileScope(wd / "(memory)", wd, nameIndices)
+            new FileScope(path, wd, nameIndices)
           )
         )
         catch{case e: Throwable =>

@@ -12,7 +12,7 @@ object ErrorTests extends TestSuite{
       OsPath(os.pwd),
       importer = sjsonnet.SjsonnetMain.resolveImport(Nil),
     )
-    interp.interpret(os.read(p))
+    interp.interpret(os.read(p), OsPath(p))
   }
   def check(expected: String)(implicit tp: utest.framework.TestPath) = {
     val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet")

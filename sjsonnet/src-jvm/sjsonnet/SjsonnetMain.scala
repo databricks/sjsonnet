@@ -115,7 +115,7 @@ object SjsonnetMain {
 
     config.multi match {
       case Some(multiPath) =>
-        interp.interpret0(os.read(path), ujson.Value).flatMap{
+        interp.interpret(os.read(path), OsPath(path)).flatMap{
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.RelPath]] =
               obj.value.toSeq.map{case (f, v) =>
@@ -147,7 +147,11 @@ object SjsonnetMain {
             )
         }
       case None =>
-        val materialized = interp.interpret0(os.read(path), new Renderer(indent = config.indent))
+        val materialized = interp.interpret0(
+          os.read(path),
+          OsPath(path),
+          new Renderer(indent = config.indent)
+        )
         config.outputFile match{
           case None => materialized.map(_.toString)
           case Some(f) =>
