@@ -47,7 +47,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       visitAssert(offset, value, msg, returned)
 
     case LocalExpr(offset, bindings, returned) =>
-      lazy val newScope: ValScope = scope ++ visitBindings(bindings.iterator, (self, sup) => newScope)
+      lazy val newScope: ValScope = scope.extend(visitBindings(bindings.iterator, (self, sup) => newScope))
       visitExpr(returned)(newScope, implicitly)
 
     case Import(offset, value) => visitImport(offset, value)
@@ -386,12 +386,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         }
       }
 
-      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope = new ValScope(
-        scope.dollar0.orElse(Some(self)),
-        Some(self),
-        sup,
-        ValScope.extendArray(scope.bindings0, self, sup, newBindings)
-      )
+      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope = {
+        scope.extend(
+          newBindings,
+          newDollar = scope.dollar0.orElse(Some(self)),
+          newSelf = Some(self),
+          newSuper = sup
+        )
+      }
 
       lazy val newBindings = visitBindings(
         value.iterator.collect{case Member.BindStmt(b) => b},
@@ -420,22 +422,19 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
-      lazy val compScope: ValScope = new ValScope(
-        scope.dollar0,
-        scope.self0,
-        None,
-        scope.bindings0
+      lazy val compScope: ValScope = scope.extend(
+        newSuper = None
       )
 
       lazy val newSelf: Val.Obj = Val.Obj(
         visitComp(first :: rest.toList, Seq(compScope))
           .flatMap { s =>
 
-            lazy val newScope: ValScope = new ValScope(
-              scope.dollar0.orElse(Some(newSelf)),
-              Some(newSelf),
-              None,
-              ValScope.extendArray(s.bindings0, scope.self0.orNull, None, newBindings)
+            lazy val newScope: ValScope = s.extend(
+              newBindings,
+              newDollar = scope.dollar0.orElse(Some(newSelf)),
+              newSelf = Some(newSelf),
+              newSuper = None
             )
 
             lazy val newBindings = visitBindings(
@@ -447,16 +446,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               case Val.Str(k) =>
                 Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
                   visitExpr(value)(
-                    new ValScope(
-                      self0 = Some(self),
-                      dollar0 = Some(s.dollar0.getOrElse(self)),
-                      super0 = s.super0,
-                      bindings0 = ValScope.extendArray(
-                        s.bindings0,
-                        s.self0.orNull,
-                        s.super0,
-                        newBindings
-                      )
+                    s.extend(
+                      newBindings,
+                      newDollar = Some(s.dollar0.getOrElse(self)),
+                      newSelf = Some(self),
                     ),
                     implicitly
                   )
@@ -487,7 +480,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               expr.offset
             )
           }
-        } yield s ++ Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e))
+        } yield s.extend(Seq(name -> ((self: Val.Obj, sup: Option[Val.Obj]) => e)))
       )
     case IfSpec(offset, expr) :: rest => visitComp(rest, scopes.filter(visitExpr(expr)(_, implicitly) == Val.True))
     case Nil => scopes

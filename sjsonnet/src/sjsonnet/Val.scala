@@ -213,8 +213,17 @@ object Val{
       }
 
       lazy val newScope: ValScope = defSiteScopes match{
-        case None => ValScope.empty(args.length + 1) ++ allArgBindings
-        case Some((s, fs)) => s ++ allArgBindings
+        case None => new ValScope(
+          None,
+          None,
+          None,
+          {
+            val arr = new Array[Lazy](allArgBindings.maxBy(_._1)._1 + 1)
+            for((i, v) <- allArgBindings) arr(i) = v(null, None)
+            arr
+          }
+        )
+        case Some((s, fs)) => s.extend(allArgBindings)
       }
 
       validateFunctionCall(passedArgsBindings, params, outerOffset)
@@ -262,23 +271,12 @@ abstract class EvalScope(extVars: Map[String, ujson.Value], wd: Path)
 }
 object ValScope{
   def empty(size: Int) = new ValScope(None, None, None, new Array(size))
-  def extendArray(arr: Array[Lazy],
-                  self: Val.Obj,
-                  sup: Option[Val.Obj],
-                  bindings: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)]) = {
-    if (bindings.isEmpty) arr
-    else{
-      val newArr = java.util.Arrays.copyOf(arr, arr.length)
-      for((i, v) <- bindings) newArr(i) = v.apply(self, sup)
-      newArr
-    }
-  }
 }
 
 class ValScope(val dollar0: Option[Val.Obj],
                val self0: Option[Val.Obj],
                val super0: Option[Val.Obj],
-               val bindings0: Array[Lazy]) {
+               bindings0: Array[Lazy]) {
   def dollar = dollar0.get
   def self = self0.get
   def bindings(k: Int): Option[Lazy] = bindings0(k) match{
@@ -286,12 +284,24 @@ class ValScope(val dollar0: Option[Val.Obj],
     case v => Some(v)
   }
 
-  def ++(newBindings: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)]) = {
+  def extend(newBindings: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)] = Nil,
+             newDollar: Option[Val.Obj] = null,
+             newSelf: Option[Val.Obj] = null,
+             newSuper: Option[Val.Obj] = null) = {
+    val dollar = if (newDollar != null) newDollar else dollar0
+    val self = if (newSelf != null) newSelf else self0
+    val sup = if (newSuper != null) newSuper else super0
+    val selfOrNull = self.orNull
     new ValScope(
-      dollar0,
-      self0,
-      super0,
-      ValScope.extendArray(bindings0, self0.orNull, super0, newBindings)
+      dollar,
+      self,
+      sup,
+      if (newBindings.isEmpty) bindings0
+      else{
+        val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
+        for((i, v) <- newBindings) newArr(i) = v.apply(selfOrNull, sup)
+        newArr
+      }
     )
   }
 }
