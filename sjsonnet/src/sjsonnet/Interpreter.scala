@@ -31,7 +31,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(
-            Scope.standard(nameIndices.size + 1),
+            Std.scope(nameIndices.size + 1),
             new FileScope(wd / "(memory)", wd, nameIndices)
           )
         )

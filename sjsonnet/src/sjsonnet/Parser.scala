@@ -338,7 +338,7 @@ object Parser{
     P.current.misc("std") = 0
     P.current.misc.get(name) match{
       case None =>
-        val index = P.current.misc.size + 1
+        val index = P.current.misc.size
         P.current.misc(name) = index
         index
       case Some(index) => index.asInstanceOf[Int]

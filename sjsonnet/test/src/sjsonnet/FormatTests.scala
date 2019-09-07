@@ -1,5 +1,6 @@
 package sjsonnet
 
+import ujson.Value
 import utest._
 
 object FormatTests extends TestSuite{
@@ -15,7 +16,10 @@ object FormatTests extends TestSuite{
         DummyPath(),
         Map.empty
       ),
-      new EvalScope(Map(), DummyPath())
+      new EvalScope(Map(), DummyPath()){
+        override def visitExpr(expr: Expr)(implicit scope: ValScope, fileScope: FileScope): Val = ???
+        override def materialize(v: Val): Value = ???
+      }
     )
     assert(formatted == expected)
   }

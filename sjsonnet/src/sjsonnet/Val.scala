@@ -56,6 +56,16 @@ object Val{
                       visibility: Visibility,
                       invoke: (Obj, Option[Obj], FileScope) => Val,
                       cached: Boolean = true)
+
+    def merge(lhs: Val.Obj, rhs: Val.Obj) = {
+      def rec(current: Val.Obj): Val.Obj = {
+        current.`super` match{
+          case None => Val.Obj(current.value0, _ => (), Some(lhs))
+          case Some(x) => Val.Obj(current.value0, _ => (), Some(rec(x)))
+        }
+      }
+      rec(rhs)
+    }
   }
   case class Obj(value0: Map[String, Obj.Member],
                  triggerAsserts: Val.Obj => Unit,
@@ -101,7 +111,7 @@ object Val{
               valueCache(cacheKey) = x
               x
             case None =>
-              Evaluator.fail("Field does not exist: " + k, offset)
+              Util.fail("Field does not exist: " + k, offset)
           }
       }
     }
@@ -113,13 +123,13 @@ object Val{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
+      case (l: Val.Obj, r: Val.Obj) => Val.Obj.merge(l, r)
       case (Val.Str(l), r) =>
-        try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-        catch Evaluator.tryCatch2(offset)
+        try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
+        catch Util.tryCatch2(offset)
       case (l, Val.Str(r)) =>
-        try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-        catch Evaluator.tryCatch2(offset)
+        try Val.Str(evaluator.materialize(l).transform(new Renderer()).toString + r)
+        catch Util.tryCatch2(offset)
     }
 
     @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -160,10 +170,10 @@ object Val{
     }
   }
 
-  case class Func(scopes: Option[(Scope, FileScope)],
+  case class Func(scopes: Option[(ValScope, FileScope)],
                   params: Params,
-                  evalRhs: (Scope, String, EvalScope, FileScope, Int) => Val,
-                  evalDefault: (Expr, Scope) => Val = null) extends Val{
+                  evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
+                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
@@ -173,7 +183,12 @@ object Val{
       val argIndices = params.args.map{case (k, d, i) => (k, i)}.toMap
       lazy val defaultArgsBindings =
         params.args.collect{
-          case (k, Some(default), index) => (index, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
+          case (k, Some(default), index) =>
+            (
+              index,
+              (self: Val.Obj, sup: Option[Val.Obj]) =>
+                Lazy(evalDefault(default, newScope, evaluator))
+            )
         }
 
       lazy val passedArgsBindings = try
@@ -182,7 +197,7 @@ object Val{
             (
               argIndices.getOrElse(
                 name,
-                Evaluator.fail(
+                Util.fail(
                   s"Function has no parameter $name",
                   outerOffset
                 )
@@ -197,14 +212,14 @@ object Val{
         }
       catch{
         case e: IndexOutOfBoundsException =>
-          Evaluator.fail(
+          Util.fail(
             "Too many args, function has " + params.args.length + " parameter(s)",
             outerOffset
           )
       }
       lazy val seen = collection.mutable.Set.empty[Int]
       for((k, v) <- passedArgsBindings){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, outerOffset)
+        if (seen(k)) Util.fail("Parameter passed more than once: " + k, outerOffset)
         else seen.add(k)
       }
 
@@ -212,7 +227,7 @@ object Val{
       if (missing.nonEmpty){
         val plural = if (missing.size > 1) "s" else ""
         val names = missing.map(fileScope.indexNames).mkString(", ")
-        Evaluator.fail(
+        Util.fail(
           s"Function parameter$plural $names not bound in call" ,
           outerOffset
         )
@@ -222,19 +237,89 @@ object Val{
       if (unexpectedParams.nonEmpty) {
         val plural = if (unexpectedParams.size > 1) "s" else ""
         val names = unexpectedParams.map(fileScope.indexNames).mkString(", ")
-        Evaluator.fail(
+        Util.fail(
           s"Function has no parameter$plural $names",
           outerOffset
         )
       }
 
-      lazy val newScope: Scope = scopes match{
+      lazy val newScope: ValScope = scopes match{
         case None =>
-          Scope.empty(args.length + 1) ++ defaultArgsBindings ++ passedArgsBindings
+          ValScope.empty(args.length + 1) ++ defaultArgsBindings ++ passedArgsBindings
         case Some((s, fs)) =>
           s ++ defaultArgsBindings ++ passedArgsBindings
       }
       evalRhs(newScope, thisFile, evaluator, fileScope, outerOffset)
     }
+  }
+}
+
+abstract class EvalScope(val extVars: Map[String, ujson.Value], val wd: Path){
+  def visitExpr(expr: Expr)
+               (implicit scope: ValScope, fileScope: FileScope): Val
+
+  def materialize(v: Val): ujson.Value
+}
+class FileScope(val currentFile: Path,
+                val currentRoot: Path,
+                val nameIndices: Map[String, Int]){
+  val indexNames = nameIndices.map(_.swap)
+}
+object ValScope{
+  def empty(size: Int) = {
+    new ValScope(None, None, None, new Array(size), None)
+  }
+}
+
+case class ValScope(dollar0: Option[Val.Obj],
+                    self0: Option[Val.Obj],
+                    super0: Option[Val.Obj],
+                    bindings0: Array[Lazy],
+                    delegate: Option[ValScope]) {
+  def dollar = dollar0.get
+  def self = self0.get
+  val bindingCache = collection.mutable.Map.empty[Int, Option[Lazy]]
+  def bindings(k: Int): Option[Lazy] = bindingCache.getOrElseUpdate(
+    k,
+    bindings0.lift(k).filter(_ != null).orElse(delegate.flatMap(_.bindings(k)))
+  )
+
+  def ++(traversableOnce: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)]) = {
+    val newBindings = java.util.Arrays.copyOf(bindings0, bindings0.length)
+    for((i, v) <- traversableOnce) newBindings(i) = v.apply(self0.getOrElse(null), super0)
+    new ValScope(
+      dollar0,
+      self0,
+      super0,
+      newBindings,
+      Some(this),
+    )
+  }
+}
+
+object Util {
+  def tryCatch[T](offset: Int)
+                 (implicit fileScope: FileScope, evaluator: EvalScope): PartialFunction[Throwable, Nothing] = {
+    case e: Error => throw e
+    case e: DelegateError =>
+      throw new Error(e.msg, Nil, None)
+        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+    case e: Throwable =>
+      throw new Error("Internal Error", Nil, Some(e))
+        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+  }
+  def tryCatch2[T](offset: Int)
+                  (implicit fileScope: FileScope, evaluator: EvalScope): PartialFunction[Throwable, Nothing] = {
+    case e: Error => throw e.addFrame(fileScope.currentFile, evaluator.wd, offset)
+    case e: DelegateError =>
+      throw new Error(e.msg, Nil, None)
+        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+    case e: Throwable =>
+      throw new Error("Internal Error", Nil, Some(e))
+        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+  }
+  def fail(msg: String, offset: Int)
+          (implicit fileScope: FileScope, evaluator: EvalScope) = {
+    throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
 }

@@ -14,7 +14,7 @@ object SjsonnetMain {
                 importer: js.Function2[String, String, js.Array[String]]): js.Any = {
     val interp = new Interpreter(
       mutable.Map.empty,
-      Scope.standard(
+      Std.scope(
         JsVirtualPath("(memory)"),
         JsVirtualPath("")
       ),

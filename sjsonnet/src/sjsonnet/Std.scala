@@ -5,7 +5,7 @@ import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
-import sjsonnet.Scope.empty
+import sjsonnet.ValScope.empty
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
@@ -138,13 +138,8 @@ object Std {
         val args = params.map {case (k, v) => k -> scope.bindings(fileScope.nameIndices(k)).get.force }.toMap
         implicitly[ReadWriter[R]].write(eval(args, evaluator))
       },
-      { (expr, scope) =>
-        new Evaluator(
-          scala.collection.mutable.Map(),
-          Map(),
-          null,
-          (_, _) => None
-        ).visitExpr(expr)(scope, new FileScope(null, null, Map.empty))
+      { (expr, scope, eval) =>
+        eval.visitExpr(expr)(scope, new FileScope(null, null, Map.empty))
       }
     )
   }
@@ -833,4 +828,11 @@ object Std {
     _ => (),
     None
   )
+
+
+  def scope(size: Int) = {
+    new ValScope(
+      None, None, None, Array(Lazy(Std)).padTo(size, null), None
+    )
+  }
 }
