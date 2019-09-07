@@ -2,7 +2,7 @@ package sjsonnet
 import utest._
 import Expr._
 object ParserTests extends TestSuite{
-  def parse(s: String) = fastparse.parse(s, Parser.document(_)).get.value
+  def parse(s: String) = fastparse.parse(s, Parser.document(_)).get.value._1
   def tests = Tests{
     test("hello") {
       parse("true") ==> True(0)
