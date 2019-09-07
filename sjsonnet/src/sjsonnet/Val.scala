@@ -170,7 +170,7 @@ object Val{
     }
   }
 
-  case class Func(scopes: Option[(ValScope, FileScope)],
+  case class Func(defSiteScopes: Option[(ValScope, FileScope)],
                   params: Params,
                   evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
@@ -248,7 +248,7 @@ object Val{
         )
       }
 
-      lazy val newScope: ValScope = scopes match{
+      lazy val newScope: ValScope = defSiteScopes match{
         case None =>
           ValScope.empty(args.length + 1) ++ defaultArgsBindings ++ passedArgsBindings
         case Some((s, fs)) =>

@@ -114,7 +114,6 @@ object Std {
   }
   def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], EvalScope, FileScope) => R) = {
     val paramIndices = params.zipWithIndex
-    val paramIndicesMap = paramIndices.toMap
     name -> Val.Func(
       None,
       Params(paramIndices.map{case (k, i) => (k, None, i)}),
@@ -130,12 +129,14 @@ object Std {
     *
     * Arguments of the eval function are (args, evaluator)
     */
-  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)
+                                        (eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
+    val indexedParams = params.zipWithIndex
     name -> Val.Func(
       None,
-      Params(params.map{case (k, v) => (k, v, -1)}),
+      Params(indexedParams.map{case ((k, v), i) => (k, v, i)}),
       { (scope, thisFile, evaluator, fileScope, outerOffset) =>
-        val args = params.map {case (k, v) => k -> scope.bindings(fileScope.nameIndices(k)).get.force }.toMap
+        val args = indexedParams.map {case ((k, v), i) => k -> scope.bindings(i).get.force }.toMap
         implicitly[ReadWriter[R]].write(eval(args, evaluator))
       },
       { (expr, scope, eval) =>
@@ -520,7 +521,9 @@ object Std {
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
       Materializer(v)(evaluator).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
     },
-    builtinWithDefaults("manifestYamlDoc", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
+    builtinWithDefaults("manifestYamlDoc",
+                        "v" -> None,
+                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
           case Val.False => false
@@ -529,7 +532,9 @@ object Std {
         }
       Materializer(v)(evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString
     },
-    builtinWithDefaults("manifestYamlStream", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
+    builtinWithDefaults("manifestYamlStream",
+                        "v" -> None,
+                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
         case Val.False => false
