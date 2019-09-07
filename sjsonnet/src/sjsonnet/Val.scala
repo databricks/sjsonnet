@@ -254,16 +254,12 @@ object Val{
   }
 }
 
-abstract class EvalScope(val extVars: Map[String, ujson.Value], val wd: Path){
+abstract class EvalScope(extVars: Map[String, ujson.Value], wd: Path)
+  extends EvalErrorScope(extVars, wd){
   def visitExpr(expr: Expr)
                (implicit scope: ValScope, fileScope: FileScope): Val
 
   def materialize(v: Val): ujson.Value
-}
-class FileScope(val currentFile: Path,
-                val currentRoot: Path,
-                val nameIndices: Map[String, Int]){
-  val indexNames = nameIndices.map(_.swap)
 }
 object ValScope{
   def empty(size: Int) = {
@@ -294,32 +290,5 @@ case class ValScope(dollar0: Option[Val.Obj],
       newBindings,
       Some(this),
     )
-  }
-}
-
-object Util {
-  def tryCatch[T](offset: Int)
-                 (implicit fileScope: FileScope, evaluator: EvalScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e
-    case e: DelegateError =>
-      throw new Error(e.msg, Nil, None)
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
-    case e: Throwable =>
-      throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
-  }
-  def tryCatch2[T](offset: Int)
-                  (implicit fileScope: FileScope, evaluator: EvalScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(fileScope.currentFile, evaluator.wd, offset)
-    case e: DelegateError =>
-      throw new Error(e.msg, Nil, None)
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
-    case e: Throwable =>
-      throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
-  }
-  def fail(msg: String, offset: Int)
-          (implicit fileScope: FileScope, evaluator: EvalScope) = {
-    throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
 }
