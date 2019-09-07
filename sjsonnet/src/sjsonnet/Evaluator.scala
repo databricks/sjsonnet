@@ -386,7 +386,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         }
       }
 
-      def makeNewScope0(self: Val.Obj, sup: Option[Val.Obj]): ValScope = new ValScope(
+      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope = new ValScope(
         scope.dollar0.orElse(Some(self)),
         Some(self),
         sup,
@@ -397,19 +397,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           arr
         }
       )
-
-      lazy val defaultScope = makeNewScope0(newSelf, newSelf.`super`)
-      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope = {
-        val same =
-          (self eq newSelf) &&
-          (sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) &&
-          (sup.isEmpty && newSelf.`super`.isEmpty)
-        // Fast path: in the common case where the `self` and `super` are
-        // unchanged by inheritence or other trickery, we can share the
-        // new scope between all members and sub-scopes.
-        if (same) defaultScope
-        else makeNewScope0(self, sup)
-      }
 
       lazy val newBindings = visitBindings(
         value.iterator.collect{case Member.BindStmt(b) => b},
