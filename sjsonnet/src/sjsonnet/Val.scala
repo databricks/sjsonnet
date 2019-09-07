@@ -209,7 +209,7 @@ object Val{
       }
 
       lazy val allArgBindings = (defaultArgsBindings ++ passedArgsBindings).map{ case (i, v) =>
-        (i, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+        (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
       }
 
       lazy val newScope: ValScope = defSiteScopes match{
@@ -277,21 +277,19 @@ class ValScope(val dollar0: Option[Val.Obj],
                val self0: Option[Val.Obj],
                val super0: Option[Val.Obj],
                bindings0: Array[Lazy]) {
-  def dollar = dollar0.get
-  def self = self0.get
+
   def bindings(k: Int): Option[Lazy] = bindings0(k) match{
     case null => None
     case v => Some(v)
   }
 
-  def extend(newBindings: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)] = Nil,
+  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)] = Nil,
              newDollar: Option[Val.Obj] = null,
              newSelf: Option[Val.Obj] = null,
              newSuper: Option[Val.Obj] = null) = {
     val dollar = if (newDollar != null) newDollar else dollar0
     val self = if (newSelf != null) newSelf else self0
     val sup = if (newSuper != null) newSuper else super0
-    val selfOrNull = self.orNull
     new ValScope(
       dollar,
       self,
@@ -299,7 +297,7 @@ class ValScope(val dollar0: Option[Val.Obj],
       if (newBindings.isEmpty) bindings0
       else{
         val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
-        for((i, v) <- newBindings) newArr(i) = v.apply(selfOrNull, sup)
+        for((i, v) <- newBindings) newArr(i) = v.apply(self, sup)
         newArr
       }
     )

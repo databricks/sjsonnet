@@ -71,8 +71,8 @@ object EvaluatorTests extends TestSuite{
       eval("local p(n='A') = {w: 'H'+n}; {p: p()}.p.w") ==> ujson.Str("HA")
     }
     test("lazy") {
-//      eval("[{x: $.y, y: $.x}.x, 2][1]") ==> ujson.Num(2)
-//      eval("{x: $.y, y: $.x, local z(z0) = [3], w: z($.x)}.w[0]") ==> ujson.Num(3)
+      eval("[{x: $.y, y: $.x}.x, 2][1]") ==> ujson.Num(2)
+      eval("{x: $.y, y: $.x, local z(z0) = [3], w: z($.x)}.w[0]") ==> ujson.Num(3)
       eval("(function(a=[1, b[1]], b=[a[0], 2]) [a, b])()[0][1]") ==> ujson.Num(2)
     }
     test("comprehensions") {
@@ -132,19 +132,19 @@ object EvaluatorTests extends TestSuite{
       eval("""("%(hello)s" % {hello::"world", bad:: error "lol"})""") ==> ujson.Str("world")
     }
     test("evaluator2") {
-//      eval("""{local x = 1, [x]: x, for x in ["foo"]}.foo""") ==> ujson.Num(1)
-//      eval("""{[x]: x, local x = 1, for x in ["foo"]}.foo""") ==> ujson.Num(1)
-//      eval("""local foo = ["foo"]; {local foo = 1, [x]: x, for x in foo}.foo""") ==> ujson.Str("foo")
-//      eval("""local foo = ["foo"]; {[x]: x, local foo = 2, for x in foo}.foo""") ==> ujson.Str("foo")
-//
-//      eval("""{ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }""") ==>
-//        ujson.read("""{ "1": 1, "2": 3, "3": 4 }""")
-//
-//      eval("""local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }""") ==>
-//        ujson.read("""{ "foo": "bar" }""")
-//
-//      eval("""{ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }""") ==>
-//        ujson.read("""{ "1": 4, "2": 5, "3": 6 }""")
+      eval("""{local x = 1, [x]: x, for x in ["foo"]}.foo""") ==> ujson.Num(1)
+      eval("""{[x]: x, local x = 1, for x in ["foo"]}.foo""") ==> ujson.Num(1)
+      eval("""local foo = ["foo"]; {local foo = 1, [x]: x, for x in foo}.foo""") ==> ujson.Str("foo")
+      eval("""local foo = ["foo"]; {[x]: x, local foo = 2, for x in foo}.foo""") ==> ujson.Str("foo")
+
+      eval("""{ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }""") ==>
+        ujson.read("""{ "1": 1, "2": 3, "3": 4 }""")
+
+      eval("""local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }""") ==>
+        ujson.read("""{ "foo": "bar" }""")
+
+      eval("""{ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }""") ==>
+        ujson.read("""{ "1": 4, "2": 5, "3": 6 }""")
       eval("""{local y = x, ["foo"]: y, for x in ["foo"]}.foo""") ==> ujson.Str("foo")
     }
     test("shadowing") {
@@ -203,6 +203,21 @@ object EvaluatorTests extends TestSuite{
       }
 
       assert(ex.getMessage.contains("Function has no parameter hello"))
+    }
+
+    test("nakedSelf") {
+      val ex = intercept[Exception]{eval("self.x")}
+      assert(ex.getMessage.contains("Cannot use `self` outside an object"))
+    }
+
+    test("nakedDollar") {
+      val ex = intercept[Exception]{eval("$.x")}
+      assert(ex.getMessage.contains("Cannot use `$` outside an object"))
+    }
+
+    test("nakedSuper") {
+      val ex = intercept[Exception]{eval("super.x")}
+      assert(ex.getMessage.contains("Cannot use `super` outside an object"))
     }
 
     test("validParam") {
