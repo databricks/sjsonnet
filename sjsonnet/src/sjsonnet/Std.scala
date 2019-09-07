@@ -837,7 +837,7 @@ object Std {
 
   def scope(size: Int) = {
     new ValScope(
-      None, None, None, Array(Lazy(Std)).padTo(size, null), None
+      None, None, None, Array(Lazy(Std)).padTo(size, null)
     )
   }
 }

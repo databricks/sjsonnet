@@ -262,32 +262,30 @@ abstract class EvalScope(extVars: Map[String, ujson.Value], wd: Path)
 }
 object ValScope{
   def empty(size: Int) = {
-    new ValScope(None, None, None, new Array(size), None)
+    new ValScope(None, None, None, new Array(size))
   }
 }
 
 case class ValScope(dollar0: Option[Val.Obj],
                     self0: Option[Val.Obj],
                     super0: Option[Val.Obj],
-                    bindings0: Array[Lazy],
-                    delegate: Option[ValScope]) {
+                    bindings0: Array[Lazy]) {
   def dollar = dollar0.get
   def self = self0.get
-  val bindingCache = collection.mutable.Map.empty[Int, Option[Lazy]]
-  def bindings(k: Int): Option[Lazy] = bindingCache.getOrElseUpdate(
-    k,
-    bindings0.lift(k).filter(_ != null).orElse(delegate.flatMap(_.bindings(k)))
-  )
+  def bindings(k: Int): Option[Lazy] = bindings0(k) match{
+    case null => None
+    case v => Some(v)
+  }
 
   def ++(traversableOnce: TraversableOnce[(Int, (Val.Obj, Option[Val.Obj]) => Lazy)]) = {
     val newBindings = java.util.Arrays.copyOf(bindings0, bindings0.length)
-    for((i, v) <- traversableOnce) newBindings(i) = v.apply(self0.getOrElse(null), super0)
+    val selfOrNull = self0.getOrElse(null)
+    for((i, v) <- traversableOnce) newBindings(i) = v.apply(selfOrNull, super0)
     new ValScope(
       dollar0,
       self0,
       super0,
-      newBindings,
-      Some(this),
+      newBindings
     )
   }
 }

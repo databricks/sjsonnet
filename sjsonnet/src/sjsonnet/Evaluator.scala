@@ -390,25 +390,26 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         scope.dollar0.orElse(Some(self)),
         Some(self),
         sup,
-        if (newBindings.isEmpty) new Array(scope.bindings0.length)
+        if (newBindings.isEmpty) java.util.Arrays.copyOf(scope.bindings0, scope.bindings0.length)
         else {
-          val arr = new Array[Lazy](scope.bindings0.length)
+          val arr = java.util.Arrays.copyOf(scope.bindings0, scope.bindings0.length)
           for((i, v) <- newBindings) arr(i) = v.apply(self, sup)
           arr
-        },
-        Some(scope),
+        }
       )
 
       lazy val defaultScope = makeNewScope0(newSelf, newSelf.`super`)
-      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope =
-        if ((self eq newSelf) &&
-            (sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) &&
-            (sup.isEmpty && newSelf.`super`.isEmpty)) {
-          // Fast path: in the common case where the `self` and `super` are
-          // unchanged by inheritence or other trickery, we can share the
-          // new scope between all members and sub-scopes.
-          defaultScope
-        }else makeNewScope0(self, sup)
+      def makeNewScope(self: Val.Obj, sup: Option[Val.Obj]): ValScope = {
+        val same =
+          (self eq newSelf) &&
+          (sup.isDefined && newSelf.`super`.isDefined && (sup.get eq newSelf.`super`.get)) &&
+          (sup.isEmpty && newSelf.`super`.isEmpty)
+        // Fast path: in the common case where the `self` and `super` are
+        // unchanged by inheritence or other trickery, we can share the
+        // new scope between all members and sub-scopes.
+        if (same) defaultScope
+        else makeNewScope0(self, sup)
+      }
 
       lazy val newBindings = visitBindings(
         value.iterator.collect{case Member.BindStmt(b) => b},
@@ -441,8 +442,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         scope.dollar0,
         scope.self0,
         None,
-        new Array[Lazy](scope.bindings0.length),
-        Some(scope),
+        scope.bindings0
       )
 
       lazy val newSelf: Val.Obj = Val.Obj(
@@ -454,11 +454,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               Some(newSelf),
               None,
               {
-                val arr = new Array[Lazy](scope.bindings0.length)
+                val arr = java.util.Arrays.copyOf(s.bindings0, s.bindings0.length)
                 for((i, v) <- newBindings) arr(i) = v.apply(scope.self0.orNull, None)
                 arr
-              },
-              Some(s),
+              }
             )
 
             lazy val newBindings = visitBindings(
