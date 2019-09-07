@@ -9,7 +9,7 @@ import scala.collection.mutable
 import scala.util.Try
 
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
+  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
     (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {

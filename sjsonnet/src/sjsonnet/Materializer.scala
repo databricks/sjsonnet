@@ -45,7 +45,7 @@ object Materializer {
           objVisitor.visitKeyValue(k)
           objVisitor.visitValue(
             apply0(
-              obj.value(k, evaluator.memoryScope, -1, evaluator),
+              obj.value(k, -1, evaluator)(new FileScope(null, null, Map())),
               evaluator,
               visitor
             ),
@@ -56,7 +56,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(Nil, "(memory)", evaluator, -1, evaluator.wd / "(memory)"),
+          f.apply(Nil, "(memory)", evaluator, -1)(new FileScope(null, null, Map())),
           evaluator,
           visitor
         )

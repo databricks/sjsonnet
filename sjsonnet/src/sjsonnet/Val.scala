@@ -97,12 +97,12 @@ object Val{
       cacheLookuped match{
         case Some(res) => res
         case None =>
-          valueRaw(k, self, scope, evaluator, offset) match{
+          valueRaw(k, self, evaluator, offset) match{
             case Some(x) =>
               valueCache(cacheKey) = x
               x
             case None =>
-              Evaluator.fail("Field does not exist: " + k, scope.currentFile, offset, evaluator.wd)
+              Evaluator.fail("Field does not exist: " + k, offset, evaluator.wd)
           }
       }
     }
@@ -164,9 +164,9 @@ object Val{
     }
   }
 
-  case class Func(scope: Option[Scope],
+  case class Func(scopes: Option[(Scope, FileScope)],
                   params: Params,
-                  evalRhs: (Scope, String, EvaluatorApi, Int) => Val,
+                  evalRhs: (Scope, String, EvaluatorApi, FileScope, Int) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
@@ -183,8 +183,23 @@ object Val{
 
       lazy val passedArgsBindings = try
         args.zipWithIndex.map{
-          case ((Some(name), v), _) => (argIndices(name), (self: Val.Obj, sup: Option[Val.Obj]) => v)
-          case ((None, v), i) => (params.args(i)._3, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+          case ((Some(name), v), _) =>
+            (
+              argIndices.getOrElse(
+                name,
+                Evaluator.fail(
+                  s"Function has no parameter $name",
+                  outerOffset,
+                  evaluator.wd
+                )
+              ),
+              (self: Val.Obj, sup: Option[Val.Obj]) => v
+            )
+          case ((None, v), i) =>
+            (
+              params.args(i)._3,
+              (self: Val.Obj, sup: Option[Val.Obj]) => v
+            )
         }
       catch{
         case e: IndexOutOfBoundsException =>
@@ -202,25 +217,31 @@ object Val{
 
       lazy val missing = params.args.collect{case (_, None, i) => i}.toSet -- seen
       if (missing.nonEmpty){
+        val plural = if (missing.size > 1) "s" else ""
+        val names = missing.map(fileScope.indexNames).mkString(", ")
         Evaluator.fail(
-          s"Function parameter${if (missing.size > 1) "s" else ""} ${missing.mkString(", ")} not bound in call" ,
+          s"Function parameter$plural $names not bound in call" ,
           outerOffset, evaluator.wd
         )
       }
 
       lazy val unexpectedParams = seen -- params.args.collect{case (_, _, i) => i}.toSet
       if (unexpectedParams.nonEmpty) {
+        val plural = if (unexpectedParams.size > 1) "s" else ""
+        val names = unexpectedParams.map(fileScope.indexNames).mkString(", ")
         Evaluator.fail(
-          s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
+          s"Function has no parameter$plural $names",
           outerOffset, evaluator.wd
         )
       }
 
-      lazy val newScope: Scope  = scope match{
-        case None => Scope.empty() ++ defaultArgsBindings ++ passedArgsBindings
-        case Some(s) => s ++ defaultArgsBindings ++ passedArgsBindings
+      lazy val newScope: Scope = scopes match{
+        case None =>
+          Scope.empty(args.length + 1) ++ defaultArgsBindings ++ passedArgsBindings
+        case Some((s, fs)) =>
+          s ++ defaultArgsBindings ++ passedArgsBindings
       }
-      evalRhs(newScope, thisFile, evaluator, outerOffset)
+      evalRhs(newScope, thisFile, evaluator, fileScope, outerOffset)
     }
   }
 }

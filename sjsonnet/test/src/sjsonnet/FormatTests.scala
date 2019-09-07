@@ -8,12 +8,14 @@ object FormatTests extends TestSuite{
     val formatted = Format.format(
       fmt,
       Materializer.reverse(json),
-      new ScopeApi(
-        DummyPath("(unknown)"),
-        DummyPath()
-      ),
       -1,
       new EvaluatorApi(Map(), DummyPath())
+    )(
+      new FileScope(
+        DummyPath("(unknown)"),
+        DummyPath(),
+        Map.empty
+      )
     )
     assert(formatted == expected)
   }

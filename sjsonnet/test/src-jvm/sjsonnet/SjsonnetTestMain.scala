@@ -55,7 +55,6 @@ object SjsonnetTestMain {
         val path = FileTests.testSuiteRoot / s"$name.jsonnet"
         val interp = new Interpreter(
           parseCache,
-          Scope.standard(OsPath(path), OsPath(FileTests.testSuiteRoot)),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),

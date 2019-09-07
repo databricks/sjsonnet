@@ -319,7 +319,7 @@ object Parser{
       if (seen(k)) overlap = k
       else seen.add(k)
     }
-    if (overlap == null) Pass(Expr.Params(x.map{case (k, v) => (k, v, -1)}))
+    if (overlap == null) Pass(Expr.Params(x.map{case (k, v) => (k, v, indexFor(k))}))
     else Fail.opaque("no duplicate parameter: " + overlap)
 
   }
@@ -335,9 +335,10 @@ object Parser{
   def document[_: P]: P[(Expr, Map[String, Int])] = P( expr ~  Pass(P.current.misc.toMap.asInstanceOf[Map[String, Int]]) ~ End )
 
   def indexFor[_: P](name: String): Int = {
+    P.current.misc("std") = 0
     P.current.misc.get(name) match{
       case None =>
-        val index = P.current.misc.size
+        val index = P.current.misc.size + 1
         P.current.misc(name) = index
         index
       case Some(index) => index.asInstanceOf[Int]

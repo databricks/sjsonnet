@@ -50,7 +50,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   val imports = collection.mutable.Map.empty[Path, Val]
   val importStrs = collection.mutable.Map.empty[Path, String]
-  def visitExpr(expr: Expr)(implicit scope: Scope, fileScope: FileScope): Val = try expr match{
+  def visitExpr(expr: Expr)
+               (implicit scope: Scope, fileScope: FileScope): Val = try expr match{
     case Null(offset) => Val.Null
     case Parened(offset, inner) => visitExpr(inner)
     case True(offset) => Val.True
@@ -105,7 +106,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitId(offset: Int, value: Int)(implicit scope: Scope, fileScope: FileScope): Val = {
     val ref = scope.bindings(value)
-      .getOrElse(Evaluator.fail("Unknown variable " + value, offset, wd))
+      .getOrElse(
+        Evaluator.fail(
+          "Unknown variable " + fileScope.indexNames(value),
+          offset,
+          wd
+        )
+      )
 
     try ref.force catch Evaluator.tryCatch2(wd, offset)
   }
@@ -265,7 +272,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             )
         }
         visitExpr(doc)(
-          Scope.standard(),
+          Scope.standard(nameIndices.size),
           new FileScope(p, fileScope.currentRoot, nameIndices)
         )
       }
@@ -368,12 +375,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitMethod(rhs: Expr, params: Params, outerOffset: Int)
                  (implicit scope: Scope, fileScope: FileScope) = {
-
     Val.Func(
-      Some(scope),
+      Some(scope -> fileScope),
       params,
-      (_, _, _, _) => visitExpr(rhs),
-      (default, _) => visitExpr(default)
+      (s, _, _, fs, _) => visitExpr(rhs)(s, fs),
+      (default, s) => visitExpr(default)(s, fileScope)
     )
   }
 
@@ -392,6 +398,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             b.name,
             (self: Val.Obj, sup: Option[Val.Obj]) =>
               Lazy(visitMethod(b.rhs, argSpec, b.offset)(scope(self, sup), implicitly))
+
           )
       }
     }

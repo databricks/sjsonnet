@@ -68,7 +68,7 @@ object Format{
              values0: Val,
              offset: Int,
              evaluator: EvaluatorApi)
-            (implicit scope: Scope, fileScope: FileScope): String = synchronized{
+            (implicit fileScope: FileScope): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
