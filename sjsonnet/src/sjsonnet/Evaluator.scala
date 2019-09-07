@@ -390,12 +390,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         scope.dollar0.orElse(Some(self)),
         Some(self),
         sup,
-        if (newBindings.isEmpty) java.util.Arrays.copyOf(scope.bindings0, scope.bindings0.length)
-        else {
-          val arr = java.util.Arrays.copyOf(scope.bindings0, scope.bindings0.length)
-          for((i, v) <- newBindings) arr(i) = v.apply(self, sup)
-          arr
-        }
+        ValScope.extendArray(scope.bindings0, self, sup, newBindings)
       )
 
       lazy val newBindings = visitBindings(
@@ -440,11 +435,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               scope.dollar0.orElse(Some(newSelf)),
               Some(newSelf),
               None,
-              {
-                val arr = java.util.Arrays.copyOf(s.bindings0, s.bindings0.length)
-                for((i, v) <- newBindings) arr(i) = v.apply(scope.self0.orNull, None)
-                arr
-              }
+              ValScope.extendArray(s.bindings0, scope.self0.orNull, None, newBindings)
             )
 
             lazy val newBindings = visitBindings(
@@ -456,8 +447,17 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               case Val.Str(k) =>
                 Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
                   visitExpr(value)(
-                    s.copy(self0 = Some(self), dollar0 = Some(s.dollar0.getOrElse(self))) ++
-                      newBindings,
+                    new ValScope(
+                      self0 = Some(self),
+                      dollar0 = Some(s.dollar0.getOrElse(self)),
+                      super0 = s.super0,
+                      bindings0 = ValScope.extendArray(
+                        s.bindings0,
+                        s.self0.orNull,
+                        s.super0,
+                        newBindings
+                      )
+                    ),
                     implicitly
                   )
                 ))
