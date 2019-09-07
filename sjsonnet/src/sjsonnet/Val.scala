@@ -181,81 +181,75 @@ object Val{
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
       val argIndices = params.args.map{case (k, d, i) => (k, i)}.toMap
+
       lazy val defaultArgsBindings =
         params.args.collect{
           case (k, Some(default), index) =>
             (
               index,
-              (self: Val.Obj, sup: Option[Val.Obj]) =>
-                Lazy(evalDefault(default, newScope, evaluator))
+              Lazy(evalDefault(default, newScope, evaluator))
             )
         }
 
       lazy val passedArgsBindings = try
         args.zipWithIndex.map{
           case ((Some(name), v), _) =>
-            (
-              argIndices.getOrElse(
-                name,
-                Util.fail(
-                  s"Function has no parameter $name",
-                  outerOffset
-                )
-              ),
-              (self: Val.Obj, sup: Option[Val.Obj]) => v
+            val argIndex = argIndices.getOrElse(
+              name,
+              Util.fail(s"Function has no parameter $name", outerOffset)
             )
-          case ((None, v), i) =>
-            (
-              params.args(i)._3,
-              (self: Val.Obj, sup: Option[Val.Obj]) => v
-            )
+            (argIndex, v)
+          case ((None, v), i) => (params.args(i)._3, v)
         }
-      catch{
-        case e: IndexOutOfBoundsException =>
-          Util.fail(
-            "Too many args, function has " + params.args.length + " parameter(s)",
-            outerOffset
-          )
-      }
-      lazy val seen = collection.mutable.Set.empty[Int]
-      for((k, v) <- passedArgsBindings){
-        if (seen(k)) {
-          Util.fail(
-            "Parameter passed more than once: " + fileScope.indexNames(k),
-            outerOffset
-          )
-        }
-        else seen.add(k)
-      }
-
-      lazy val missing = params.args.collect{case (_, None, i) => i}.toSet -- seen
-      if (missing.nonEmpty){
-        val plural = if (missing.size > 1) "s" else ""
-        val names = missing.map(fileScope.indexNames).mkString(", ")
+      catch{ case e: IndexOutOfBoundsException =>
         Util.fail(
-          s"Function parameter$plural $names not bound in call" ,
+          "Too many args, function has " + params.args.length + " parameter(s)",
           outerOffset
         )
       }
 
-      lazy val unexpectedParams = seen -- params.args.collect{case (_, _, i) => i}.toSet
-      if (unexpectedParams.nonEmpty) {
-        val plural = if (unexpectedParams.size > 1) "s" else ""
-        val names = unexpectedParams.map(fileScope.indexNames).mkString(", ")
-        Util.fail(
-          s"Function has no parameter$plural $names",
-          outerOffset
-        )
+      lazy val allArgBindings = (defaultArgsBindings ++ passedArgsBindings).map{ case (i, v) =>
+        (i, (self: Val.Obj, sup: Option[Val.Obj]) => v)
       }
 
       lazy val newScope: ValScope = defSiteScopes match{
-        case None =>
-          ValScope.empty(args.length + 1) ++ defaultArgsBindings ++ passedArgsBindings
-        case Some((s, fs)) =>
-          s ++ defaultArgsBindings ++ passedArgsBindings
+        case None => ValScope.empty(args.length + 1) ++ allArgBindings
+        case Some((s, fs)) => s ++ allArgBindings
       }
+
+      validateFunctionCall(passedArgsBindings, params, outerOffset)
+
       evalRhs(newScope, thisFile, evaluator, fileScope, outerOffset)
     }
+
+    def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
+                             params: Params,
+                             outerOffset: Int)
+                            (implicit fileScope: FileScope, eval: EvalScope): Unit = {
+
+      val groupedParams = passedArgsBindings.groupBy(_._1)
+      Util.failIfNonEmpty(
+        groupedParams.collect{case (k, vs) if vs.size > 1 => k}.map(fileScope.indexNames),
+        outerOffset,
+        (plural, names) => s"Function parameter$plural $names passed more than once"
+      )
+
+      val seen = groupedParams.keySet
+
+      Util.failIfNonEmpty(
+        (params.args.collect{case (_, None, i) => i}.toSet -- seen).map(fileScope.indexNames),
+        outerOffset,
+        (plural, names) => s"Function parameter$plural $names not bound in call"
+      )
+
+      Util.failIfNonEmpty(
+        (seen -- params.args.map{case (_, _, i) => i}.toSet).map(fileScope.indexNames),
+        outerOffset,
+        (plural, names) => s"Function has no parameter$plural $names"
+      )
+    }
+
+
   }
 }
 

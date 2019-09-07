@@ -26,6 +26,15 @@ object Util {
           (implicit fileScope: FileScope, evaluator: EvalErrorScope) = {
     throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
+
+  def failIfNonEmpty(names: Iterable[String],
+                     outerOffset: Int,
+                     formatMsg: (String, String) => String)
+                    (implicit fileScope: FileScope, eval: EvalErrorScope) = if (names.nonEmpty){
+    val plural = if (names.size > 1) "s" else ""
+    val nameSnippet = names.mkString(", ")
+    Util.fail(formatMsg(plural, nameSnippet), outerOffset)
+  }
 }
 
 class FileScope(val currentFile: Path,

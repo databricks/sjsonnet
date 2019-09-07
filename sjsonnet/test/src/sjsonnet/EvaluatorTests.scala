@@ -32,6 +32,7 @@ object EvaluatorTests extends TestSuite{
       eval("(function(x) x)(1)") ==> ujson.Num(1)
       eval("function() 1") ==> ujson.Num(1)
       eval("function(a=1) a") ==> ujson.Num(1)
+      eval("(function(x, y = x + 1) y)(x = 10)") ==> ujson.Num(11)
     }
     test("members") {
       eval("{local x = 1, x: x}['x']") ==> ujson.Num(1)

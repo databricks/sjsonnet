@@ -131,7 +131,7 @@ object ErrorTests extends TestSuite{
     )
 
     test("function_duplicate_arg") - check(
-      """sjsonnet.Error: Parameter passed more than once: x
+      """sjsonnet.Error: Function parameter x passed more than once
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |""".stripMargin
