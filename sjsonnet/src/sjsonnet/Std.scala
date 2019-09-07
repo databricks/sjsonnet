@@ -134,11 +134,10 @@ object Std {
       { (expr, scope) =>
         new Evaluator(
           scala.collection.mutable.Map(),
-          scope,
           Map(),
           null,
           (_, _) => None
-        ).visitExpr(expr, scope)
+        ).visitExpr(expr)(scope)
       }
     )
   }
@@ -218,7 +217,7 @@ object Std {
         .mkString
     },
     builtin("format", "str", "vals"){ (evaluator, v1: String, v2: Val) =>
-      Format.format(v1, v2, evaluator.memoryScope, -1, evaluator)
+      Format.format(v1, v2, -1, evaluator)
     },
     builtin("foldl", "func", "arr", "init"){ (evaluator, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
@@ -817,8 +816,8 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], scope: ScopeApi) =>
-            Val.Str(scope.currentFile.relativeToString(scope.currentRoot))
+          { (self: Val.Obj, sup: Option[Val.Obj], fileScope: FileScope) =>
+            Val.Str(fileScope.currentFile.relativeToString(fileScope.currentRoot))
           },
           cached = false
         )

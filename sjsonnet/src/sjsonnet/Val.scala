@@ -54,7 +54,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], ScopeApi) => Val,
+                      invoke: (Obj, Option[Obj], FileScope) => Val,
                       cached: Boolean = true)
   }
   case class Obj(value0: Map[String, Obj.Member],
@@ -83,10 +83,10 @@ object Val{
     }
     val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String,
-              scope: ScopeApi,
               offset: Int,
               evaluator: EvaluatorApi,
-              self: Obj = this): Val = {
+              self: Obj = this)
+             (implicit fileScope: FileScope): Val = {
 
       val cacheKey = if(self eq this) k else (k, self)
 
@@ -110,18 +110,18 @@ object Val{
     def mergeMember(l: Val,
                     r: Val,
                     evaluator: EvaluatorApi,
-                    currentFile: Path,
-                    offset: Int) = (l, r) match{
+                    offset: Int)
+                   (implicit fileScope: FileScope)= (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
       case (Val.Str(l), r) =>
         try Val.Str(l + Materializer.apply(r, evaluator).transform(new Renderer()).toString)
-        catch Evaluator.tryCatch2(currentFile, evaluator.wd, offset)
+        catch Evaluator.tryCatch2(evaluator.wd, offset)
       case (l, Val.Str(r)) =>
         try Val.Str(Materializer.apply(l, evaluator).transform(new Renderer()).toString + r)
-        catch Evaluator.tryCatch2(currentFile, evaluator.wd, offset)
+        catch Evaluator.tryCatch2(evaluator.wd, offset)
     }
 
     @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -135,32 +135,31 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 scope: ScopeApi,
                  evaluator: EvaluatorApi,
-                 offset: Int): Option[Val] = this.value0.get(k) match{
+                 offset: Int)
+                (implicit fileScope: FileScope): Option[Val] = this.value0.get(k) match{
       case Some(m) =>
         this.`super` match{
           case Some(s) if m.add =>
             Some(
-              s.valueRaw(k, self, scope, evaluator, offset) match{
-                case None => m.invoke(self, this.`super`, scope)
+              s.valueRaw(k, self, evaluator, offset) match{
+                case None => m.invoke(self, this.`super`, fileScope)
                 case Some(x) =>
                   mergeMember(
                     x,
-                    m.invoke(self, this.`super`, scope),
+                    m.invoke(self, this.`super`, fileScope),
                     evaluator,
-                    scope.currentFile,
                     offset
                   )
               }
             )
           case _ =>
-            Some(m.invoke(self, this.`super`, scope))
+            Some(m.invoke(self, this.`super`, fileScope))
         }
 
       case None => this.`super` match{
         case None => None
-        case Some(s) => s.valueRaw(k, self, scope, evaluator, offset)
+        case Some(s) => s.valueRaw(k, self, evaluator, offset)
       }
     }
   }
@@ -173,53 +172,53 @@ object Val{
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
               evaluator: EvaluatorApi,
-              outerOffset: Int,
-              callerPath: Path) = {
+              outerOffset: Int)
+             (implicit fileScope: FileScope) = {
 
-      lazy val newScope1 =
+      val argIndices = params.args.map{case (k, d, i) => (k, i)}.toMap
+      lazy val defaultArgsBindings =
         params.args.collect{
-          case (k, Some(default)) => (k, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
+          case (k, Some(default), index) => (index, (self: Val.Obj, sup: Option[Val.Obj]) => Lazy(evalDefault(default, newScope)))
         }
 
-      lazy val newScope2 = try
+      lazy val passedArgsBindings = try
         args.zipWithIndex.map{
-          case ((Some(name), v), _) => (name, (self: Val.Obj, sup: Option[Val.Obj]) => v)
-          case ((None, v), i) => (params.args(i)._1, (self: Val.Obj, sup: Option[Val.Obj]) => v)
+          case ((Some(name), v), _) => (argIndices(name), (self: Val.Obj, sup: Option[Val.Obj]) => v)
+          case ((None, v), i) => (params.args(i)._3, (self: Val.Obj, sup: Option[Val.Obj]) => v)
         }
       catch{
         case e: IndexOutOfBoundsException =>
           Evaluator.fail(
             "Too many args, function has " + params.args.length + " parameter(s)",
-            callerPath,
             outerOffset,
             evaluator.wd
           )
       }
-      lazy val seen = collection.mutable.Set.empty[String]
-      for((k, v) <- newScope2){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, callerPath, outerOffset, evaluator.wd)
+      lazy val seen = collection.mutable.Set.empty[Int]
+      for((k, v) <- passedArgsBindings){
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, outerOffset, evaluator.wd)
         else seen.add(k)
       }
 
-      lazy val missing = params.args.collect{case (s, None) => s}.toSet -- seen
+      lazy val missing = params.args.collect{case (_, None, i) => i}.toSet -- seen
       if (missing.nonEmpty){
         Evaluator.fail(
           s"Function parameter${if (missing.size > 1) "s" else ""} ${missing.mkString(", ")} not bound in call" ,
-          callerPath, outerOffset, evaluator.wd
+          outerOffset, evaluator.wd
         )
       }
 
-      lazy val unexpectedParams = seen -- params.args.collect{case (s, _) => s}.toSet
+      lazy val unexpectedParams = seen -- params.args.collect{case (_, _, i) => i}.toSet
       if (unexpectedParams.nonEmpty) {
         Evaluator.fail(
           s"Function has no parameter${if (missing.size > 1) "s" else ""} ${unexpectedParams.mkString(", ")}",
-          callerPath, outerOffset, evaluator.wd
+          outerOffset, evaluator.wd
         )
       }
 
       lazy val newScope: Scope  = scope match{
-        case None => Scope.empty(evaluator.wd) ++ newScope1 ++ newScope2
-        case Some(s) => s ++ newScope1 ++ newScope2
+        case None => Scope.empty() ++ defaultArgsBindings ++ passedArgsBindings
+        case Some(s) => s ++ defaultArgsBindings ++ passedArgsBindings
       }
       evalRhs(newScope, thisFile, evaluator, outerOffset)
     }

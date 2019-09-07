@@ -14,7 +14,7 @@ object Expr{
 
   case class Str(offset: Int, value: String) extends Expr
   case class Num(offset: Int, value: Double) extends Expr
-  case class Id(offset: Int, value: String) extends Expr
+  case class Id(offset: Int, value: Int) extends Expr
   case class Arr(offset: Int, value: Seq[Expr]) extends Expr
   case class Obj(offset: Int, value: ObjBody) extends Expr
 
@@ -46,7 +46,7 @@ object Expr{
 
 
   case class Parened(offset: Int, value: Expr) extends Expr
-  case class Params(args: Seq[(String, Option[Expr])])
+  case class Params(args: Seq[(String, Option[Expr], Int)])
   case class Args(args: Seq[(Option[String], Expr)])
 
   case class UnaryOp(offset: Int, op: UnaryOp.Op, value: Expr) extends Expr
@@ -83,7 +83,7 @@ object Expr{
   case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
 
-  case class Bind(offset: Int, name: String, args: Option[Params], rhs: Expr) extends Offsetted
+  case class Bind(offset: Int, name: Int, args: Option[Params], rhs: Expr) extends Offsetted
   case class Import(offset: Int, value: String) extends Expr
   case class ImportStr(offset: Int, value: String) extends Expr
   case class Error(offset: Int, value: Expr) extends Expr
@@ -100,7 +100,7 @@ object Expr{
 
   sealed trait CompSpec extends Expr
   case class IfSpec(offset: Int, cond: Expr) extends CompSpec
-  case class ForSpec(offset: Int, name: String, cond: Expr) extends CompSpec
+  case class ForSpec(offset: Int, name: Int, cond: Expr) extends CompSpec
 
   case class Comp(offset: Int, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
   case class ObjExtend(offset: Int, base: Expr, ext: ObjBody) extends Expr

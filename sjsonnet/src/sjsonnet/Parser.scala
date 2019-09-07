@@ -253,7 +253,7 @@ object Parser{
               case "error"     => Pass ~ error(index)
               case "assert"    => Pass ~ assertExpr(index)
               case "local"     => Pass ~ local
-              case x           => Pass(Expr.Id(index, x))
+              case x           => Pass(Expr.Id(index, indexFor(x)))
             }
           }
           case _ => Fail
@@ -292,7 +292,7 @@ object Parser{
   def objlocal[_: P] = P( "local" ~~ break ~/ bind ).map(Expr.Member.BindStmt)
   def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   def forspec[_: P] =
-    P( Index ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
+    P( Index ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
   def ifspec[_: P] = P( Index ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
   def fieldname[_: P] = P(
     id.map(Expr.FieldName.Fixed) |
@@ -303,7 +303,7 @@ object Parser{
     P( expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
-    P( Index ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+    P( Index ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
@@ -319,7 +319,7 @@ object Parser{
       if (seen(k)) overlap = k
       else seen.add(k)
     }
-    if (overlap == null) Pass(Expr.Params(x))
+    if (overlap == null) Pass(Expr.Params(x.map{case (k, v) => (k, v, -1)}))
     else Fail.opaque("no duplicate parameter: " + overlap)
 
   }
@@ -332,5 +332,15 @@ object Parser{
 
   ).!
 
-  def document[_: P]: P[Expr] = P( expr ~ End )
+  def document[_: P]: P[(Expr, Map[String, Int])] = P( expr ~  Pass(P.current.misc.toMap.asInstanceOf[Map[String, Int]]) ~ End )
+
+  def indexFor[_: P](name: String): Int = {
+    P.current.misc.get(name) match{
+      case None =>
+        val index = P.current.misc.size
+        P.current.misc(name) = index
+        index
+      case Some(index) => index.asInstanceOf[Int]
+    }
+  }
 }

@@ -6,15 +6,13 @@ import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{FieldName, Member, ObjBody, Params}
 
-class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
-                  scope: Scope,
+class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: (Path, String) => Option[(Path, String)]) {
   val evaluator = new Evaluator(
     parseCache,
-    scope,
     extVars,
     wd,
     importer,
@@ -25,12 +23,18 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
   }
   def interpret0[T](txt: String, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
-      parsed <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
+      res <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
         case Parsed.Success(r, index) => Right(r)
       }
+      (parsed, nameIndices) = res
       res0 <-
-        try Right(evaluator.visitExpr(parsed, scope))
+        try Right(
+          evaluator.visitExpr(parsed)(
+            Scope.standard(),
+            new FileScope(wd / "(memory)", wd, nameIndices)
+          )
+        )
         catch{case e: Throwable =>
           val s = new StringWriter()
           val p = new PrintWriter(s)
@@ -40,11 +44,11 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[Ex
         }
       res = res0 match{
         case f: Val.Func =>
-          f.copy(params = Params(f.params.args.map{ case (k, default) =>
+          f.copy(params = Params(f.params.args.map{ case (k, default, i) =>
             (k, tlaVars.get(k) match{
               case None => default
               case Some(v) => Some(Materializer.toExpr(v))
-            })
+            }, i)
           }))
         case x => x
       }

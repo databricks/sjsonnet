@@ -28,7 +28,7 @@ object SjsonnetMain {
         case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
         case _ => args
       },
-      collection.mutable.Map[String, fastparse.Parsed[Expr]](),
+      collection.mutable.Map.empty,
       System.in,
       System.out,
       System.err,
@@ -39,7 +39,7 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-            parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
+            parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -84,7 +84,7 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-                     parseCache: collection.mutable.Map[String, fastparse.Parsed[Expr]],
+                     parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                      stdin: InputStream,
                      stdout: PrintStream,
                      stderr: PrintStream,
@@ -94,10 +94,6 @@ object SjsonnetMain {
     val path = os.Path(file, wd)
     val interp = new Interpreter(
       parseCache,
-      Scope.standard(
-        OsPath(path),
-        OsPath(wd)
-      ),
       config.varBinding,
       config.tlaBinding,
       OsPath(wd),
