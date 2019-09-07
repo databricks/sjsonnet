@@ -373,7 +373,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         value.collect {
           case Member.AssertStmt(value, msg) =>
 
-            if (visitExpr(value) != Val.True) {
+            if (visitExpr(value)(newScope, fileScope) != Val.True) {
               msg match{
                 case None => Util.fail("Assertion failed", value.offset)
                 case Some(msg) =>
