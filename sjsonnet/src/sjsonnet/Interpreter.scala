@@ -53,7 +53,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         case x => x
       }
       json <-
-        try Right(Materializer.apply0(res, evaluator, visitor))
+        try Right(Materializer.apply0(res, visitor)(evaluator))
         catch{
           case DelegateError(msg) => Left(msg)
           case e: Throwable =>

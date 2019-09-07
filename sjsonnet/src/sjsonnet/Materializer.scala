@@ -5,12 +5,10 @@ import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
 object Materializer {
-  def apply(v: Val,
-            evaluator: EvaluatorApi): ujson.Value = apply0(v, evaluator, ujson.Value)
+  def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
 
-  def apply0[T](v: Val,
-                evaluator: EvaluatorApi,
-                visitor: Visitor[T, T]): T = try {
+  def apply0[T](v: Val, visitor: Visitor[T, T])
+               (implicit evaluator: EvalScope): T = try {
     v match {
       case Val.True => visitor.visitTrue(-1)
       case Val.False => visitor.visitFalse(-1)
@@ -21,7 +19,7 @@ object Materializer {
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x.force, evaluator: EvaluatorApi, visitor),
+            apply0(x.force, visitor),
             -1
           )
         }
@@ -45,8 +43,10 @@ object Materializer {
           objVisitor.visitKeyValue(k)
           objVisitor.visitValue(
             apply0(
-              obj.value(k, -1, evaluator)(new FileScope(null, null, Map())),
-              evaluator,
+              obj.value(k, -1)(
+                new FileScope(null, null, Map()),
+                implicitly
+              ),
               visitor
             ),
             -1
@@ -56,8 +56,10 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(Nil, "(memory)", evaluator, -1)(new FileScope(null, null, Map())),
-          evaluator,
+          f.apply(Nil, "(memory)", -1)(
+            new FileScope(null, null, Map()),
+            implicitly
+          ),
           visitor
         )
     }

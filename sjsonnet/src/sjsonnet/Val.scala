@@ -84,9 +84,8 @@ object Val{
     val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String,
               offset: Int,
-              evaluator: EvaluatorApi,
               self: Obj = this)
-             (implicit fileScope: FileScope): Val = {
+             (implicit fileScope: FileScope, evaluator: EvalScope): Val = {
 
       val cacheKey = if(self eq this) k else (k, self)
 
@@ -97,31 +96,30 @@ object Val{
       cacheLookuped match{
         case Some(res) => res
         case None =>
-          valueRaw(k, self, evaluator, offset) match{
+          valueRaw(k, self, offset) match{
             case Some(x) =>
               valueCache(cacheKey) = x
               x
             case None =>
-              Evaluator.fail("Field does not exist: " + k, offset, evaluator.wd)
+              Evaluator.fail("Field does not exist: " + k, offset)
           }
       }
     }
 
     def mergeMember(l: Val,
                     r: Val,
-                    evaluator: EvaluatorApi,
                     offset: Int)
-                   (implicit fileScope: FileScope)= (l, r) match{
+                   (implicit fileScope: FileScope, evaluator: EvalScope) = (l, r) match{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
       case (l: Val.Obj, r: Val.Obj) => Evaluator.mergeObjects(l, r)
       case (Val.Str(l), r) =>
-        try Val.Str(l + Materializer.apply(r, evaluator).transform(new Renderer()).toString)
-        catch Evaluator.tryCatch2(evaluator.wd, offset)
+        try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+        catch Evaluator.tryCatch2(offset)
       case (l, Val.Str(r)) =>
-        try Val.Str(Materializer.apply(l, evaluator).transform(new Renderer()).toString + r)
-        catch Evaluator.tryCatch2(evaluator.wd, offset)
+        try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+        catch Evaluator.tryCatch2(offset)
     }
 
     @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -135,20 +133,18 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 evaluator: EvaluatorApi,
                  offset: Int)
-                (implicit fileScope: FileScope): Option[Val] = this.value0.get(k) match{
+                (implicit fileScope: FileScope, evaluator: EvalScope): Option[Val] = this.value0.get(k) match{
       case Some(m) =>
         this.`super` match{
           case Some(s) if m.add =>
             Some(
-              s.valueRaw(k, self, evaluator, offset) match{
+              s.valueRaw(k, self, offset) match{
                 case None => m.invoke(self, this.`super`, fileScope)
                 case Some(x) =>
                   mergeMember(
                     x,
                     m.invoke(self, this.`super`, fileScope),
-                    evaluator,
                     offset
                   )
               }
@@ -159,21 +155,20 @@ object Val{
 
       case None => this.`super` match{
         case None => None
-        case Some(s) => s.valueRaw(k, self, evaluator, offset)
+        case Some(s) => s.valueRaw(k, self, offset)
       }
     }
   }
 
   case class Func(scopes: Option[(Scope, FileScope)],
                   params: Params,
-                  evalRhs: (Scope, String, EvaluatorApi, FileScope, Int) => Val,
+                  evalRhs: (Scope, String, EvalScope, FileScope, Int) => Val,
                   evalDefault: (Expr, Scope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(args: Seq[(Option[String], Lazy)],
               thisFile: String,
-              evaluator: EvaluatorApi,
               outerOffset: Int)
-             (implicit fileScope: FileScope) = {
+             (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
       val argIndices = params.args.map{case (k, d, i) => (k, i)}.toMap
       lazy val defaultArgsBindings =
@@ -189,8 +184,7 @@ object Val{
                 name,
                 Evaluator.fail(
                   s"Function has no parameter $name",
-                  outerOffset,
-                  evaluator.wd
+                  outerOffset
                 )
               ),
               (self: Val.Obj, sup: Option[Val.Obj]) => v
@@ -205,13 +199,12 @@ object Val{
         case e: IndexOutOfBoundsException =>
           Evaluator.fail(
             "Too many args, function has " + params.args.length + " parameter(s)",
-            outerOffset,
-            evaluator.wd
+            outerOffset
           )
       }
       lazy val seen = collection.mutable.Set.empty[Int]
       for((k, v) <- passedArgsBindings){
-        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, outerOffset, evaluator.wd)
+        if (seen(k)) Evaluator.fail("Parameter passed more than once: " + k, outerOffset)
         else seen.add(k)
       }
 
@@ -221,7 +214,7 @@ object Val{
         val names = missing.map(fileScope.indexNames).mkString(", ")
         Evaluator.fail(
           s"Function parameter$plural $names not bound in call" ,
-          outerOffset, evaluator.wd
+          outerOffset
         )
       }
 
@@ -231,7 +224,7 @@ object Val{
         val names = unexpectedParams.map(fileScope.indexNames).mkString(", ")
         Evaluator.fail(
           s"Function has no parameter$plural $names",
-          outerOffset, evaluator.wd
+          outerOffset
         )
       }
 

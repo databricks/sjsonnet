@@ -12,19 +12,19 @@ import scala.collection.compat._
 
 object Std {
   sealed trait ReadWriter[T]{
-    def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope): Either[String, T]
+    def apply(t: Val, evaluator: EvalScope, fileScope: FileScope): Either[String, T]
     def write(t: T): Val
   }
   object ReadWriter{
     implicit object StringRead extends ReadWriter[String]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case Val.Str(s) => Right(s)
         case _ => Left("String")
       }
       def write(t: String) = Val.Str(t)
     }
     implicit object BooleanRead extends ReadWriter[Boolean]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case Val.True => Right(true)
         case Val.False => Right(false)
         case _ => Left("Boolean")
@@ -32,39 +32,39 @@ object Std {
       def write(t: Boolean) = Val.bool(t)
     }
     implicit object IntRead extends ReadWriter[Int]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case Val.Num(s) => Right(s.toInt)
         case _ => Left("Int")
       }
       def write(t: Int) = Val.Num(t)
     }
     implicit object DoubleRead extends ReadWriter[Double]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case Val.Num(s) => Right(s)
         case _ => Left("Number")
       }
       def write(t: Double) = Val.Num(t)
     }
     implicit object ValRead extends ReadWriter[Val]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = Right(t)
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = Right(t)
       def write(t: Val) = t
     }
     implicit object ObjRead extends ReadWriter[Val.Obj]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case v: Val.Obj => Right(v)
         case _ => Left("Object")
       }
       def write(t: Val.Obj) = t
     }
     implicit object ArrRead extends ReadWriter[Val.Arr]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case v: Val.Arr => Right(v)
         case _ => Left("Array")
       }
       def write(t: Val.Arr) = t
     }
     implicit object FuncRead extends ReadWriter[Val.Func]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case v: Val.Func => Right(v)
         case _ => Left("Function")
       }
@@ -72,21 +72,21 @@ object Std {
     }
 
     implicit object ApplyerRead extends ReadWriter[Applyer]{
-      def apply(t: Val, evaluator: EvaluatorApi, fileScope: FileScope) = t match{
+      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
         case v: Val.Func => Right(Applyer(v, evaluator, fileScope))
         case _ => Left("Function")
       }
       def write(t: Applyer) = t.f
     }
   }
-  case class Applyer(f: Val.Func, evaluator: EvaluatorApi, fileScope: FileScope){
+  case class Applyer(f: Val.Func, evaluator: EvalScope, fileScope: FileScope){
     def apply(args: Lazy*) = {
-      f.apply(args.map((None, _)), "(memory)", evaluator, -1)(fileScope)
+      f.apply(args.map((None, _)), "(memory)", -1)(fileScope, evaluator)
     }
   }
 
   def validate(vs: Seq[Val],
-               evaluator: EvaluatorApi,
+               evaluator: EvalScope,
                fileScope: FileScope,
                rs: Seq[ReadWriter[_]]) = {
     for((v, r) <- vs.zip(rs)) yield r.apply(v, evaluator, fileScope) match{
@@ -96,23 +96,23 @@ object Std {
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
-                             (eval: (EvaluatorApi, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, evaluator, fileScope) =>
+                             (eval: (EvalScope, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, evaluator, fileScope) =>
     val Seq(v: T1) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]]))
     eval(evaluator, fileScope, v)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
-                                             (eval: (EvaluatorApi, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, evaluator, fileScope) =>
+                                             (eval: (EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, evaluator, fileScope) =>
     val Seq(v1: T1, v2: T2) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
     eval(evaluator, fileScope, v1, v2)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
-                                                             (eval: (EvaluatorApi, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, evaluator, fileScope) =>
+                                                             (eval: (EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, evaluator, fileScope) =>
     val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
     eval(evaluator, fileScope, v1, v2, v3)
   }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], EvaluatorApi, FileScope) => R) = {
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], EvalScope, FileScope) => R) = {
     val paramIndices = params.zipWithIndex
     val paramIndicesMap = paramIndices.toMap
     name -> Val.Func(
@@ -130,7 +130,7 @@ object Std {
     *
     * Arguments of the eval function are (args, evaluator)
     */
-  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], EvaluatorApi) => R): (String, Val.Func) = {
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)(eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
     name -> Val.Func(
       None,
       Params(params.map{case (k, v) => (k, v, -1)}),
@@ -150,8 +150,8 @@ object Std {
   }
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin("assertEqual", "a", "b"){ (evaluator, fileScope, v1: Val, v2: Val) =>
-      val x1 = Materializer(v1, evaluator)
-      val x2 = Materializer(v2, evaluator)
+      val x1 = Materializer(v1)(evaluator)
+      val x2 = Materializer(v2)(evaluator)
       if (x1 == x2) true
       else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
     },
@@ -159,7 +159,7 @@ object Std {
       v1 match{
         case Val.Str(s) => s
         case v =>
-          Materializer.apply(v, evaluator).transform(new Renderer()).toString
+          Materializer.apply(v)(evaluator).transform(new Renderer()).toString
       }
     },
     builtin("codepoint", "str"){ (evaluator, fileScope, v1: Val) =>
@@ -214,7 +214,7 @@ object Std {
         case _: Val.Str | Val.Null => // donothing
         case x => throw new DelegateError("Cannot call .lines on " + x.prettyName)
       }
-      Materializer.apply(v1, evaluator).asInstanceOf[ujson.Arr]
+      Materializer.apply(v1)(evaluator).asInstanceOf[ujson.Arr]
         .value
         .filter(_ != ujson.Null)
         .map{
@@ -224,7 +224,7 @@ object Std {
         .mkString
     },
     builtin("format", "str", "vals"){ (evaluator, fileScope, v1: String, v2: Val) =>
-      Format.format(v1, v2, -1, evaluator)(fileScope)
+      Format.format(v1, v2, -1)(fileScope, evaluator)
     },
     builtin("foldl", "func", "arr", "init"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
@@ -264,7 +264,7 @@ object Std {
           case (_, _) => r
         }
       }
-      Materializer.reverse(rec(Materializer(target, evaluator), Materializer(patch, evaluator)))
+      Materializer.reverse(rec(Materializer(target)(evaluator), Materializer(patch)(evaluator)))
     },
     builtin("sqrt", "x"){ (evaluator, fileScope, x: Double) =>
       math.sqrt(x)
@@ -357,7 +357,7 @@ object Std {
     },
     builtin("count", "arr", "x"){ (evaluator, fileScope, arr: Val.Arr, x: Val) =>
       val res =  arr.value.count{i =>
-        Materializer(i.force, evaluator) == Materializer(x, evaluator)
+        Materializer(i.force)(evaluator) == Materializer(x)(evaluator)
       }
       res
     },
@@ -382,7 +382,7 @@ object Std {
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
             func.apply(
               Lazy(Val.Str(k._1)),
-              Lazy(obj.value(k._1, -1, evaluator)(fileScope))
+              Lazy(obj.value(k._1, -1)(fileScope,evaluator))
             )
           ))
         }.toMap,
@@ -410,7 +410,7 @@ object Std {
       Val.Arr(
         for (
           (v, i) <- arr.value.zipWithIndex
-          if Materializer(v.force, evaluator) == Materializer(value, evaluator)
+          if Materializer(v.force)(evaluator) == Materializer(value)(evaluator)
         ) yield Lazy(Val.Num(i))
       )
     },
@@ -485,7 +485,7 @@ object Std {
       Val.Arr(out.toSeq)
     },
     builtin("manifestIni", "v"){ (evaluator, fileScope, v: Val) =>
-      val materialized = Materializer(v, evaluator)
+      val materialized = Materializer(v)(evaluator)
       def sect(x: ujson.Obj) = {
         x.value.flatMap{
           case (k, ujson.Str(v)) => Seq(k + " = " + v)
@@ -515,15 +515,15 @@ object Std {
       str.replace("$", "$$")
     },
     builtin("manifestPython", "v"){ (evaluator, fileScope, v: Val) =>
-      Materializer(v, evaluator).transform(new PythonRenderer()).toString
+      Materializer(v)(evaluator).transform(new PythonRenderer()).toString
     },
     builtin("manifestJson", "v"){ (evaluator, fileScope, v: Val) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-      Materializer(v, evaluator).render(indent = 4).replaceAll("\n[ ]+\n", "\n\n")
+      Materializer(v)(evaluator).render(indent = 4).replaceAll("\n[ ]+\n", "\n\n")
     },
     builtin("manifestJsonEx", "value", "indent"){ (evaluator, fileScope, v: Val, i: String) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
-      Materializer(v, evaluator).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
+      Materializer(v)(evaluator).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
     },
     builtinWithDefaults("manifestYamlDoc", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
       val v = args("v")
@@ -532,7 +532,7 @@ object Std {
           case Val.True => true
           case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
         }
-      Materializer(v, evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString
+      Materializer(v)(evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString
     },
     builtinWithDefaults("manifestYamlStream", "v" -> None, "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
       val v = args("v")
@@ -543,13 +543,13 @@ object Std {
       }
       v match {
         case Val.Arr(values) => values
-          .map { item => Materializer(item.force, evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString() }
+          .map { item => Materializer(item.force)(evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString() }
           .mkString("---\n", "\n---\n", "\n...\n")
         case _ => throw new DelegateError("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
     builtin("manifestPythonVars", "v"){ (evaluator, fileScope, v: Val.Obj) =>
-      Materializer(v, evaluator).obj
+      Materializer(v)(evaluator).obj
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
         .mkString
     },
@@ -575,7 +575,7 @@ object Std {
         }
       }
 
-      rec(Materializer(value, evaluator)).render
+      rec(Materializer(value)(evaluator)).render
 
     },
     builtin("base64", "v"){ (evaluator, fileScope, v: Val) =>
@@ -610,14 +610,14 @@ object Std {
       }
     },
     builtin("uniq", "arr"){ (evaluator, fileScope, arr: Val.Arr) =>
-      val ujson.Arr(vs) = Materializer(arr, evaluator)
+      val ujson.Arr(vs) = Materializer(arr)(evaluator)
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
       Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("set", "arr"){ (evaluator, fileScope, arr: Val.Arr) =>
-      val ujson.Arr(vs0) = Materializer(arr, evaluator)
+      val ujson.Arr(vs0) = Materializer(arr)(evaluator)
       val vs =
         if (vs0.forall(_.isInstanceOf[ujson.Str])){
           vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
@@ -634,8 +634,8 @@ object Std {
     },
     builtin("setUnion", "a", "b"){ (evaluator, fileScope, a: Val.Arr, b: Val.Arr) =>
 
-      val ujson.Arr(vs1) = Materializer(a, evaluator)
-      val ujson.Arr(vs2) = Materializer(b, evaluator)
+      val ujson.Arr(vs1) = Materializer(a)(evaluator)
+      val ujson.Arr(vs2) = Materializer(b)(evaluator)
       val vs0 = vs1 ++ vs2
       val vs =
         if (vs0.forall(_.isInstanceOf[ujson.Str])){
@@ -652,11 +652,11 @@ object Std {
       Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("setInter", "a", "b"){ (evaluator, fileScope, a: Val, b: Val.Arr) =>
-      val vs1 = Materializer(a, evaluator) match{
+      val vs1 = Materializer(a)(evaluator) match{
         case ujson.Arr(vs1) => vs1
         case x => Seq(x)
       }
-      val ujson.Arr(vs2) = Materializer(b, evaluator)
+      val ujson.Arr(vs2) = Materializer(b)(evaluator)
 
 
       val vs0 = vs1.to(collection.mutable.LinkedHashSet)
@@ -677,8 +677,8 @@ object Std {
       Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
     },
     builtin("setDiff", "a", "b"){ (evaluator, fileScope, a: Val.Arr, b: Val.Arr) =>
-      val ujson.Arr(vs1) = Materializer(a, evaluator)
-      val ujson.Arr(vs2) = Materializer(b, evaluator)
+      val ujson.Arr(vs1) = Materializer(a)(evaluator)
+      val ujson.Arr(vs2) = Materializer(b)(evaluator)
 
 
       val vs0 = vs1.to(collection.mutable.LinkedHashSet)
@@ -700,8 +700,8 @@ object Std {
 
     },
     builtin("setMember", "x", "arr"){ (evaluator, fileScope, x: Val, arr: Val.Arr) =>
-      val vs1 = Materializer(x, evaluator)
-      val ujson.Arr(vs2) = Materializer(arr, evaluator)
+      val vs1 = Materializer(x)(evaluator)
+      val ujson.Arr(vs2) = Materializer(arr)(evaluator)
       vs2.contains(vs1)
     },
     builtin("split", "str", "c"){ (evaluator, fileScope, str: String, c: String) =>
@@ -768,7 +768,7 @@ object Std {
           val bindings = for{
             (k, hidden) <- o.getVisibleKeys()
             if !hidden
-            v = rec(o.value(k, -1, evaluator)(fileScope))
+            v = rec(o.value(k, -1)(fileScope, evaluator))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => v))
           Val.Obj(bindings.toMap, _ => (), None)

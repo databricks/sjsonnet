@@ -66,9 +66,8 @@ object Format{
   }
   def format(s: String,
              values0: Val,
-             offset: Int,
-             evaluator: EvaluatorApi)
-            (implicit fileScope: FileScope): String = synchronized{
+             offset: Int)
+            (implicit fileScope: FileScope, evaluator: EvalScope): String = synchronized{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
@@ -84,11 +83,11 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.cast[Val.Arr].value(i).force, evaluator)
+            case None => Materializer(values.cast[Val.Arr].value(i).force)
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).force, evaluator)
-                case v: Val.Obj => Materializer(v.value(key, offset, evaluator), evaluator)
+                case v: Val.Arr => Materializer(v.value(i).force)
+                case v: Val.Obj => Materializer(v.value(key, offset))
               }
           }
           i += 1

@@ -1,8 +1,9 @@
 package sjsonnet
 
-case class FileScope(currentFile: Path,
-                     currentRoot: Path,
-                     nameIndices: Map[String, Int]){
+class EvalScope(val extVars: Map[String, ujson.Value], val wd: Path)
+class FileScope(val currentFile: Path,
+                val currentRoot: Path,
+                val nameIndices: Map[String, Int]){
   val indexNames = nameIndices.map(_.swap)
 }
 object Scope{
