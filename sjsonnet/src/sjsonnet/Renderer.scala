@@ -48,7 +48,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
-    RenderUtils.renderDouble(out, d)
+    out.append(RenderUtils.renderDouble(d))
     out
   }
   override val colonSnippet = ": "
@@ -156,7 +156,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
   }
   override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
-    RenderUtils.renderDouble(out, d)
+    out.append(RenderUtils.renderDouble(d))
     out
   }
   override val colonSnippet = ": "
@@ -246,13 +246,11 @@ object RenderUtils {
   /**
     * Custom rendering of Doubles used in rendering
     */
-  def renderDouble(out: java.io.Writer, d: Double): Unit = {
-    out.append(
-      if (d.toLong == d) d.toLong.toString
-      else if (d % 1 == 0) {
-        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
-      }
-      else d.toString
-    )
+  def renderDouble(d: Double): String = {
+    if (d.toLong == d) d.toLong.toString
+    else if (d % 1 == 0) {
+      BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+    }
+    else d.toString
   }
 }

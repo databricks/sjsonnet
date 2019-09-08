@@ -261,11 +261,19 @@ object EvaluatorTests extends TestSuite{
     test("stdSubstr") {
       eval("std.substr('cookie', 6, 2)") ==> ujson.Str("")
     }
-//    test("format") {
-//      eval("\"%s\" % \"world\"") ==> Value.Str("world")
-//      eval("\"%s\" % [\"world\"]") ==> Value.Str("world")
-//      eval("\"%s %s\" % [\"hello\", \"world\"]") ==> Value.Str("hello world")
-//      eval("\"%(hello)s\" % {hello: \"world\"}") ==> Value.Str("world")
-//    }
+    test("manifestIni") {
+      eval(
+        """std.manifestIni({
+          |  main: { a: "1", b: 2, c: true, d: null, e: [1, {"2": 2}, [3]], f: {"hello": "world"} },
+          |  sections: {}
+          |})""".stripMargin) ==>
+        ujson.Str("a = 1\nb = 2\nc = true\nd = null\ne = 1\ne = {\"2\": 2}\ne = [3]\nf = {\"hello\": \"world\"}\n")
+    }
+    test("format") {
+      eval("\"%s\" % \"world\"") ==> ujson.Str("world")
+      eval("\"%s\" % [\"world\"]") ==> ujson.Str("world")
+      eval("\"%s %s\" % [\"hello\", \"world\"]") ==> ujson.Str("hello world")
+      eval("\"%(hello)s\" % {hello: \"world\"}") ==> ujson.Str("world")
+    }
   }
 }

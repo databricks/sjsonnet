@@ -6,6 +6,7 @@ import java.util.Base64
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 import sjsonnet.ValScope.empty
+import ujson.StringRenderer
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
@@ -482,15 +483,17 @@ object Std {
     },
     builtin("manifestIni", "v"){ (evaluator, fileScope, v: Val) =>
       val materialized = Materializer(v)(evaluator)
+      def render(x: ujson.Value) = x match{
+        case ujson.Str(v) => v
+        case ujson.Num(v) => RenderUtils.renderDouble(v)
+        case ujson.Bool(v) => v.toString
+        case ujson.Null => "null"
+        case _ => x.transform(new sjsonnet.Renderer())
+      }
       def sect(x: ujson.Obj) = {
         x.value.flatMap{
-          case (k, ujson.Str(v)) => Seq(k + " = " + v)
-          case (k, ujson.Arr(vs)) =>
-            vs.map{
-              case ujson.Str(v) => k + " = " + v
-              case x => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
-            }
-          case (k, x) => throw new DelegateError("Cannot call manifestIni on " + x.getClass)
+          case (k, ujson.Arr(vs)) => vs.map(x => k + " = " + render(x))
+          case (k, v) => Seq(k + " = " + render(v))
         }
       }
       val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
