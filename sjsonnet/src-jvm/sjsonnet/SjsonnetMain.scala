@@ -20,7 +20,7 @@ object SjsonnetMain {
       })
       .filter(p => allowedInputs.fold(true)(_(p)))
       .find(os.exists)
-      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e => None})
+      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e: Throwable => None})
   }
   def main(args: Array[String]): Unit = {
     val exitCode = main0(

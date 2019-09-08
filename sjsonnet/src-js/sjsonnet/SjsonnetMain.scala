@@ -6,6 +6,7 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
+  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
@@ -14,10 +15,6 @@ object SjsonnetMain {
                 importer: js.Function2[String, String, js.Array[String]]): js.Any = {
     val interp = new Interpreter(
       mutable.Map.empty,
-      Std.scope(
-        JsVirtualPath("(memory)"),
-        JsVirtualPath("")
-      ),
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap,
       JsVirtualPath(wd0),
@@ -28,7 +25,7 @@ object SjsonnetMain {
         }
       }
     )
-    interp.interpret0(text, ujson.WebJson.Builder) match{
+    interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{
       case Left(msg) => throw new js.JavaScriptException(msg)
       case Right(v) => v
     }
