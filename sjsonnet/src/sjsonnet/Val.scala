@@ -126,10 +126,10 @@ object Val{
       case (l: Val.Obj, r: Val.Obj) => Val.Obj.merge(l, r)
       case (Val.Str(l), r) =>
         try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
-        catch Util.tryCatch2(offset)
+        catch Util.tryCatchWrap(offset)
       case (l, Val.Str(r)) =>
         try Val.Str(evaluator.materialize(l).transform(new Renderer()).toString + r)
-        catch Util.tryCatch2(offset)
+        catch Util.tryCatchWrap(offset)
     }
 
     @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -228,7 +228,13 @@ object Val{
 
       validateFunctionCall(passedArgsBindings, params, outerOffset)
 
-      evalRhs(newScope, thisFile, evaluator, fileScope, outerOffset)
+      evalRhs(
+        newScope,
+        thisFile,
+        evaluator,
+        defSiteScopes.map(_._2).getOrElse(fileScope),
+        outerOffset
+      )
     }
 
     def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],

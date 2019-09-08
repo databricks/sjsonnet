@@ -9,7 +9,7 @@ import ujson.Value
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                 extVars: Map[String, ujson.Value],
                 wd: Path,
-                importer: (Path, String) => Option[(Path, String)]) extends EvalScope(extVars, wd){
+                importer: (Seq[Path], String) => Option[(Path, String)]) extends EvalScope(extVars, wd){
   implicit def evalScope: EvalScope = this
 
   override def materialize(v: Val): Value = {
@@ -80,7 +80,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         )
       )
 
-    try ref.force catch Util.tryCatch2(offset)
+    try ref.force catch Util.tryCatchWrap(offset)
   }
 
   def visitIfElse(offset: Int,
@@ -103,7 +103,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         case Val.Str(s) => s
         case r =>
           try Materializer(r).toString()
-          catch Util.tryCatch2(offset)
+          catch Util.tryCatchWrap(offset)
       },
       offset
     )
@@ -128,7 +128,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       fileScope.currentFile.last,
       offset
     )
-    catch Util.tryCatch2(offset)
+    catch Util.tryCatchWrap(offset)
   }
 
   def visitAssert(offset: Int, value: Expr, msg: Option[Expr], returned: Expr)
@@ -181,12 +181,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         val int = i.value.toInt
         if (int != i.value) Util.fail("array index was not integer: " + i.value, offset)
         try v.value(int).force
-        catch Util.tryCatch2(offset)
+        catch Util.tryCatchWrap(offset)
       case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
         val ref = v.value(i.value, offset)
         try ref
-        catch Util.tryCatch2(offset)
+        catch Util.tryCatchWrap(offset)
       case (lhs, rhs) =>
         Util.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
     }
@@ -202,7 +202,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       case obj: Val.Obj =>
         val ref = obj.value(name, offset)
         try ref
-        catch Util.tryCatch2(offset)
+        catch Util.tryCatchWrap(offset)
       case r =>
         Util.fail(
           s"attemped to index a ${r.prettyName} with string ${name}",
@@ -218,13 +218,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitImport(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
     val (p, str) = resolveImport(value, offset)
-//    if (value == "../../../../sisyphus/sisyphus-deployable.jsonnet.TEMPLATE"){
-
-      pprint.log(value)
-//      pprint.log(offset)
-//      pprint.log(str)
-      pprint.log(p)
-//    }
     imports.getOrElseUpdate(
       p,
       {
@@ -240,17 +233,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               offset
             )
         }
-        visitExpr(doc)(
-          Std.scope(nameIndices.size),
-          new FileScope(p, nameIndices)
-        )
+        val newFileScope = new FileScope(p, nameIndices)
+        try visitExpr(doc)(Std.scope(nameIndices.size), newFileScope)
+        catch Util.tryCatchWrap(offset)
       }
     )
   }
 
   def resolveImport(value: String, offset: Int)
                    (implicit scope: ValScope, fileScope: FileScope): (Path, String) = {
-    importer(fileScope.currentFile.parent(), value)
+    importer(Seq(wd, fileScope.currentFile.parent()), value)
       .getOrElse(
         Util.fail(
           "Couldn't import file: " + pprint.Util.literalize(value),
@@ -282,7 +274,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
 
             try Val.Str(Format.format(l, r, offset))
-            catch Util.tryCatch2(offset)
+            catch Util.tryCatchWrap(offset)
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
           case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
@@ -290,10 +282,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
             try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
-            catch Util.tryCatch2(offset)
+            catch Util.tryCatchWrap(offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
             try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
-            catch Util.tryCatch2(offset)
+            catch Util.tryCatchWrap(offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
@@ -306,13 +298,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               Util.fail("cannot test equality of functions", offset)
             }
             try Val.bool(Materializer(l) == Materializer(r))
-            catch Util.tryCatch2(offset)
+            catch Util.tryCatchWrap(offset)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
               Util.fail("cannot test equality of functions", offset)
             }
             try Val.bool(Materializer(l) != Materializer(r))
-            catch Util.tryCatch2(offset)
+            catch Util.tryCatchWrap(offset)
           case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)

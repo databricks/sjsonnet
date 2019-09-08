@@ -12,8 +12,8 @@ object Util {
       throw new Error("Internal Error", Nil, Some(e))
         .addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
-  def tryCatch2[T](offset: Int)
-                  (implicit fileScope: FileScope, evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
+  def tryCatchWrap[T](offset: Int)
+                     (implicit fileScope: FileScope, evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(fileScope.currentFile, evaluator.wd, offset)
     case e: DelegateError =>
       throw new Error(e.msg, Nil, None)

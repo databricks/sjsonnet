@@ -169,6 +169,7 @@ object ErrorTests extends TestSuite{
     "import_static-check-failure" - check(
       """sjsonnet.Error: Unknown variable x
         |    at .(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
+        |    at .(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
         |""".stripMargin
     )
     "import_syntax-error" - check(
