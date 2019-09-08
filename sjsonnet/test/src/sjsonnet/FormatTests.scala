@@ -13,7 +13,6 @@ object FormatTests extends TestSuite{
     )(
       new FileScope(
         DummyPath("(unknown)"),
-        DummyPath(),
         Map.empty
       ),
       new EvalScope(Map(), DummyPath()){

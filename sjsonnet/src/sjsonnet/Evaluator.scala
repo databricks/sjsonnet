@@ -218,6 +218,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitImport(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
     val (p, str) = resolveImport(value, offset)
+//    if (value == "../../../../sisyphus/sisyphus-deployable.jsonnet.TEMPLATE"){
+
+      pprint.log(value)
+//      pprint.log(offset)
+//      pprint.log(str)
+      pprint.log(p)
+//    }
     imports.getOrElseUpdate(
       p,
       {
@@ -235,7 +242,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         }
         visitExpr(doc)(
           Std.scope(nameIndices.size),
-          new FileScope(p, fileScope.currentRoot, nameIndices)
+          new FileScope(p, nameIndices)
         )
       }
     )
@@ -404,12 +411,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       lazy val newSelf: Val.Obj = Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
+            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
               assertions(self)
               visitExpr(rhs)(makeNewScope(Some(self), sup), implicitly)
             }))
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _) => {
+            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
               assertions(self)
               visitMethod(rhs, argSpec, offset)(makeNewScope(Some(self), sup), implicitly)
             }))
@@ -445,7 +452,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
             visitExpr(key)(s, implicitly) match {
               case Val.Str(k) =>
-                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
+                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
                   visitExpr(value)(
                     s.extend(
                       newBindings,

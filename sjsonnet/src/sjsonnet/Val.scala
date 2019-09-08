@@ -54,7 +54,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], FileScope) => Val,
+                      invoke: (Obj, Option[Obj], FileScope, EvalScope) => Val,
                       cached: Boolean = true)
 
     def merge(lhs: Val.Obj, rhs: Val.Obj) = {
@@ -150,17 +150,17 @@ object Val{
           case Some(s) if m.add =>
             Some(
               s.valueRaw(k, self, offset) match{
-                case None => m.invoke(self, this.`super`, fileScope)
+                case None => m.invoke(self, this.`super`, fileScope, evaluator)
                 case Some(x) =>
                   mergeMember(
                     x,
-                    m.invoke(self, this.`super`, fileScope),
+                    m.invoke(self, this.`super`, fileScope, evaluator),
                     offset
                   )
               }
             )
           case _ =>
-            Some(m.invoke(self, this.`super`, fileScope))
+            Some(m.invoke(self, this.`super`, fileScope, evaluator))
         }
 
       case None => this.`super` match{

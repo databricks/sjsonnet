@@ -140,7 +140,7 @@ object Std {
         implicitly[ReadWriter[R]].write(eval(args, evaluator))
       },
       { (expr, scope, eval) =>
-        eval.visitExpr(expr)(scope, new FileScope(null, null, Map.empty))
+        eval.visitExpr(expr)(scope, new FileScope(null, Map.empty))
       }
     )
   }
@@ -375,7 +375,7 @@ object Std {
       val allKeys = obj.getVisibleKeys()
       Val.Obj(
         allKeys.map{ k =>
-          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _) =>
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
             func.apply(
               Lazy(Val.Str(k._1)),
               Lazy(obj.value(k._1, -1)(fileScope,evaluator))
@@ -746,7 +746,7 @@ object Std {
           case ujson.Obj(valueMap) =>
             val transformedValue = valueMap
               .mapValues { v =>
-                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _ ,_) => recursiveTransform(v))
+                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
               }.toMap
             Val.Obj(transformedValue , (x: Val.Obj) => (), None)
         }
@@ -770,7 +770,7 @@ object Std {
             if !hidden
             v = rec(o.value(k, -1)(fileScope, evaluator))
             if filter(v)
-          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _) => v))
+          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
           Val.Obj(bindings.toMap, _ => (), None)
         case a: Val.Arr =>
           Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Lazy(_)))
@@ -813,7 +813,7 @@ object Std {
             Val.Obj.Member(
               false,
               Visibility.Hidden,
-              (self: Val.Obj, sup: Option[Val.Obj], _) => v
+              (self: Val.Obj, sup: Option[Val.Obj], _, _) => v
             )
           )
       }
@@ -823,8 +823,8 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], fileScope: FileScope) =>
-            Val.Str(fileScope.currentFile.relativeToString(fileScope.currentRoot))
+          { (self: Val.Obj, sup: Option[Val.Obj], fileScope: FileScope, eval: EvalScope) =>
+            Val.Str(fileScope.currentFile.relativeToString(eval.wd))
           },
           cached = false
         )

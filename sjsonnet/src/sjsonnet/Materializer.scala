@@ -44,7 +44,7 @@ object Materializer {
           objVisitor.visitValue(
             apply0(
               obj.value(k, -1)(
-                new FileScope(null, null, Map()),
+                new FileScope(null, Map()),
                 implicitly
               ),
               visitor
@@ -57,7 +57,7 @@ object Materializer {
       case f: Val.Func =>
         apply0(
           f.apply(Nil, "(memory)", -1)(
-            new FileScope(null, null, Map()),
+            new FileScope(null, Map()),
             implicitly
           ),
           visitor
@@ -76,7 +76,14 @@ object Materializer {
     case ujson.Str(s) => Val.Str(s)
     case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toSeq)
     case ujson.Obj(xs) => Val.Obj(
-      xs.map(x => (x._1, Val.Obj.Member(false, Visibility.Normal, (_: Val.Obj, _: Option[Val.Obj], _) => reverse(x._2)))).toMap,
+      xs.map(x =>
+        (
+          x._1,
+          Val.Obj.Member(false, Visibility.Normal,
+            (_: Val.Obj, _: Option[Val.Obj], _, _) => reverse(x._2)
+          )
+        )
+      ).toMap,
       _ => (),
       None
     )

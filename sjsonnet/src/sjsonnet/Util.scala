@@ -38,7 +38,6 @@ object Util {
 }
 
 class FileScope(val currentFile: Path,
-                val currentRoot: Path,
                 val nameIndices: Map[String, Int]){
   val indexNames = nameIndices.map(_.swap)
 }
