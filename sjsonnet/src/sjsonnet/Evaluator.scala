@@ -258,8 +258,30 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       // these short-circuit during evaluation in some cases when the LHS is known.
       case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
         (visitExpr(lhs), op) match {
-          case (Val.False, Expr.BinaryOp.`&&`) => Val.False
-          case (Val.True, Expr.BinaryOp.`||`) => Val.True
+          case (lhs, Expr.BinaryOp.`&&`) =>
+            lhs match{
+              case Val.True =>
+                visitExpr(rhs) match{
+                  case b: Val.Bool => b
+                  case unknown =>
+                    Util.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+                }
+              case Val.False => Val.False
+              case unknown =>
+                Util.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+            }
+          case (lhs, Expr.BinaryOp.`||`) =>
+            lhs match{
+              case Val.True => Val.True
+              case Val.False =>
+                visitExpr(rhs) match{
+                  case b: Val.Bool => b
+                  case unknown =>
+                    Util.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+                }
+              case unknown =>
+                Util.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+            }
           case _ => visitExpr(rhs)
 
         }

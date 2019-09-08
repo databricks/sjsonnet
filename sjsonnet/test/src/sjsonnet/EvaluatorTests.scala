@@ -275,5 +275,12 @@ object EvaluatorTests extends TestSuite{
       eval("\"%s %s\" % [\"hello\", \"world\"]") ==> ujson.Str("hello world")
       eval("\"%(hello)s\" % {hello: \"world\"}") ==> ujson.Str("world")
     }
+    test("binaryOps"){
+      val ex = intercept[Exception](eval("1 && 2"))
+      assert(ex.getMessage.contains("binary operator && does not operate on numbers."))
+
+      val ex2 = intercept[Exception](eval("1 || 2"))
+      assert(ex2.getMessage.contains("binary operator || does not operate on numbers."))
+    }
   }
 }
