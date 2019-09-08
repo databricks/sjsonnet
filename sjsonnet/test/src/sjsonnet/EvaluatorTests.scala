@@ -100,6 +100,21 @@ object EvaluatorTests extends TestSuite{
 
         eval("{ x: 1 } + { x: 2, y: super.x } + { x: 3, z: super.x }") ==>
           ujson.read("""{ "x": 3, "y": 1, "z": 2 }""")
+
+        eval("""({a: 1} + {b: 2} + {c: ["a" in super, "b" in super]}).c""") ==>
+          ujson.Arr(true, true)
+
+        eval("""{a: ["a" in super, "b" in super]}.a""") ==> ujson.Arr(false, false)
+
+        eval("""(({a: 1}{b: 2}){c: super.a}).c""") ==> ujson.Num(1)
+        eval("""(({a: 1}{b: 2}){c: super.b}).c""") ==> ujson.Num(2)
+
+        eval("""(({a: 1}{b: 2, f: super.a}){c: super.f}).c""") ==> ujson.Num(1)
+        val ex = intercept[Exception]{eval("""(({a: 1}{b: 2, f: super.b}){c: super.f}).c""")}
+        assert(ex.getMessage.contains("Field does not exist: b"))
+
+        eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).c""") ==> ujson.Num(2)
+        eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).d""") ==> ujson.Num(1)
       }
     }
     test("hidden") {

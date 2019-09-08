@@ -60,7 +60,8 @@ object SjsonnetTestMain {
           OsPath(os.pwd),
           SjsonnetMain.resolveImport(Nil, None)
         )
-        interp.interpret(os.read(path), OsPath(path))
+        val res = interp.interpret(os.read(path), OsPath(path))
+        assert(res.isRight)
       }
     }
     println(count)

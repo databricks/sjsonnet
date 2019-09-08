@@ -25,10 +25,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case False(offset) => Val.False
     case Self(offset) => scope.self0.getOrElse(Util.fail("Cannot use `self` outside an object", offset))
 
-
-    case BinaryOp(_, lhs, Expr.BinaryOp.`in`, Super(offset)) =>
-      val key = visitExpr(lhs).cast[Val.Str]
-      Val.bool(scope.super0.get.value0.contains(key.value))
+    case BinaryOp(offset, lhs, Expr.BinaryOp.`in`, Super(_)) =>
+      scope.super0 match{
+        case None => Val.False
+        case Some(sup) =>
+          val key = visitExpr(lhs).cast[Val.Str]
+          Val.bool(sup.valueRaw(key.value, sup, offset).isDefined)
+      }
 
     case $(offset) => scope.dollar0.getOrElse(Util.fail("Cannot use `$` outside an object", offset))
     case Str(offset, value) => Val.Str(value)
@@ -91,7 +94,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                   fileScope: FileScope): Val = {
     visitExpr(cond) match {
       case Val.True => visitExpr(then)
-      case Val.False => else0.fold[Val](Val.Null)(visitExpr(_))
+      case Val.False =>
+        else0 match{
+          case None => Val.Null
+          case Some(v) => visitExpr(v)
+        }
       case v => Util.fail("Need boolean, found " + v.prettyName, offset)
     }
   }
@@ -203,11 +210,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         val ref = obj.value(name, offset)
         try ref
         catch Util.tryCatchWrap(offset)
-      case r =>
-        Util.fail(
-          s"attemped to index a ${r.prettyName} with string ${name}",
-          offset
-        )
+      case r => Util.fail(s"attemped to index a ${r.prettyName} with string ${name}", offset)
     }
   }
 
