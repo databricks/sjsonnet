@@ -66,6 +66,9 @@ object EvaluatorTests extends TestSuite{
       eval("{x: 1, y: {x: 2, z: $.x + 10}}.y.z") ==> ujson.Num(11)
       eval("{x: 1, y: {x: 2, z: self.x + 10}}.y.z") ==> ujson.Num(12)
       eval("{x: 1, y: {x: 0, y: self.x}.y}.y") ==> ujson.Num(0)
+      eval("""{x: 1, y: "x" in self}.y""") ==> ujson.True
+      eval("""{x: 1, y: "z" in self}.y""") ==> ujson.False
+      eval("""{y: "y" in self}.y""") ==> ujson.True
     }
     test("topLevel") {
       eval("local p(n='A') = {w: 'H'+n}; {p: p()}.p.w") ==> ujson.Str("HA")
@@ -92,6 +95,7 @@ object EvaluatorTests extends TestSuite{
         eval("{local x = self, y: 1, z: {a: x, y: 2}}.z.a.y") ==> ujson.Num(1)
         eval("local A = {x: 1, local outer = self, y: A{x: outer.x}}; A.y.x") ==> ujson.Num(1)
         eval("local A = {x: 1, local outer = self, y: A{x: outer.x + 1}}; A.y.y.x") ==> ujson.Num(3)
+        eval("""("a" in ({a: 1}{b: 2}))""") ==> ujson.True
       }
       test("explicit") {
 

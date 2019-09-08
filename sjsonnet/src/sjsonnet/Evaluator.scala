@@ -30,7 +30,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         case None => Val.False
         case Some(sup) =>
           val key = visitExpr(lhs).cast[Val.Str]
-          Val.bool(sup.valueRaw(key.value, sup, offset).isDefined)
+          Val.bool(sup.containsKey(key.value))
       }
 
     case $(offset) => scope.dollar0.getOrElse(Util.fail("Cannot use `$` outside an object", offset))
@@ -70,7 +70,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value).cast[Val.Obj]
       val extension = visitObjBody(ext)
-      Val.Obj.merge(original, extension)
+      extension.mergeLeft(original)
     }
   } catch Util.tryCatch(expr.offset)
 
@@ -275,9 +275,9 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
-
             try Val.Str(Format.format(l, r, offset))
             catch Util.tryCatchWrap(offset)
+
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
           case (Val.Str(l), Expr.BinaryOp.`>`, Val.Str(r)) => Val.bool(l > r)
@@ -308,11 +308,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             }
             try Val.bool(Materializer(l) != Materializer(r))
             catch Util.tryCatchWrap(offset)
-          case (Val.Str(l), Expr.BinaryOp.`in`, Val.Obj(r, _, _)) => Val.bool(r.contains(l))
+          case (Val.Str(l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(o.containsKey(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => Val.Obj.merge(l, r)
+          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.mergeLeft(l)
           case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
           case (l, op, r) =>
             Util.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", offset)

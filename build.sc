@@ -62,6 +62,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
       def scalacOptions = Seq("-P:acyclic:force")
       def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
+      def forkOptions = Seq("-Xss100m")
     }
   }
 

@@ -57,19 +57,19 @@ object Val{
                       invoke: (Obj, Option[Obj], FileScope, EvalScope) => Val,
                       cached: Boolean = true)
 
-    def merge(lhs: Val.Obj, rhs: Val.Obj) = {
-      def rec(current: Val.Obj): Val.Obj = {
-        current.`super` match{
-          case None => Val.Obj(current.value0, _ => (), Some(lhs))
-          case Some(x) => Val.Obj(current.value0, _ => (), Some(rec(x)))
-        }
-      }
-      rec(rhs)
-    }
+
   }
   case class Obj(value0: Map[String, Obj.Member],
                  triggerAsserts: Val.Obj => Unit,
                  `super`: Option[Obj]) extends Val{
+
+    def mergeLeft(lhs: Val.Obj): Val.Obj = {
+      `super` match{
+        case None => Val.Obj(value0, _ => (), Some(lhs))
+        case Some(x) => Val.Obj(value0, _ => (), Some(x.mergeLeft(lhs)))
+      }
+    }
+
     def prettyName = "object"
 
     def getVisibleKeys() = {
@@ -123,7 +123,7 @@ object Val{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => Val.Obj.merge(l, r)
+      case (l: Val.Obj, r: Val.Obj) => r.mergeLeft(l)
       case (Val.Str(l), r) =>
         try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
         catch Util.tryCatchWrap(offset)
@@ -166,6 +166,15 @@ object Val{
       case None => this.`super` match{
         case None => None
         case Some(s) => s.valueRaw(k, self, offset)
+      }
+    }
+
+    def containsKey(k: String): Boolean = {
+      this.value0.contains(k) || {
+        this.`super` match {
+          case None => false
+          case Some(s) => s.containsKey(k)
+        }
       }
     }
   }
