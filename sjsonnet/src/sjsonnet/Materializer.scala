@@ -26,15 +26,8 @@ object Materializer {
         arrVisitor.visitEnd(-1)
 
       case obj: Val.Obj =>
-        def rec(x: Val.Obj): Unit = {
-          x.triggerAsserts(obj)
-          x.`super` match {
-            case Some(s) => rec(s)
-            case None => ()
-          }
-        }
+        obj.triggerAllAsserts(obj)
 
-        rec(obj)
         val keys = obj.getVisibleKeys().toSeq.sortBy(_._1)
         val objVisitor = visitor.visitObject(keys.size, -1)
 
@@ -75,7 +68,7 @@ object Materializer {
     case ujson.Num(n) => Val.Num(n)
     case ujson.Str(s) => Val.Str(s)
     case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toSeq)
-    case ujson.Obj(xs) => Val.Obj(
+    case ujson.Obj(xs) => new Val.Obj(
       xs.map(x =>
         (
           x._1,

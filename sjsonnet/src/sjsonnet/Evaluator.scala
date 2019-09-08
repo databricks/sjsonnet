@@ -70,7 +70,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value).cast[Val.Obj]
       val extension = visitObjBody(ext)
-      extension.mergeLeft(original)
+      extension.addSuper(original)
     }
   } catch Util.tryCatch(expr.offset)
 
@@ -312,7 +312,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`|`, Val.Num(r)) => Val.Num(l.toLong | r.toLong)
-          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.mergeLeft(l)
+          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(l)
           case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
           case (l, op, r) =>
             Util.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", offset)
@@ -371,7 +371,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
         asserting = true
-        val newScope: ValScope = makeNewScope(Some(self), self.`super`)
+        val newScope: ValScope = makeNewScope(Some(self), self.getSuper)
 
         value.collect {
           case Member.AssertStmt(value, msg) =>
@@ -403,7 +403,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         (self, sup) => makeNewScope(self, sup)
       ).toArray
 
-      lazy val newSelf: Val.Obj = Val.Obj(
+      lazy val newSelf: Val.Obj = new Val.Obj(
         value.flatMap {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
@@ -429,7 +429,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         newSuper = None
       )
 
-      lazy val newSelf: Val.Obj = Val.Obj(
+      lazy val newSelf: Val.Obj = new Val.Obj(
         visitComp(first :: rest.toList, Seq(compScope))
           .flatMap { s =>
 

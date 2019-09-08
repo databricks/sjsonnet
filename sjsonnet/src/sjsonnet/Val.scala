@@ -59,27 +59,37 @@ object Val{
 
 
   }
-  case class Obj(value0: Map[String, Obj.Member],
-                 triggerAsserts: Val.Obj => Unit,
-                 `super`: Option[Obj]) extends Val{
+  final class Obj(value0: Map[String, Obj.Member],
+                  triggerAsserts: Val.Obj => Unit,
+                  `super`: Option[Obj]) extends Val{
 
-    def mergeLeft(lhs: Val.Obj): Val.Obj = {
+    def getSuper = `super`
+
+    @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
+      triggerAsserts(obj)
+      `super` match {
+        case Some(s) => s.triggerAllAsserts(obj)
+        case None => ()
+      }
+    }
+
+    def addSuper(lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case None => Val.Obj(value0, _ => (), Some(lhs))
-        case Some(x) => Val.Obj(value0, _ => (), Some(x.mergeLeft(lhs)))
+        case None => new Val.Obj(value0, _ => (), Some(lhs))
+        case Some(x) => new Val.Obj(value0, _ => (), Some(x.addSuper(lhs)))
       }
     }
 
     def prettyName = "object"
 
-    def getVisibleKeys() = {
-      def rec(current: Val.Obj): Seq[(String, Visibility)] = {
-        current.`super`.toSeq.flatMap(rec) ++
-        current.value0.map{case (k, m) => (k, m.visibility)}.toSeq
-      }
+    def getVisibleKeys0(): Seq[(String, Visibility)] = {
+      this.`super`.toSeq.flatMap(_.getVisibleKeys0()) ++
+      this.value0.map{case (k, m) => (k, m.visibility)}.toSeq
+    }
 
+    def getVisibleKeys() = {
       val mapping = collection.mutable.LinkedHashMap.empty[String, Boolean]
-      for ((k, sep) <- rec(this)){
+      for ((k, sep) <- this.getVisibleKeys0()){
         (mapping.get(k), sep) match{
           case (None, Visibility.Hidden) => mapping(k) = true
           case (None, _)    => mapping(k) = false
@@ -91,7 +101,7 @@ object Val{
       }
       mapping
     }
-    val valueCache = collection.mutable.Map.empty[Any, Val]
+    private[this] val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String,
               offset: Int,
               self: Obj = this)
@@ -123,7 +133,7 @@ object Val{
       case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
       case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
       case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => r.mergeLeft(l)
+      case (l: Val.Obj, r: Val.Obj) => r.addSuper(l)
       case (Val.Str(l), r) =>
         try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
         catch Util.tryCatchWrap(offset)
@@ -132,7 +142,7 @@ object Val{
         catch Util.tryCatchWrap(offset)
     }
 
-    @tailrec final def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
+    @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
       case Some(m) => Some(m.cached)
 
       case None => this.`super` match{
@@ -169,7 +179,7 @@ object Val{
       }
     }
 
-    def containsKey(k: String): Boolean = {
+    @tailrec def containsKey(k: String): Boolean = {
       this.value0.contains(k) || {
         this.`super` match {
           case None => false

@@ -373,7 +373,7 @@ object Std {
     },
     builtin("mapWithKey", "func", "obj"){ (evaluator, fileScope, func: Applyer, obj: Val.Obj) =>
       val allKeys = obj.getVisibleKeys()
-      Val.Obj(
+      new Val.Obj(
         allKeys.map{ k =>
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
             func.apply(
@@ -748,7 +748,7 @@ object Std {
               .mapValues { v =>
                 Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
               }.toMap
-            Val.Obj(transformedValue , (x: Val.Obj) => (), None)
+            new Val.Obj(transformedValue , (x: Val.Obj) => (), None)
         }
       }
       recursiveTransform(ujson.read(str))
@@ -771,7 +771,7 @@ object Std {
             v = rec(o.value(k, -1)(fileScope, evaluator))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
-          Val.Obj(bindings.toMap, _ => (), None)
+          new Val.Obj(bindings.toMap, _ => (), None)
         case a: Val.Arr =>
           Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Lazy(_)))
         case _ => x
@@ -804,7 +804,7 @@ object Std {
       }
     )
   )
-  val Std = Val.Obj(
+  val Std = new Val.Obj(
     functions
       .map{
         case (k, v) =>
