@@ -206,10 +206,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         .getOrElse(Util.fail("Cannot use `super` outside an object", offset))
         .value(name, offset, scope.self0.get)
     } else visitExpr(value) match {
-      case obj: Val.Obj =>
-        val ref = obj.value(name, offset)
-        try ref
-        catch Util.tryCatchWrap(offset)
+      case obj: Val.Obj => obj.value(name, offset)
       case r => Util.fail(s"attemped to index a ${r.prettyName} with string ${name}", offset)
     }
   }
