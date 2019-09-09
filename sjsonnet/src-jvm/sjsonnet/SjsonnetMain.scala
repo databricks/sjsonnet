@@ -10,8 +10,8 @@ import scala.util.Try
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
-  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wds: Seq[Path], str: String) = {
-    (wds ++ searchRoots0)
+  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
+    (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {
         case r: os.RelPath =>
           if (r.ups > base.segmentCount()) None
@@ -45,7 +45,7 @@ object SjsonnetMain {
             stderr: PrintStream,
             wd: os.Path,
             allowedInputs: Option[Set[os.Path]] = None,
-            importer: Option[(Seq[Path], String) => Option[os.Path]] = None): Int = {
+            importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
 
     val result = for{
       t <- Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()).left.map{
@@ -90,7 +90,7 @@ object SjsonnetMain {
                      stderr: PrintStream,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
-                     importer: Option[(Seq[Path], String) => Option[os.Path]] = None): Either[String, String] = {
+                     importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
     val path = os.Path(file, wd)
     val interp = new Interpreter(
       parseCache,

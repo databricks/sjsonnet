@@ -282,5 +282,8 @@ object EvaluatorTests extends TestSuite{
       val ex2 = intercept[Exception](eval("1 || 2"))
       assert(ex2.getMessage.contains("binary operator || does not operate on numbers."))
     }
+    test("stdToString"){
+      eval("""std.toString({k: "v"})""") ==> ujson.Str("""{"k": "v"}""")
+    }
   }
 }

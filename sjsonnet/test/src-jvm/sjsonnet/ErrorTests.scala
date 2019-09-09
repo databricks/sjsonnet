@@ -10,7 +10,7 @@ object ErrorTests extends TestSuite{
       Map(),
       Map(),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Nil),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
     )
     interp.interpret(os.read(p), OsPath(p))
   }
@@ -64,7 +64,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("08") - check(
-      """sjsonnet.Error: {"a":1,"b":2,"c":3}
+      """sjsonnet.Error: {"a": 1, "b": 2, "c": 3}
         |    at .(sjsonnet/test/resources/test_suite/error.08.jsonnet:18:1)
         |""".stripMargin
     )

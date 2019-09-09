@@ -1,5 +1,7 @@
 package sjsonnet
 
+import scala.collection.mutable
+
 
 object Util {
   def tryCatch[T](offset: Int)
@@ -27,19 +29,21 @@ object Util {
     throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
 
-  def failIfNonEmpty(names: Iterable[String],
+  def failIfNonEmpty(names: collection.BitSet,
                      outerOffset: Int,
                      formatMsg: (String, String) => String)
                     (implicit fileScope: FileScope, eval: EvalErrorScope) = if (names.nonEmpty){
     val plural = if (names.size > 1) "s" else ""
-    val nameSnippet = names.mkString(", ")
+    val nameSnippet = names.map(fileScope.indexNames).mkString(", ")
     Util.fail(formatMsg(plural, nameSnippet), outerOffset)
   }
 }
 
 class FileScope(val currentFile: Path,
                 val nameIndices: Map[String, Int]){
-  val indexNames = nameIndices.map(_.swap)
+  // Only used for error messages, so in the common case
+  // where nothing blows up this does not need to be allocated
+  lazy val indexNames = nameIndices.map(_.swap)
 }
 
 class EvalErrorScope(val extVars: Map[String, ujson.Value], val wd: Path)

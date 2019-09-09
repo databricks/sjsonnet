@@ -10,7 +10,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
-                  importer: (Seq[Path], String) => Option[(Path, String)]) {
+                  importer: (Path, String) => Option[(Path, String)]) {
 
   val evaluator = new Evaluator(
     parseCache,

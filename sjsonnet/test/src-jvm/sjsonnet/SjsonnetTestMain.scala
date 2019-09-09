@@ -45,7 +45,7 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 200000000){
+    while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- names){
 

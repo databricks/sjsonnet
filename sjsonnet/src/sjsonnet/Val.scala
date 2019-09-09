@@ -4,6 +4,7 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 object Lazy{
@@ -82,14 +83,14 @@ object Val{
 
     def prettyName = "object"
 
-    def getVisibleKeys0(): Seq[(String, Visibility)] = {
-      this.`super`.toSeq.flatMap(_.getVisibleKeys0()) ++
-      this.value0.map{case (k, m) => (k, m.visibility)}.toSeq
+    def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
+      for(s <- this.`super`) s.foreachVisibleKey(output)
+      for(t <- value0) output(t._1, t._2.visibility)
     }
 
     def getVisibleKeys() = {
-      val mapping = collection.mutable.LinkedHashMap.empty[String, Boolean]
-      for ((k, sep) <- this.getVisibleKeys0()){
+      val mapping = collection.mutable.Map.empty[String, Boolean]
+      foreachVisibleKey{ (k, sep) =>
         (mapping.get(k), sep) match{
           case (None, Visibility.Hidden) => mapping(k) = true
           case (None, _)    => mapping(k) = false
@@ -109,16 +110,12 @@ object Val{
 
       val cacheKey = if(self eq this) k else (k, self)
 
-      val cacheLookuped =
-        if (value0.get(k).exists(_.cached == false)) None
-        else valueCache.get(cacheKey)
-
-      cacheLookuped match{
+      valueCache.get(cacheKey) match{
         case Some(res) => res
         case None =>
           valueRaw(k, self, offset) match{
-            case Some(x) =>
-              valueCache(cacheKey) = x
+            case Some((x, cached)) =>
+              if (cached) valueCache(cacheKey) = x
               x
             case None =>
               Util.fail("Field does not exist: " + k, offset)
@@ -154,28 +151,27 @@ object Val{
     def valueRaw(k: String,
                  self: Obj,
                  offset: Int)
-                (implicit fileScope: FileScope, evaluator: EvalScope): Option[Val] = this.value0.get(k) match{
-      case Some(m) =>
-        this.`super` match{
-          case Some(s) if m.add =>
-            Some(
-              s.valueRaw(k, self, offset) match{
+                (implicit fileScope: FileScope, evaluator: EvalScope): Option[(Val, Boolean)] = {
+      this.value0.get(k) match{
+        case Some(m) =>
+          this.`super` match{
+            case Some(s) if m.add =>
+              val merged = s.valueRaw(k, self, offset) match{
                 case None => m.invoke(self, this.`super`, fileScope, evaluator)
-                case Some(x) =>
-                  mergeMember(
-                    x,
-                    m.invoke(self, this.`super`, fileScope, evaluator),
-                    offset
-                  )
+                case Some((supValue, supCached)) =>
+                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), offset)
               }
-            )
-          case _ =>
-            Some(m.invoke(self, this.`super`, fileScope, evaluator))
-        }
 
-      case None => this.`super` match{
-        case None => None
-        case Some(s) => s.valueRaw(k, self, offset)
+              Some(merged -> m.cached)
+
+            case _ =>
+              Some(m.invoke(self, this.`super`, fileScope, evaluator) -> m.cached)
+          }
+
+        case None => this.`super` match{
+          case None => None
+          case Some(s) => s.valueRaw(k, self, offset)
+        }
       }
     }
 
@@ -199,21 +195,14 @@ object Val{
               outerOffset: Int)
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
-      val argIndices = params.args.map{case (k, d, i) => (k, i)}.toMap
-
-      lazy val defaultArgsBindings =
-        params.args.collect{
-          case (k, Some(default), index) =>
-            (
-              index,
-              Lazy(evalDefault(default, newScope, evaluator))
-            )
-        }
+      lazy val defaultArgsBindings = params
+        .defaults
+        .map{ case (index, default) => (index, Lazy(evalDefault(default, newScope, evaluator)))}
 
       lazy val passedArgsBindings = try
         args.zipWithIndex.map{
           case ((Some(name), v), _) =>
-            val argIndex = argIndices.getOrElse(
+            val argIndex = params.argIndices.getOrElse(
               name,
               Util.fail(s"Function has no parameter $name", outerOffset)
             )
@@ -227,22 +216,34 @@ object Val{
         )
       }
 
-      lazy val allArgBindings = (defaultArgsBindings ++ passedArgsBindings).map{ case (i, v) =>
-        (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
-      }
+      lazy val newScope: ValScope = {
+        var max = -1
+        val builder = Array.newBuilder[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)]
+        for(t <- defaultArgsBindings){
+          val (i, v) = t
+          if (i > max) max = i
+          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+        }
 
-      lazy val newScope: ValScope = defSiteScopes match{
-        case None => new ValScope(
-          None,
-          None,
-          None,
-          {
-            val arr = new Array[Lazy](allArgBindings.maxBy(_._1)._1 + 1)
-            for((i, v) <- allArgBindings) arr(i) = v(null, None)
-            arr
-          }
-        )
-        case Some((s, fs)) => s.extend(allArgBindings)
+        for(t <- passedArgsBindings){
+          val (i, v) = t
+          if (i > max) max = i
+          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+        }
+
+        defSiteScopes match{
+          case None => new ValScope(
+            None,
+            None,
+            None,
+            {
+              val arr = new Array[Lazy](max + 1)
+              for((i, v) <- builder.result()) arr(i) = v(null, None)
+              arr
+            }
+          )
+          case Some((s, fs)) => s.extend(builder.result())
+        }
       }
 
       validateFunctionCall(passedArgsBindings, params, outerOffset)
@@ -251,7 +252,7 @@ object Val{
         newScope,
         thisFile,
         evaluator,
-        defSiteScopes.map(_._2).getOrElse(fileScope),
+        defSiteScopes match{case None => fileScope case Some((s, fs)) => fs},
         outerOffset
       )
     }
@@ -261,29 +262,31 @@ object Val{
                              outerOffset: Int)
                             (implicit fileScope: FileScope, eval: EvalScope): Unit = {
 
-      val groupedParams = passedArgsBindings.groupBy(_._1)
+      val seen = mutable.BitSet.empty
+      val repeats = mutable.BitSet.empty
+      for(t <- passedArgsBindings){
+        if (!seen(t._1)) seen.add(t._1)
+        else repeats.add(t._1)
+      }
+
       Util.failIfNonEmpty(
-        groupedParams.collect{case (k, vs) if vs.size > 1 => k}.map(fileScope.indexNames),
+        repeats,
         outerOffset,
         (plural, names) => s"Function parameter$plural $names passed more than once"
       )
 
-      val seen = groupedParams.keySet
-
       Util.failIfNonEmpty(
-        (params.args.collect{case (_, None, i) => i}.toSet -- seen).map(fileScope.indexNames),
+        params.noDefaultIndices.filter(!seen(_)),
         outerOffset,
         (plural, names) => s"Function parameter$plural $names not bound in call"
       )
 
       Util.failIfNonEmpty(
-        (seen -- params.args.map{case (_, _, i) => i}.toSet).map(fileScope.indexNames),
+        seen.filter(!params.allIndices(_)),
         outerOffset,
         (plural, names) => s"Function has no parameter$plural $names"
       )
     }
-
-
   }
 }
 
@@ -293,6 +296,8 @@ abstract class EvalScope(extVars: Map[String, ujson.Value], wd: Path)
                (implicit scope: ValScope, fileScope: FileScope): Val
 
   def materialize(v: Val): ujson.Value
+
+  val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
 }
 object ValScope{
   def empty(size: Int) = new ValScope(None, None, None, new Array(size))

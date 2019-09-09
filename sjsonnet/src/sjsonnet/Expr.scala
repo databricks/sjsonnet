@@ -1,5 +1,7 @@
 package sjsonnet
 
+import scala.collection.{BitSet, mutable}
+
 sealed trait Offsetted{
   def offset: Int
 }
@@ -46,7 +48,12 @@ object Expr{
 
 
   case class Parened(offset: Int, value: Expr) extends Expr
-  case class Params(args: Seq[(String, Option[Expr], Int)])
+  case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
+    val argIndices: Map[String, Int] = args.map{case (k, d, i) => (k, i)}.toMap
+    val noDefaultIndices: BitSet = mutable.BitSet.empty ++ args.collect{case (_, None, i) => i}
+    val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
+    val allIndices: Set[Int] = args.map{case (_, _, i) => i}.toSet
+  }
   case class Args(args: Seq[(Option[String], Expr)])
 
   case class UnaryOp(offset: Int, op: UnaryOp.Op, value: Expr) extends Expr

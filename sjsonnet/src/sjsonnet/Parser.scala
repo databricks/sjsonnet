@@ -309,7 +309,7 @@ object Parser{
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       println("FAIL")
       Fail.opaque("no positional params after named params")
-    } else Pass(Expr.Args(x))
+    } else Pass(Expr.Args(x.toArray[(Option[String], Expr)]))
   }
 
   def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
@@ -319,7 +319,10 @@ object Parser{
       if (seen(k)) overlap = k
       else seen.add(k)
     }
-    if (overlap == null) Pass(Expr.Params(x.map{case (k, v) => (k, v, indexFor(k))}))
+    if (overlap == null) {
+      val paramData = x.map{case (k, v) => (k, v, indexFor(k))}.toArray
+      Pass(Expr.Params(paramData))
+    }
     else Fail.opaque("no duplicate parameter: " + overlap)
 
   }

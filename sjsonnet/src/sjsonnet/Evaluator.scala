@@ -9,7 +9,7 @@ import ujson.Value
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                 extVars: Map[String, ujson.Value],
                 wd: Path,
-                importer: (Seq[Path], String) => Option[(Path, String)]) extends EvalScope(extVars, wd){
+                importer: (Path, String) => Option[(Path, String)]) extends EvalScope(extVars, wd){
   implicit def evalScope: EvalScope = this
 
   override def materialize(v: Val): Value = {
@@ -109,7 +109,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       visitExpr(value) match {
         case Val.Str(s) => s
         case r =>
-          try Materializer(r).toString()
+          try Materializer.stringify(r)
           catch Util.tryCatchWrap(offset)
       },
       offset
@@ -242,7 +242,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def resolveImport(value: String, offset: Int)
                    (implicit scope: ValScope, fileScope: FileScope): (Path, String) = {
-    importer(Seq(wd, fileScope.currentFile.parent()), value)
+    importer(fileScope.currentFile.parent(), value)
       .getOrElse(
         Util.fail(
           "Couldn't import file: " + pprint.Util.literalize(value),
@@ -303,10 +303,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Str(l), Expr.BinaryOp.`<=`, Val.Str(r)) => Val.bool(l <= r)
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
-            try Val.Str(l + Materializer.apply(r).transform(new Renderer()).toString)
+            try Val.Str(l + Materializer.stringify(r))
             catch Util.tryCatchWrap(offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
-            try Val.Str(Materializer.apply(l).transform(new Renderer()).toString + r)
+            try Val.Str(Materializer.stringify(l) + r)
             catch Util.tryCatchWrap(offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
@@ -422,25 +422,25 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         (self, sup) => makeNewScope(self, sup)
       ).toArray
 
-      lazy val newSelf: Val.Obj = new Val.Obj(
-        value.flatMap {
+      lazy val newSelf: Val.Obj = {
+        val builder = Map.newBuilder[String, Val.Obj.Member]
+        value.foreach {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
               assertions(self)
               visitExpr(rhs)(makeNewScope(Some(self), sup), implicitly)
-            }))
+            })).foreach(builder.+=)
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
               assertions(self)
               visitMethod(rhs, argSpec, offset)(makeNewScope(Some(self), sup), implicitly)
-            }))
+            })).foreach(builder.+=)
+          case _: Member.BindStmt => // do nothing
+          case _: Member.AssertStmt => // do nothing
+        }
 
-          case _: Member.BindStmt => None
-          case _: Member.AssertStmt => None
-        }.toMap,
-        self => assertions(self),
-        None
-      )
+        new Val.Obj(builder.result(), self => assertions(self), None)
+      }
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
@@ -448,42 +448,38 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         newSuper = None
       )
 
-      lazy val newSelf: Val.Obj = new Val.Obj(
-        visitComp(first :: rest.toList, Seq(compScope))
-          .flatMap { s =>
+      lazy val newSelf: Val.Obj = {
+        val builder = Map.newBuilder[String, Val.Obj.Member]
+        for(s <- visitComp(first :: rest.toList, Seq(compScope))){
+          lazy val newScope: ValScope = s.extend(
+            newBindings,
+            newDollar = scope.dollar0.orElse(Some(newSelf)),
+            newSelf = Some(newSelf),
+            newSuper = None
+          )
 
-            lazy val newScope: ValScope = s.extend(
-              newBindings,
-              newDollar = scope.dollar0.orElse(Some(newSelf)),
-              newSelf = Some(newSelf),
-              newSuper = None
-            )
+          lazy val newBindings = visitBindings(
+            (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b},
+            (self, sup) => newScope
+          ).toArray
 
-            lazy val newBindings = visitBindings(
-              (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b},
-              (self, sup) => newScope
-            ).toArray
-
-            visitExpr(key)(s, implicitly) match {
-              case Val.Str(k) =>
-                Some(k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
-                  visitExpr(value)(
-                    s.extend(
-                      newBindings,
-                      newDollar = Some(s.dollar0.getOrElse(self)),
-                      newSelf = Some(self),
-                    ),
-                    implicitly
-                  )
-                ))
-              case Val.Null => None
-            }
-
+          visitExpr(key)(s, implicitly) match {
+            case Val.Str(k) =>
+              builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
+                visitExpr(value)(
+                  s.extend(
+                    newBindings,
+                    newDollar = Some(s.dollar0.getOrElse(self)),
+                    newSelf = Some(self),
+                  ),
+                  implicitly
+                )
+              ))
+            case Val.Null => // do nothing
           }
-          .toMap,
-        _ => (),
-        None
-      )
+        }
+        new Val.Obj(builder.result(), _ => (), None)
+      }
 
       newSelf
   }

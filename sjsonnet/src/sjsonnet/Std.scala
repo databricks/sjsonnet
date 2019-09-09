@@ -86,41 +86,46 @@ object Std {
     }
   }
 
-  def validate(vs: Seq[Val],
+  def validate(vs: Array[Val],
                evaluator: EvalScope,
                fileScope: FileScope,
-               rs: Seq[ReadWriter[_]]) = {
-    for((v, r) <- vs.zip(rs)) yield r.apply(v, evaluator, fileScope) match{
-      case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
-      case Right(x) => x
+               rs: Array[ReadWriter[_]]) = {
+    for(i <- vs.indices) yield {
+      val v = vs(i)
+      val r = rs(i)
+      r.apply(v, evaluator, fileScope) match {
+        case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
+        case Right(x) => x
+      }
     }
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
                              (eval: (EvalScope, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, evaluator, fileScope) =>
-    val Seq(v: T1) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]]))
+    val Seq(v: T1) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]]))
     eval(evaluator, fileScope, v)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
                                              (eval: (EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, evaluator, fileScope) =>
-    val Seq(v1: T1, v2: T2) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
+    val Seq(v1: T1, v2: T2) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
     eval(evaluator, fileScope, v1, v2)
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
                                                              (eval: (EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, evaluator, fileScope) =>
-    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, evaluator, fileScope, Seq(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
+    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
     eval(evaluator, fileScope, v1, v2, v3)
   }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Seq[Val], EvalScope, FileScope) => R) = {
-    val paramIndices = params.zipWithIndex
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Array[Val], EvalScope, FileScope) => R) = {
+    val paramData = params.zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
+    val paramIndices = params.indices.toArray
     name -> Val.Func(
       None,
-      Params(paramIndices.map{case (k, i) => (k, None, i)}),
+      Params(paramData),
       {(scope, thisFile, evaluator, fileScope, outerOffset) =>
         implicitly[ReadWriter[R]].write(
-          eval(paramIndices.map(t => scope.bindings(t._2).get.force), evaluator, fileScope)
+          eval(paramIndices.map(i => scope.bindings(i).get.force), evaluator, fileScope)
         )
       }
     )
@@ -132,12 +137,13 @@ object Std {
     */
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)
                                         (eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
-    val indexedParams = params.zipWithIndex
+    val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
+    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
     name -> Val.Func(
       None,
-      Params(indexedParams.map{case ((k, v), i) => (k, v, i)}),
+      Params(indexedParams),
       { (scope, thisFile, evaluator, fileScope, outerOffset) =>
-        val args = indexedParams.map {case ((k, v), i) => k -> scope.bindings(i).get.force }.toMap
+        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap
         implicitly[ReadWriter[R]].write(eval(args, evaluator))
       },
       { (expr, scope, eval) =>
@@ -155,8 +161,7 @@ object Std {
     builtin("toString", "a"){ (evaluator, fileScope, v1: Val) =>
       v1 match{
         case Val.Str(s) => s
-        case v =>
-          Materializer.apply(v)(evaluator).transform(new Renderer()).toString
+        case v => Materializer.stringify(v)(evaluator)
       }
     },
     builtin("codepoint", "str"){ (evaluator, fileScope, v1: Val) =>
@@ -514,15 +519,21 @@ object Std {
       str.replace("$", "$$")
     },
     builtin("manifestPython", "v"){ (evaluator, fileScope, v: Val) =>
-      Materializer(v)(evaluator).transform(new PythonRenderer()).toString
+      Materializer.apply0(v, new PythonRenderer())(evaluator).toString
     },
     builtin("manifestJson", "v"){ (evaluator, fileScope, v: Val) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-      Materializer(v)(evaluator).render(indent = 4).replaceAll("\n[ ]+\n", "\n\n")
+      Materializer
+        .apply0(v, new ujson.StringRenderer(indent = 4))(evaluator)
+        .toString
+        .replaceAll("\n[ ]+\n", "\n\n")
     },
     builtin("manifestJsonEx", "value", "indent"){ (evaluator, fileScope, v: Val, i: String) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
-      Materializer(v)(evaluator).render(indent = i.length).replaceAll("\n[ ]+\n", "\n\n")
+      Materializer
+        .apply0(v, new ujson.StringRenderer(indent = i.length))(evaluator)
+        .toString
+        .replaceAll("\n[ ]+\n", "\n\n")
     },
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> None,
@@ -533,7 +544,10 @@ object Std {
           case Val.True => true
           case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
         }
-      Materializer(v)(evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString
+      Materializer.apply0(
+        v,
+        new YamlRenderer(indentArrayInObject = indentArrayInObject)
+      )(evaluator).toString
     },
     builtinWithDefaults("manifestYamlStream",
                         "v" -> None,
@@ -546,7 +560,12 @@ object Std {
       }
       v match {
         case Val.Arr(values) => values
-          .map { item => Materializer(item.force)(evaluator).transform(new YamlRenderer(indentArrayInObject = indentArrayInObject)).toString() }
+          .map { item =>
+            Materializer.apply0(
+              item.force,
+              new YamlRenderer(indentArrayInObject = indentArrayInObject)
+            )(evaluator).toString()
+          }
           .mkString("---\n", "\n---\n", "\n...\n")
         case _ => throw new DelegateError("manifestYamlStream only takes arrays, got " + v.getClass)
       }
@@ -786,7 +805,7 @@ object Std {
     builtin("asciiLower", "str"){ (evaluator, fileScope, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
       None,
-      Params(Seq(("str", None, 0), ("rest", None, 1))),
+      Params(Array(("str", None, 0), ("rest", None, 1))),
       { (scope, thisFile, evaluator, fileScope, outerOffset) =>
         val Val.Str(msg) = scope.bindings(0).get.force
         System.err.println(s"TRACE: $thisFile " + msg)
@@ -795,7 +814,7 @@ object Std {
     ),
     "extVar" -> Val.Func(
       None,
-      Params(Seq(("x", None, 0))),
+      Params(Array(("x", None, 0))),
       { (scope, thisFile, evaluator, fileScope, outerOffset) =>
         val Val.Str(x) = scope.bindings(0).get.force
         Materializer.reverse(

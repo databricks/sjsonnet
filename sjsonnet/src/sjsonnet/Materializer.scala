@@ -4,8 +4,13 @@ import java.util.IdentityHashMap
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
+
+import scala.collection.mutable
 object Materializer {
   def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
+  def stringify(v: Val)(implicit evaluator: EvalScope): String = {
+    apply0(v, new sjsonnet.Renderer()).toString
+  }
 
   def apply0[T](v: Val, visitor: Visitor[T, T])
                (implicit evaluator: EvalScope): T = try {
@@ -28,31 +33,27 @@ object Materializer {
       case obj: Val.Obj =>
         obj.triggerAllAsserts(obj)
 
-        val keys = obj.getVisibleKeys().toSeq.sortBy(_._1)
-        val objVisitor = visitor.visitObject(keys.size, -1)
+        val keys = obj.getVisibleKeys().toArray.sortBy(_._1)
+        val objVisitor = visitor.visitObject(keys.length , -1)
 
-        for((k, hidden) <- keys if !hidden){
-          objVisitor.visitKey(-1)
-          objVisitor.visitKeyValue(k)
-          objVisitor.visitValue(
-            apply0(
-              obj.value(k, -1)(
-                new FileScope(null, Map()),
-                implicitly
+        for(t <- keys) {
+          val (k, hidden) = t
+          if (!hidden){
+            objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
+            objVisitor.visitValue(
+              apply0(
+                obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly),
+                visitor
               ),
-              visitor
-            ),
-            -1
-          )
+              -1
+            )
+          }
         }
         objVisitor.visitEnd(-1)
 
       case f: Val.Func =>
         apply0(
-          f.apply(Nil, "(memory)", -1)(
-            new FileScope(null, Map()),
-            implicitly
-          ),
+          f.apply(Nil, "(memory)", -1)(evaluator.emptyMaterializeFileScope, implicitly),
           visitor
         )
     }
@@ -67,19 +68,16 @@ object Materializer {
     case ujson.Null => Val.Null
     case ujson.Num(n) => Val.Num(n)
     case ujson.Str(s) => Val.Str(s)
-    case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toSeq)
-    case ujson.Obj(xs) => new Val.Obj(
-      xs.map(x =>
-        (
-          x._1,
-          Val.Obj.Member(false, Visibility.Normal,
-            (_: Val.Obj, _: Option[Val.Obj], _, _) => reverse(x._2)
-          )
+    case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toArray[Lazy])
+    case ujson.Obj(xs) =>
+      val builder = Map.newBuilder[String, Val.Obj.Member]
+      for(x <- xs){
+        val v = Val.Obj.Member(false, Visibility.Normal,
+          (_: Val.Obj, _: Option[Val.Obj], _, _) => reverse(x._2)
         )
-      ).toMap,
-      _ => (),
-      None
-    )
+        builder += (x._1 -> v)
+      }
+      new Val.Obj(builder.result(), _ => (), None)
   }
 
   def toExpr(v: ujson.Value): Expr = v match{
@@ -88,12 +86,12 @@ object Materializer {
     case ujson.Null => Expr.Null(0)
     case ujson.Num(n) => Expr.Num(0, n)
     case ujson.Str(s) => Expr.Str(0, s)
-    case ujson.Arr(xs) => Expr.Arr(0, xs.map(toExpr).toSeq)
+    case ujson.Arr(xs) => Expr.Arr(0, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
       Expr.Obj(0,
         ObjBody.MemberList(
-          for((k, v) <- kvs.toSeq)
-            yield Member.Field(0, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
+          for((k, v) <- kvs.toArray)
+          yield Member.Field(0, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
         )
       )
   }
