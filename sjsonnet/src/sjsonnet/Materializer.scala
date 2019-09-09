@@ -1,11 +1,14 @@
 package sjsonnet
-import java.util.IdentityHashMap
 
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
 
-import scala.collection.mutable
+/**
+  * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
+  * which can transform it into [[ujson.Value]]s or directly serialize it
+  * to `String`s
+  */
 object Materializer {
   def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
@@ -59,7 +62,7 @@ object Materializer {
     }
 
   }catch {case e: StackOverflowError =>
-    throw DelegateError("Stackoverflow while materializing, possibly due to recursive value")
+    throw Error.Delegate("Stackoverflow while materializing, possibly due to recursive value")
   }
 
   def reverse(v: ujson.Value): Val = v match{
@@ -68,7 +71,7 @@ object Materializer {
     case ujson.Null => Val.Null
     case ujson.Num(n) => Val.Num(n)
     case ujson.Str(s) => Val.Str(s)
-    case ujson.Arr(xs) => Val.Arr(xs.map(x => Lazy(reverse(x))).toArray[Lazy])
+    case ujson.Arr(xs) => Val.Arr(xs.map(x => Val.Lazy(reverse(x))).toArray[Val.Lazy])
     case ujson.Obj(xs) =>
       val builder = Map.newBuilder[String, Val.Obj.Member]
       for(x <- xs){

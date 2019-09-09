@@ -5,6 +5,12 @@ import fastparse._
 import Expr.Member.Visibility
 import scala.annotation.switch
 
+/**
+  * Parses Jsonnet source code `String`s into a [[Expr]] syntax tree, using the
+  * FastParse parsing library. Uses precedence climbing to handle infix
+  * operators, and resolves local variable names to array indices during parsing
+  * to allow better performance at runtime.
+  */
 object Parser{
   val precedenceTable = Seq(
     Seq("*", "/", "%"),

@@ -5,202 +5,66 @@ import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
-import sjsonnet.ValScope.empty
-import ujson.StringRenderer
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
 
+/**
+  * The Jsonnet standard library, `std`, with each builtin function implemented
+  * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
+  * logic automatically
+  */
 object Std {
-  sealed trait ReadWriter[T]{
-    def apply(t: Val, evaluator: EvalScope, fileScope: FileScope): Either[String, T]
-    def write(t: T): Val
-  }
-  object ReadWriter{
-    implicit object StringRead extends ReadWriter[String]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case Val.Str(s) => Right(s)
-        case _ => Left("String")
-      }
-      def write(t: String) = Val.Str(t)
-    }
-    implicit object BooleanRead extends ReadWriter[Boolean]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case Val.True => Right(true)
-        case Val.False => Right(false)
-        case _ => Left("Boolean")
-      }
-      def write(t: Boolean) = Val.bool(t)
-    }
-    implicit object IntRead extends ReadWriter[Int]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case Val.Num(s) => Right(s.toInt)
-        case _ => Left("Int")
-      }
-      def write(t: Int) = Val.Num(t)
-    }
-    implicit object DoubleRead extends ReadWriter[Double]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case Val.Num(s) => Right(s)
-        case _ => Left("Number")
-      }
-      def write(t: Double) = Val.Num(t)
-    }
-    implicit object ValRead extends ReadWriter[Val]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = Right(t)
-      def write(t: Val) = t
-    }
-    implicit object ObjRead extends ReadWriter[Val.Obj]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case v: Val.Obj => Right(v)
-        case _ => Left("Object")
-      }
-      def write(t: Val.Obj) = t
-    }
-    implicit object ArrRead extends ReadWriter[Val.Arr]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case v: Val.Arr => Right(v)
-        case _ => Left("Array")
-      }
-      def write(t: Val.Arr) = t
-    }
-    implicit object FuncRead extends ReadWriter[Val.Func]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case v: Val.Func => Right(v)
-        case _ => Left("Function")
-      }
-      def write(t: Val.Func) = t
-    }
-
-    implicit object ApplyerRead extends ReadWriter[Applyer]{
-      def apply(t: Val, evaluator: EvalScope, fileScope: FileScope) = t match{
-        case v: Val.Func => Right(Applyer(v, evaluator, fileScope))
-        case _ => Left("Function")
-      }
-      def write(t: Applyer) = t.f
-    }
-  }
-  case class Applyer(f: Val.Func, evaluator: EvalScope, fileScope: FileScope){
-    def apply(args: Lazy*) = {
-      f.apply(args.map((None, _)), "(memory)", -1)(fileScope, evaluator)
-    }
-  }
-
-  def validate(vs: Array[Val],
-               evaluator: EvalScope,
-               fileScope: FileScope,
-               rs: Array[ReadWriter[_]]) = {
-    for(i <- vs.indices) yield {
-      val v = vs(i)
-      val r = rs(i)
-      r.apply(v, evaluator, fileScope) match {
-        case Left(err) => throw new DelegateError("Wrong parameter type: expected " + err + ", got " + v.prettyName)
-        case Right(x) => x
-      }
-    }
-  }
-
-  def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
-                             (eval: (EvalScope, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, evaluator, fileScope) =>
-    val Seq(v: T1) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]]))
-    eval(evaluator, fileScope, v)
-  }
-
-  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
-                                             (eval: (EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, evaluator, fileScope) =>
-    val Seq(v1: T1, v2: T2) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
-    eval(evaluator, fileScope, v1, v2)
-  }
-
-  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
-                                                             (eval: (EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, evaluator, fileScope) =>
-    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, evaluator, fileScope, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
-    eval(evaluator, fileScope, v1, v2, v3)
-  }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Array[Val], EvalScope, FileScope) => R) = {
-    val paramData = params.zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
-    val paramIndices = params.indices.toArray
-    name -> Val.Func(
-      None,
-      Params(paramData),
-      {(scope, thisFile, evaluator, fileScope, outerOffset) =>
-        implicitly[ReadWriter[R]].write(
-          eval(paramIndices.map(i => scope.bindings(i).get.force), evaluator, fileScope)
-        )
-      }
-    )
-  }
-  /**
-    * Helper function that can define a built-in function with default parameters
-    *
-    * Arguments of the eval function are (args, evaluator)
-    */
-  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)
-                                        (eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
-    val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
-    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
-    name -> Val.Func(
-      None,
-      Params(indexedParams),
-      { (scope, thisFile, evaluator, fileScope, outerOffset) =>
-        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap
-        implicitly[ReadWriter[R]].write(eval(args, evaluator))
-      },
-      { (expr, scope, eval) =>
-        eval.visitExpr(expr)(scope, new FileScope(null, Map.empty))
-      }
-    )
-  }
   val functions: Seq[(String, Val.Func)] = Seq(
-    builtin("assertEqual", "a", "b"){ (evaluator, fileScope, v1: Val, v2: Val) =>
-      val x1 = Materializer(v1)(evaluator)
-      val x2 = Materializer(v2)(evaluator)
+    builtin("assertEqual", "a", "b"){ (ev, fs, v1: Val, v2: Val) =>
+      val x1 = Materializer(v1)(ev)
+      val x2 = Materializer(v2)(ev)
       if (x1 == x2) true
-      else throw new DelegateError("assertEqual failed: " + x1 + " != " + x2)
+      else throw new Error.Delegate("assertEqual failed: " + x1 + " != " + x2)
     },
-    builtin("toString", "a"){ (evaluator, fileScope, v1: Val) =>
+    builtin("toString", "a"){ (ev, fs, v1: Val) =>
       v1 match{
         case Val.Str(s) => s
-        case v => Materializer.stringify(v)(evaluator)
+        case v => Materializer.stringify(v)(ev)
       }
     },
-    builtin("codepoint", "str"){ (evaluator, fileScope, v1: Val) =>
+    builtin("codepoint", "str"){ (ev, fs, v1: Val) =>
       v1.cast[Val.Str].value.charAt(0).toInt
     },
-    builtin("length", "x"){ (evaluator, fileScope, v1: Val) =>
+    builtin("length", "x"){ (ev, fs, v1: Val) =>
       v1 match{
         case Val.Str(s) => s.length
         case Val.Arr(s) => s.length
         case o: Val.Obj => o.getVisibleKeys().count(!_._2)
         case o: Val.Func => o.params.args.length
-        case _ => throw new DelegateError("Cannot get length of " + v1.prettyName)
+        case _ => throw new Error.Delegate("Cannot get length of " + v1.prettyName)
       }
     },
-    builtin("objectHas", "o", "f"){ (evaluator, fileScope, v1: Val.Obj, v2: String) =>
+    builtin("objectHas", "o", "f"){ (ev, fs, v1: Val.Obj, v2: String) =>
       v1.getVisibleKeys().get(v2) == Some(false)
     },
-    builtin("objectHasAll", "o", "f"){ (evaluator, fileScope, v1: Val.Obj, v2: String) =>
+    builtin("objectHasAll", "o", "f"){ (ev, fs, v1: Val.Obj, v2: String) =>
       v1.getVisibleKeys().get(v2).isDefined
     },
-    builtin("objectFields", "o"){ (evaluator, fileScope, v1: Val.Obj) =>
+    builtin("objectFields", "o"){ (ev, fs, v1: Val.Obj) =>
       Val.Arr(
         v1.getVisibleKeys()
           .collect{case (k, false) => k}
           .toSeq
           .sorted
-          .map(k => Lazy(Val.Str(k)))
+          .map(k => Val.Lazy(Val.Str(k)))
       )
     },
-    builtin("objectFieldsAll", "o"){ (evaluator, fileScope, v1: Val.Obj) =>
+    builtin("objectFieldsAll", "o"){ (ev, fs, v1: Val.Obj) =>
       Val.Arr(
         v1.getVisibleKeys()
           .collect{case (k, _) => k}
           .toSeq
           .sorted
-          .map(k => Lazy(Val.Str(k)))
+          .map(k => Val.Lazy(Val.Str(k)))
       )
     },
-    builtin("type", "x"){ (evaluator, fileScope, v1: Val) =>
+    builtin("type", "x"){ (ev, fs, v1: Val) =>
       v1 match{
         case Val.True | Val.False => "boolean"
         case Val.Null => "null"
@@ -211,12 +75,12 @@ object Std {
         case _: Val.Str => "string"
       }
     },
-    builtin("lines", "arr"){ (evaluator, fileScope, v1: Val.Arr) =>
+    builtin("lines", "arr"){ (ev, fs, v1: Val.Arr) =>
       v1.value.map(_.force).foreach{
         case _: Val.Str | Val.Null => // donothing
-        case x => throw new DelegateError("Cannot call .lines on " + x.prettyName)
+        case x => throw new Error.Delegate("Cannot call .lines on " + x.prettyName)
       }
-      Materializer.apply(v1)(evaluator).asInstanceOf[ujson.Arr]
+      Materializer.apply(v1)(ev).asInstanceOf[ujson.Arr]
         .value
         .filter(_ != ujson.Null)
         .map{
@@ -225,31 +89,31 @@ object Std {
         }
         .mkString
     },
-    builtin("format", "str", "vals"){ (evaluator, fileScope, v1: String, v2: Val) =>
-      Format.format(v1, v2, -1)(fileScope, evaluator)
+    builtin("format", "str", "vals"){ (ev, fs, v1: String, v2: Val) =>
+      Format.format(v1, v2, -1)(fs, ev)
     },
-    builtin("foldl", "func", "arr", "init"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr, init: Val) =>
+    builtin("foldl", "func", "arr", "init"){ (ev, fs, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
       for(item <- arr.value){
         val c = current
-        current = func.apply(Lazy(c), item)
+        current = func.apply(Val.Lazy(c), item)
       }
       current
     },
-    builtin("foldr", "func", "arr", "init"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr, init: Val) =>
+    builtin("foldr", "func", "arr", "init"){ (ev, fs, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
       for(item <- arr.value.reverse){
         val c = current
-        current = func.apply(item, Lazy(c))
+        current = func.apply(item, Val.Lazy(c))
       }
       current
     },
-    builtin("range", "from", "to"){ (evaluator, fileScope, from: Int, to: Int) =>
+    builtin("range", "from", "to"){ (ev, fs, from: Int, to: Int) =>
       Val.Arr(
-        (from to to).map(i => Lazy(Val.Num(i)))
+        (from to to).map(i => Val.Lazy(Val.Num(i)))
       )
     },
-    builtin("mergePatch", "target", "patch"){ (evaluator, fileScope, target: Val, patch: Val) =>
+    builtin("mergePatch", "target", "patch"){ (ev, fs, target: Val, patch: Val) =>
       def rec(l: ujson.Value, r: ujson.Value): ujson.Value = {
         (l, r) match{
           case (l0, r: ujson.Obj) =>
@@ -266,125 +130,125 @@ object Std {
           case (_, _) => r
         }
       }
-      Materializer.reverse(rec(Materializer(target)(evaluator), Materializer(patch)(evaluator)))
+      Materializer.reverse(rec(Materializer(target)(ev), Materializer(patch)(ev)))
     },
-    builtin("sqrt", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("sqrt", "x"){ (ev, fs, x: Double) =>
       math.sqrt(x)
     },
-    builtin("max", "a", "b"){ (evaluator, fileScope, a: Double, b: Double) =>
+    builtin("max", "a", "b"){ (ev, fs, a: Double, b: Double) =>
       math.max(a, b)
     },
-    builtin("min", "a", "b"){ (evaluator, fileScope, a: Double, b: Double) =>
+    builtin("min", "a", "b"){ (ev, fs, a: Double, b: Double) =>
       math.min(a, b)
     },
-    builtin("mod", "a", "b"){ (evaluator, fileScope, a: Int, b: Int) =>
+    builtin("mod", "a", "b"){ (ev, fs, a: Int, b: Int) =>
       a % b
     },
 
-    builtin("makeArray", "sz", "func"){ (evaluator, fileScope, sz: Int, func: Applyer) =>
+    builtin("makeArray", "sz", "func"){ (ev, fs, sz: Int, func: Applyer) =>
       Val.Arr(
         (0 until sz).map(i =>
-          Lazy(func.apply(Lazy(Val.Num(i))))
+          Val.Lazy(func.apply(Val.Lazy(Val.Num(i))))
         )
       )
     },
 
-    builtin("pow", "x", "n"){ (evaluator, fileScope, x: Double, n: Double) =>
+    builtin("pow", "x", "n"){ (ev, fs, x: Double, n: Double) =>
       math.pow(x, n)
     },
 
-    builtin("floor", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("floor", "x"){ (ev, fs, x: Double) =>
       math.floor(x)
     },
-    builtin("ceil", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("ceil", "x"){ (ev, fs, x: Double) =>
       math.ceil(x)
     },
-    builtin("abs", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("abs", "x"){ (ev, fs, x: Double) =>
       math.abs(x)
     },
-    builtin("sin", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("sin", "x"){ (ev, fs, x: Double) =>
       math.sin(x)
     },
-    builtin("cos", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("cos", "x"){ (ev, fs, x: Double) =>
       math.cos(x)
     },
-    builtin("tan", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("tan", "x"){ (ev, fs, x: Double) =>
       math.tan(x)
     },
 
-    builtin("asin", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("asin", "x"){ (ev, fs, x: Double) =>
       math.asin(x)
     },
-    builtin("acos", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("acos", "x"){ (ev, fs, x: Double) =>
       math.acos(x)
     },
-    builtin("atan", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("atan", "x"){ (ev, fs, x: Double) =>
       math.atan(x)
     },
-    builtin("log", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("log", "x"){ (ev, fs, x: Double) =>
       math.log(x)
     },
-    builtin("exp", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("exp", "x"){ (ev, fs, x: Double) =>
       math.exp(x)
     },
-    builtin("mantissa", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("mantissa", "x"){ (ev, fs, x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toInt + 1
       val mantissa = value * Math.pow(2.0, -exponent)
       mantissa
     },
-    builtin("exponent", "x"){ (evaluator, fileScope, x: Double) =>
+    builtin("exponent", "x"){ (ev, fs, x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toInt + 1
       val mantissa = value * Math.pow(2.0, -exponent)
       exponent
     },
-    builtin("isString", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isString", "v"){ (ev, fs, v: Val) =>
       v.isInstanceOf[Val.Str]
     },
-    builtin("isBoolean", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isBoolean", "v"){ (ev, fs, v: Val) =>
       v == Val.True || v == Val.False
     },
-    builtin("isNumber", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isNumber", "v"){ (ev, fs, v: Val) =>
       v.isInstanceOf[Val.Num]
     },
-    builtin("isObject", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isObject", "v"){ (ev, fs, v: Val) =>
       v.isInstanceOf[Val.Obj]
     },
-    builtin("isArray", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isArray", "v"){ (ev, fs, v: Val) =>
       v.isInstanceOf[Val.Arr]
     },
-    builtin("isFunction", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("isFunction", "v"){ (ev, fs, v: Val) =>
       v.isInstanceOf[Val.Func]
     },
-    builtin("count", "arr", "x"){ (evaluator, fileScope, arr: Val.Arr, x: Val) =>
+    builtin("count", "arr", "x"){ (ev, fs, arr: Val.Arr, x: Val) =>
       val res =  arr.value.count{i =>
-        Materializer(i.force)(evaluator) == Materializer(x)(evaluator)
+        Materializer(i.force)(ev) == Materializer(x)(ev)
       }
       res
     },
-    builtin("filter", "func", "arr"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr) =>
+    builtin("filter", "func", "arr"){ (ev, fs, func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.filter{ i =>
           func.apply(i) == Val.True
         }
       )
     },
-    builtin("map", "func", "arr"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr) =>
+    builtin("map", "func", "arr"){ (ev, fs, func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.map{ i =>
-          Lazy(func.apply(i))
+          Val.Lazy(func.apply(i))
         }
       )
     },
-    builtin("mapWithKey", "func", "obj"){ (evaluator, fileScope, func: Applyer, obj: Val.Obj) =>
+    builtin("mapWithKey", "func", "obj"){ (ev, fs, func: Applyer, obj: Val.Obj) =>
       val allKeys = obj.getVisibleKeys()
       new Val.Obj(
         allKeys.map{ k =>
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
             func.apply(
-              Lazy(Val.Str(k._1)),
-              Lazy(obj.value(k._1, -1)(fileScope,evaluator))
+              Val.Lazy(Val.Str(k._1)),
+              Val.Lazy(obj.value(k._1, -1)(fs,ev))
             )
           ))
         }.toMap,
@@ -392,31 +256,31 @@ object Std {
         None
       )
     },
-    builtin("mapWithIndex", "func", "arr"){ (evaluator, fileScope, func: Applyer, arr: Val.Arr) =>
+    builtin("mapWithIndex", "func", "arr"){ (ev, fs, func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.zipWithIndex.map{ case (x, i) =>
-          Lazy(func.apply(Lazy(Val.Num(i)), x))
+          Val.Lazy(func.apply(Val.Lazy(Val.Num(i)), x))
         }
       )
     },
-    builtin("filterMap", "filter_func", "map_func", "arr"){ (evaluator, fileScope, filter_func: Applyer, map_func: Applyer, arr: Val.Arr) =>
+    builtin("filterMap", "filter_func", "map_func", "arr"){ (ev, fs, filter_func: Applyer, map_func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.flatMap { i =>
           val x = i.force
-          if (filter_func.apply(Lazy(x)) != Val.True) None
-          else Some(Lazy(map_func.apply(Lazy(x))))
+          if (filter_func.apply(Val.Lazy(x)) != Val.True) None
+          else Some(Val.Lazy(map_func.apply(Val.Lazy(x))))
         }
       )
     },
-    builtin("find", "value","arr"){ (evaluator, fileScope, value: Val, arr: Val.Arr) =>
+    builtin("find", "value","arr"){ (ev, fs, value: Val, arr: Val.Arr) =>
       Val.Arr(
         for (
           (v, i) <- arr.value.zipWithIndex
-          if Materializer(v.force)(evaluator) == Materializer(value)(evaluator)
-        ) yield Lazy(Val.Num(i))
+          if Materializer(v.force)(ev) == Materializer(value)(ev)
+        ) yield Val.Lazy(Val.Num(i))
       )
     },
-    builtin("findSubstr", "pat", "str") { (evaluator, fileScope, pat: String, str: String) =>
+    builtin("findSubstr", "pat", "str") { (ev, fs, pat: String, str: String) =>
       if (pat.length == 0) Val.Arr(Seq())
       else {
         val indices = ArrayBuffer[Int]()
@@ -425,28 +289,28 @@ object Std {
           indices.append(matchIndex)
           matchIndex = str.indexOf(pat, matchIndex + 1)
         }
-        Val.Arr(indices.map(x => Lazy(Val.Num(x))).toSeq)
+        Val.Arr(indices.map(x => Val.Lazy(Val.Num(x))).toSeq)
       }
     },
-    builtin("substr", "s", "from", "len"){ (evaluator, fileScope, s: String, from: Int, len: Int) =>
+    builtin("substr", "s", "from", "len"){ (ev, fs, s: String, from: Int, len: Int) =>
       val safeOffset = math.min(from, s.length)
       val safeLength = math.min(len, s.length - safeOffset)
       s.substring(safeOffset, safeOffset + safeLength)
     },
-    builtin("startsWith", "a", "b"){ (evaluator, fileScope, a: String, b: String) =>
+    builtin("startsWith", "a", "b"){ (ev, fs, a: String, b: String) =>
       a.startsWith(b)
     },
-    builtin("endsWith", "a", "b"){ (evaluator, fileScope, a: String, b: String) =>
+    builtin("endsWith", "a", "b"){ (ev, fs, a: String, b: String) =>
       a.endsWith(b)
     },
-    builtin("char", "n"){ (evaluator, fileScope, n: Double) =>
+    builtin("char", "n"){ (ev, fs, n: Double) =>
       n.toInt.toChar.toString
     },
 
-    builtin("strReplace", "str", "from", "to"){ (evaluator, fileScope, str: String, from: String, to: String) =>
+    builtin("strReplace", "str", "from", "to"){ (ev, fs, str: String, from: String, to: String) =>
       str.replace(from, to)
     },
-    builtin("join", "sep", "arr"){ (evaluator, fileScope, sep: Val, arr: Val.Arr) =>
+    builtin("join", "sep", "arr"){ (ev, fs, sep: Val, arr: Val.Arr) =>
       val res: Val = sep match{
         case Val.Str(s) =>
           Val.Str(
@@ -455,39 +319,39 @@ object Std {
               .filter(_ != Val.Null)
               .map{
                 case Val.Str(x) => x
-                case x => throw new DelegateError("Cannot join " + x.prettyName)
+                case x => throw new Error.Delegate("Cannot join " + x.prettyName)
               }
               .mkString(s)
           )
         case Val.Arr(sep) =>
-          val out = collection.mutable.Buffer.empty[Lazy]
+          val out = collection.mutable.Buffer.empty[Val.Lazy]
           for(x <- arr.value){
             x.force match{
               case Val.Null => // do nothing
               case Val.Arr(v) =>
                 if (out.nonEmpty) out.appendAll(sep)
                 out.appendAll(v)
-              case x => throw new DelegateError("Cannot join " + x.prettyName)
+              case x => throw new Error.Delegate("Cannot join " + x.prettyName)
             }
           }
           Val.Arr(out.toSeq)
-        case x => throw new DelegateError("Cannot join " + x.prettyName)
+        case x => throw new Error.Delegate("Cannot join " + x.prettyName)
       }
       res
     },
-    builtin("flattenArrays", "arrs"){ (evaluator, fileScope, arrs: Val.Arr) =>
-      val out = collection.mutable.Buffer.empty[Lazy]
+    builtin("flattenArrays", "arrs"){ (ev, fs, arrs: Val.Arr) =>
+      val out = collection.mutable.Buffer.empty[Val.Lazy]
       for(x <- arrs.value){
         x.force match{
           case Val.Null => // do nothing
           case Val.Arr(v) => out.appendAll(v)
-          case x => throw new DelegateError("Cannot call flattenArrays on " + x)
+          case x => throw new Error.Delegate("Cannot call flattenArrays on " + x)
         }
       }
       Val.Arr(out.toSeq)
     },
-    builtin("manifestIni", "v"){ (evaluator, fileScope, v: Val) =>
-      val materialized = Materializer(v)(evaluator)
+    builtin("manifestIni", "v"){ (ev, fs, v: Val) =>
+      val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match{
         case ujson.Str(v) => v
         case ujson.Num(v) => RenderUtils.renderDouble(v)
@@ -507,56 +371,56 @@ object Std {
         )
       lines.flatMap(Seq(_, "\n")).mkString
     },
-    builtin("escapeStringJson", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("escapeStringJson", "str"){ (ev, fs, str: String) =>
       val out = new StringWriter()
       ujson.Renderer.escape(out, str, unicode = true)
       out.toString
     },
-    builtin("escapeStringBash", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("escapeStringBash", "str"){ (ev, fs, str: String) =>
       "'" + str.replace("'", """'"'"'""") + "'"
     },
-    builtin("escapeStringDollars", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("escapeStringDollars", "str"){ (ev, fs, str: String) =>
       str.replace("$", "$$")
     },
-    builtin("manifestPython", "v"){ (evaluator, fileScope, v: Val) =>
-      Materializer.apply0(v, new PythonRenderer())(evaluator).toString
+    builtin("manifestPython", "v"){ (ev, fs, v: Val) =>
+      Materializer.apply0(v, new PythonRenderer())(ev).toString
     },
-    builtin("manifestJson", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("manifestJson", "v"){ (ev, fs, v: Val) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
       Materializer
-        .apply0(v, new ujson.StringRenderer(indent = 4))(evaluator)
+        .apply0(v, new ujson.StringRenderer(indent = 4))(ev)
         .toString
         .replaceAll("\n[ ]+\n", "\n\n")
     },
-    builtin("manifestJsonEx", "value", "indent"){ (evaluator, fileScope, v: Val, i: String) =>
+    builtin("manifestJsonEx", "value", "indent"){ (ev, fs, v: Val, i: String) =>
       // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
       Materializer
-        .apply0(v, new ujson.StringRenderer(indent = i.length))(evaluator)
+        .apply0(v, new ujson.StringRenderer(indent = i.length))(ev)
         .toString
         .replaceAll("\n[ ]+\n", "\n\n")
     },
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> None,
-                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
+                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
           case Val.False => false
           case Val.True => true
-          case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
+          case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
         }
       Materializer.apply0(
         v,
         new YamlRenderer(indentArrayInObject = indentArrayInObject)
-      )(evaluator).toString
+      )(ev).toString
     },
     builtinWithDefaults("manifestYamlStream",
                         "v" -> None,
-                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, evaluator) =>
+                        "indent_array_in_object" -> Some(Expr.False(0))){ (args, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
         case Val.False => false
         case Val.True => true
-        case _ => throw DelegateError("indent_array_in_object has to be a boolean, got" + v.getClass)
+        case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
       }
       v match {
         case Val.Arr(values) => values
@@ -564,18 +428,18 @@ object Std {
             Materializer.apply0(
               item.force,
               new YamlRenderer(indentArrayInObject = indentArrayInObject)
-            )(evaluator).toString()
+            )(ev).toString()
           }
           .mkString("---\n", "\n---\n", "\n...\n")
-        case _ => throw new DelegateError("manifestYamlStream only takes arrays, got " + v.getClass)
+        case _ => throw new Error.Delegate("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
-    builtin("manifestPythonVars", "v"){ (evaluator, fileScope, v: Val.Obj) =>
-      Materializer(v)(evaluator).obj
+    builtin("manifestPythonVars", "v"){ (ev, fs, v: Val.Obj) =>
+      Materializer(v)(ev).obj
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
         .mkString
     },
-    builtin("manifestXmlJsonml", "value"){ (evaluator, fileScope, value: Val) =>
+    builtin("manifestXmlJsonml", "value"){ (ev, fs, value: Val) =>
       import scalatags.Text.all.{value => _, _}
 
 
@@ -586,78 +450,78 @@ object Std {
             tag(t)(
               attrs.value.map {
                 case (k, ujson.Str(v)) => attr(k) := v
-                case (k, v) => throw new DelegateError("Cannot call manifestXmlJsonml on " + v.getClass)
+                case (k, v) => throw new Error.Delegate("Cannot call manifestXmlJsonml on " + v.getClass)
               }.toSeq,
               children.map(rec)
             )
           case ujson.Arr(collection.mutable.Seq(ujson.Str(t), children@_*)) =>
             tag(t)(children.map(rec).toSeq)
           case x =>
-            throw new DelegateError("Cannot call manifestXmlJsonml on " + x.getClass)
+            throw new Error.Delegate("Cannot call manifestXmlJsonml on " + x.getClass)
         }
       }
 
-      rec(Materializer(value)(evaluator)).render
+      rec(Materializer(value)(ev)).render
 
     },
-    builtin("base64", "v"){ (evaluator, fileScope, v: Val) =>
+    builtin("base64", "v"){ (ev, fs, v: Val) =>
       v match{
         case Val.Str(value) => Base64.getEncoder().encodeToString(value.getBytes)
         case Val.Arr(bytes) => Base64.getEncoder().encodeToString(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
-        case x => throw new DelegateError("Cannot base64 encode " + x.prettyName)
+        case x => throw new Error.Delegate("Cannot base64 encode " + x.prettyName)
       }
     },
 
-    builtin("base64Decode", "s"){ (evaluator, fileScope, s: String) =>
+    builtin("base64Decode", "s"){ (ev, fs, s: String) =>
       new String(Base64.getDecoder().decode(s))
     },
-    builtin("base64DecodeBytes", "s"){ (evaluator, fileScope, s: String) =>
-      Val.Arr(Base64.getDecoder().decode(s).map(i => Lazy(Val.Num(i))))
+    builtin("base64DecodeBytes", "s"){ (ev, fs, s: String) =>
+      Val.Arr(Base64.getDecoder().decode(s).map(i => Val.Lazy(Val.Num(i))))
     },
-    builtin("sort", "arr"){ (evaluator, fileScope, arr: Val) =>
+    builtin("sort", "arr"){ (ev, fs, arr: Val) =>
       arr match{
         case Val.Arr(vs) =>
           Val.Arr(
 
             if (vs.forall(_.force.isInstanceOf[Val.Str])){
-              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Lazy(_))
+              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Val.Lazy(_))
             }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
-              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Lazy(_))
+              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Val.Lazy(_))
             }else {
               ???
             }
           )
-        case Val.Str(s) => Val.Arr(s.sorted.map(c => Lazy(Val.Str(c.toString))))
-        case x => throw new DelegateError("Cannot sort " + x.prettyName)
+        case Val.Str(s) => Val.Arr(s.sorted.map(c => Val.Lazy(Val.Str(c.toString))))
+        case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
       }
     },
-    builtin("uniq", "arr"){ (evaluator, fileScope, arr: Val.Arr) =>
-      val ujson.Arr(vs) = Materializer(arr)(evaluator)
+    builtin("uniq", "arr"){ (ev, fs, arr: Val.Arr) =>
+      val ujson.Arr(vs) = Materializer(arr)(ev)
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
+      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
-    builtin("set", "arr"){ (evaluator, fileScope, arr: Val.Arr) =>
-      val ujson.Arr(vs0) = Materializer(arr)(evaluator)
+    builtin("set", "arr"){ (ev, fs, arr: Val.Arr) =>
+      val ujson.Arr(vs0) = Materializer(arr)(ev)
       val vs =
         if (vs0.forall(_.isInstanceOf[ujson.Str])){
           vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
         }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
           vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
-          throw new DelegateError("Every element of the input must be of the same type, string or number")
+          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
         }
 
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
+      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
-    builtin("setUnion", "a", "b"){ (evaluator, fileScope, a: Val.Arr, b: Val.Arr) =>
+    builtin("setUnion", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
 
-      val ujson.Arr(vs1) = Materializer(a)(evaluator)
-      val ujson.Arr(vs2) = Materializer(b)(evaluator)
+      val ujson.Arr(vs1) = Materializer(a)(ev)
+      val ujson.Arr(vs2) = Materializer(b)(ev)
       val vs0 = vs1 ++ vs2
       val vs =
         if (vs0.forall(_.isInstanceOf[ujson.Str])){
@@ -665,20 +529,20 @@ object Std {
         }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
           vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
-          throw new DelegateError("Every element of the input must be of the same type, string or number")
+          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
         }
 
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
+      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
-    builtin("setInter", "a", "b"){ (evaluator, fileScope, a: Val, b: Val.Arr) =>
-      val vs1 = Materializer(a)(evaluator) match{
+    builtin("setInter", "a", "b"){ (ev, fs, a: Val, b: Val.Arr) =>
+      val vs1 = Materializer(a)(ev) match{
         case ujson.Arr(vs1) => vs1
         case x => Seq(x)
       }
-      val ujson.Arr(vs2) = Materializer(b)(evaluator)
+      val ujson.Arr(vs2) = Materializer(b)(ev)
 
 
       val vs0 = vs1.to(collection.mutable.LinkedHashSet)
@@ -690,17 +554,17 @@ object Std {
         }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
           vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
-          throw new DelegateError("Every element of the input must be of the same type, string or number")
+          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
         }
 
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
+      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
-    builtin("setDiff", "a", "b"){ (evaluator, fileScope, a: Val.Arr, b: Val.Arr) =>
-      val ujson.Arr(vs1) = Materializer(a)(evaluator)
-      val ujson.Arr(vs2) = Materializer(b)(evaluator)
+    builtin("setDiff", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
+      val ujson.Arr(vs1) = Materializer(a)(ev)
+      val ujson.Arr(vs2) = Materializer(b)(ev)
 
 
       val vs0 = vs1.to(collection.mutable.LinkedHashSet)
@@ -712,27 +576,27 @@ object Std {
         }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
           vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
         }else {
-          throw new DelegateError("Every element of the input must be of the same type, string or number")
+          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
         }
 
       val out = collection.mutable.Buffer.empty[ujson.Value]
       for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
 
-      Val.Arr(out.map(v => Lazy(Materializer.reverse(v))).toSeq)
+      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
 
     },
-    builtin("setMember", "x", "arr"){ (evaluator, fileScope, x: Val, arr: Val.Arr) =>
-      val vs1 = Materializer(x)(evaluator)
-      val ujson.Arr(vs2) = Materializer(arr)(evaluator)
+    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
+      val vs1 = Materializer(x)(ev)
+      val ujson.Arr(vs2) = Materializer(arr)(ev)
       vs2.contains(vs1)
     },
-    builtin("split", "str", "c"){ (evaluator, fileScope, str: String, c: String) =>
-      Val.Arr(str.split(java.util.regex.Pattern.quote(c), -1).map(s => Lazy(Val.Str(s))))
+    builtin("split", "str", "c"){ (ev, fs, str: String, c: String) =>
+      Val.Arr(str.split(java.util.regex.Pattern.quote(c), -1).map(s => Val.Lazy(Val.Str(s))))
     },
-    builtin("splitLimit", "str", "c", "maxSplits"){ (evaluator, fileScope, str: String, c: String, maxSplits: Int) =>
-      Val.Arr(str.split(java.util.regex.Pattern.quote(c), maxSplits + 1).map(s => Lazy(Val.Str(s))))
+    builtin("splitLimit", "str", "c", "maxSplits"){ (ev, fs, str: String, c: String, maxSplits: Int) =>
+      Val.Arr(str.split(java.util.regex.Pattern.quote(c), maxSplits + 1).map(s => Val.Lazy(Val.Str(s))))
     },
-    builtin("stringChars", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("stringChars", "str"){ (ev, fs, str: String) =>
 
       var offset = 0
       val output = collection.mutable.Buffer.empty[String]
@@ -741,19 +605,19 @@ object Std {
         output.append(new String(Character.toChars(codepoint)))
         offset += Character.charCount(codepoint)
       }
-      Val.Arr(output.map(s => Lazy(Val.Str(s))).toSeq)
+      Val.Arr(output.map(s => Val.Lazy(Val.Str(s))).toSeq)
 
     },
-    builtin("parseInt", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("parseInt", "str"){ (ev, fs, str: String) =>
       str.toInt
     },
-    builtin("parseOctal", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("parseOctal", "str"){ (ev, fs, str: String) =>
       Integer.parseInt(str, 8)
     },
-    builtin("parseHex", "str"){ (evaluator, fileScope, str: String) =>
+    builtin("parseHex", "str"){ (ev, fs, str: String) =>
       Integer.parseInt(str, 16)
     },
-    builtin("parseJson", "str") { (evaluator, fileScope, str: String) =>
+    builtin("parseJson", "str") { (ev, fs, str: String) =>
 
       def recursiveTransform(js: ujson.Value): Val = {
         js match {
@@ -763,7 +627,7 @@ object Std {
           case ujson.Num(value) => Val.Num(value)
           case ujson.Str(value) => Val.Str(value)
           case ujson.Arr(values) =>
-            val transformedValue: Seq[Lazy] = values.map(v => Lazy(recursiveTransform(v))).toSeq
+            val transformedValue: Seq[Val.Lazy] = values.map(v => Val.Lazy(recursiveTransform(v))).toSeq
             Val.Arr(transformedValue)
           case ujson.Obj(valueMap) =>
             val transformedValue = valueMap
@@ -775,10 +639,10 @@ object Std {
       }
       recursiveTransform(ujson.read(str))
     },
-    builtin("md5", "s"){ (evaluator, fileScope, s: String) =>
+    builtin("md5", "s"){ (ev, fs, s: String) =>
       Platform.md5(s)
     },
-    builtin("prune", "x"){ (evaluator, fileScope, s: Val) =>
+    builtin("prune", "x"){ (ev, fs, s: Val) =>
       def filter(x: Val) = x match{
         case c: Val.Arr if c.value.isEmpty => false
         case c: Val.Obj if c.getVisibleKeys().count(_._2 == false) == 0 => false
@@ -790,23 +654,23 @@ object Std {
           val bindings = for{
             (k, hidden) <- o.getVisibleKeys()
             if !hidden
-            v = rec(o.value(k, -1)(fileScope, evaluator))
+            v = rec(o.value(k, -1)(fs, ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
           new Val.Obj(bindings.toMap, _ => (), None)
         case a: Val.Arr =>
-          Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Lazy(_)))
+          Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Val.Lazy(_)))
         case _ => x
       }
       rec(s)
     },
 
-    builtin("asciiUpper", "str"){ (evaluator, fileScope, str: String) => str.toUpperCase},
-    builtin("asciiLower", "str"){ (evaluator, fileScope, str: String) => str.toLowerCase()},
+    builtin("asciiUpper", "str"){ (ev, fs, str: String) => str.toUpperCase},
+    builtin("asciiLower", "str"){ (ev, fs, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
       None,
       Params(Array(("str", None, 0), ("rest", None, 1))),
-      { (scope, thisFile, evaluator, fileScope, outerOffset) =>
+      { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(msg) = scope.bindings(0).get.force
         System.err.println(s"TRACE: $thisFile " + msg)
         scope.bindings(1).get.force
@@ -815,12 +679,12 @@ object Std {
     "extVar" -> Val.Func(
       None,
       Params(Array(("x", None, 0))),
-      { (scope, thisFile, evaluator, fileScope, outerOffset) =>
+      { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(x) = scope.bindings(0).get.force
         Materializer.reverse(
-          evaluator.extVars.getOrElse(
+          ev.extVars.getOrElse(
             x,
-            throw new DelegateError("Unknown extVar: " + x)
+            throw new Error.Delegate("Unknown extVar: " + x)
           )
         )
       }
@@ -845,8 +709,8 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], fileScope: FileScope, eval: EvalScope) =>
-            Val.Str(fileScope.currentFile.relativeToString(eval.wd))
+          { (self: Val.Obj, sup: Option[Val.Obj], fs: FileScope, eval: EvalScope) =>
+            Val.Str(fs.currentFile.relativeToString(eval.wd))
           },
           cached = false
         )
@@ -856,10 +720,75 @@ object Std {
     None
   )
 
+  def validate(vs: Array[Val],
+               ev: EvalScope,
+               fs: FileScope,
+               rs: Array[ReadWriter[_]]) = {
+    for(i <- vs.indices) yield {
+      val v = vs(i)
+      val r = rs(i)
+      r.apply(v, ev, fs) match {
+        case Left(err) => throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + v.prettyName)
+        case Right(x) => x
+      }
+    }
+  }
+
+  def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
+                                            (eval: (EvalScope, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (vs, ev, fs) =>
+    val Seq(v: T1) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]]))
+    eval(ev, fs, v)
+  }
+
+  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
+                                                            (eval: (EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (vs, ev, fs) =>
+    val Seq(v1: T1, v2: T2) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
+    eval(ev, fs, v1, v2)
+  }
+
+  def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
+                                                                            (eval: (EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (vs, ev, fs) =>
+    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
+    eval(ev, fs, v1, v2, v3)
+  }
+  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Array[Val], EvalScope, FileScope) => R) = {
+    val paramData = params.zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
+    val paramIndices = params.indices.toArray
+    name -> Val.Func(
+      None,
+      Params(paramData),
+      {(scope, thisFile, ev, fs, outerOffset) =>
+        implicitly[ReadWriter[R]].write(
+          eval(paramIndices.map(i => scope.bindings(i).get.force), ev, fs)
+        )
+      }
+    )
+  }
+  /**
+    * Helper function that can define a built-in function with default parameters
+    *
+    * Arguments of the eval function are (args, ev)
+    */
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)
+                                        (eval: (Map[String, Val], EvalScope) => R): (String, Val.Func) = {
+    val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
+    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
+    name -> Val.Func(
+      None,
+      Params(indexedParams),
+      { (scope, thisFile, ev, fs, outerOffset) =>
+        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap
+        implicitly[ReadWriter[R]].write(eval(args, ev))
+      },
+      { (expr, scope, eval) =>
+        eval.visitExpr(expr)(scope, new FileScope(null, Map.empty))
+      }
+    )
+  }
 
   def scope(size: Int) = {
     new ValScope(
-      None, None, None, Array(Lazy(Std)).padTo(size, null)
+      None, None, None, Array(Val.Lazy(Std)).padTo(size, null)
     )
   }
 }

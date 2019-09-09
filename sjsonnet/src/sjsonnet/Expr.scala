@@ -1,11 +1,17 @@
 package sjsonnet
 
 import scala.collection.{BitSet, mutable}
-
-sealed trait Offsetted{
+/**
+  * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the
+  * program mostly as-written, except for resolving local variable names and
+  * assigning them indices in the scope bindings array.
+  *
+  * Each [[Expr]] represents an expression in the Jsonnet program, and contains an
+  * integer offset into the file that is later used to provide error messages.
+  */
+sealed trait Expr{
   def offset: Int
 }
-sealed trait Expr extends Offsetted
 object Expr{
   case class Null(offset: Int) extends Expr
   case class True(offset: Int) extends Expr
@@ -90,7 +96,7 @@ object Expr{
   case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
 
-  case class Bind(offset: Int, name: Int, args: Option[Params], rhs: Expr) extends Offsetted
+  case class Bind(offset: Int, name: Int, args: Option[Params], rhs: Expr)
   case class Import(offset: Int, value: String) extends Expr
   case class ImportStr(offset: Int, value: String) extends Expr
   case class Error(offset: Int, value: Expr) extends Expr

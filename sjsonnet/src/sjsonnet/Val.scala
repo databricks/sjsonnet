@@ -7,17 +7,17 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-object Lazy{
-  def apply(calc0: => Val) = new Lazy(calc0)
-}
-class Lazy(calc0: => Val){
-  lazy val force = calc0
-}
+/**
+  * [[Val]]s represented Jsonnet values that are the result of evaluating
+  * a Jsonnet program. The [[Val]] data structure is essentially a JSON tree,
+  * except evaluation of object attributes and array contents are lazy, and
+  * the tree can contain functions.
+  */
 sealed trait Val{
   def prettyName: String
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
-    else throw new DelegateError(
+    else throw new Error.Delegate(
       "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
     )
 }
@@ -30,6 +30,19 @@ object PrettyNamed{
   implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
 }
 object Val{
+
+  /**
+    * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily
+    * evaluated dictionary values, array contents, or function parameters
+    * are all wrapped in [[Lazy]] and only truly evaluated on-demand
+    */
+  class Lazy(calc0: => Val){
+    lazy val force = calc0
+  }
+  object Lazy{
+    def apply(calc0: => Val) = new Lazy(calc0)
+  }
+
   def bool(b: Boolean) = if (b) True else False
   sealed trait Bool extends Val{
   }
@@ -118,7 +131,7 @@ object Val{
               if (cached) valueCache(cacheKey) = x
               x
             case None =>
-              Util.fail("Field does not exist: " + k, offset)
+              Error.fail("Field does not exist: " + k, offset)
           }
       }
     }
@@ -133,10 +146,10 @@ object Val{
       case (l: Val.Obj, r: Val.Obj) => r.addSuper(l)
       case (Val.Str(l), r) =>
         try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
-        catch Util.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(offset)
       case (l, Val.Str(r)) =>
         try Val.Str(evaluator.materialize(l).transform(new Renderer()).toString + r)
-        catch Util.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(offset)
     }
 
     @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -204,13 +217,13 @@ object Val{
           case ((Some(name), v), _) =>
             val argIndex = params.argIndices.getOrElse(
               name,
-              Util.fail(s"Function has no parameter $name", outerOffset)
+              Error.fail(s"Function has no parameter $name", outerOffset)
             )
             (argIndex, v)
           case ((None, v), i) => (params.args(i)._3, v)
         }
       catch{ case e: IndexOutOfBoundsException =>
-        Util.fail(
+        Error.fail(
           "Too many args, function has " + params.args.length + " parameter(s)",
           outerOffset
         )
@@ -269,19 +282,19 @@ object Val{
         else repeats.add(t._1)
       }
 
-      Util.failIfNonEmpty(
+      Error.failIfNonEmpty(
         repeats,
         outerOffset,
         (plural, names) => s"Function parameter$plural $names passed more than once"
       )
 
-      Util.failIfNonEmpty(
+      Error.failIfNonEmpty(
         params.noDefaultIndices.filter(!seen(_)),
         outerOffset,
         (plural, names) => s"Function parameter$plural $names not bound in call"
       )
 
-      Util.failIfNonEmpty(
+      Error.failIfNonEmpty(
         seen.filter(!params.allIndices(_)),
         outerOffset,
         (plural, names) => s"Function has no parameter$plural $names"
@@ -290,6 +303,10 @@ object Val{
   }
 }
 
+/**
+  * [[EvalScope]] models the per-evaluator context that is propagated
+  * throughout the Jsonnet evaluation.
+  */
 abstract class EvalScope(extVars: Map[String, ujson.Value], wd: Path)
   extends EvalErrorScope(extVars, wd){
   def visitExpr(expr: Expr)
@@ -303,17 +320,22 @@ object ValScope{
   def empty(size: Int) = new ValScope(None, None, None, new Array(size))
 }
 
+/**
+  * [[ValScope]]s which model the lexical scopes within
+  * * a Jsonnet file that bind variable names to [[Val]]s, as well as other
+  * * contextual information like `self` `this` or `super`.
+  */
 class ValScope(val dollar0: Option[Val.Obj],
                val self0: Option[Val.Obj],
                val super0: Option[Val.Obj],
-               bindings0: Array[Lazy]) {
+               bindings0: Array[Val.Lazy]) {
 
-  def bindings(k: Int): Option[Lazy] = bindings0(k) match{
+  def bindings(k: Int): Option[Val.Lazy] = bindings0(k) match{
     case null => None
     case v => Some(v)
   }
 
-  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)] = Nil,
+  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = Nil,
              newDollar: Option[Val.Obj] = null,
              newSelf: Option[Val.Obj] = null,
              newSuper: Option[Val.Obj] = null) = {

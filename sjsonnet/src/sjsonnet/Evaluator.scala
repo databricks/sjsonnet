@@ -5,7 +5,15 @@ import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
 
-
+/**
+  * Recursively walks the [[Expr]] trees to convert them into into [[Val]]
+  * objects that can be materialized to JSON.
+  *
+  * Performs import resolution and parsing on-demand when the relevant nodes
+  * in the syntax tree are reached, and caches the evaluated result of each
+  * imported module to be re-used. Parsing is cached separatedly by an external
+  * `parseCache`.
+  */
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                 extVars: Map[String, ujson.Value],
                 wd: Path,
@@ -23,7 +31,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Parened(offset, inner) => visitExpr(inner)
     case True(offset) => Val.True
     case False(offset) => Val.False
-    case Self(offset) => scope.self0.getOrElse(Util.fail("Cannot use `self` outside an object", offset))
+    case Self(offset) => scope.self0.getOrElse(Error.fail("Cannot use `self` outside an object", offset))
 
     case BinaryOp(offset, lhs, Expr.BinaryOp.`in`, Super(_)) =>
       scope.super0 match{
@@ -33,12 +41,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           Val.bool(sup.containsKey(key.value))
       }
 
-    case $(offset) => scope.dollar0.getOrElse(Util.fail("Cannot use `$` outside an object", offset))
+    case $(offset) => scope.dollar0.getOrElse(Error.fail("Cannot use `$` outside an object", offset))
     case Str(offset, value) => Val.Str(value)
     case Num(offset, value) => Val.Num(value)
     case Id(offset, value) => visitId(offset, value)
 
-    case Arr(offset, value) => Val.Arr(value.map(v => Lazy(visitExpr(v))))
+    case Arr(offset, value) => Val.Arr(value.map(v => Val.Lazy(visitExpr(v))))
     case Obj(offset, value) => visitObjBody(value)
 
     case UnaryOp(offset, op, value) => visitUnaryOp(op, value)
@@ -66,24 +74,24 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Function(offset, params, body) => visitMethod(body, params, offset)
     case IfElse(offset, cond, then, else0) => visitIfElse(offset, cond, then, else0)
     case Comp(offset, value, first, rest) =>
-      Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Lazy(visitExpr(value)(s, implicitly))))
+      Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Val.Lazy(visitExpr(value)(s, implicitly))))
     case ObjExtend(offset, value, ext) => {
       val original = visitExpr(value).cast[Val.Obj]
       val extension = visitObjBody(ext)
       extension.addSuper(original)
     }
-  } catch Util.tryCatch(expr.offset)
+  } catch Error.tryCatch(expr.offset)
 
   def visitId(offset: Int, value: Int)(implicit scope: ValScope, fileScope: FileScope): Val = {
     val ref = scope.bindings(value)
       .getOrElse(
-        Util.fail(
+        Error.fail(
           "Unknown variable " + fileScope.indexNames(value),
           offset
         )
       )
 
-    try ref.force catch Util.tryCatchWrap(offset)
+    try ref.force catch Error.tryCatchWrap(offset)
   }
 
   def visitIfElse(offset: Int,
@@ -99,18 +107,18 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case None => Val.Null
           case Some(v) => visitExpr(v)
         }
-      case v => Util.fail("Need boolean, found " + v.prettyName, offset)
+      case v => Error.fail("Need boolean, found " + v.prettyName, offset)
     }
   }
 
   def visitError(offset: Int, value: Expr)
                 (implicit scope: ValScope, fileScope: FileScope): Nothing = {
-    Util.fail(
+    Error.fail(
       visitExpr(value) match {
         case Val.Str(s) => s
         case r =>
           try Materializer.stringify(r)
-          catch Util.tryCatchWrap(offset)
+          catch Error.tryCatchWrap(offset)
       },
       offset
     )
@@ -131,20 +139,20 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                         (implicit scope: ValScope, fileScope: FileScope) = {
     val lhs = visitExpr(value)
     try lhs.cast[Val.Func].apply(
-      args.map { case (k, v) => (k, Lazy(visitExpr(v))) },
+      args.map { case (k, v) => (k, Val.Lazy(visitExpr(v))) },
       fileScope.currentFile.last,
       offset
     )
-    catch Util.tryCatchWrap(offset)
+    catch Error.tryCatchWrap(offset)
   }
 
   def visitAssert(offset: Int, value: Expr, msg: Option[Expr], returned: Expr)
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (visitExpr(value) != Val.True) {
       msg match {
-        case None => Util.fail("Assertion failed", offset)
+        case None => Error.fail("Assertion failed", offset)
         case Some(msg) =>
-          Util.fail(
+          Error.fail(
             "Assertion failed: " + visitExpr(msg).cast[Val.Str].value,
             offset
           )
@@ -173,7 +181,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt) by
             stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
         Val.Str(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
-      case x => Util.fail("Can only slice array or string, not " + x.prettyName, offset)
+      case x => Error.fail("Can only slice array or string, not " + x.prettyName, offset)
     }
   }
 
@@ -181,21 +189,21 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (value.isInstanceOf[Super]) {
       val key = visitExpr(index).cast[Val.Str]
-      scope.super0.getOrElse(scope.self0.getOrElse(Util.fail("Cannot use `super` outside an object", offset))).value(key.value, offset)
+      scope.super0.getOrElse(scope.self0.getOrElse(Error.fail("Cannot use `super` outside an object", offset))).value(key.value, offset)
     } else (visitExpr(value), visitExpr(index)) match {
       case (v: Val.Arr, i: Val.Num) =>
-        if (i.value > v.value.length) Util.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", offset)
+        if (i.value > v.value.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", offset)
         val int = i.value.toInt
-        if (int != i.value) Util.fail("array index was not integer: " + i.value, offset)
+        if (int != i.value) Error.fail("array index was not integer: " + i.value, offset)
         try v.value(int).force
-        catch Util.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(offset)
       case (v: Val.Str, i: Val.Num) => Val.Str(new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
         val ref = v.value(i.value, offset)
         try ref
-        catch Util.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(offset)
       case (lhs, rhs) =>
-        Util.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
+        Error.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
     }
   }
 
@@ -203,11 +211,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (value.isInstanceOf[Super]) {
       scope.super0
-        .getOrElse(Util.fail("Cannot use `super` outside an object", offset))
+        .getOrElse(Error.fail("Cannot use `super` outside an object", offset))
         .value(name, offset, scope.self0.get)
     } else visitExpr(value) match {
       case obj: Val.Obj => obj.value(name, offset)
-      case r => Util.fail(s"attemped to index a ${r.prettyName} with string ${name}", offset)
+      case r => Error.fail(s"attemped to index a ${r.prettyName} with string ${name}", offset)
     }
   }
 
@@ -227,7 +235,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         ) match {
           case Parsed.Success((doc, nameIndices), _) => (doc, nameIndices)
           case f @ Parsed.Failure(l, i, e) =>
-            Util.fail(
+            Error.fail(
               "Imported file " + pprint.Util.literalize(value) +
                 " had Parse error. " + f.trace().msg,
               offset
@@ -235,7 +243,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         }
         val newFileScope = new FileScope(p, nameIndices)
         try visitExpr(doc)(Std.scope(nameIndices.size), newFileScope)
-        catch Util.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(offset)
       }
     )
   }
@@ -244,7 +252,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                    (implicit scope: ValScope, fileScope: FileScope): (Path, String) = {
     importer(fileScope.currentFile.parent(), value)
       .getOrElse(
-        Util.fail(
+        Error.fail(
           "Couldn't import file: " + pprint.Util.literalize(value),
           offset
         )
@@ -264,11 +272,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 visitExpr(rhs) match{
                   case b: Val.Bool => b
                   case unknown =>
-                    Util.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+                    Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
                 }
               case Val.False => Val.False
               case unknown =>
-                Util.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
             }
           case (lhs, Expr.BinaryOp.`||`) =>
             lhs match{
@@ -277,10 +285,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 visitExpr(rhs) match{
                   case b: Val.Bool => b
                   case unknown =>
-                    Util.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+                    Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
                 }
               case unknown =>
-                Util.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
             }
           case _ => visitExpr(rhs)
 
@@ -289,13 +297,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         (visitExpr(lhs), op, visitExpr(rhs)) match {
           case (Val.Num(l), Expr.BinaryOp.`*`, Val.Num(r)) => Val.Num(l * r)
           case (Val.Num(l), Expr.BinaryOp.`/`, Val.Num(r)) =>
-            if (r == 0) Util.fail("division by zero", offset)
+            if (r == 0) Error.fail("division by zero", offset)
             Val.Num(l / r)
           case (Val.Num(l), Expr.BinaryOp.`%`, Val.Num(r)) => Val.Num(l % r)
           case (Val.Num(l), Expr.BinaryOp.`+`, Val.Num(r)) => Val.Num(l + r)
           case (Val.Str(l), Expr.BinaryOp.`%`, r) =>
             try Val.Str(Format.format(l, r, offset))
-            catch Util.tryCatchWrap(offset)
+            catch Error.tryCatchWrap(offset)
 
           case (Val.Str(l), Expr.BinaryOp.`+`, Val.Str(r)) => Val.Str(l + r)
           case (Val.Str(l), Expr.BinaryOp.`<`, Val.Str(r)) => Val.bool(l < r)
@@ -304,10 +312,10 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Str(l), Expr.BinaryOp.`>=`, Val.Str(r)) => Val.bool(l >= r)
           case (Val.Str(l), Expr.BinaryOp.`+`, r) =>
             try Val.Str(l + Materializer.stringify(r))
-            catch Util.tryCatchWrap(offset)
+            catch Error.tryCatchWrap(offset)
           case (l, Expr.BinaryOp.`+`, Val.Str(r)) =>
             try Val.Str(Materializer.stringify(l) + r)
-            catch Util.tryCatchWrap(offset)
+            catch Error.tryCatchWrap(offset)
           case (Val.Num(l), Expr.BinaryOp.`-`, Val.Num(r)) => Val.Num(l - r)
           case (Val.Num(l), Expr.BinaryOp.`<<`, Val.Num(r)) => Val.Num(l.toLong << r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`>>`, Val.Num(r)) => Val.Num(l.toLong >> r.toLong)
@@ -317,16 +325,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (Val.Num(l), Expr.BinaryOp.`>=`, Val.Num(r)) => Val.bool(l >= r)
           case (l, Expr.BinaryOp.`==`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Util.fail("cannot test equality of functions", offset)
+              Error.fail("cannot test equality of functions", offset)
             }
             try Val.bool(Materializer(l) == Materializer(r))
-            catch Util.tryCatchWrap(offset)
+            catch Error.tryCatchWrap(offset)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Util.fail("cannot test equality of functions", offset)
+              Error.fail("cannot test equality of functions", offset)
             }
             try Val.bool(Materializer(l) != Materializer(r))
-            catch Util.tryCatchWrap(offset)
+            catch Error.tryCatchWrap(offset)
           case (Val.Str(l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(o.containsKey(l))
           case (Val.Num(l), Expr.BinaryOp.`&`, Val.Num(r)) => Val.Num(l.toLong & r.toLong)
           case (Val.Num(l), Expr.BinaryOp.`^`, Val.Num(r)) => Val.Num(l.toLong ^ r.toLong)
@@ -334,7 +342,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(l)
           case (Val.Arr(l), Expr.BinaryOp.`+`, Val.Arr(r)) => Val.Arr(l ++ r)
           case (l, op, r) =>
-            Util.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", offset)
+            Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", offset)
         }
     }
   }
@@ -346,7 +354,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       case FieldName.Dyn(k) => visitExpr(k) match{
         case Val.Str(k1) => Some(k1)
         case Val.Null => None
-        case x => Util.fail(
+        case x => Error.fail(
           s"Field name must be string or null, not ${x.prettyName}",
           offset
         )
@@ -372,13 +380,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           (
             b.name,
             (self: Option[Val.Obj], sup: Option[Val.Obj]) =>
-              Lazy(visitExpr(b.rhs)(scope(self, sup), implicitly))
+              Val.Lazy(visitExpr(b.rhs)(scope(self, sup), implicitly))
           )
         case Some(argSpec) =>
           (
             b.name,
             (self: Option[Val.Obj], sup: Option[Val.Obj]) =>
-              Lazy(visitMethod(b.rhs, argSpec, b.offset)(scope(self, sup), implicitly))
+              Val.Lazy(visitMethod(b.rhs, argSpec, b.offset)(scope(self, sup), implicitly))
 
           )
       }
@@ -397,9 +405,9 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
             if (visitExpr(value)(newScope, fileScope) != Val.True) {
               msg match{
-                case None => Util.fail("Assertion failed", value.offset)
+                case None => Error.fail("Assertion failed", value.offset)
                 case Some(msg) =>
-                  Util.fail(
+                  Error.fail(
                     "Assertion failed: " + visitExpr(msg)(newScope, implicitly).cast[Val.Str].value,
                     value.offset
                   )
@@ -493,7 +501,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           s <- scopes
           e <- visitExpr(expr)(s, implicitly) match{
             case Val.Arr(value) => value
-            case r => Util.fail(
+            case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
               expr.offset
             )

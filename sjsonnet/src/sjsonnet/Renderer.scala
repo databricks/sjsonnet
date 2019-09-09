@@ -4,36 +4,6 @@ import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 import ujson.BaseRenderer
-class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
-                     indent: Int = -1) extends BaseRenderer(out, indent){
-
-  override def visitNull(index: Int) = {
-    flushBuffer()
-    out.append("None")
-    out
-  }
-
-  override def visitFalse(index: Int) = {
-    flushBuffer()
-    out.append("False")
-    out
-  }
-
-  override def visitTrue(index: Int) = {
-    flushBuffer()
-    out.append("True")
-    out
-  }
-
-  override val colonSnippet = ": "
-  override def flushBuffer() = {
-    if (commaBuffered) {
-      commaBuffered = false
-      out.append(", ")
-      renderIndent()
-    }
-  }
-}
 
 /**
   * Custom JSON renderer to try and match the behavior of google/jsonnet's
@@ -241,6 +211,38 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
     }
   }
 }
+
+class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
+                     indent: Int = -1) extends BaseRenderer(out, indent){
+
+  override def visitNull(index: Int) = {
+    flushBuffer()
+    out.append("None")
+    out
+  }
+
+  override def visitFalse(index: Int) = {
+    flushBuffer()
+    out.append("False")
+    out
+  }
+
+  override def visitTrue(index: Int) = {
+    flushBuffer()
+    out.append("True")
+    out
+  }
+
+  override val colonSnippet = ": "
+  override def flushBuffer() = {
+    if (commaBuffered) {
+      commaBuffered = false
+      out.append(", ")
+      renderIndent()
+    }
+  }
+}
+
 
 object RenderUtils {
   /**

@@ -1,5 +1,16 @@
 package sjsonnet
 
+/**
+  * Minimal re-implementation of Python's `%` formatting logic, since Jsonnet's
+  * `%` formatter is basically "do whatever python does", with a link to:
+  *
+  * - https://docs.python.org/2/library/stdtypes.html#string-formatting
+  *
+  * Parses the formatted strings into a sequence of literal strings separated
+  * by `%` interpolations modelled as structured [[Format.FormatSpec]]s, and
+  * use those to decide how to inteprolate the provided Jsonnet [[Val]]s into
+  * the final string.
+  */
 object Format{
   case class FormatSpec(label: Option[String],
                         alternate: Boolean,
@@ -71,7 +82,7 @@ object Format{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(Seq(Lazy(x)))
+      case x => Val.Arr(Seq(Val.Lazy(x)))
     }
     val (leading, chunks) = fastparse.parse(s, format(_)).get.value
     val output = new StringBuilder

@@ -3,9 +3,12 @@ package sjsonnet
 import java.io.{PrintWriter, StringWriter}
 
 import fastparse.Parsed
-import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.{FieldName, Member, ObjBody, Params}
+import sjsonnet.Expr.Params
 
+/**
+  * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
+  * evaluation to materialization, into a convenient wrapper class.
+  */
 class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
@@ -58,7 +61,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
       json <-
         try Right(Materializer.apply0(res, visitor)(evaluator))
         catch{
-          case DelegateError(msg) => Left(msg)
+          case Error.Delegate(msg) => Left(msg)
           case e: Throwable =>
             val s = new StringWriter()
             val p = new PrintWriter(s)
