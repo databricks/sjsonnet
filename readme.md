@@ -216,3 +216,37 @@ To publish, run the following commands:
 ./mill -i show sjsonnet[2.13.0].js.fullOpt
 ./mill -i show sjsonnet[2.13.0].jvm.assembly
 ```
+
+## Changelog
+
+### 0.1.6
+
+- ~2x performance increase
+
+### 0.1.5
+
+- Javascript support, allowing Sjsonnet to be used in the browser or on
+  Node.js
+- Performance improvements
+
+### 0.1.4
+
+- Scala 2.13 support
+- Performance improvements
+
+### 0.1.3
+
+- Add `std.mod`, `std.min` and `std.max`
+- Performance improvements
+
+### 0.1.2
+
+- Improvements to error reporting when types do not match
+
+### 0.1.1
+
+- Performance improvements to the parser via upgrading to Fastparse 2.x
+
+### 0.1.0
+
+- First release
