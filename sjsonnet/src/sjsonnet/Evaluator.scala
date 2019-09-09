@@ -5,6 +5,8 @@ import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
 
+import scala.collection.mutable
+
 /**
   * Recursively walks the [[Expr]] trees to convert them into into [[Val]]
   * objects that can be materialized to JSON.
@@ -15,16 +17,17 @@ import ujson.Value
   * `parseCache`.
   */
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
-                extVars: Map[String, ujson.Value],
-                wd: Path,
-                importer: (Path, String) => Option[(Path, String)]) extends EvalScope(extVars, wd){
+                val extVars: Map[String, ujson.Value],
+                val wd: Path,
+                importer: (Path, String) => Option[(Path, String)]) extends EvalScope{
   implicit def evalScope: EvalScope = this
 
-  override def materialize(v: Val): Value = {
-    Materializer.apply(v)
-  }
-  val imports = collection.mutable.Map.empty[Path, Val]
-  val importStrs = collection.mutable.Map.empty[Path, String]
+  val loadedFileContents = mutable.Map.empty[Path, String]
+  def loadCachedSource(p: Path) = loadedFileContents.get(p)
+  def materialize(v: Val): Value = Materializer.apply(v)
+  val cachedImports = collection.mutable.Map.empty[Path, Val]
+
+  val cachedImportedStrings = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr)
                (implicit scope: ValScope, fileScope: FileScope): Val = try expr match{
     case Null(offset) => Val.Null
@@ -221,12 +224,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitImportStr(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
     val (p, str) = resolveImport(value, offset)
-    Val.Str(importStrs.getOrElseUpdate(p, str))
+    Val.Str(cachedImportedStrings.getOrElseUpdate(p, str))
   }
 
   def visitImport(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
     val (p, str) = resolveImport(value, offset)
-    imports.getOrElseUpdate(
+    loadedFileContents(p) = str
+    cachedImports.getOrElseUpdate(
       p,
       {
         val (doc, nameIndices) = parseCache.getOrElseUpdate(

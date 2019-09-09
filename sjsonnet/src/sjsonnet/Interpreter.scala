@@ -19,7 +19,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
     parseCache,
     extVars,
     wd,
-    importer,
+    importer
   )
 
   def interpret(txt: String, path: Path): Either[String, ujson.Value] = {
@@ -34,6 +34,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         case Parsed.Success(r, index) => Right(r)
       }
       (parsed, nameIndices) = res
+      _ = evaluator.loadedFileContents(path) = txt
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(

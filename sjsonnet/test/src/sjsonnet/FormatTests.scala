@@ -6,18 +6,14 @@ import utest._
 object FormatTests extends TestSuite{
   def check(fmt: String, jsonStr: String, expected: String) = {
     val json = ujson.read(jsonStr)
-    val formatted = Format.format(
-      fmt,
-      Materializer.reverse(json),
-      -1
-    )(
-      new FileScope(
-        DummyPath("(unknown)"),
-        Map.empty
-      ),
-      new EvalScope(Map(), DummyPath()){
-        override def visitExpr(expr: Expr)(implicit scope: ValScope, fileScope: FileScope): Val = ???
-        override def materialize(v: Val): Value = ???
+    val formatted = Format.format(fmt, Materializer.reverse(json), -1)(
+      new FileScope(DummyPath("(unknown)"), Map.empty),
+      new EvalScope{
+        def extVars: Map[String, Value] = Map()
+        def loadCachedSource(p: Path): Option[String] = None
+        def wd: Path = DummyPath()
+        def visitExpr(expr: Expr)(implicit scope: ValScope, fileScope: FileScope): Val = ???
+        def materialize(v: Val): Value = ???
       }
     )
     assert(formatted == expected)
