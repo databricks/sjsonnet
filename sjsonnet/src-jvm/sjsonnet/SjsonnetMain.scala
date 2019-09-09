@@ -64,8 +64,8 @@ object SjsonnetMain {
       outputStr <- {
         if (config.interactive){
           Left("error: -i/--interactive must be passed in as the first argument")
-        }else if (rest.nonEmpty) {
-          Left("error: Unknown arguments: " + rest.mkString(" "))
+        }else if (leftover.nonEmpty) {
+          Left("error: Unknown arguments: " + leftover.mkString(" "))
         }else mainConfigured(
           file, config, parseCache, stdin, stdout, stderr, wd, allowedInputs, importer
         )
