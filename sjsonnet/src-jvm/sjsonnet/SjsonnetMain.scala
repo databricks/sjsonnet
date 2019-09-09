@@ -157,7 +157,7 @@ object SjsonnetMain {
           case Some(f) =>
             for{
               materializedStr <- materialized
-              _ <- writeFile(f, materializedStr.toString)
+              _ <- writeFile(os.RelPath(f), materializedStr.toString)
             } yield ""
 
         }

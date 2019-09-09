@@ -137,7 +137,8 @@ object Cli{
     val leftMargin = genericSignature(wd).map(showArg(_).length).max + 2
 
 
-    s"""usage: sjsonnet [sjsonnet-options] script-file
+    s"""Sjsonnet ${sjsonnet.Version.version}
+       |usage: sjsonnet  [sjsonnet-options] script-file
        |
        |${formatBlock(genericSignature(wd), leftMargin).mkString("\n")}
     """.stripMargin

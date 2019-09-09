@@ -140,7 +140,6 @@ object Format{
       formatted,
       if (s < 0) "-" else "", "",
       sjsonnet.DecimalFormat.format(
-        1,
         maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
         None,
         math.abs(s)
@@ -190,7 +189,6 @@ object Format{
         formatted,
         if (s < 0) "-" else "", "",
         sjsonnet.DecimalFormat.format(
-          1,
           maybeDecimalPoint(formatted, if (formatted.alternate)(precision - 1, 0) else (0, precision - 1)),
           Some(2),
           math.abs(s)
@@ -204,7 +202,6 @@ object Format{
         formatted,
         if (s < 0) "-" else "", "",
         sjsonnet.DecimalFormat.format(
-          leadingPrecision,
           maybeDecimalPoint(formatted, if (formatted.alternate) (trailingPrecision, 0) else (0, trailingPrecision)),
           None,
           math.abs(s)
@@ -221,7 +218,6 @@ object Format{
       formatted,
       if (s < 0) "-" else "", "",
       sjsonnet.DecimalFormat.format(
-        1,
         maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
         Some(2),
         math.abs(s)

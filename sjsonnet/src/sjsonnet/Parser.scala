@@ -307,7 +307,6 @@ object Parser{
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
-      println("FAIL")
       Fail.opaque("no positional params after named params")
     } else Pass(Expr.Args(x.toArray[(Option[String], Expr)]))
   }

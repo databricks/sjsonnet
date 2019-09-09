@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
-val sjsonnetVersion = "0.1.5"
+val sjsonnetVersion = "0.1.6"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
@@ -24,6 +24,17 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     )
     def publishVersion = sjsonnetVersion
 
+    def generatedSources = T{
+      os.write(
+        T.ctx().dest / "Version.scala",
+        s"""package sjsonnet
+           |object Version{
+           |  val version = ${pprint.Util.literalize(sjsonnetVersion)}
+           |}
+           |""".stripMargin
+      )
+      Seq(PathRef(T.ctx().dest / "Version.scala"))
+    }
     def pomSettings = PomSettings(
       description = artifactName(),
       organization = "com.lihaoyi",

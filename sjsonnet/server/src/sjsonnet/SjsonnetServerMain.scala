@@ -6,7 +6,7 @@ import java.net.Socket
 
 import scala.collection.JavaConverters._
 import org.scalasbt.ipcsocket._
-import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util}
+import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util => ClientUtil}
 import sun.misc.{Signal, SignalHandler}
 
 trait SjsonnetServerMain[T]{
@@ -22,7 +22,7 @@ trait SjsonnetServerMain[T]{
             wd: os.Path): (Boolean, Option[T])
 }
 
-object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[String, fastparse.Parsed[Expr]]]{
+object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]]{
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
@@ -43,7 +43,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[Stri
     ).run()
   }
   def main0(args: Array[String],
-            stateCache: Option[collection.mutable.Map[String, fastparse.Parsed[Expr]]],
+            stateCache: Option[collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]],
             mainInteractive: Boolean,
             stdin: InputStream,
             stdout: PrintStream,
@@ -53,7 +53,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.Map[Stri
             wd: os.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
-      val p = collection.mutable.Map[String, fastparse.Parsed[Expr]]()
+      val p = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
       this.stateCache = Some(p)
       p
     }
@@ -95,8 +95,8 @@ class Server[T](lockBase: String,
       var running = true
       while (running) {
         Server.lockBlock(locks.serverLock){
-          val (serverSocket, socketClose) = if (Util.isWindows) {
-            val socketName = Util.WIN32_PIPE_PREFIX + new File(lockBase).getName
+          val (serverSocket, socketClose) = if (ClientUtil.isWindows) {
+            val socketName = ClientUtil.WIN32_PIPE_PREFIX + new File(lockBase).getName
             (new Win32NamedPipeServerSocket(socketName), () => new Win32NamedPipeSocket(socketName).close())
           } else {
             val socketName = lockBase + "/io"
@@ -136,15 +136,15 @@ class Server[T](lockBase: String,
     val socketIn = clientSocket.getInputStream
     val argStream = new FileInputStream(lockBase + "/run")
     val interactive = argStream.read() != 0
-    val clientSjsonnetVersion = Util.readString(argStream)
+    val clientSjsonnetVersion = ClientUtil.readString(argStream)
     val serverSjsonnetVersion = sys.props("SJSONNET_VERSION")
     if (clientSjsonnetVersion != serverSjsonnetVersion) {
       stdout.println(s"Sjsonnet version changed ($serverSjsonnetVersion -> $clientSjsonnetVersion), re-starting server")
       System.exit(0)
     }
-    val wd = Util.readString(argStream)
-    val args = Util.parseArgs(argStream)
-    val env = Util.parseMap(argStream)
+    val wd = ClientUtil.readString(argStream)
+    val args = ClientUtil.parseArgs(argStream)
+    val env = ClientUtil.parseMap(argStream)
     argStream.close()
 
     @volatile var done = false
@@ -186,7 +186,7 @@ class Server[T](lockBase: String,
     t.interrupt()
     t.stop()
 
-    if (Util.isWindows) {
+    if (ClientUtil.isWindows) {
       // Closing Win32NamedPipeSocket can often take ~5s
       // It seems OK to exit the client early and subsequently
       // start up sjsonnet client again (perhaps closing the server

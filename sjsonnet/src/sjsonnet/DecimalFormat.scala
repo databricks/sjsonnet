@@ -33,19 +33,18 @@ object DecimalFormat {
       (n + "0" * (minWidth - nWidth)).take(maxWidth)
     }
   }
-  def format(wholeLength: Int, fracLengthOpt: Option[(Int, Int)], expLengthOpt: Option[Int], number: Double): String = {
-
+  def format(fracLengthOpt: Option[(Int, Int)], expLengthOpt: Option[Int], number: Double): String = {
     expLengthOpt match{
       case Some(expLength) =>
-        val roundLog10 = Math.ceil(Math.log10(Math.abs(number))).toInt
-        val expNum = roundLog10 - wholeLength
+        val roundLog10 = Math.ceil(Math.log10(Math.abs(number))).toLong
+        val expNum = roundLog10 - 1
         val scaled = number / math.pow(10, expNum)
-        val prefix = leftPad(scaled.toInt, wholeLength)
+        val prefix = scaled.toLong.toString
         val expFrag = leftPad(expNum, expLength)
         val fracFrag = fracLengthOpt.map{case (zeroes, hashes) =>
           if (zeroes == 0 && hashes == 0) ""
           else {
-            val divided = (number / Math.pow(10, expNum - zeroes - hashes))
+            val divided = number / Math.pow(10, expNum - zeroes - hashes)
             val scaledFrac = divided % Math.pow(10, zeroes + hashes)
             rightPad(Math.abs(Math.round(scaledFrac)), zeroes, zeroes + hashes)
           }
@@ -56,20 +55,28 @@ object DecimalFormat {
           case Some("") => if (fracLengthOpt.contains((0, 0))) prefix + ".E" + expFrag else prefix + "E" + expFrag
           case Some(frac) => prefix + "." + frac + "E" + expFrag
         }
+
       case None =>
-        val prefix = leftPad(number.toInt, wholeLength)
+        val prefix = number.toLong.toString
         val fracFrag = fracLengthOpt.map { case (zeroes, hashes) =>
-          val fracNum = Math.round(number * math.pow(10, zeroes + hashes)) % math.pow(10, zeroes + hashes).toLong
-          rightPad(fracNum, zeroes, zeroes + hashes)
+          var fracNum = Math.round(number * math.pow(10, zeroes + hashes)) % math.pow(10, zeroes + hashes).toLong
+
+          if (fracNum == 0 && zeroes == 0) ""
+          else {
+            var n = 0
+            while(n < hashes && fracNum % 10 == 0 && fracNum != 0) {
+              fracNum /= 10
+              n += 1
+            }
+            leftPad(fracNum, zeroes + hashes - n)
+          }
         }
+
         fracFrag match{
           case None  => prefix
           case Some("") => if (fracLengthOpt.contains((0, 0))) prefix + "." else prefix
           case Some(frac) => prefix + "." + frac
         }
-
     }
-
   }
-
 }

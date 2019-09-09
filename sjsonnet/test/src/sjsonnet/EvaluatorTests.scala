@@ -285,5 +285,20 @@ object EvaluatorTests extends TestSuite{
     test("stdToString"){
       eval("""std.toString({k: "v"})""") ==> ujson.Str("""{"k": "v"}""")
     }
+    test("floatFormatRegression"){
+      eval("'%.4f' % 0.01") ==> ujson.Str("0.0100")
+      eval("'%05d' % 2") ==> ujson.Str("00002")
+      eval("'%000d' % 2") ==> ujson.Str("2")
+      eval("'%000d' % 2.123") ==> ujson.Str("2")
+      eval("'%5d' % 2") ==> ujson.Str("    2")
+      eval("'%5f' % 2") ==> ujson.Str("2.000000")
+
+      eval("'%10d' % 2.123") ==> ujson.Str("         2")
+      eval("'%+5.5f' % 123.456") ==> ujson.Str("+123.45600")
+      eval("'%+5.5f' % -123.456") ==> ujson.Str("-123.45600")
+      eval("'% 5.5f' % -123.456") ==> ujson.Str("-123.45600")
+      eval("'%--+5.5f' % -123.456") ==> ujson.Str("-123.45600")
+      eval("'%#-0- + 5.5f' % -123.456") ==> ujson.Str("-123.45600")
+    }
   }
 }
