@@ -45,20 +45,24 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 20000){
+    while(System.currentTimeMillis() - start < 20000000){
       count += 1
-      for(name <- names){
+      for(name <- Seq(
+        "kube-config/sentry/dev/sentry.jsonnet",
+        "kubernetes/config/prometheus/prom-jobs/prod/azure/westus/prometheus.jsonnet",
+        "kube-config/shard/multitenant/aws/dev/us-west-2/shard.jsonnet"
+      )){
 
 //        println(name)
 //
 //        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
-        val path = FileTests.testSuiteRoot / s"$name.jsonnet"
+        val path = os.pwd / os.up / "universe" / os.RelPath(name)
         val interp = new Interpreter(
           parseCache,
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),
-          SjsonnetMain.resolveImport(Nil, None)
+          SjsonnetMain.resolveImport(Array(OsPath(os.pwd / os.up / "universe")), None)
         )
         val res = interp.interpret(os.read(path), OsPath(path))
         assert(res.isRight)

@@ -321,8 +321,18 @@ object ValScope{
 
 /**
   * [[ValScope]]s which model the lexical scopes within
-  * * a Jsonnet file that bind variable names to [[Val]]s, as well as other
-  * * contextual information like `self` `this` or `super`.
+  * a Jsonnet file that bind variable names to [[Val]]s, as well as other
+  * contextual information like `self` `this` or `super`.
+  *
+  * Note that scopes are standalone, and nested scopes are done by copying
+  * and updating the array of bindings rather than using a linked list. This
+  * is because the bindings array is typically pretty small and the constant
+  * factor overhead from a cleverer data structure dominates any algorithmic
+  * improvements
+  *
+  * The bindings array is private and only copy-on-write, so for nested scopes
+  * which do not change it (e.g. those just updating `dollar0` or `self0`) the
+  * bindings array can be shared cheaply.
   */
 class ValScope(val dollar0: Option[Val.Obj],
                val self0: Option[Val.Obj],
