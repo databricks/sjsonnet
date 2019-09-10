@@ -342,6 +342,19 @@ object Parser{
 
   def document[_: P]: P[(Expr, Map[String, Int])] = P( expr ~  Pass(P.current.misc.toMap.asInstanceOf[Map[String, Int]]) ~ End )
 
+  /**
+    * We assign local identifier names to integer offsets into a local variable
+    * array at parse time, to avoid having to make a separate pass over the AST
+    * to replace them. This is sub-optimal, since we do not keep track of the
+    * fact that identifiers in unrelated scopes could share slots in the array,
+    * but it's good enough for now since the number of local variables in a
+    * particular file tends to be pretty small.
+    *
+    * We do not bother releasing a slot when backtracking after a parse fails,
+    * because this parser uses cuts to aggressively prevent backtracking.
+    *
+    * The Jsonnet standard library `std` always lives at slot 0.
+    */
   def indexFor[_: P](name: String): Int = {
     P.current.misc("std") = 0
     P.current.misc.get(name) match{

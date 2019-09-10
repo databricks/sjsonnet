@@ -153,16 +153,35 @@ this blog post for more details:
 
 - [Writing a Faster Jsonnet Compiler](https://databricks.com/blog/2018/10/12/writing-a-faster-jsonnet-compiler.html)
 
+Here's the latest set of benchmarks I've run comparing Sjsonnet against
+google/jsonnet and google/go-jsonnet, measuring the time taken to  
+evaluate the `test_suite/` folder (smaller is better):
+
+|              | Sjsonnet 0.1.5 | Sjsonnet 0.1.6 |
+|:-------------|---------------:|---------------:|
+| Scala 2.13.0 | 14.26ms ± 0.22 |  6.59ms ± 0.27 |
+| Scala 2.12.8 | 18.07ms ± 0.30	|  9.29ms ± 0.26 |
+
+| google/jsonnet | google/go-jsonnet |
+|---------------:|------------------:|
+|         ~1277ms|             ~274ms|
+
+google/jsonnet was built from source on commit
+f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
+`go get`ed at version ` v0.13.0`. You can see the source code of the
+benchmark in  
+[SjsonnetTestMain.scala](https://github.com/databricks/sjsonnet/blob/master/sjsonnet/test/src-jvm/sjsonnet/SjsonnetTestMain.scala)
+
 ## Laziness
 
-The Jsonnet language is *lazy*: expressions don't get evaluated unless their
-value is needed, and thus even erroneous expressions do not cause a failure if
-un-used. This is represented in the Sjsonnet codebase by `sjsonnet.Lazy`: a
-wrapper type that encapsulates an arbitrary computation that returns a
-`sjsonnet.Val`.
+The Jsonnet language is *lazy*: expressions don't get evaluated unless
+their value is needed, and thus even erroneous expressions do not cause
+a failure if un-used. This is represented in the Sjsonnet codebase by
+`sjsonnet.Val.Lazy`: a wrapper type that encapsulates an arbitrary
+computation that returns a `sjsonnet.Val`.
 
-`sjsonnet.Lazy` is used in several places, representing where laziness is
-present in the language:
+`sjsonnet.Val.Lazy` is used in several places, representing where
+laziness is present in the language:
 
 - Inside `sjsonnet.Scope`, representing local variable name bindings
 

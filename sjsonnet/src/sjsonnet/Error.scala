@@ -82,7 +82,9 @@ object Error {
 
 /**
   * FileScope models the per-file context that is propagated throughout the
-  * evaluation of a single Jsonnet file
+  * evaluation of a single Jsonnet file. Contains the current file path, as
+  * well as the mapping of local variable names to local variable array indices
+  * which is shared throughout each file.
   */
 class FileScope(val currentFile: Path,
                 val nameIndices: Map[String, Int]){
