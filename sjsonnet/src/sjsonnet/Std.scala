@@ -8,7 +8,7 @@ import sjsonnet.Expr.Params
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
-import com.google.re2j.{Matcher, Pattern}
+import com.google.re2j.{Matcher, Pattern, RE2}
 
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
@@ -687,6 +687,7 @@ object Std {
     },
     builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
       Matcher.quoteReplacement(str)
+      //RE2.quoteMeta(str)
     },
     builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
       Pattern.compile(pattern).matcher(str).replaceFirst(to)

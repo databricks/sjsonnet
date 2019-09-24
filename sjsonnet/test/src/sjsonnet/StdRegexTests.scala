@@ -18,11 +18,12 @@ object StdRegexTests extends TestSuite{
   def tests = Tests{
     test("stdRegex") {
       eval("std.regexFullMatch('ab.*c', 'abxyzc')") ==> ujson.True
-//      eval("std.pow(x=2, n=3)") ==> ujson.Num(8)
-//      eval("std.pow(n=3, x=2)") ==> ujson.Num(8)
-//      eval("({a:: 1} + {a+:::2}).a") ==> ujson.Num(3)
-//      eval("(std.prune({a:: 1}) + {a+:::2}).a") ==> ujson.Num(2)
-//      eval("std.toString(std.mapWithIndex(function(idx, elem) elem, [2,1,0]))") ==> ujson.Str("[2, 1, 0]")
+      eval("std.regexFullMatch('ab.*c', 'abxyz')") ==> ujson.False
+      eval("std.regexPartialMatch('.*[aeiou]', 'abcdefgh')") ==> ujson.True
+      eval("std.regexPartialMatch('.*[aeiou]', 'xyz')") ==> ujson.False
+//      eval("std.regexQuoteMeta('foo\\\\.\\\\$')") ==> ujson.Str("foo\\\\\\\\\\\\.\\\\\\\\\\\\$")
+      eval("std.regexReplace('abcdabc', '^[a-c]*', 'x')") ==> ujson.Str("xdabc")
+      eval("std.regexGlobalReplace('abcdabc', '[a-c]', 'x')") ==> ujson.Str("xxxdxxx")
     }
   }
 }
