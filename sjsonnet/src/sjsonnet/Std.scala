@@ -8,6 +8,7 @@ import sjsonnet.Expr.Params
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
+import com.google.re2j.{Matcher, Pattern}
 
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
@@ -676,6 +677,25 @@ object Std {
         scope.bindings(1).get.force
       }
     ),
+
+    //Regex functions as described in this PR: https://github.com/google/jsonnet/pull/665
+    builtin("regexFullMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
+      Pattern.matches(pattern, str)
+    },
+    builtin("regexPartialMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
+      Pattern.compile(pattern).matcher(str).find()
+    },
+    builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
+      Matcher.quoteReplacement(str)
+    },
+    builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
+      Pattern.compile(pattern).matcher(str).replaceFirst(to)
+    },
+    builtin("regexGlobalReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
+      Pattern.compile(pattern).matcher(str).replaceAll(to)
+    },
+    //////////////////////////////////////////////////////////////
+
     "extVar" -> Val.Func(
       None,
       Params(Array(("x", None, 0))),
