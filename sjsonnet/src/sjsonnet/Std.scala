@@ -686,8 +686,7 @@ object Std {
       Pattern.compile(pattern).matcher(str).find()
     },
     builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
-      Matcher.quoteReplacement(str)
-      //RE2.quoteMeta(str)
+      Pattern.quote(str)
     },
     builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
       Pattern.compile(pattern).matcher(str).replaceFirst(to)

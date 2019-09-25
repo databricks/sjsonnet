@@ -21,7 +21,7 @@ object StdRegexTests extends TestSuite{
       eval("std.regexFullMatch('ab.*c', 'abxyz')") ==> ujson.False
       eval("std.regexPartialMatch('.*[aeiou]', 'abcdefgh')") ==> ujson.True
       eval("std.regexPartialMatch('.*[aeiou]', 'xyz')") ==> ujson.False
-//      eval("std.regexQuoteMeta('foo\\\\.\\\\$')") ==> ujson.Str("foo\\\\\\\\\\\\.\\\\\\\\\\\\$")
+      eval("std.regexQuoteMeta('foo\\\\.\\\\$')") ==> ujson.Str("foo\\\\\\.\\\\\\$")
       eval("std.regexReplace('abcdabc', '^[a-c]*', 'x')") ==> ujson.Str("xdabc")
       eval("std.regexGlobalReplace('abcdabc', '[a-c]', 'x')") ==> ujson.Str("xxxdxxx")
     }
