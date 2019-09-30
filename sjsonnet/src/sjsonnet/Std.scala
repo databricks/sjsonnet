@@ -680,19 +680,19 @@ object Std {
 
     //Regex functions as described in this PR: https://github.com/google/jsonnet/pull/665
     builtin("regexFullMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
-      Pattern.matches(pattern, str)
+      Platform.patternMatches(pattern, str)
     },
     builtin("regexPartialMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
-      Pattern.compile(pattern).matcher(str).find()
+      Platform.patternFind(pattern, str)
     },
     builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
-      Pattern.quote(str)
+      Platform.patternQuote(str)
     },
     builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
-      Pattern.compile(pattern).matcher(str).replaceFirst(to)
+      Platform.patternReplaceFirst(pattern, str, to)
     },
     builtin("regexGlobalReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
-      Pattern.compile(pattern).matcher(str).replaceAll(to)
+      Platform.patternReplaceAll(pattern, str, to)
     },
     //////////////////////////////////////////////////////////////
 
