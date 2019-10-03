@@ -27,7 +27,9 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"com.github.scopt::scopt::3.7.1",
       ivy"org.scala-lang.modules::scala-collection-compat::2.0.0",
       ivy"com.google.re2j:re2j:1.3",
-      ivy"org.webjars.npm:re2:1.10.3"
+      ivy"org.webjars.npm:re2:1.10.3",
+//      ivy"com.lihaoyi::utest:0.7.1"
+//      ivy"com.lihaoyi::utest_sjs0.6:0.7.1"
     )
     def publishVersion = sjsonnetVersion
 
@@ -54,6 +56,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     )
     trait CrossTests extends ScalaModule with TestModule {
       def platformSegment = SjsonnetCrossModule.this.platformSegment
+      //def ivyDeps = Agg(ivy"com.lihaoyi::utest:0.7.1", ivy"com.lihaoyi::utest_sjs0.6:0.7.1")
       def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.1")
       def testFrameworks = Seq("utest.runner.Framework")
       def sources = T.sources(
@@ -67,14 +70,15 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     //def scalaJSVersion = "1.0.0-M8"
     def platformSegment = "js"
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"org.webjars.npm:re2:1.10.3",
+      ivy"org.webjars.npm:re2:1.10.3"
     )
     override def moduleKind = T(mill.scalajslib.api.ModuleKind.CommonJSModule)
 
     object test extends Tests with CrossTests {
+      override def testFrameworks = Seq("utest.runner.Framework")
       override def moduleKind = T(mill.scalajslib.api.ModuleKind.CommonJSModule)
-      def ivyDeps = super.ivyDeps() ++ Agg(
-        ivy"org.webjars.npm:re2:1.10.3",
+      override def ivyDeps = Agg(
+        ivy"org.webjars.npm:re2:1.10.3", ivy"com.lihaoyi::utest_sjs0.6:0.7.1"
       )
     }
   }
