@@ -589,16 +589,14 @@ object Std {
 
     },
 
-    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
-      val vs1 = Materializer(x)(ev)
-      val ujson.Arr(vs2) = Materializer(arr)(ev)
-      vs2.contains(vs1)
-    },
+//    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
+//      val vs1 = Materializer(x)(ev)
+//      val ujson.Arr(vs2) = Materializer(arr)(ev)
+//      vs2.contains(vs1)
+//    },
 
 
-    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" ->
-      Some(Expr.False(0))
-    ) { (args, ev) =>
+    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       val x = args("x")
       val arr = args("arr")
       val keyF = args("keyF")
@@ -606,10 +604,6 @@ object Std {
       val vs1 = Materializer(x)(ev)
       val ujson.Arr(vs2) = Materializer(arr)(ev)
 
-//      System.out.println("******* X is " + x)
-//      System.out.println("******* ARR is " + arr)
-//      System.out.println("******* keyF is " + keyF)
-//
       if (keyF == Val.False) {
         vs2.contains(vs1)
       } else {
@@ -621,7 +615,6 @@ object Std {
         breakable {
           vs2.foreach(value => {
             val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
-            //System.out.println("Value is " + appliedValue)
             if (appliedValue == appliedX) {
               found = true
               break
@@ -632,13 +625,6 @@ object Std {
       }
     },
 
-/*
-    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
-      val vs1 = Materializer(x)(ev)
-      val ujson.Arr(vs2) = Materializer(arr)(ev)
-      vs2.contains(vs1)
-    },
-*/
     builtin("split", "str", "c"){ (ev, fs, str: String, c: String) =>
       Val.Arr(str.split(java.util.regex.Pattern.quote(c), -1).map(s => Val.Lazy(Val.Str(s))))
     },
