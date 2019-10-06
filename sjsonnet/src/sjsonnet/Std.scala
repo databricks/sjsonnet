@@ -4,12 +4,14 @@ import java.io.StringWriter
 import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.{False, Params}
+import sjsonnet.Expr.{BinaryOp, False, Params}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
 import com.google.re2j.{Matcher, Pattern, RE2}
+import sjsonnet.Std.builtinWithDefaults
 import ujson.Value
+
 import util.control.Breaks._
 
 /**
@@ -505,6 +507,64 @@ object Std {
 
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
+
+    builtinWithDefaults("sort", "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
+      val arr = args("arr")
+
+      arr match{
+        case Val.Arr(vs) =>
+          Val.Arr(
+
+            if (vs.forall(_.force.isInstanceOf[Val.Str])){
+              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Val.Lazy(_))
+            }else if (vs.forall(_.force.isInstanceOf[Val.Num])) {
+              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Val.Lazy(_))
+            }else if (vs.forall(_.force.isInstanceOf[Val.Obj])){
+              val keyF = args("keyF")
+              if (keyF == Val.False) {
+                throw new Error.Delegate("Unable to sort array of objects without key function")
+              } else {
+                val keyFFunc = keyF.asInstanceOf[Val.Func]
+                val keyFApplyer = Applyer(keyFFunc, ev, null)
+                vs.map(_.force.cast[Val.Obj]).sortWith((o1, o2) => {
+                  val o1Key = keyFApplyer.apply(Val.Lazy(o1))
+                  val o2Key = keyFApplyer.apply(Val.Lazy(o2))
+                  val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))
+                  val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))
+
+                  val comparisonExpr = Expr.BinaryOp(0, o1KeyExpr, BinaryOp.`<`, o2KeyExpr)
+                  val exprResult = ev.visitExpr(comparisonExpr)(scope(0), new FileScope(null, Map.empty))
+                  val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]
+                  res.value
+                }).map(Val.Lazy(_))
+              }
+            }else {
+              ???
+            }
+          )
+        case Val.Str(s) => Val.Arr(s.sorted.map(c => Val.Lazy(Val.Str(c.toString))))
+        case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
+      }
+    },
+/*
+    builtin("sort", "arr"){ (ev, fs, arr: Val) =>
+      arr match{
+        case Val.Arr(vs) =>
+          Val.Arr(
+
+            if (vs.forall(_.force.isInstanceOf[Val.Str])){
+              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Val.Lazy(_))
+            }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
+              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Val.Lazy(_))
+            }else {
+              ???
+            }
+          )
+        case Val.Str(s) => Val.Arr(s.sorted.map(c => Val.Lazy(Val.Str(c.toString))))
+        case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
+      }
+    },
+ */
     builtin("set", "arr"){ (ev, fs, arr: Val.Arr) =>
       val ujson.Arr(vs0) = Materializer(arr)(ev)
       val vs =
@@ -521,6 +581,7 @@ object Std {
 
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
+
     builtin("setUnion", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
 
       val ujson.Arr(vs1) = Materializer(a)(ev)
