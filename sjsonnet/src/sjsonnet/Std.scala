@@ -4,11 +4,13 @@ import java.io.StringWriter
 import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.Params
+import sjsonnet.Expr.{False, Params}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
 import com.google.re2j.{Matcher, Pattern, RE2}
+import ujson.Value
+import util.control.Breaks._
 
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
@@ -586,11 +588,57 @@ object Std {
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
 
     },
+
     builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
       val vs1 = Materializer(x)(ev)
       val ujson.Arr(vs2) = Materializer(arr)(ev)
       vs2.contains(vs1)
     },
+
+
+    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" ->
+      Some(Expr.False(0))
+    ) { (args, ev) =>
+      val x = args("x")
+      val arr = args("arr")
+      val keyF = args("keyF")
+
+      val vs1 = Materializer(x)(ev)
+      val ujson.Arr(vs2) = Materializer(arr)(ev)
+
+//      System.out.println("******* X is " + x)
+//      System.out.println("******* ARR is " + arr)
+//      System.out.println("******* keyF is " + keyF)
+//
+      if (keyF == Val.False) {
+        vs2.contains(vs1)
+      } else {
+        var found = false;
+        val keyFFunc = keyF.asInstanceOf[Val.Func]
+        val keyFApplyer = Applyer(keyFFunc, ev, null)
+        val appliedX = keyFApplyer.apply(Val.Lazy(x))
+
+        breakable {
+          vs2.foreach(value => {
+            val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
+            //System.out.println("Value is " + appliedValue)
+            if (appliedValue == appliedX) {
+              found = true
+              break
+            }
+          })
+        }
+        found
+      }
+    },
+
+/*
+    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
+      val vs1 = Materializer(x)(ev)
+      val ujson.Arr(vs2) = Materializer(arr)(ev)
+      vs2.contains(vs1)
+    },
+*/
     builtin("split", "str", "c"){ (ev, fs, str: String, c: String) =>
       Val.Arr(str.split(java.util.regex.Pattern.quote(c), -1).map(s => Val.Lazy(Val.Str(s))))
     },
@@ -811,4 +859,15 @@ object Std {
       None, None, None, Array(Val.Lazy(Std)).padTo(size, null)
     )
   }
+
+
+  val paramData = Array("x").zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
+  val defaultFunc = Val.Func(
+    None,
+    Params(paramData),
+    {(scope, thisFile, ev, fs, outerOffset) =>
+      scope.bindings(0).get.force
+    }
+  )
+
 }
