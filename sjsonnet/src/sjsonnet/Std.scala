@@ -549,6 +549,14 @@ object Std {
     },
 */
 
+    builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
+      val ujson.Arr(a) = Materializer(args("a"))(ev)
+      val ujson.Arr(b) = Materializer(args("b"))(ev)
+
+      uniqArr(ev, sortArr(ev, Materializer.reverse(a ++ b), args("keyF")), args("keyF"))
+    },
+
+/*
     builtin("setUnion", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
 
       val ujson.Arr(vs1) = Materializer(a)(ev)
@@ -568,6 +576,8 @@ object Std {
 
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
+*/
+
     builtin("setInter", "a", "b"){ (ev, fs, a: Val, b: Val.Arr) =>
       val vs1 = Materializer(a)(ev) match{
         case ujson.Arr(vs1) => vs1

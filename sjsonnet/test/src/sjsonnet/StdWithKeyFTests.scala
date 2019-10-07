@@ -56,7 +56,6 @@ object StdWithKeyFTests extends TestSuite{
               std.setMember(testObj, arr, function(x) x.language.name)
         """) ==> ujson.True
     }
-
     test("stdSortWithKeyF") {
       eval("std.sort([\"c\", \"a\", \"b\"])").toString() ==> """["a","b","c"]"""
 
@@ -122,32 +121,6 @@ object StdWithKeyFTests extends TestSuite{
     test("stdSetWithKeyF") {
       eval("std.set([\"c\", \"c\", \"b\", \"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["a","b","c"]"""
 
-//      eval("""local arr = [
-//                {
-//                   "name": "Foo",
-//                   "language": {
-//                     "name": "Java",
-//                     "version": "1.8"
-//                   }
-//                 },
-//                 {
-//                   "name": "Bar",
-//                   "language": {
-//                     "name": "Java",
-//                     "version": "1.7"
-//                   }
-//                 },
-//                 {
-//                   "name": "FooBar",
-//                   "language": {
-//                     "name": "C++",
-//                     "version": "n/a"
-//                   }
-//                 }
-//              ];
-//
-//              std.uniq(arr, function(x) x.language.name)
-//        """).toString() ==> """[{"language":{"name":"Java","version":"1.8"},"name":"Foo"},{"language":{"name":"C++","version":"n/a"},"name":"FooBar"}]"""
       eval("""local arr = [
                 {
                    "name": "Foo",
@@ -174,8 +147,59 @@ object StdWithKeyFTests extends TestSuite{
 
               std.set(arr, function(x) x.language.name)
         """).toString() ==> """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"}]"""
-
     }
+    test("stdSetUnionWithKeyF") {
+      eval("std.setUnion([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["a","b","c"]"""
 
+      eval("""local arr1 = [
+                {
+                   "name": "Foo",
+                   "language": {
+                     "name": "Java",
+                     "version": "1.8"
+                   }
+                 },
+                 {
+                   "name": "Bar",
+                   "language": {
+                     "name": "Java",
+                     "version": "1.7"
+                   }
+                 },
+                 {
+                   "name": "FooBar",
+                   "language": {
+                     "name": "C++",
+                     "version": "n/a"
+                   }
+                 }
+              ];
+             local arr2 = [
+               {
+                  "name": "Foo",
+                  "language": {
+                    "name": "Java",
+                    "version": "12"
+                  }
+                },
+                {
+                  "name": "Bar",
+                  "language": {
+                    "name": "Scala",
+                    "version": "2.13"
+                  }
+                },
+                {
+                  "name": "FooBar",
+                  "language": {
+                    "name": "C++",
+                    "version": "n/a"
+                  }
+                }
+             ];
+             
+             std.setUnion(arr1, arr2, function(x) x.language.name)""").toString() ==>
+                """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"},{"language":{"name":"Scala","version":"2.13"},"name":"Bar"}]"""
+    }
   }
 }
