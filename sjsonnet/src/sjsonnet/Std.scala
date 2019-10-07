@@ -646,21 +646,14 @@ object Std {
       if (keyF == Val.False) {
         vs2.contains(vs1)
       } else {
-        var found = false;
         val keyFFunc = keyF.asInstanceOf[Val.Func]
         val keyFApplyer = Applyer(keyFFunc, ev, null)
         val appliedX = keyFApplyer.apply(Val.Lazy(x))
 
-        breakable {
-          vs2.foreach(value => {
-            val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
-            if (appliedValue == appliedX) {
-              found = true
-              break
-            }
-          })
-        }
-        found
+        !(vs2.forall(value => {
+          val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
+          appliedValue != appliedX
+        }))
       }
     },
 
