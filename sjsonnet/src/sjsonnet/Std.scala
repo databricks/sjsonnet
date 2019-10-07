@@ -490,65 +490,16 @@ object Std {
 
       uniqArr(ev, arr, keyF)
     },
-
-/*
-    builtin("uniq", "arr"){ (ev, fs, arr: Val.Arr) =>
-      val ujson.Arr(vs) = Materializer(arr)(ev)
-      val out = collection.mutable.Buffer.empty[ujson.Value]
-      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
-    },
-*/
-
     builtinWithDefaults("sort", "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
 
       sortArr(ev, arr, keyF)
     },
-/*
-    builtin("sort", "arr"){ (ev, fs, arr: Val) =>
-      arr match{
-        case Val.Arr(vs) =>
-          Val.Arr(
-
-            if (vs.forall(_.force.isInstanceOf[Val.Str])){
-              vs.map(_.force.cast[Val.Str]).sortBy(_.value).map(Val.Lazy(_))
-            }else if (vs.forall(_.force.isInstanceOf[Val.Num])){
-              vs.map(_.force.cast[Val.Num]).sortBy(_.value).map(Val.Lazy(_))
-            }else {
-              ???
-            }
-          )
-        case Val.Str(s) => Val.Arr(s.sorted.map(c => Val.Lazy(Val.Str(c.toString))))
-        case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
-      }
-    },
- */
 
     builtinWithDefaults("set", "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       uniqArr(ev, sortArr(ev, args("arr"), args("keyF")), args("keyF"))
     },
-/*
-    builtin("set", "arr"){ (ev, fs, arr: Val.Arr) =>
-      val ujson.Arr(vs0) = Materializer(arr)(ev)
-      val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Str])){
-          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
-          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
-        }else {
-          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
-        }
-
-      val out = collection.mutable.Buffer.empty[ujson.Value]
-      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
-    },
-*/
-
     builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       val a = args("a").asInstanceOf[Val.Arr].value
       val b = args("b").asInstanceOf[Val.Arr].value
@@ -556,29 +507,6 @@ object Std {
       val concat = Val.Arr(a ++ b)
       uniqArr(ev, sortArr(ev, concat, args("keyF")), args("keyF"))
     },
-
-/*
-    builtin("setUnion", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
-
-      val ujson.Arr(vs1) = Materializer(a)(ev)
-      val ujson.Arr(vs2) = Materializer(b)(ev)
-      val vs0 = vs1 ++ vs2
-      val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Str])){
-          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
-          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
-        }else {
-          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
-        }
-
-      val out = collection.mutable.Buffer.empty[ujson.Value]
-      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
-    },
-*/
-
     builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
 
       val a = args("a").asInstanceOf[Val.Arr].value
@@ -618,34 +546,6 @@ object Std {
 
       sortArr(ev, Val.Arr(out.toSeq), keyF)
     },
-
-/*
-    builtin("setInter", "a", "b"){ (ev, fs, a: Val, b: Val.Arr) =>
-      val vs1 = Materializer(a)(ev) match{
-        case ujson.Arr(vs1) => vs1
-        case x => Seq(x)
-      }
-      val ujson.Arr(vs2) = Materializer(b)(ev)
-
-
-      val vs0 = vs1.to(collection.mutable.LinkedHashSet)
-        .intersect(vs2.to(collection.mutable.LinkedHashSet))
-        .toSeq
-      val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Str])){
-          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
-          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
-        }else {
-          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
-        }
-
-      val out = collection.mutable.Buffer.empty[ujson.Value]
-      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
-    },
-*/
     builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
 
       val a = args("a").asInstanceOf[Val.Arr].value
@@ -685,39 +585,6 @@ object Std {
 
       sortArr(ev, Val.Arr(out.toSeq), keyF)
     },
-    /*
-    builtin("setDiff", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
-      val ujson.Arr(vs1) = Materializer(a)(ev)
-      val ujson.Arr(vs2) = Materializer(b)(ev)
-
-
-      val vs0 = vs1.to(collection.mutable.LinkedHashSet)
-        .diff(vs2.to(collection.mutable.LinkedHashSet))
-        .toSeq
-      val vs =
-        if (vs0.forall(_.isInstanceOf[ujson.Str])){
-          vs0.map(_.asInstanceOf[ujson.Str]).sortBy(_.value)
-        }else if (vs0.forall(_.isInstanceOf[ujson.Num])){
-          vs0.map(_.asInstanceOf[ujson.Num]).sortBy(_.value)
-        }else {
-          throw new Error.Delegate("Every element of the input must be of the same type, string or number")
-        }
-
-      val out = collection.mutable.Buffer.empty[ujson.Value]
-      for(v <- vs) if (out.isEmpty || out.last != v) out.append(v)
-
-      Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
-
-    },*/
-
-/*
-    builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
-      val vs1 = Materializer(x)(ev)
-      val ujson.Arr(vs2) = Materializer(arr)(ev)
-      vs2.contains(vs1)
-    },
-*/
-
     builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       val keyF = args("keyF")
 
@@ -1028,17 +895,4 @@ object Std {
       case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
     }
   }
-
-
-/*
-  val paramData = Array("x").zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
-  val defaultFunc = Val.Func(
-    None,
-    Params(paramData),
-    {(scope, thisFile, ev, fs, outerOffset) =>
-      scope.bindings(0).get.force
-    }
-  )
-*/
-
 }
