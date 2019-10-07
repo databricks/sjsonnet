@@ -550,10 +550,11 @@ object Std {
 */
 
     builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
-      val ujson.Arr(a) = Materializer(args("a"))(ev)
-      val ujson.Arr(b) = Materializer(args("b"))(ev)
+      val a = args("a").asInstanceOf[Val.Arr].value
+      val b = args("b").asInstanceOf[Val.Arr].value
 
-      uniqArr(ev, sortArr(ev, Materializer.reverse(a ++ b), args("keyF")), args("keyF"))
+      val concat = Val.Arr(a ++ b)
+      uniqArr(ev, sortArr(ev, concat, args("keyF")), args("keyF"))
     },
 
 /*
@@ -578,6 +579,47 @@ object Std {
     },
 */
 
+    builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
+
+      val a = args("a").asInstanceOf[Val.Arr].value
+      val b = args("b").asInstanceOf[Val.Arr].value
+
+      val keyF = args("keyF")
+      val out = collection.mutable.Buffer.empty[Val.Lazy]
+
+      for (v <- a) {
+        if (keyF == Val.False) {
+          val mv = Materializer.apply(v.force)(ev)
+          if (b.exists(value => {
+            val mValue = Materializer.apply(value.force)(ev)
+            mValue == mv
+          }) && !out.exists(value => {
+            val mValue = Materializer.apply(value.force)(ev)
+            mValue == mv
+          })) {
+            out.append(v)
+          }
+        } else {
+          val keyFFunc = keyF.asInstanceOf[Val.Func]
+          val keyFApplyer = Applyer(keyFFunc, ev, null)
+          val appliedX = keyFApplyer.apply(v)
+
+          if (b.exists(value => {
+            val appliedValue = keyFApplyer.apply(value)
+            appliedValue == appliedX
+          }) && !out.exists(value => {
+            val mValue = keyFApplyer.apply(value)
+            mValue == appliedX
+          })) {
+            out.append(v)
+          }
+        }
+      }
+
+      sortArr(ev, Val.Arr(out.toSeq), keyF)
+    },
+
+/*
     builtin("setInter", "a", "b"){ (ev, fs, a: Val, b: Val.Arr) =>
       val vs1 = Materializer(a)(ev) match{
         case ujson.Arr(vs1) => vs1
@@ -603,6 +645,47 @@ object Std {
 
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
     },
+*/
+    builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
+
+      val a = args("a").asInstanceOf[Val.Arr].value
+      val b = args("b").asInstanceOf[Val.Arr].value
+
+      val keyF = args("keyF")
+      val out = collection.mutable.Buffer.empty[Val.Lazy]
+
+      for (v <- a) {
+        if (keyF == Val.False) {
+          val mv = Materializer.apply(v.force)(ev)
+          if (!b.exists(value => {
+            val mValue = Materializer.apply(value.force)(ev)
+            mValue == mv
+          }) && !out.exists(value => {
+            val mValue = Materializer.apply(value.force)(ev)
+            mValue == mv
+          })) {
+            out.append(v)
+          }
+        } else {
+          val keyFFunc = keyF.asInstanceOf[Val.Func]
+          val keyFApplyer = Applyer(keyFFunc, ev, null)
+          val appliedX = keyFApplyer.apply(v)
+
+          if (!b.exists(value => {
+            val appliedValue = keyFApplyer.apply(value)
+            appliedValue == appliedX
+          }) && !out.exists(value => {
+            val mValue = keyFApplyer.apply(value)
+            mValue == appliedX
+          })) {
+            out.append(v)
+          }
+        }
+      }
+
+      sortArr(ev, Val.Arr(out.toSeq), keyF)
+    },
+    /*
     builtin("setDiff", "a", "b"){ (ev, fs, a: Val.Arr, b: Val.Arr) =>
       val ujson.Arr(vs1) = Materializer(a)(ev)
       val ujson.Arr(vs2) = Materializer(b)(ev)
@@ -625,7 +708,7 @@ object Std {
 
       Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
 
-    },
+    },*/
 
 /*
     builtin("setMember", "x", "arr"){ (ev, fs, x: Val, arr: Val.Arr) =>
@@ -636,22 +719,20 @@ object Std {
 */
 
     builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
-      val x = args("x")
-      val arr = args("arr")
       val keyF = args("keyF")
 
-      val vs1 = Materializer(x)(ev)
-      val ujson.Arr(vs2) = Materializer(arr)(ev)
-
       if (keyF == Val.False) {
-        vs2.contains(vs1)
+        val ujson.Arr(mArr) = Materializer(args("arr"))(ev)
+        val mx = Materializer(args("x"))(ev)
+        mArr.contains(mx)
       } else {
+        val x = Val.Lazy(args("x"))
+        val arr = args("arr").asInstanceOf[Val.Arr].value
         val keyFFunc = keyF.asInstanceOf[Val.Func]
         val keyFApplyer = Applyer(keyFFunc, ev, null)
-        val appliedX = keyFApplyer.apply(Val.Lazy(x))
-
-        vs2.exists(value => {
-          val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
+        val appliedX = keyFApplyer.apply(x)
+        arr.exists(value => {
+          val appliedValue = keyFApplyer.apply(value)
           appliedValue == appliedX
         })
       }
@@ -879,20 +960,22 @@ object Std {
   }
 
   def uniqArr(ev: EvalScope, arr: Val, keyF: Val) = {
-    val ujson.Arr(vs) = Materializer(arr)(ev)
-    val out = collection.mutable.Buffer.empty[ujson.Value]
-    for (v <- vs) {
-
+    val out = collection.mutable.Buffer.empty[Val.Lazy]
+    for (v <- arr.asInstanceOf[Val.Arr].value) {
       if (out.isEmpty) {
         out.append(v)
-      } else if (keyF == Val.False && out.last != v) {
-        out.append(v)
+      } else if (keyF == Val.False) {
+        val ol = Materializer.apply(out.last.force)(ev)
+        val mv = Materializer.apply(v.force)(ev)
+        if (ol != mv) {
+          out.append(v)
+        }
       } else if (keyF != Val.False) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
         val keyFApplyer = Applyer(keyFFunc, ev, null)
 
-        val o1Key = keyFApplyer.apply(Val.Lazy(Materializer.reverse(v)))
-        val o2Key = keyFApplyer.apply(Val.Lazy(Materializer.reverse(out.last)))
+        val o1Key = keyFApplyer.apply(v)
+        val o2Key = keyFApplyer.apply(out.last)
         val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))
         val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))
 
@@ -907,7 +990,7 @@ object Std {
       }
     }
 
-    Val.Arr(out.map(v => Val.Lazy(Materializer.reverse(v))).toSeq)
+    Val.Arr(out.toSeq)
   }
 
   def sortArr(ev: EvalScope, arr: Val, keyF: Val) = {
