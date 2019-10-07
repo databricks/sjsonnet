@@ -650,10 +650,10 @@ object Std {
         val keyFApplyer = Applyer(keyFFunc, ev, null)
         val appliedX = keyFApplyer.apply(Val.Lazy(x))
 
-        !(vs2.forall(value => {
+        vs2.exists(value => {
           val appliedValue = keyFApplyer.apply(Val.Lazy(Materializer.reverse(value)))
-          appliedValue != appliedX
-        }))
+          appliedValue == appliedX
+        })
       }
     },
 
