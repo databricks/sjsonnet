@@ -64,7 +64,7 @@ object Parser{
     case "r" => "\r"
     case "t" => "\t"
   }
-  def escape1[_: P] = P( "\\u" ~~ CharIn("0-9").repX(min=4, max=4).! ).map{
+  def escape1[_: P] = P( "\\u" ~~ CharIn("0-9a-fA-F").repX(min=4, max=4).! ).map{
     s => Integer.parseInt(s, 16).toChar.toString
   }
   def doubleString[_: P]: P[Seq[String]] =
