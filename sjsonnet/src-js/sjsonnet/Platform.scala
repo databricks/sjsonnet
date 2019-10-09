@@ -4,11 +4,6 @@ import scala.scalajs.js
 import scala.scalajs.js.RegExp
 import scala.scalajs.js.annotation.JSImport
 
-//@js.native
-//@JSGlobal("re2.RE2")
-//class RE2(pattern: String,flags: String) extends RegExp(pattern, flags) {
-//  def `match`(str: String): Boolean = js.native
-//}
 package re2 {
 
   @js.native
