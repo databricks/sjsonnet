@@ -327,6 +327,9 @@ std.assertEqual(std.base64Decode('SGVsbG8gV29ybGQ='), 'Hello World') &&
 std.assertEqual(std.base64Decode('SGVsbG8gV29ybA=='), 'Hello Worl') &&
 std.assertEqual(std.base64Decode(''), '') &&
 
+std.assertEqual(std.decodeUTF8([36, 194, 162, 224, 164, 185, 226, 130, 172, 240, 144, 141, 136]), '\u0024\u00a2\u0939\u20AC\uD800\uDF48') &&
+std.assertEqual(std.encodeUTF8('\u0024\u00a2\u0939\u20AC\uD800\uDF48'), [36, 194, 162, 224, 164, 185, 226, 130, 172, 240, 144, 141, 136]) &&
+
 std.assertEqual(std.sort([]), []) &&
 std.assertEqual(std.sort([1]), [1]) &&
 std.assertEqual(std.sort([1, 2]), [1, 2]) &&

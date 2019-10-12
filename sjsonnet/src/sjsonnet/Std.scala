@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.io.StringWriter
+import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
@@ -481,6 +482,13 @@ object Std {
     },
     builtin("base64DecodeBytes", "s"){ (ev, fs, s: String) =>
       Val.Arr(Base64.getDecoder().decode(s).map(i => Val.Lazy(Val.Num(i))))
+    },
+
+    builtin("encodeUTF8", "s"){ (ev, fs, s: String) =>
+      Val.Arr(s.getBytes(UTF_8).map(i => Val.Lazy(Val.Num(i & 0xff))))
+    },
+    builtin("decodeUTF8", "arr"){ (ev, fs, arr: Val.Arr) =>
+      new String(arr.value.map(_.force.cast[Val.Num].value.toByte).toArray, UTF_8)
     },
 
     builtinWithDefaults("uniq", "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
