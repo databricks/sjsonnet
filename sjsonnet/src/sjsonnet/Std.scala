@@ -14,6 +14,8 @@ import ujson.Value
 
 import util.control.Breaks._
 
+import com.google.re2j.{Matcher, Pattern, RE2}
+
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
@@ -712,6 +714,24 @@ object Std {
         scope.bindings(1).get.force
       }
     ),
+
+    //Regex functions as described in this PR: https://github.com/google/jsonnet/pull/665
+    builtin("regexFullMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
+      Platform.patternMatches(pattern, str)
+    },
+    builtin("regexPartialMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
+      Platform.patternFind(pattern, str)
+    },
+    builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
+      Platform.patternQuote(str)
+    },
+    builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
+      Platform.patternReplaceFirst(pattern, str, to)
+    },
+    builtin("regexGlobalReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
+      Platform.patternReplaceAll(pattern, str, to)
+    },
+    //////////////////////////////////////////////////////////////
 
     "extVar" -> Val.Func(
       None,
