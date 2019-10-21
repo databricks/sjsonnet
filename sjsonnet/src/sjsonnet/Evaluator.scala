@@ -109,7 +109,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                   else0: Option[Expr])
                  (implicit scope: ValScope,
                   fileScope: FileScope): Val = {
-    System.out.println("*** visiting IfElse")
     visitExpr(cond) match {
       case Val.True => visitExpr(then)
       case Val.False =>
