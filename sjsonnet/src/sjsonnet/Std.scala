@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.io.StringWriter
+import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
 import sjsonnet.Expr.Member.Visibility
@@ -8,7 +9,6 @@ import sjsonnet.Expr.{BinaryOp, False, Params}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.compat._
-import com.google.re2j.{Matcher, Pattern, RE2}
 import sjsonnet.Std.builtinWithDefaults
 import ujson.Value
 
@@ -484,6 +484,13 @@ object Std {
       Val.Arr(Base64.getDecoder().decode(s).map(i => Val.Lazy(Val.Num(i))))
     },
 
+    builtin("encodeUTF8", "s"){ (ev, fs, s: String) =>
+      Val.Arr(s.getBytes(UTF_8).map(i => Val.Lazy(Val.Num(i & 0xff))))
+    },
+    builtin("decodeUTF8", "arr"){ (ev, fs, arr: Val.Arr) =>
+      new String(arr.value.map(_.force.cast[Val.Num].value.toByte).toArray, UTF_8)
+    },
+
     builtinWithDefaults("uniq", "arr" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
@@ -501,16 +508,31 @@ object Std {
       uniqArr(ev, sortArr(ev, args("arr"), args("keyF")), args("keyF"))
     },
     builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
-      val a = args("a").asInstanceOf[Val.Arr].value
-      val b = args("b").asInstanceOf[Val.Arr].value
+      val a = args("a") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
+      val b = args("b") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
 
       val concat = Val.Arr(a ++ b)
       uniqArr(ev, sortArr(ev, concat, args("keyF")), args("keyF"))
     },
     builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
-
-      val a = args("a").asInstanceOf[Val.Arr].value
-      val b = args("b").asInstanceOf[Val.Arr].value
+      val a = args("a") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
+      val b = args("b") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
 
       val keyF = args("keyF")
       val out = collection.mutable.Buffer.empty[Val.Lazy]
@@ -548,8 +570,16 @@ object Std {
     },
     builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(0))) { (args, ev) =>
 
-      val a = args("a").asInstanceOf[Val.Arr].value
-      val b = args("b").asInstanceOf[Val.Arr].value
+      val a = args("a") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
+      val b = args("b") match {
+        case arr: Val.Arr => arr.value
+        case str: Val.Str => stringChars(str.value).value
+        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      }
 
       val keyF = args("keyF")
       val out = collection.mutable.Buffer.empty[Val.Lazy]
@@ -612,16 +642,7 @@ object Std {
       Val.Arr(str.split(java.util.regex.Pattern.quote(c), maxSplits + 1).map(s => Val.Lazy(Val.Str(s))))
     },
     builtin("stringChars", "str"){ (ev, fs, str: String) =>
-
-      var offset = 0
-      val output = collection.mutable.Buffer.empty[String]
-      while (offset < str.length) {
-        val codepoint = str.codePointAt(offset)
-        output.append(new String(Character.toChars(codepoint)))
-        offset += Character.charCount(codepoint)
-      }
-      Val.Arr(output.map(s => Val.Lazy(Val.Str(s))).toSeq)
-
+      stringChars(str)
     },
     builtin("parseInt", "str"){ (ev, fs, str: String) =>
       str.toInt
@@ -691,24 +712,6 @@ object Std {
         scope.bindings(1).get.force
       }
     ),
-
-    //Regex functions as described in this PR: https://github.com/google/jsonnet/pull/665
-    builtin("regexFullMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
-      Platform.patternMatches(pattern, str)
-    },
-    builtin("regexPartialMatch", "pattern", "str"){ (ev, fs, pattern: String, str: String) =>
-      Platform.patternFind(pattern, str)
-    },
-    builtin("regexQuoteMeta","str"){ (ev, fs, str: String) =>
-      Platform.patternQuote(str)
-    },
-    builtin("regexReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
-      Platform.patternReplaceFirst(pattern, str, to)
-    },
-    builtin("regexGlobalReplace","str", "pattern", "to"){ (ev, fs, str: String, pattern: String, to: String) =>
-      Platform.patternReplaceAll(pattern, str, to)
-    },
-    //////////////////////////////////////////////////////////////
 
     "extVar" -> Val.Func(
       None,
@@ -827,8 +830,14 @@ object Std {
   }
 
   def uniqArr(ev: EvalScope, arr: Val, keyF: Val) = {
+    val arrValue = arr match {
+      case arr: Val.Arr => arr.value
+      case str: Val.Str => stringChars(str.value).value
+      case _ => throw new Error.Delegate("Argument must be either array or string")
+    }
+
     val out = collection.mutable.Buffer.empty[Val.Lazy]
-    for (v <- arr.asInstanceOf[Val.Arr].value) {
+    for (v <- arrValue) {
       if (out.isEmpty) {
         out.append(v)
       } else if (keyF == Val.False) {
@@ -894,5 +903,11 @@ object Std {
       case Val.Str(s) => Val.Arr(s.sorted.map(c => Val.Lazy(Val.Str(c.toString))))
       case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
     }
+  }
+
+  def stringChars(str: String): Val.Arr = {
+    var offset = 0
+    val output = str.toSeq.sliding(1).toList
+    Val.Arr(output.map(s => Val.Lazy(Val.Str(s.toString()))).toSeq)
   }
 }
