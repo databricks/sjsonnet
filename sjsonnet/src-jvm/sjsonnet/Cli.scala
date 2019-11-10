@@ -16,6 +16,7 @@ object Cli{
                     outputFile: Option[String] = None,
                     multi: Option[String] = None,
                     createDirs: Boolean = false,
+                    yamlStream: Boolean = false,
                     expectString: Boolean = false,
                     varBinding: Map[String, ujson.Value] = Map(),
                     tlaBinding: Map[String, ujson.Value] = Map(),
@@ -52,6 +53,11 @@ object Cli{
       "create-output-dirs", Some('c'),
       "Automatically creates all parent directories for files",
       (c, v) => c.copy(createDirs = true)
+    ),
+    Arg[Config, Unit](
+      "yaml-stream", Some('y'),
+      "Write output as a YAML stream of JSON documents",
+      (c, v) => c.copy(yamlStream = true)
     ),
     Arg[Config, Unit](
       "String", Some('S'),
