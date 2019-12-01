@@ -487,24 +487,8 @@ object Std {
 
     builtin("gzip", "v"){ (ev, fs, v: Val) =>
       v match{
-        case Val.Str(value) => {
-          val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(value.length)
-          val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
-          gzip.write(value.getBytes())
-          gzip.close()
-          val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
-          outputStream.close()
-          gzippedBase64
-        }
-        case Val.Arr(bytes) => {
-          val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(bytes.length)
-          val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
-          gzip.write(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
-          gzip.close()
-          val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
-          outputStream.close()
-          gzippedBase64
-        }
+        case Val.Str(value) => Platform.gzipString(value)
+        case Val.Arr(bytes) => Platform.gzipBytes(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
         case x => throw new Error.Delegate("Cannot gzip encode " + x.prettyName)
       }
     },
