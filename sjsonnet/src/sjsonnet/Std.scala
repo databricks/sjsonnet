@@ -3,6 +3,7 @@ package sjsonnet
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
+import java.util.zip.GZIPOutputStream
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{BinaryOp, False, Params}
@@ -482,6 +483,30 @@ object Std {
     },
     builtin("base64DecodeBytes", "s"){ (ev, fs, s: String) =>
       Val.Arr(Base64.getDecoder().decode(s).map(i => Val.Lazy(Val.Num(i))))
+    },
+
+    builtin("gzip", "v"){ (ev, fs, v: Val) =>
+      v match{
+        case Val.Str(value) => {
+          val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(value.length)
+          val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
+          gzip.write(value.getBytes())
+          gzip.close()
+          val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
+          outputStream.close()
+          gzippedBase64
+        }
+        case Val.Arr(bytes) => {
+          val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(bytes.length)
+          val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
+          gzip.write(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
+          gzip.close()
+          val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
+          outputStream.close()
+          gzippedBase64
+        }
+        case x => throw new Error.Delegate("Cannot gzip encode " + x.prettyName)
+      }
     },
 
     builtin("encodeUTF8", "s"){ (ev, fs, s: String) =>
