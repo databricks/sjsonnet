@@ -238,6 +238,15 @@ To publish, run the following commands:
 
 ## Changelog
 
+
+### 0.1.7
+
+- Support std lib methods that take a key lambda [#40](https://github.com/databricks/sjsonnet/pull/40)
+- Handle hex in unicode escaoes [#41](https://github.com/databricks/sjsonnet/pull/41)
+- Add encodeUTF8, decodeUTF8 std lib methdos [#42](https://github.com/databricks/sjsonnet/pull/42)
+- Properly fail on non-boolean conditionals [#44](https://github.com/databricks/sjsonnet/pull/44)
+- Support YAML-steam output [#45](https://github.com/databricks/sjsonnet/pull/45)
+
 ### 0.1.6
 
 - ~2x performance increase
