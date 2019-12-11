@@ -113,8 +113,8 @@ object SjsonnetMain {
         }
     }
 
-    config.multi match {
-      case Some(multiPath) =>
+    (config.multi, config.yamlStream) match {
+      case (Some(multiPath), _) =>
         interp.interpret(os.read(path), OsPath(path)).flatMap{
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.RelPath]] =
@@ -140,13 +140,31 @@ object SjsonnetMain {
             }
 
           case _ =>
-            Left(
-              """error: multi mode: top-level should be an object
-                | whose keys are filenames and values hold the JSON for that file."""
-                .stripMargin.stripLineEnd
-            )
+            Left("error: multi mode: top-level should be an object " +
+              "whose keys are filenames and values hold the JSON for that file.")
         }
-      case None =>
+      case (None, true) =>
+        // YAML stream
+        interp.interpret(os.read(path), OsPath(path)).flatMap {
+          case arr: ujson.Arr =>
+            val renderedFiles: Seq[Either[String, String]] =
+              arr.value.toSeq.map{ v =>
+                Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
+              }
+            renderedFiles.collect{case Left(err) => err} match{
+              case Nil =>
+                val docs = renderedFiles.collect{case Right(yaml) => yaml}
+                val stream = if (docs.isEmpty) "" else docs.mkString("---\n", "\n---\n", "\n...")
+                Right[String, String](stream)
+              case errs =>
+                Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
+            }
+
+          case _ =>
+            Left("error: stream mode: top-level object should be an array " +
+              "whose elements hold the JSON for each document in the stream.")
+        }
+      case _ =>
         val materialized = interp.interpret0(
           os.read(path),
           OsPath(path),

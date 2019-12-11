@@ -14,11 +14,16 @@ package re2 {
   }
 }
 
-object Platform{
+object Platform {
+  def gzipBytes(s: Array[Byte]): String = {
+    throw new Exception("GZip not implemented in Scala.js")
+  }
+  def gzipString(s: String): String = {
+    throw new Exception("GZip not implemented in Scala.js")
+  }
   def md5(s: String): String = {
     throw new Exception("MD5 not implemented in Scala.js")
   }
-
   def patternMatches(pattern: String, str: String): Boolean = {
     val matchStr = new re2.RE2(pattern, "g").`match`(str)
     matchStr != null && matchStr.toString == str

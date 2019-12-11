@@ -3,6 +3,7 @@ package sjsonnet
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
+import java.util.zip.GZIPOutputStream
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{BinaryOp, False, Params}
@@ -484,6 +485,14 @@ object Std {
     },
     builtin("base64DecodeBytes", "s"){ (ev, fs, s: String) =>
       Val.Arr(Base64.getDecoder().decode(s).map(i => Val.Lazy(Val.Num(i))))
+    },
+
+    builtin("gzip", "v"){ (ev, fs, v: Val) =>
+      v match{
+        case Val.Str(value) => Platform.gzipString(value)
+        case Val.Arr(bytes) => Platform.gzipBytes(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
+        case x => throw new Error.Delegate("Cannot gzip encode " + x.prettyName)
+      }
     },
 
     builtin("encodeUTF8", "s"){ (ev, fs, s: String) =>

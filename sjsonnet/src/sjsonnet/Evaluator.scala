@@ -512,7 +512,15 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           }
         } yield s.extend(Seq(name -> ((self: Option[Val.Obj], sup: Option[Val.Obj]) => e)))
       )
-    case IfSpec(offset, expr) :: rest => visitComp(rest, scopes.filter(visitExpr(expr)(_, implicitly) == Val.True))
+    case IfSpec(offset, expr) :: rest =>
+      visitComp(rest, scopes.filter(visitExpr(expr)(_, implicitly) match {
+        case Val.True => true
+        case Val.False => false
+        case other => Error.fail(
+          "Condition must be boolean, got " + other.prettyName,
+          expr.offset
+        )
+      }))
     case Nil => scopes
   }
 }
