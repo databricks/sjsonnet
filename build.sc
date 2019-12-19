@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
-val sjsonnetVersion = "0.1.8"
+val sjsonnetVersion = "0.1.9"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
@@ -15,10 +15,10 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.1.3",
+      ivy"com.lihaoyi::fastparse::2.2.0",
       ivy"com.lihaoyi::pprint::0.5.5",
       ivy"com.lihaoyi::ujson::0.9.0",
-      ivy"com.lihaoyi::scalatags::0.8.1",
+      ivy"com.lihaoyi::scalatags::0.8.2",
       ivy"com.github.scopt::scopt::3.7.1",
       ivy"org.scala-lang.modules::scala-collection-compat::2.0.0"
     )

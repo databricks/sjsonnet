@@ -239,6 +239,10 @@ To publish, run the following commands:
 ## Changelog
 
 
+### 0.1.9
+
+- Bump version of FastParse
+
 ### 0.1.8
 
 - Bump versions of OS-Lib, uJson, Scalatags
