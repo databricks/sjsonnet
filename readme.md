@@ -29,8 +29,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.1.8" // SBT
-ivy"com.lihaoyi::sjsonnet:0.1.8" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.2.0" // SBT
+ivy"com.lihaoyi::sjsonnet:0.2.0" // Mill
 ```
 
 ```scala
@@ -238,6 +238,10 @@ To publish, run the following commands:
 
 ## Changelog
 
+
+### 0.2.0
+
+- Bump verion of Scalatags, uPickle
 
 ### 0.1.9
 
