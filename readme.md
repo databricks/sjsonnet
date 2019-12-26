@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.2.1</version>
+    <version>0.2.2</version>
 </dependency>
 ```
 ```java
@@ -29,8 +29,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.2.1" // SBT
-ivy"com.lihaoyi::sjsonnet:0.2.1" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.2.2" // SBT
+ivy"com.lihaoyi::sjsonnet:0.2.2" // Mill
 ```
 
 ```scala
@@ -239,7 +239,7 @@ To publish, run the following commands:
 ## Changelog
 
 
-### 0.2.1
+### 0.2.2
 
 - Bump verion of Scalatags, uPickle
 
