@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.1.6</version>
+    <version>0.2.2</version>
 </dependency>
 ```
 ```java
@@ -29,8 +29,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.1.6" // SBT
-ivy"com.lihaoyi::sjsonnet:0.1.6" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.2.2" // SBT
+ivy"com.lihaoyi::sjsonnet:0.2.2" // Mill
 ```
 
 ```scala
@@ -47,10 +47,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.6/sjsonnet.jar
+- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.8/sjsonnet.jar
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.6/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.8/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -70,10 +70,10 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.1.6/sjsonnet.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.1.8/sjsonnet.js > sjsonnet.js
 
 $ node
- 
+
 > require("./sjsonnet.js")
 
 > SjsonnetMain.interpret("local f = function(x) x * x; f(11)", {}, {}, "", (wd, imported) => null)
@@ -98,14 +98,14 @@ by emulating a filesystem in-memory)
 
 ### Running deeply recursive Jsonnet programs
 
-The depth of recursion is limited by JVM stack size. You can run Sjsonnet with increased 
+The depth of recursion is limited by JVM stack size. You can run Sjsonnet with increased
 stack size as follows:
 ```
 java -Xss100m -cp sjsonnet.jar sjsonnet.SjsonnetMain foo.jsonnet
 ```
 
-The -Xss option above is responsible for JVM stack size. Please try this if you 
-ever run into `sjsonnet.Error: Internal Error ... Caused by: java.lang.StackOverflowError ...`. 
+The -Xss option above is responsible for JVM stack size. Please try this if you
+ever run into `sjsonnet.Error: Internal Error ... Caused by: java.lang.StackOverflowError ...`.
 
 There is no analog of `--max-stack`/`-s` option of [google/jsonnet](https://github.com/google/jsonnet).
 The only stack size limit is the one of the JVM.
@@ -148,7 +148,7 @@ Some notes on the values used in parts of the pipeline:
 
 ## Performance
 
-Due to pervasive caching, sjsonnet is much faster than google/jsonnet. See 
+Due to pervasive caching, sjsonnet is much faster than google/jsonnet. See
 this blog post for more details:
 
 - [Writing a Faster Jsonnet Compiler](https://databricks.com/blog/2018/10/12/writing-a-faster-jsonnet-compiler.html)
@@ -230,13 +230,34 @@ programmatically via `new Interpreter(...).interpret(...)`.
 To publish, run the following commands:
 
 ```bash
-./mill -i mill.scalalib.PublishModule/publishAll lihaoyi:$SONATYPE_PASSWORD $GPG_PASSWORD __.publishArtifacts --release true
+./mill -i mill.scalalib.PublishModule/publishAll lihaoyi:$SONATYPE_PASSWORD $GPG_PASSWORD --publishArtifacts __.publishArtifacts --release true
 
 ./mill -i show sjsonnet[2.13.0].js.fullOpt
 ./mill -i show sjsonnet[2.13.0].jvm.assembly
 ```
 
 ## Changelog
+
+
+### 0.2.2
+
+- Bump verion of Scalatags, uPickle
+
+### 0.1.9
+
+- Bump version of FastParse
+
+### 0.1.8
+
+- Bump versions of OS-Lib, uJson, Scalatags
+
+### 0.1.7
+
+- Support std lib methods that take a key lambda [#40](https://github.com/databricks/sjsonnet/pull/40)
+- Handle hex in unicode escaoes [#41](https://github.com/databricks/sjsonnet/pull/41)
+- Add encodeUTF8, decodeUTF8 std lib methdos [#42](https://github.com/databricks/sjsonnet/pull/42)
+- Properly fail on non-boolean conditionals [#44](https://github.com/databricks/sjsonnet/pull/44)
+- Support YAML-steam output [#45](https://github.com/databricks/sjsonnet/pull/45)
 
 ### 0.1.6
 
