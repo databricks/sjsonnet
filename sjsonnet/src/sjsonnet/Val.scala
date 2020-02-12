@@ -73,7 +73,7 @@ object Val{
 
 
   }
-  final class Obj(value0: Map[String, Obj.Member],
+  final class Obj(value0: mutable.Map[String, Obj.Member],
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Option[Obj]) extends Val{
 
@@ -102,7 +102,7 @@ object Val{
     }
 
     def getVisibleKeys() = {
-      val mapping = collection.mutable.Map.empty[String, Boolean]
+      val mapping = mutable.LinkedHashMap.empty[String, Boolean]
       foreachVisibleKey{ (k, sep) =>
         (mapping.get(k), sep) match{
           case (None, Visibility.Hidden) => mapping(k) = true
@@ -314,6 +314,8 @@ trait EvalScope extends EvalErrorScope{
   def materialize(v: Val): ujson.Value
 
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
+
+  val sortKeys: Boolean = true
 }
 object ValScope{
   def empty(size: Int) = new ValScope(None, None, None, new Array(size))
