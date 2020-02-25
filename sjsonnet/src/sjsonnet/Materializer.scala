@@ -39,7 +39,7 @@ object Materializer {
         obj.triggerAllAsserts(obj)
 
         val keysUnsorted = obj.getVisibleKeys().toArray
-        val keys = if (evaluator.sortKeys) keysUnsorted.sortBy(_._1) else keysUnsorted
+        val keys = if (!evaluator.preserveOrder) keysUnsorted.sortBy(_._1) else keysUnsorted
         val objVisitor = visitor.visitObject(keys.length , -1)
 
         for(t <- keys) {

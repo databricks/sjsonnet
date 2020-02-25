@@ -315,7 +315,7 @@ trait EvalScope extends EvalErrorScope{
 
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
 
-  val sortKeys: Boolean = true
+  val preserveOrder: Boolean = false
 }
 object ValScope{
   def empty(size: Int) = new ValScope(None, None, None, new Array(size))

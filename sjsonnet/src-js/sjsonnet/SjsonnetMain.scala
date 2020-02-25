@@ -12,7 +12,8 @@ object SjsonnetMain {
                 extVars: js.Any,
                 tlaVars: js.Any,
                 wd0: String,
-                importer: js.Function2[String, String, js.Array[String]]): js.Any = {
+                importer: js.Function2[String, String, js.Array[String]],
+                preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
       mutable.Map.empty,
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
@@ -23,7 +24,8 @@ object SjsonnetMain {
           case null => None
           case arr => Some((JsVirtualPath(arr(0)), arr(1)))
         }
-      }
+      },
+      preserveOrder
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{
       case Left(msg) => throw new js.JavaScriptException(msg)

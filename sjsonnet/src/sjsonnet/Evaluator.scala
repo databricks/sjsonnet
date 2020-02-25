@@ -20,7 +20,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 importer: (Path, String) => Option[(Path, String)],
-                override val sortKeys: Boolean = true) extends EvalScope{
+                override val preserveOrder: Boolean = false) extends EvalScope{
   implicit def evalScope: EvalScope = this
 
   val loadedFileContents = mutable.Map.empty[Path, String]

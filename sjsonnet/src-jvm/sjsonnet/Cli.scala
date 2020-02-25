@@ -20,7 +20,8 @@ object Cli{
                     expectString: Boolean = false,
                     varBinding: Map[String, ujson.Value] = Map(),
                     tlaBinding: Map[String, ujson.Value] = Map(),
-                    indent: Int = 3)
+                    indent: Int = 3,
+                    preserveOrder: Boolean = false)
 
 
   def genericSignature(wd: os.Path) = Seq(
@@ -127,7 +128,13 @@ object Cli{
         case Array(x, v) =>
           c.copy(tlaBinding = c.tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd)))))
       }
-    )
+    ),
+    Arg[Config, Unit](
+      "preserve-order", Some('p'),
+      "Preserves order of keys in the resulting JSON",
+      (c, v) => c.copy(preserveOrder = true)
+    ),
+
   )
   def showArg(arg: Arg[_, _]) =
     "  " + arg.shortName.fold("")("-" + _ + ", ") + "--" + arg.name
