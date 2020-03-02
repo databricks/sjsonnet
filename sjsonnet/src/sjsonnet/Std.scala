@@ -8,7 +8,7 @@ import java.util.zip.GZIPOutputStream
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{BinaryOp, False, Params}
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 import scala.collection.compat._
 import sjsonnet.Std.builtinWithDefaults
 import ujson.Value
@@ -250,6 +250,7 @@ object Std {
     builtin("mapWithKey", "func", "obj"){ (ev, fs, func: Applyer, obj: Val.Obj) =>
       val allKeys = obj.getVisibleKeys()
       new Val.Obj(
+        mutable.LinkedHashMap() ++
         allKeys.map{ k =>
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
             func.apply(
@@ -257,7 +258,7 @@ object Std {
               Val.Lazy(obj.value(k._1, -1)(fs,ev))
             )
           ))
-        }.toMap,
+        },
         _ => (),
         None
       )
@@ -289,7 +290,7 @@ object Std {
     builtin("findSubstr", "pat", "str") { (ev, fs, pat: String, str: String) =>
       if (pat.length == 0) Val.Arr(Seq())
       else {
-        val indices = ArrayBuffer[Int]()
+        val indices = mutable.ArrayBuffer[Int]()
         var matchIndex = str.indexOf(pat)
         while (0 <= matchIndex && matchIndex < str.length) {
           indices.append(matchIndex)
@@ -675,10 +676,10 @@ object Std {
             val transformedValue: Seq[Val.Lazy] = values.map(v => Val.Lazy(recursiveTransform(v))).toSeq
             Val.Arr(transformedValue)
           case ujson.Obj(valueMap) =>
-            val transformedValue = valueMap
+            val transformedValue = mutable.LinkedHashMap() ++ valueMap
               .mapValues { v =>
                 Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
-              }.toMap
+              }
             new Val.Obj(transformedValue , (x: Val.Obj) => (), None)
         }
       }
@@ -702,7 +703,7 @@ object Std {
             v = rec(o.value(k, -1)(fs, ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
-          new Val.Obj(bindings.toMap, _ => (), None)
+          new Val.Obj(mutable.LinkedHashMap() ++ bindings, _ => (), None)
         case a: Val.Arr =>
           Val.Arr(a.value.map(x => rec(x.force)).filter(filter).map(Val.Lazy(_)))
         case _ => x
@@ -737,6 +738,7 @@ object Std {
     )
   )
   val Std = new Val.Obj(
+    mutable.LinkedHashMap() ++
     functions
       .map{
         case (k, v) =>
@@ -748,8 +750,7 @@ object Std {
               (self: Val.Obj, sup: Option[Val.Obj], _, _) => v
             )
           )
-      }
-      .toMap ++ Seq(
+      } ++ Seq(
       (
         "thisFile",
         Val.Obj.Member(
