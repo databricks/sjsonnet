@@ -44,7 +44,7 @@ object Materializer {
 
         for(t <- keys) {
           val (k, hidden) = t
-          if (!hidden){ // TODO wait didn't it already call getVisibleKeys??
+          if (!hidden){ 
             objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
             objVisitor.visitValue(
               apply0(
