@@ -13,6 +13,7 @@ object SjsonnetMain {
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
     (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {
+        case r: os.SubPath => Some(base.asInstanceOf[OsPath].p / r)
         case r: os.RelPath =>
           if (r.ups > base.segmentCount()) None
           else Some(base.asInstanceOf[OsPath].p / r)
