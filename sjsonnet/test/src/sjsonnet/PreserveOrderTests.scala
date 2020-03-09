@@ -294,5 +294,11 @@ object PreserveOrderTests extends TestSuite {
            })""", true) ==>
         ujson.Str("""{"z": "1", "a": "2", "b": "3"}""")
     }
+
+    test("preserveOrderMemberConcat") {
+      eval(
+        """{b: "b", a: "a"} + {a+: {d: 1, c: 2}, s: 4}""", true).toString ==>
+        """{"b":"b","a":"a{\"d\": 1, \"c\": 2}","s":4}"""
+    }
   }
 }
