@@ -53,22 +53,26 @@ object Std {
       v1.getVisibleKeys().get(v2).isDefined
     },
     builtin("objectFields", "o"){ (ev, fs, v1: Val.Obj) =>
-      Val.Arr(
-        v1.getVisibleKeys()
-          .collect{case (k, false) => k}
-          .toSeq
-          .sorted
-          .map(k => Val.Lazy(Val.Str(k)))
-      )
+      val keys = v1.getVisibleKeys()
+        .collect{case (k, false) => k}
+        .toSeq
+      val maybeSorted = if(ev.preserveOrder) {
+        keys
+      } else {
+        keys.sorted
+      }
+      Val.Arr(maybeSorted.map(k => Val.Lazy(Val.Str(k))))
     },
     builtin("objectFieldsAll", "o"){ (ev, fs, v1: Val.Obj) =>
-      Val.Arr(
-        v1.getVisibleKeys()
-          .collect{case (k, _) => k}
-          .toSeq
-          .sorted
-          .map(k => Val.Lazy(Val.Str(k)))
-      )
+      val keys = v1.getVisibleKeys()
+        .collect{case (k, _) => k}
+        .toSeq
+      val maybeSorted = if(ev.preserveOrder) {
+        keys
+      } else {
+        keys.sorted
+      }
+      Val.Arr(maybeSorted.map(k => Val.Lazy(Val.Str(k))))
     },
     builtin("type", "x"){ (ev, fs, v1: Val) =>
       v1 match{
