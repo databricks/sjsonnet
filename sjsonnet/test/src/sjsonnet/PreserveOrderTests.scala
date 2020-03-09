@@ -284,5 +284,15 @@ object PreserveOrderTests extends TestSuite {
           ])""", true) ==>
         ujson.Str("""<a c="c" b="b"></a>""")
     }
+
+    test("preserveOrderToString") {
+      eval(
+        """std.toString({
+             "z": "1",
+             "a": "2",
+             "b": "3"
+           })""", true) ==>
+        ujson.Str("""{"z": "1", "a": "2", "b": "3"}""")
+    }
   }
 }
