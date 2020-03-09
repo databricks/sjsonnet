@@ -300,5 +300,17 @@ object PreserveOrderTests extends TestSuite {
         """{b: "b", a: "a"} + {a+: {d: 1, c: 2}, s: 4}""", true).toString ==>
         """{"b":"b","a":"a{\"d\": 1, \"c\": 2}","s":4}"""
     }
+
+    test("preserveOrderError") {
+      try {
+        eval(
+          """local x = { b: 1, a: 2, c: self.a + self.b };
+           error x""", true)
+        assert(false)
+      } catch {
+        case e: Exception =>
+          assert(e.getMessage().startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}"""))
+      }
+    }
   }
 }
