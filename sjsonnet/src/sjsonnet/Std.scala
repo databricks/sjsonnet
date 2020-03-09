@@ -566,14 +566,14 @@ object Std {
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
           val keyFApplyer = Applyer(keyFFunc, ev, null)
-          val appliedX = keyFApplyer.apply(v)
+          val appliedX = Materializer(keyFApplyer.apply(v))(ev)
 
           if (b.exists(value => {
             val appliedValue = keyFApplyer.apply(value)
-            appliedValue == appliedX
+            Materializer(appliedValue)(ev) == appliedX
           }) && !out.exists(value => {
             val mValue = keyFApplyer.apply(value)
-            mValue == appliedX
+            Materializer(mValue)(ev) == appliedX
           })) {
             out.append(v)
           }
@@ -613,14 +613,14 @@ object Std {
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
           val keyFApplyer = Applyer(keyFFunc, ev, null)
-          val appliedX = keyFApplyer.apply(v)
+          val appliedX = Materializer(keyFApplyer.apply(v))(ev)
 
           if (!b.exists(value => {
             val appliedValue = keyFApplyer.apply(value)
-            appliedValue == appliedX
+            Materializer(appliedValue)(ev) == appliedX
           }) && !out.exists(value => {
             val mValue = keyFApplyer.apply(value)
-            mValue == appliedX
+            Materializer(mValue)(ev) == appliedX
           })) {
             out.append(v)
           }
@@ -896,19 +896,19 @@ object Std {
             if (keyF == Val.False) {
               throw new Error.Delegate("Unable to sort array of objects without key function")
             } else {
+              val objs = vs.map(_.force.cast[Val.Obj])
+
               val keyFFunc = keyF.asInstanceOf[Val.Func]
               val keyFApplyer = Applyer(keyFFunc, ev, null)
-              vs.map(_.force.cast[Val.Obj]).sortWith((o1, o2) => {
-                val o1Key = keyFApplyer.apply(Val.Lazy(o1))
-                val o2Key = keyFApplyer.apply(Val.Lazy(o2))
-                val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))
-                val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))
+              val keys = objs.map((v) => keyFApplyer(Val.Lazy(v)))
 
-                val comparisonExpr = Expr.BinaryOp(0, o1KeyExpr, BinaryOp.`<`, o2KeyExpr)
-                val exprResult = ev.visitExpr(comparisonExpr)(scope(0), new FileScope(null, Map.empty))
-                val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]
-                res.value
-              }).map(Val.Lazy(_))
+              if (keys.forall(_.isInstanceOf[Val.Str])){
+                objs.sortBy((v) => keyFApplyer(Val.Lazy(v)).cast[Val.Str].value).map(Val.Lazy(_))
+              } else if (keys.forall(_.isInstanceOf[Val.Num])) {
+                objs.sortBy((v) => keyFApplyer(Val.Lazy(v)).cast[Val.Num].value).map(Val.Lazy(_))
+              } else {
+                throw new Error.Delegate("Cannot sort with key values that are " + keys(0).prettyName + "s")
+              }
             }
           }else {
             ???

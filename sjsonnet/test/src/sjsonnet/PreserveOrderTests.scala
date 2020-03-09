@@ -317,10 +317,34 @@ object PreserveOrderTests extends TestSuite {
       eval("""{a: 1, b: 2} == {b: 2, a: 1}""", true).toString ==> "true"
     }
 
+    test("preserveOrderSet") {
+      eval(
+        """std.set([{a: 1, b: 2}, {a:3}, {b: 2, a: 1}],
+           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2},{"a":3}]"""
+    }
+
     test("preserveOrderPreservesSetMembership") {
       eval("""std.setMember({a: 1, b: 2}, [{b: 2, a: 1}])""", true).toString ==> "true"
 
       eval("""std.setMember({q: {a: 1, b: 2}}, [{q: {b: 2, a: 1}}], keyF=function(v) v.q)""", true).toString ==> "true"
+    }
+
+    test("preserveOrderSetIntersection") {
+      eval(
+        """std.setInter([{a: 1, b: 2}], [{b: 2, a: 1}],
+           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2}]"""
+    }
+
+    test("preserveOrderSetUnion") {
+      eval(
+        """std.setUnion([{a: 1, b: 2}, {a:3}], [{b: 2, a: 1}],
+           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2},{"a":3}]"""
+    }
+
+    test("preserveOrderSetDiff") {
+      eval(
+        """std.setDiff([{a: 1, b: 2}, {a:3}], [{b: 2, a: 1}],
+           keyF=function(v) v.a)""", true).toString ==> """[{"a":3}]"""
     }
   }
 }
