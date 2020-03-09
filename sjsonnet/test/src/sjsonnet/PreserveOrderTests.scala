@@ -312,5 +312,9 @@ object PreserveOrderTests extends TestSuite {
           assert(e.getMessage().startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}"""))
       }
     }
+
+    test("preserveOrderPreservesEquality") {
+      eval("""{a: 1, b: 2} == {b:2, a: 1}""", true).toString ==> "true"
+    }
   }
 }
