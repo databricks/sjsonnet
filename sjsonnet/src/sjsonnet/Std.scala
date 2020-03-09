@@ -644,7 +644,7 @@ object Std {
         val appliedX = keyFApplyer.apply(x)
         arr.exists(value => {
           val appliedValue = keyFApplyer.apply(value)
-          appliedValue == appliedX
+          Materializer(appliedValue)(ev) == Materializer(appliedX)(ev)
         })
       }
     },
