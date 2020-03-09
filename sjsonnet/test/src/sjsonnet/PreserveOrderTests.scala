@@ -314,7 +314,13 @@ object PreserveOrderTests extends TestSuite {
     }
 
     test("preserveOrderPreservesEquality") {
-      eval("""{a: 1, b: 2} == {b:2, a: 1}""", true).toString ==> "true"
+      eval("""{a: 1, b: 2} == {b: 2, a: 1}""", true).toString ==> "true"
+    }
+
+    test("preserveOrderPreservesSetMembership") {
+      eval("""std.setMember({a: 1, b: 2}, [{b: 2, a: 1}])""", true).toString ==> "true"
+
+      eval("""std.setMember({q: {a: 1, b: 2}}, [{q: {b: 2, a: 1}}], keyF=function(v) v.q)""", true).toString ==> "true"
     }
   }
 }
