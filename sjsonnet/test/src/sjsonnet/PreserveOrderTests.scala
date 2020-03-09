@@ -37,7 +37,7 @@ object PreserveOrderTests extends TestSuite {
            ][1]""", true).toString() ==> """{"z":"z","a":"a"}"""
 
       eval(
-        """[{b: null}  // TODO Why does this object affect the order of the next object?
+        """[{b: null},
            {
              "z": null,
              "a": "2",
@@ -179,7 +179,7 @@ object PreserveOrderTests extends TestSuite {
 
     test("preserveOrderPrune") {
       eval(
-        """std.prune([{b: null} // TODO okay for some reason having a previous object changes order of a later one...
+        """std.prune([{b: null},
            {
              "z": null,
              "a": "2",
