@@ -19,7 +19,8 @@ import scala.collection.mutable
 class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
-                importer: (Path, String) => Option[(Path, String)]) extends EvalScope{
+                importer: (Path, String) => Option[(Path, String)],
+                override val preserveOrder: Boolean = false) extends EvalScope{
   implicit def evalScope: EvalScope = this
 
   val loadedFileContents = mutable.Map.empty[Path, String]
@@ -435,7 +436,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       ).toArray
 
       lazy val newSelf: Val.Obj = {
-        val builder = Map.newBuilder[String, Val.Obj.Member]
+        val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
         value.foreach {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
@@ -461,7 +462,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       )
 
       lazy val newSelf: Val.Obj = {
-        val builder = Map.newBuilder[String, Val.Obj.Member]
+        val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
         for(s <- visitComp(first :: rest.toList, Seq(compScope))){
           lazy val newScope: ValScope = s.extend(
             newBindings,
