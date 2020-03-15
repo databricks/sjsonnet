@@ -239,6 +239,11 @@ To publish, run the following commands:
 ## Changelog
 
 
+### 0.2.4
+
+- Add support for syntactical key ordering [#53](https://github.com/databricks/sjsonnet/pull/53)
+- Bump dependency versions
+
 ### 0.2.2
 
 - Bump verion of Scalatags, uPickle

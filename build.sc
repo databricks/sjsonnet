@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
-val sjsonnetVersion = "0.2.3"
+val sjsonnetVersion = "0.2.4"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.8", "2.13.0")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
@@ -15,11 +15,11 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.2.3",
-      ivy"com.lihaoyi::pprint::0.5.8",
-      ivy"com.lihaoyi::ujson::0.9.7",
-      ivy"com.lihaoyi::scalatags::0.8.4",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.1.3"
+      ivy"com.lihaoyi::fastparse::2.2.4",
+      ivy"com.lihaoyi::pprint::0.5.9",
+      ivy"com.lihaoyi::ujson::1.0.0",
+      ivy"com.lihaoyi::scalatags::0.8.6",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
     )
     def publishVersion = sjsonnetVersion
 
@@ -46,7 +46,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     )
     trait CrossTests extends ScalaModule with TestModule {
       def platformSegment = SjsonnetCrossModule.this.platformSegment
-      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.3")
+      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.4")
       def testFrameworks = Seq("utest.runner.Framework")
       def sources = T.sources(
         millSourcePath / "src",
@@ -55,7 +55,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "0.6.31"
+    def scalaJSVersion = "1.0.0"
     def platformSegment = "js"
     object test extends Tests with CrossTests
   }
@@ -63,7 +63,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def mainClass = Some("sjsonnet.SjsonnetMain")
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::os-lib:0.6.2",
+      ivy"com.lihaoyi::os-lib:0.6.3",
       ivy"com.github.scopt::scopt::3.7.1",
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
