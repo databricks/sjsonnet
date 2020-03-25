@@ -321,6 +321,9 @@ object Std {
     builtin("strReplace", "str", "from", "to"){ (ev, fs, str: String, from: String, to: String) =>
       str.replace(from, to)
     },
+    builtin("strReplaceAll", "str", "from", "to"){ (ev, fs, str: String, from: String, to: String) =>
+      str.replaceAll(from, to)
+    },
     builtin("join", "sep", "arr"){ (ev, fs, sep: Val, arr: Val.Arr) =>
       val res: Val = sep match{
         case Val.Str(s) =>
