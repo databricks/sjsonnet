@@ -4,6 +4,8 @@ import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
 
+import scala.collection.mutable
+
 /**
   * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
   * which can transform it into [[ujson.Value]]s or directly serialize it
@@ -36,12 +38,13 @@ object Materializer {
       case obj: Val.Obj =>
         obj.triggerAllAsserts(obj)
 
-        val keys = obj.getVisibleKeys().toArray.sortBy(_._1)
+        val keysUnsorted = obj.getVisibleKeys().toArray
+        val keys = if (!evaluator.preserveOrder) keysUnsorted.sortBy(_._1) else keysUnsorted
         val objVisitor = visitor.visitObject(keys.length , -1)
 
         for(t <- keys) {
           val (k, hidden) = t
-          if (!hidden){
+          if (!hidden){ 
             objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
             objVisitor.visitValue(
               apply0(
@@ -73,7 +76,7 @@ object Materializer {
     case ujson.Str(s) => Val.Str(s)
     case ujson.Arr(xs) => Val.Arr(xs.map(x => Val.Lazy(reverse(x))).toArray[Val.Lazy])
     case ujson.Obj(xs) =>
-      val builder = Map.newBuilder[String, Val.Obj.Member]
+      val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
       for(x <- xs){
         val v = Val.Obj.Member(false, Visibility.Normal,
           (_: Val.Obj, _: Option[Val.Obj], _, _) => reverse(x._2)

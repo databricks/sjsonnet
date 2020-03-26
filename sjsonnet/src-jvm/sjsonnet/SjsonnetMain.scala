@@ -101,7 +101,8 @@ object SjsonnetMain {
       importer = resolveImport(
         config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
         allowedInputs
-      )
+      ),
+      config.preserveOrder
     )
 
     def writeFile(f: os.RelPath, contents: String): Either[String, Unit] = {
