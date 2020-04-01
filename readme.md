@@ -11,9 +11,10 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.2.2</version>
+    <version>0.2.5</version>
 </dependency>
 ```
+
 ```java
 sjsonnet.SjsonnetMain.main0(
     new String[]{"foo.jsonnet"},
@@ -29,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.2.2" // SBT
-ivy"com.lihaoyi::sjsonnet:0.2.2" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.2.5" // SBT
+ivy"com.lihaoyi::sjsonnet:0.2.5" // Mill
 ```
 
 ```scala
@@ -47,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- https://github.com/lihaoyi/sjsonnet/releases/download/0.1.8/sjsonnet.jar
+- <https://github.com/lihaoyi/sjsonnet/releases/download/0.2.5/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.1.8/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.2.5/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -100,7 +101,8 @@ by emulating a filesystem in-memory)
 
 The depth of recursion is limited by JVM stack size. You can run Sjsonnet with increased
 stack size as follows:
-```
+
+```bash
 java -Xss100m -cp sjsonnet.jar sjsonnet.SjsonnetMain foo.jsonnet
 ```
 
@@ -160,7 +162,7 @@ evaluate the `test_suite/` folder (smaller is better):
 |              | Sjsonnet 0.1.5 | Sjsonnet 0.1.6 |
 |:-------------|---------------:|---------------:|
 | Scala 2.13.0 | 14.26ms ± 0.22 |  6.59ms ± 0.27 |
-| Scala 2.12.8 | 18.07ms ± 0.30	|  9.29ms ± 0.26 |
+| Scala 2.12.8 | 18.07ms ± 0.30 |  9.29ms ± 0.26 |
 
 | google/jsonnet | google/go-jsonnet |
 |---------------:|------------------:|
@@ -168,7 +170,7 @@ evaluate the `test_suite/` folder (smaller is better):
 
 google/jsonnet was built from source on commit
 f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
-`go get`ed at version ` v0.13.0`. You can see the source code of the
+`go get`ed at version `v0.13.0`. You can see the source code of the
 benchmark in  
 [SjsonnetTestMain.scala](https://github.com/databricks/sjsonnet/blob/master/sjsonnet/test/src-jvm/sjsonnet/SjsonnetTestMain.scala)
 
@@ -237,7 +239,6 @@ To publish, run the following commands:
 ```
 
 ## Changelog
-
 
 ### 0.2.4
 
