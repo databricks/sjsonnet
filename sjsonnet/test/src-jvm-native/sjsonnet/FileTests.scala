@@ -10,7 +10,7 @@ object FileTests extends TestSuite{
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       OsPath(testSuiteRoot),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot))),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot)))
     )
     interp.interpret(os.read(p), OsPath(p))
   }
@@ -70,4 +70,3 @@ object FileTests extends TestSuite{
     test("verbatim_strings") - check()
   }
 }
-

@@ -145,7 +145,7 @@ object Cli{
       "yaml-out", None,
       "Write output as a YAML document",
       (c, v) => c.copy(yamlOut = true)
-    ),
+    )
 
   )
   def showArg(arg: Arg[_, _]) =

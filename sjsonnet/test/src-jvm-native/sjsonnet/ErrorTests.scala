@@ -2,19 +2,19 @@ package sjsonnet
 
 import utest._
 
-object ErrorTests extends TestSuite{
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path) = {
+object ErrorTests extends TestSuite with ErrorTestsBase{
+  override val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  override def eval(p: os.Path) = {
     val interp = new Interpreter(
       sjsonnet.SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path])
     )
     interp.interpret(os.read(p), OsPath(p))
   }
-  def check(expected: String)(implicit tp: utest.framework.TestPath) = {
+  override def check(expected: String)(implicit tp: utest.framework.TestPath) = {
     val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet")
 
     assert(res == Left(expected))
@@ -90,9 +90,6 @@ object ErrorTests extends TestSuite{
       """sjsonnet.Error: array bounds error: 1.8446744073709552E19 not within [0, 3)
         |    at .(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
         |""".stripMargin
-    )
-    test("array_recursive_manifest") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
     )
     "assert.fail1" - check(
       """sjsonnet.Error: Assertion failed
@@ -261,12 +258,6 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
       )
     }
-    test("obj_recursive") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
-    )
-    test("obj_recursive_manifest") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
-    )
 
     test("import_wrong_nr_args") - checkImports(
       """|sjsonnet.Error: Function parameter y not bound in call

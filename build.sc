@@ -1,139 +1,192 @@
-import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
+
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, mill.scalanativelib.api._
 val sjsonnetVersion = "0.2.7"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.12", "2.13.3")
-class SjsonnetModule(val crossScalaVersion: String) extends Module {
-  def millSourcePath = super.millSourcePath / ammonite.ops.up
-  trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
+val crossScalaVersions = Seq("2.13.3", "2.12.12")
 
-    def artifactName = "sjsonnet"
-    def platformSegment: String
+object sjsonnet extends Module{
+  
+  object native extends Cross[SjsonnetNativeModule]("2.11.12")
+  class SjsonnetNativeModule(val crossScalaVersion: String) extends SjsonnetCrossModule with CommonJvmNative with ScalaNativeModule{
+    def releaseMode = ReleaseMode.ReleaseFast
+    def nativeLinkStubs = true
+    def libcrypto = T(os.walk(os.root / "usr").filter(_.last == "libcrypto.a").head.toString)
+    def staticLinkLibcrypto = T { true }
+    def libcryptoLinkingOptions = T {
+      if(staticLinkLibcrypto()) {
+        Array(libcrypto())
+      } else {
+        val libcryptoDir = os.Path(libcrypto()) / os.up
+        Array(s"-L$libcryptoDir", "-lcrypto")
+      }
+    }
+    def nativeLinkingOptions = T { libcryptoLinkingOptions() ++ super.nativeLinkingOptions() }
+    def scalaNativeVersion = "0.4.0-M2"
+    def platformSegment = "native"
     def sources = T.sources(
       millSourcePath / "src",
-      millSourcePath / s"src-$platformSegment"
+      millSourcePath / "src-native",
+      millSourcePath / "src-jvm-native"
     )
-    def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
-
-    def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.3.0",
-      ivy"com.lihaoyi::pprint::0.5.9",
-      ivy"com.lihaoyi::ujson::1.2.0",
-      ivy"com.lihaoyi::scalatags::0.9.1",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
-    )
-    def publishVersion = sjsonnetVersion
-
-    def generatedSources = T{
-      os.write(
-        T.ctx().dest / "Version.scala",
-        s"""package sjsonnet
-           |object Version{
-           |  val version = ${pprint.Util.literalize(sjsonnetVersion)}
-           |}
-           |""".stripMargin
-      )
-      Seq(PathRef(T.ctx().dest / "Version.scala"))
-    }
-    def pomSettings = PomSettings(
-      description = artifactName(),
-      organization = "com.lihaoyi",
-      url = "https://github.com/lihaoyi/sjsonnet",
-      licenses = Seq(License.MIT),
-      versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
-      developers = Seq(
-        Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
-      )
-    )
-    trait CrossTests extends ScalaModule with TestModule {
-      def platformSegment = SjsonnetCrossModule.this.platformSegment
-      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.4")
-      def testFrameworks = Seq("utest.runner.Framework")
+    object test extends Tests with CrossTests{
+      // def releaseMode = ReleaseMode.ReleaseFast
+      def nativeLinkingOptions = SjsonnetNativeModule.this.nativeLinkingOptions()
       def sources = T.sources(
         millSourcePath / "src",
-        millSourcePath / s"src-$platformSegment"
+        millSourcePath / "src-native",
+        millSourcePath / "src-jvm-native"
       )
     }
   }
-  object js extends SjsonnetCrossModule with ScalaJSModule{
+  object js extends Cross[SjsonnetJsModule](crossScalaVersions:_*)
+  class SjsonnetJsModule(val crossScalaVersion: String) extends SjsonnetCrossModule with ScalaJSModule{
     def scalaJSVersion = "1.1.1"
     def platformSegment = "js"
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / "src-js"
+    )
     object test extends Tests with CrossTests
   }
-  object jvm extends SjsonnetCrossModule {
-    def mainClass = Some("sjsonnet.SjsonnetMain")
+  object jvm extends Cross[SjsonnetJvmModule](crossScalaVersions:_*)
+  class SjsonnetJvmModule(val crossScalaVersion: String) extends CommonJvmNative with SjsonnetCrossModule{
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::os-lib:0.7.1",
-      ivy"com.github.scopt::scopt::3.7.1",
       ivy"org.tukaani:xz::1.8"
     )
-    def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / "src-jvm",
+      millSourcePath / "src-jvm-native"
+    )
+    def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")
-    def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
+    def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
     object test extends Tests with CrossTests{
-      def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-jvm",
+        millSourcePath / "src-jvm-native"
+      )
+      def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
       def scalacOptions = Seq("-P:acyclic:force")
       def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
       def forkOptions = Seq("-Xss100m")
     }
-  }
-
-  object client extends JavaModule {
-    def ivyDeps = Agg(
-      ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
-        "net.java.dev.jna" -> "jna",
-        "net.java.dev.jna" -> "jna-platform"
+    object client extends JavaModule{
+      def ivyDeps = Agg(
+        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
+          "net.java.dev.jna" -> "jna",
+          "net.java.dev.jna" -> "jna-platform"
+        )
       )
-    )
-    object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
-      def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
-    }
-  }
-
-  object server extends ScalaModule{
-    def scalaVersion = crossScalaVersion
-    def moduleDeps = Seq(SjsonnetModule.this.jvm, client)
-    def ivyDeps = Agg(
-      ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
-        "net.java.dev.jna" -> "jna",
-        "net.java.dev.jna" -> "jna-platform"
-      ),
-      ivy"net.java.dev.jna:jna:4.5.0",
-      ivy"net.java.dev.jna:jna-platform:4.5.0"
-    )
-
-    override def prependShellScript = mill.modules.Jvm.universalScript(
-      shellCommands = {
-        def java(mainClass: String) =
-          s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=$sjsonnetVersion $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
-
-        s"""case "$$1" in
-           |  -i | --interactive )
-           |    ${java("sjsonnet.SjsonnetMain")}
-           |    ;;
-           |  *)
-           |    ${java("sjsonnet.client.SjsonnetClientMain")}
-           |    ;;
-           |esac""".stripMargin
-      },
-      cmdCommands = {
-        def java(mainClass: String) =
-          s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=$sjsonnetVersion %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
-
-        s"""if "%1" == "-i" set _I_=true
-           |if "%1" == "--interactive" set _I_=true
-           |if defined _I_ (
-           |  ${java("sjsonnet.SjsonnetMain")}
-           |) else (
-           |  ${java("sjsonnet.client.SjsonnetClientMain")}
-           |)""".stripMargin
+      object test extends Tests{
+        def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+        def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
       }
-    )
-    object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
-      def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
+    }
+    
+
+    object server extends ScalaModule{
+      def scalaVersion = crossScalaVersion
+      def moduleDeps = Seq(SjsonnetJvmModule.this, client)
+      def ivyDeps = Agg(
+        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
+          "net.java.dev.jna" -> "jna",
+          "net.java.dev.jna" -> "jna-platform"
+        ),
+        ivy"net.java.dev.jna:jna:4.5.0",
+        ivy"net.java.dev.jna:jna-platform:4.5.0"
+      )
+
+      override def prependShellScript = mill.modules.Jvm.universalScript(
+        shellCommands = {
+          def java(mainClass: String) =
+            s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=$sjsonnetVersion $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
+
+          s"""case "$$1" in
+            |  -i | --interactive )
+            |    ${java("sjsonnet.SjsonnetMain")}
+            |    ;;
+            |  *)
+            |    ${java("sjsonnet.client.SjsonnetClientMain")}
+            |    ;;
+            |esac""".stripMargin
+        },
+        cmdCommands = {
+          def java(mainClass: String) =
+            s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=$sjsonnetVersion %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
+
+          s"""if "%1" == "-i" set _I_=true
+            |if "%1" == "--interactive" set _I_=true
+            |if defined _I_ (
+            |  ${java("sjsonnet.SjsonnetMain")}
+            |) else (
+            |  ${java("sjsonnet.client.SjsonnetClientMain")}
+            |)""".stripMargin
+        }
+      )
+      object test extends Tests{
+        def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+        def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
+      }
     }
   }
+}
 
+trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
+  def artifactName = "sjsonnet"
+  def platformSegment: String
+  def crossScalaVersion = SjsonnetCrossModule.this.crossScalaVersion
+  def millSourcePath = super.millSourcePath / os.up
+
+  def ivyDeps = T { super.ivyDeps() ++
+    Agg(
+      ivy"com.lihaoyi::fastparse::2.2.4",
+      ivy"com.lihaoyi::pprint::0.5.9",
+      ivy"com.lihaoyi::ujson::1.0.0",
+      ivy"com.lihaoyi::scalatags::0.8.6",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
+    )
+  }
+  def publishVersion = sjsonnetVersion
+
+  def generatedSources = T{
+    os.write(
+      T.ctx().dest / "Version.scala",
+      s"""package sjsonnet
+          |object Version{
+          |  val version = ${pprint.Util.literalize(sjsonnetVersion)}
+          |}
+          |""".stripMargin
+    )
+    Seq(PathRef(T.ctx().dest / "Version.scala"))
+  }
+  def pomSettings = PomSettings(
+    description = artifactName(),
+    organization = "com.lihaoyi",
+    url = "https://github.com/lihaoyi/sjsonnet",
+    licenses = Seq(License.MIT),
+    versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
+    developers = Seq(
+      Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
+    )
+  )
+  trait CrossTests extends ScalaModule with TestModule{
+    def platformSegment = SjsonnetCrossModule.this.platformSegment
+    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.4")
+    def testFrameworks = Seq("utest.runner.Framework")
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / s"src-$platformSegment"
+    )
+  }
+}
+
+trait CommonJvmNative extends ScalaModule{
+  def mainClass = Some("sjsonnet.SjsonnetMain")
+  def ivyDeps = super.ivyDeps() ++ Agg(
+    ivy"com.lihaoyi::os-lib::0.7.1",
+    ivy"com.github.scopt::scopt::3.7.1"
+  )
 }

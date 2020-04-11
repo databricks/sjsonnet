@@ -492,7 +492,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                   s.extend(
                     newBindings,
                     newDollar = Some(s.dollar0.getOrElse(self)),
-                    newSelf = Some(self),
+                    newSelf = Some(self)
                   ),
                   implicitly
                 )

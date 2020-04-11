@@ -9,6 +9,8 @@ import sjsonnet.Cli.Config
 import scala.collection.mutable
 import scala.util.Try
 
+import scala.util.control.NonFatal
+
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
@@ -22,7 +24,7 @@ object SjsonnetMain {
       })
       .filter(p => allowedInputs.fold(true)(_(p)))
       .find(os.exists)
-      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e: Throwable => None})
+      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case NonFatal(e) => None})
   }
   def main(args: Array[String]): Unit = {
     val exitCode = main0(
@@ -87,11 +89,14 @@ object SjsonnetMain {
   def rendererForConfig(wr: Writer, config: Config) =
     if (config.yamlOut) new PrettyYamlRenderer(wr, indent = config.indent)
     else new Renderer(wr, indent = config.indent)
-  def handleWriteFile[T](f: => T): Either[String, T] =
-    Try(f).toEither.left.map{
-      case e: NoSuchFileException => s"open $f: no such file or directory"
-      case e => e.toString
+  def handleWriteFile[T](f: => T): Either[String, T] = {
+    try {
+      Right(f)
+    } catch {
+      case e: NoSuchFileException => Left(s"open $f: no such file or directory")
+      case NonFatal(e) => Left(e.toString)
     }
+  }
 
   def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
     handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs))
