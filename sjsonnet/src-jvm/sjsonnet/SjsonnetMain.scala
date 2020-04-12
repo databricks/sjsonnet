@@ -175,11 +175,14 @@ object SjsonnetMain {
         config.outputFile match{
           case None => materialized.map(_.toString)
           case Some(f) =>
+            val filePath = os.FilePath(f) match{
+              case _: os.Path => os.Path(f).relativeTo(os.pwd)
+              case _ => os.RelPath(f)
+            }
             for{
               materializedStr <- materialized
-              _ <- writeFile(os.RelPath(f), materializedStr.toString)
+              _ <- writeFile(filePath, materializedStr.toString)
             } yield ""
-
         }
     }
   }
