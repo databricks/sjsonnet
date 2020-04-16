@@ -20,8 +20,15 @@ object sjsonnet extends Module{
         Array(s"-L$libcryptoDir", "-lcrypto")
       }
     }
-    def nativeLinkingOptions = T { libcryptoLinkingOptions() ++ super.nativeLinkingOptions() }
-    def scalaNativeVersion = "0.4.0-M2"
+    def forkArgs = Seq("-Xmx4g")
+
+    def logLevel = NativeLogLevel.Debug
+    def nativeClang = os.Path("/usr/local/bin/zigclang")
+    def nativeClangPP = os.Path("/usr/local/bin/zigclangpp")
+    def nativeCompileOptions = Seq("-march=native")
+    def nativeTarget = "nativeasdc"
+    def nativeLinkingOptions = T { "-flto=thin" +: (libcryptoLinkingOptions() ++ super.nativeLinkingOptions()) }
+    def scalaNativeVersion = "0.4.0-SNAPSHOT"
     def platformSegment = "native"
     def sources = T.sources(
       millSourcePath / "src",
@@ -29,8 +36,11 @@ object sjsonnet extends Module{
       millSourcePath / "src-jvm-native"
     )
     object test extends Tests with CrossTests{
-      // def releaseMode = ReleaseMode.ReleaseFast
+      def releaseMode = ReleaseMode.ReleaseFast
       def nativeLinkingOptions = SjsonnetNativeModule.this.nativeLinkingOptions()
+      def nativeLinkStubs = true
+      def forkArgs = Seq("-Xmx4g")
+
       def sources = T.sources(
         millSourcePath / "src",
         millSourcePath / "src-native",
@@ -49,7 +59,7 @@ object sjsonnet extends Module{
     object test extends Tests with CrossTests
   }
   object jvm extends Cross[SjsonnetJvmModule](crossScalaVersions:_*)
-  class SjsonnetJvmModule(val crossScalaVersion: String) extends CommonJvmNative with SjsonnetCrossModule{
+  class SjsonnetJvmModule(val crossScalaVersion: String) extends SjsonnetCrossModule with CommonJvmNative{
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.tukaani:xz::1.8"
@@ -59,6 +69,21 @@ object sjsonnet extends Module{
       millSourcePath / "src-jvm",
       millSourcePath / "src-jvm-native"
     )
+    def nativeImage = T {
+      val classpath = runClasspath().map(_.path).mkString(":")
+      val outPath = T.ctx.dest / 'out
+        os.proc(
+          "native-image",
+          "--no-fallback",
+          "--allow-incomplete-classpath",
+          "--report-unsupported-elements-at-runtime",
+          "-cp",
+          classpath,
+          s"-H:Class=${mainClass().get}",
+          s"-H:Name=$outPath"
+        ).call()
+      PathRef(outPath)
+    }
     def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")
     def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
@@ -71,7 +96,7 @@ object sjsonnet extends Module{
       def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
       def scalacOptions = Seq("-P:acyclic:force")
       def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
-      def forkOptions = Seq("-Xss100m")
+      def forkArgs = Seq("-Xss100m")
     }
     object client extends JavaModule{
       def ivyDeps = Agg(
@@ -174,7 +199,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
   )
   trait CrossTests extends ScalaModule with TestModule{
     def platformSegment = SjsonnetCrossModule.this.platformSegment
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.4")
+    def ivyDeps = super.ivyDeps() ++ Agg(ivy"com.lihaoyi::utest:0.7.4")
     def testFrameworks = Seq("utest.runner.Framework")
     def sources = T.sources(
       millSourcePath / "src",
@@ -187,6 +212,6 @@ trait CommonJvmNative extends ScalaModule{
   def mainClass = Some("sjsonnet.SjsonnetMain")
   def ivyDeps = super.ivyDeps() ++ Agg(
     ivy"com.lihaoyi::os-lib::0.7.1",
-    ivy"com.github.scopt::scopt::3.7.1"
+    ivy"com.github.scopt::scopt::3.7.2"
   )
 }

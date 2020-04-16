@@ -1,8 +1,7 @@
 package sjsonnet
 
 object SjsonnetTestMain {
-  def main(args: Array[String]): Unit = {
-    val names = Seq(
+  val names = Seq(
       "arith_bool",
       "arith_float",
       "arith_string",
@@ -41,33 +40,53 @@ object SjsonnetTestMain {
       // disabled because it spams the console a lot
 //      "stdlib"
     )
+  val parseCache = sjsonnet.SjsonnetMain.createParseCache()
 
-    val start = System.currentTimeMillis()
+  def main(args: Array[String]): Unit = {
+    // Warmup
+    // runExternal("jsonnet", 20000)
+    // for(command <- Seq("sjsonnet", "go-jsonnet", "jsonnet", "sjsonnet-native-image")) {
+    //   val res = runExternal(command, 20000)
+    //   println(s"$command: $res")
+    // }
+    
+    // Warmup
+    run(10000)
+    println(run(20000))
+  }
+
+  def run(milliseconds: Int): Int = {
     var count = 0
-    val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 20000000){
+    val start = System.currentTimeMillis()
+    while(System.currentTimeMillis() - start < milliseconds){
       count += 1
-      for(name <- Seq(
-        "kube-config/sentry/dev/sentry.jsonnet",
-        "kubernetes/config/prometheus/prom-jobs/prod/azure/westus/prometheus.jsonnet",
-        "kube-config/shard/multitenant/aws/dev/us-west-2/shard.jsonnet"
-      )){
-
-//        println(name)
-//
-//        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
-        val path = os.pwd / os.up / "universe" / os.RelPath(name)
+      for(name <- names){
+        val dir = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+        val path = dir / os.RelPath(s"$name.jsonnet")
         val interp = new Interpreter(
           parseCache,
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),
-          SjsonnetMain.resolveImport(Array(OsPath(os.pwd / os.up / "universe")), None)
+          SjsonnetMain.resolveImport(Array(OsPath(dir)), None)
         )
         val res = interp.interpret(os.read(path), OsPath(path))
         assert(res.isRight)
       }
     }
-    println(count)
+    count
+  }
+
+  def runExternal(command: String, milliseconds: Int): Int = {
+    var count = 0
+    val start = System.currentTimeMillis()
+    while(System.currentTimeMillis() - start < milliseconds){
+      count += 1
+      for(name <- names) {
+        val dir = os.pwd / 'sjsonnet / 'test / 'resources / 'test_suite
+        os.proc(command, dir / s"$name.jsonnet").call()
+      }
+    }
+    count
   }
 }
