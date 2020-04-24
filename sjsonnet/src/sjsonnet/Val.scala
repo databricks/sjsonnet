@@ -259,20 +259,22 @@ object Val{
         }
       }
 
-      validateFunctionCall(passedArgsBindings, params, outerOffset)
+      val funDefFileScope: FileScope = defSiteScopes match {case None => fileScope case Some((s, fs)) => fs}
+      validateFunctionCall(passedArgsBindings, params, outerOffset, funDefFileScope)
 
       evalRhs(
         newScope,
         thisFile,
         evaluator,
-        defSiteScopes match{case None => fileScope case Some((s, fs)) => fs},
+        funDefFileScope,
         outerOffset
       )
     }
 
     def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
                              params: Params,
-                             outerOffset: Int)
+                             outerOffset: Int,
+                             defSiteFileScope: FileScope)
                             (implicit fileScope: FileScope, eval: EvalScope): Unit = {
 
       val seen = mutable.BitSet.empty
@@ -292,7 +294,7 @@ object Val{
         params.noDefaultIndices.filter(!seen(_)),
         outerOffset,
         (plural, names) => s"Function parameter$plural $names not bound in call"
-      )
+      )(defSiteFileScope, eval) // pass the definition site for the correct error message/names to be resolved
 
       Error.failIfNonEmpty(
         seen.filter(!params.allIndices(_)),
