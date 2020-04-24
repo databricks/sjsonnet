@@ -19,6 +19,14 @@ object ErrorTests extends TestSuite{
 
     assert(res == Left(expected))
   }
+
+  def checkImports(expected: String)(implicit tp: utest.framework.TestPath) = {
+    val res = eval(os.pwd / "sjsonnet" / "test" / "resources" / "imports" / s"error.${tp.value.mkString(".")}.jsonnet")
+
+    assert(res == Left(expected))
+  }
+
+
   val tests = Tests{
     test("01") - check(
       """sjsonnet.Error: foo
@@ -260,7 +268,27 @@ object ErrorTests extends TestSuite{
       """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
     )
 
-//    test("overflow") - check(
+    test("import_wrong_nr_args") - checkImports(
+      """|sjsonnet.Error: Function parameter y not bound in call
+         |    at .(sjsonnet/test/resources/imports/defsite.jsonnet:4:23)
+         |    at .(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
+         |""".stripMargin
+    )
+
+    test("wrong_named_arg") - checkImports(
+      """|sjsonnet.Error: Function has no parameter z
+         |    at .(sjsonnet/test/resources/imports/error.wrong_named_arg.jsonnet:3:6)
+         |    at .(sjsonnet/test/resources/imports/error.wrong_named_arg.jsonnet:3:6)
+         |""".stripMargin
+    )
+
+    test("too_many_arg") - checkImports(
+      """|sjsonnet.Error: Too many args, function has 2 parameter(s)
+         |    at .(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
+         |    at .(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
+         |""".stripMargin
+    )
+    //    test("overflow") - check(
 //      """sjsonnet.Error: my error message
 //        |    at .(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
 //        |""".stripMargin
