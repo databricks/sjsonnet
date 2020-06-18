@@ -82,7 +82,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("array_index_string") - check(
-      """sjsonnet.Error: attemped to index a array with string foo
+      """sjsonnet.Error: attempted to index a array with string foo
         |    at .(sjsonnet/test/resources/test_suite/error.array_index_string.jsonnet:17:10)
         |""".stripMargin
     )
