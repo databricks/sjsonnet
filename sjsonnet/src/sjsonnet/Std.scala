@@ -324,6 +324,17 @@ object Std {
     builtin("strReplaceAll", "str", "from", "to"){ (ev, fs, str: String, from: String, to: String) =>
       str.replaceAll(from, to)
     },
+
+    builtin("rstripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
+      rstripChars(str, chars.toList)
+    },
+    builtin("lstripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
+      lstripChars(str, chars.toList)
+    },
+    builtin("stripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
+      lstripChars(rstripChars(str, chars.toList), chars.toList)
+    },
+
     builtin("join", "sep", "arr"){ (ev, fs, sep: Val, arr: Val.Arr) =>
       val res: Val = sep match{
         case Val.Str(s) =>
@@ -927,4 +938,25 @@ object Std {
     val output = str.toSeq.sliding(1).toList
     Val.Arr(output.map(s => Val.Lazy(Val.Str(s.toString()))).toSeq)
   }
+
+  def rstripChars(str: String, charsList: List[Char]): String = {
+    var response = str
+    val len = response.length
+    if (len > 0 && charsList.contains(response.charAt(len - 1))) {
+      response = rstripChars(response.substring(0, len - 1), charsList)
+    } else {
+      response = str
+    }
+    response
+  }
+  def lstripChars(str: String, charsList: List[Char]): String = {
+    var response = str
+    if (response.length > 0 && charsList.contains(response.charAt(0))) {
+      response = lstripChars(response.substring(1), charsList)
+    } else {
+      response = str
+    }
+    response
+  }
+
 }
