@@ -21,16 +21,17 @@ object StdStripCharsTests extends TestSuite {
       eval("std.rstripChars(\" test test test \", \" \")").toString() ==> """" test test test""""
       eval("std.rstripChars(\"aaabbbbcccc\", \"ac\")").toString() ==> """"aaabbbb""""
       eval("std.rstripChars(\"cacabbbbaacc\", \"ac\")").toString() ==> """"cacabbbb""""
+      eval("std.rstripChars(\"cacabbcacabbaacc\", \"ac\")").toString() ==> """"cacabbcacabb""""
     }
     test("stdLStripChars") {
       eval("std.lstripChars(\" test test test \", \" \")").toString() ==> """"test test test """"
       eval("std.lstripChars(\"aaabbbbcccc\", \"ac\")").toString() ==> """"bbbbcccc""""
-      eval("std.lstripChars(\"cacabbbbaacc\", \"ac\")").toString() ==> """"bbbbaacc""""
+      eval("std.lstripChars(\"cacabbcacabbaacc\", \"ac\")").toString() ==> """"bbcacabbaacc""""
     }
     test("stdStripChars") {
       eval("std.stripChars(\" test test test \", \" \")").toString() ==> """"test test test""""
       eval("std.stripChars(\"aaabbbbcccc\", \"ac\")").toString() ==> """"bbbb""""
-      eval("std.stripChars(\"cacabbbbaacc\", \"ac\")").toString() ==> """"bbbb""""
+      eval("std.stripChars(\"cacabbcacabbaacc\", \"ac\")").toString() ==> """"bbcacabb""""
     }
 
   }
