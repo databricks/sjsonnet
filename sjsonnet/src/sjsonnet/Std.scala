@@ -154,6 +154,9 @@ object Std {
     builtin("mod", "a", "b"){ (ev, fs, a: Int, b: Int) =>
       a % b
     },
+    builtin("clamp", "x", "minVal", "maxVal"){ (ev, fs, x: Double, minVal: Double, maxVal: Double) =>
+      math.max(minVal, math.min(x, maxVal))
+    },
 
     builtin("makeArray", "sz", "func"){ (ev, fs, sz: Int, func: Applyer) =>
       Val.Arr(
