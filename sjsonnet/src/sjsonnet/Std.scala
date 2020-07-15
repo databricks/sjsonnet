@@ -274,6 +274,40 @@ object Std {
         }
       )
     },
+    builtin("flatMap", "func", "arr"){ (ev, fs, func: Applyer, arr: Val) =>
+      val res: Val = arr match {
+        case a: Val.Arr =>
+          val arrs = Val.Arr(
+            a.value.map{ i =>
+              Val.Lazy(func.apply(i))
+            }
+          )
+          val out = collection.mutable.Buffer.empty[Val.Lazy]
+          for(x <- arrs.value){
+            x.force match{
+              case Val.Null => // do nothing
+              case Val.Arr(v) => out.appendAll(v)
+              case x => out.append(Val.Lazy(x))
+            }
+          }
+          Val.Arr(out.toSeq)
+
+        case s: Val.Str =>
+          val builder = new StringBuilder()
+          for (c: Char <- s.value) {
+            val fres = func.apply(Val.Lazy(Val.Str(c.toString)))
+            builder.append(
+              fres match {
+                case fstr: Val.Str => fstr.value
+                case x => Materializer(fres)(ev).toString
+              }
+            )
+          }
+          Val.Str(builder.toString)
+      }
+      res
+    },
+
     builtin("filterMap", "filter_func", "map_func", "arr"){ (ev, fs, filter_func: Applyer, map_func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.flatMap { i =>
