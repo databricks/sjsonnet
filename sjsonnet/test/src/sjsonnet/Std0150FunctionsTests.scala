@@ -39,6 +39,16 @@ object Std0150FunctionsTests extends TestSuite {
 
       eval("std.member([['f', 'o', 'o'], ['b', 'a', 'r']], ['f', 'o', 'o'])") ==> ujson.True
     }
-
+    test("repeat") {
+      eval("std.repeat([], 0)") ==> ujson.Arr()
+      eval("std.repeat([1], 1)") ==> ujson.Arr(1)
+      eval("std.repeat([1, 2], 1)") ==> ujson.Arr(1, 2)
+      eval("std.repeat([1], 2)") ==> ujson.Arr(1, 1)
+      eval("std.repeat([1, 2], 2)") ==> ujson.Arr(1, 2, 1, 2)
+      eval("std.repeat('a', 1)") ==> ujson.Str("a")
+      eval("std.repeat('a', 4)") ==> ujson.Str("aaaa")
+      eval("std.repeat('ab', 4)") ==> ujson.Str("abababab")
+      eval("std.repeat('a', 0)") ==> ujson.Str("")
+    }
   }
 }

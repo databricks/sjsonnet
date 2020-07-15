@@ -373,6 +373,24 @@ object Std {
       }
       res
     },
+    builtin("repeat", "what", "count"){ (ev, fs, what: Val, count: Int) =>
+      val res: Val = what match {
+        case str: Val.Str =>
+          val builder = new StringBuilder
+          for (i <- 1 to count) {
+            builder.append(str.value)
+          }
+          Val.Str(builder.toString())
+        case a: Val.Arr =>
+          val out = collection.mutable.Buffer.empty[Val.Lazy]
+          for (i <- 1 to count) {
+            out.appendAll(a.value)
+          }
+          Val.Arr(out.toSeq)
+        case x => throw new Error.Delegate("std.repeat first argument must be an array or a string")
+      }
+      res
+    },
 
     builtin("flattenArrays", "arrs"){ (ev, fs, arrs: Val.Arr) =>
       val out = collection.mutable.Buffer.empty[Val.Lazy]
