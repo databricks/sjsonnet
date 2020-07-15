@@ -356,6 +356,24 @@ object Std {
       }
       res
     },
+    builtin("member", "arr", "x"){ (ev, fs, arr: Val, x: Val) =>
+      val res = arr match {
+        case str: Val.Str =>
+          val secondArg = x match {
+            case Val.Str(value) => value
+            case n => Materializer(x)(ev).toString //The behavior of 'member' when first arg is string and second arg is not string is undefined - we do our best here
+          }
+          str.value.contains(secondArg)
+        case a: Val.Arr =>
+          val c = a.value.count {
+            i => Materializer(i.force)(ev) == Materializer(x)(ev)
+          }
+          c > 0
+        case x => throw new Error.Delegate("std.member first argument must be an array or a string")
+      }
+      res
+    },
+
     builtin("flattenArrays", "arrs"){ (ev, fs, arrs: Val.Arr) =>
       val out = collection.mutable.Buffer.empty[Val.Lazy]
       for(x <- arrs.value){
@@ -367,6 +385,7 @@ object Std {
       }
       Val.Arr(out.toSeq)
     },
+
     builtin("manifestIni", "v"){ (ev, fs, v: Val) =>
       val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match{
