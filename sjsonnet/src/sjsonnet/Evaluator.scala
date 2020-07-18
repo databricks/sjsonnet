@@ -207,7 +207,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         try ref
         catch Error.tryCatchWrap(offset)
       case (lhs, rhs) =>
-        Error.fail(s"attemped to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
+        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
     }
   }
 
@@ -219,7 +219,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         .value(name, offset, scope.self0.get)
     } else visitExpr(value) match {
       case obj: Val.Obj => obj.value(name, offset)
-      case r => Error.fail(s"attemped to index a ${r.prettyName} with string ${name}", offset)
+      case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", offset)
     }
   }
 
