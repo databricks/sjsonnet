@@ -11,6 +11,8 @@ import sjsonnet.Expr.{BinaryOp, False, Params}
 import scala.collection.mutable
 import scala.collection.compat._
 import sjsonnet.Std.builtinWithDefaults
+import scala.util.matching.Regex
+
 import ujson.Value
 
 import util.control.Breaks._
@@ -326,13 +328,13 @@ object Std {
     },
 
     builtin("rstripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
-      str.replaceAll("[" + chars + "]+$", "")
+      str.replaceAll("[" + Regex.quote(chars) + "]+$", "")
     },
     builtin("lstripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
-      str.replaceAll("^[" + chars + "]+", "")
+      str.replaceAll("^[" + Regex.quote(chars) + "]+", "")
     },
     builtin("stripChars", "str", "chars"){ (ev, fs, str: String, chars: String) =>
-      str.replaceAll("[" + chars + "]+$", "").replaceAll("^[" + chars + "]+", "")
+      str.replaceAll("[" + Regex.quote(chars) + "]+$", "").replaceAll("^[" + Regex.quote(chars) + "]+", "")
     },
 
     builtin("join", "sep", "arr"){ (ev, fs, sep: Val, arr: Val.Arr) =>
