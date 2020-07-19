@@ -361,7 +361,7 @@ object Std {
         case str: Val.Str =>
           val secondArg = x match {
             case Val.Str(value) => value
-            case n => Materializer(x)(ev).toString //The behavior of 'member' when first arg is string and second arg is not string is undefined - we do our best here
+            case n => throw new Error.Delegate("std.member second argument must be a string, got " + x.prettyName)
           }
           str.value.contains(secondArg)
         case a: Val.Arr =>
@@ -369,7 +369,7 @@ object Std {
             i => Materializer(i.force)(ev) == Materializer(x)(ev)
           }
           c > 0
-        case x => throw new Error.Delegate("std.member first argument must be an array or a string")
+        case x => throw new Error.Delegate("std.member first argument must be an array or a string, got " + arr.prettyName)
       }
       res
     },

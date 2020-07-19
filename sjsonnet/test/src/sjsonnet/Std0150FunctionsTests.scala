@@ -32,8 +32,6 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.member(['f', 'o', 'o'], 'f')") ==> ujson.True
       eval("std.member(['f', 'o', 'o'], 'g')") ==> ujson.False
 
-      eval("std.member('foo', 123)") ==> ujson.False
-      eval("std.member('foo1', 1)") ==> ujson.True
       eval("std.member([1, 2, 3], 1)") ==> ujson.True
       eval("std.member([1, 2, 3], 4)") ==> ujson.False
 
