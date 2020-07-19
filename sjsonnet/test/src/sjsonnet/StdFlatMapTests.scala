@@ -23,6 +23,14 @@ object StdFlatMapTests extends TestSuite {
       eval("std.flatMap(function(x) if x == 2 then [] else [x * 3, x * 2], [1, 2, 3])") ==> ujson.Arr(3, 2, 9, 6)
 
       eval("std.flatMap(function(x) x + x, 'Hello')") ==> ujson.Str("HHeelllloo")
+
+      try {
+        eval("std.flatMap(function(x) 123, 'Hello')")
+        assert(false)
+      } catch {
+        case e: Exception =>
+          assert(e.getMessage().startsWith("""sjsonnet.Error: flatMap func must return string, got number"""))
+      }
     }
   }
 }
