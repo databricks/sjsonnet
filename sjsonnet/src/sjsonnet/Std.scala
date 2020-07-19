@@ -279,6 +279,37 @@ object Std {
         }
       )
     },
+    builtin("flatMap", "func", "arr"){ (ev, fs, func: Applyer, arr: Val) =>
+      val res: Val = arr match {
+        case a: Val.Arr =>
+          val arrResults = a.value.flatMap {
+            v => {
+              val fres = func.apply(v)
+              fres match {
+                case va: Val.Arr => va.value
+                case unknown => throw new Error.Delegate("flatMap func must return an array, not " + unknown)
+              }
+            }
+          }
+          Val.Arr(arrResults)
+
+        case s: Val.Str =>
+          val builder = new StringBuilder()
+          for (c: Char <- s.value) {
+            val fres = func.apply(Val.Lazy(Val.Str(c.toString)))
+            builder.append(
+              fres match {
+                case fstr: Val.Str => fstr.value
+                case Val.Null => ""
+                case x => throw Error.Delegate("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
+              }
+            )
+          }
+          Val.Str(builder.toString)
+      }
+      res
+    },
+
     builtin("filterMap", "filter_func", "map_func", "arr"){ (ev, fs, filter_func: Applyer, map_func: Applyer, arr: Val.Arr) =>
       Val.Arr(
         arr.value.flatMap { i =>
