@@ -156,6 +156,9 @@ object Std {
     builtin("mod", "a", "b"){ (ev, fs, a: Int, b: Int) =>
       a % b
     },
+    builtin("clamp", "x", "minVal", "maxVal"){ (ev, fs, x: Double, minVal: Double, maxVal: Double) =>
+      math.max(minVal, math.min(x, maxVal))
+    },
 
     builtin("makeArray", "sz", "func"){ (ev, fs, sz: Int, func: Applyer) =>
       Val.Arr(
@@ -366,6 +369,42 @@ object Std {
       }
       res
     },
+    builtin("member", "arr", "x"){ (ev, fs, arr: Val, x: Val) =>
+      val res = arr match {
+        case str: Val.Str =>
+          val secondArg = x match {
+            case Val.Str(value) => value
+            case n => throw new Error.Delegate("std.member second argument must be a string, got " + x.prettyName)
+          }
+          str.value.contains(secondArg)
+        case a: Val.Arr =>
+          val c = a.value.count {
+            i => Materializer(i.force)(ev) == Materializer(x)(ev)
+          }
+          c > 0
+        case x => throw new Error.Delegate("std.member first argument must be an array or a string, got " + arr.prettyName)
+      }
+      res
+    },
+    builtin("repeat", "what", "count"){ (ev, fs, what: Val, count: Int) =>
+      val res: Val = what match {
+        case str: Val.Str =>
+          val builder = new StringBuilder
+          for (i <- 1 to count) {
+            builder.append(str.value)
+          }
+          Val.Str(builder.toString())
+        case a: Val.Arr =>
+          val out = collection.mutable.Buffer.empty[Val.Lazy]
+          for (i <- 1 to count) {
+            out.appendAll(a.value)
+          }
+          Val.Arr(out.toSeq)
+        case x => throw new Error.Delegate("std.repeat first argument must be an array or a string")
+      }
+      res
+    },
+
     builtin("flattenArrays", "arrs"){ (ev, fs, arrs: Val.Arr) =>
       val out = collection.mutable.Buffer.empty[Val.Lazy]
       for(x <- arrs.value){
@@ -377,6 +416,7 @@ object Std {
       }
       Val.Arr(out.toSeq)
     },
+
     builtin("manifestIni", "v"){ (ev, fs, v: Val) =>
       val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match{
