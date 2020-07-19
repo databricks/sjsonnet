@@ -277,20 +277,16 @@ object Std {
     builtin("flatMap", "func", "arr"){ (ev, fs, func: Applyer, arr: Val) =>
       val res: Val = arr match {
         case a: Val.Arr =>
-          val arrs = Val.Arr(
-            a.value.map{ i =>
-              Val.Lazy(func.apply(i))
-            }
-          )
-          val out = collection.mutable.Buffer.empty[Val.Lazy]
-          for(x <- arrs.value){
-            x.force match{
-              case Val.Null => // do nothing
-              case Val.Arr(v) => out.appendAll(v)
-              case x => out.append(Val.Lazy(x))
+          val arrResults = a.value.flatMap {
+            v => {
+              val fres = func.apply(v)
+              fres match {
+                case va: Val.Arr => va.value
+                case unknown => throw new Error.Delegate("flatMap func must return an array, not " + unknown)
+              }
             }
           }
-          Val.Arr(out.toSeq)
+          Val.Arr(arrResults)
 
         case s: Val.Str =>
           val builder = new StringBuilder()
@@ -299,7 +295,8 @@ object Std {
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
-                case x => Materializer(fres)(ev).toString
+                case Val.Null => throw Error.Delegate("flatMap func result must not be null")
+                case x => throw Error.Delegate("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
               }
             )
           }
