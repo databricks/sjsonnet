@@ -295,7 +295,7 @@ object Std {
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
-                case Val.Null => throw Error.Delegate("flatMap func result must not be null")
+                case Val.Null => ""
                 case x => throw Error.Delegate("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
               }
             )

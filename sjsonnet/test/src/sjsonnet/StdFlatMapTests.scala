@@ -24,6 +24,8 @@ object StdFlatMapTests extends TestSuite {
 
       eval("std.flatMap(function(x) x + x, 'Hello')") ==> ujson.Str("HHeelllloo")
 
+      eval("std.flatMap(function (x) if x == \" \" then null else x, \"a b c d e\")") ==> ujson.Str("abcde")
+
       try {
         eval("std.flatMap(function(x) 123, 'Hello')")
         assert(false)
