@@ -61,7 +61,7 @@ object Cli{
       (c, v) => c.copy(yamlStream = true)
     ),
     Arg[Config, Unit](
-      "String", Some('S'),
+      "string", Some('S'),
       "Expect a string, manifest as plain text",
       (c, v) => c.copy(expectString = true)
     ),

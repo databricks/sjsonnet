@@ -1,7 +1,7 @@
 import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
-val sjsonnetVersion = "0.2.5"
+val sjsonnetVersion = "0.2.6"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.9", "2.13.1")
+object sjsonnet extends Cross[SjsonnetModule]("2.12.12", "2.13.3")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
   def millSourcePath = super.millSourcePath / ammonite.ops.up
   trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
@@ -15,10 +15,10 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.2.4",
+      ivy"com.lihaoyi::fastparse::2.3.0",
       ivy"com.lihaoyi::pprint::0.5.9",
-      ivy"com.lihaoyi::ujson::1.0.0",
-      ivy"com.lihaoyi::scalatags::0.8.6",
+      ivy"com.lihaoyi::ujson::1.2.0",
+      ivy"com.lihaoyi::scalatags::0.9.1",
       ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
     )
     def publishVersion = sjsonnetVersion
@@ -55,7 +55,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.0.0"
+    def scalaJSVersion = "1.1.1"
     def platformSegment = "js"
     object test extends Tests with CrossTests
   }
@@ -63,7 +63,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def mainClass = Some("sjsonnet.SjsonnetMain")
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::os-lib:0.6.3",
+      ivy"com.lihaoyi::os-lib:0.7.1",
       ivy"com.github.scopt::scopt::3.7.1",
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
