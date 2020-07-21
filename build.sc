@@ -21,14 +21,9 @@ object sjsonnet extends Module{
       }
     }
     def forkArgs = Seq("-Xmx4g")
-
-    def logLevel = NativeLogLevel.Debug
-    def nativeClang = os.Path("/usr/local/bin/zigclang")
-    def nativeClangPP = os.Path("/usr/local/bin/zigclangpp")
-    def nativeCompileOptions = Seq("-march=native")
-    def nativeTarget = "nativeasdc"
-    def nativeLinkingOptions = T { "-flto=thin" +: (libcryptoLinkingOptions() ++ super.nativeLinkingOptions()) }
-    def scalaNativeVersion = "0.4.0-SNAPSHOT"
+    def scoptVersion = "3.7.1"
+    def nativeLinkingOptions = T { libcryptoLinkingOptions() ++ super.nativeLinkingOptions() }
+    def scalaNativeVersion = "0.4.0-M2"
     def platformSegment = "native"
     def sources = T.sources(
       millSourcePath / "src",
@@ -84,6 +79,7 @@ object sjsonnet extends Module{
         ).call()
       PathRef(outPath)
     }
+    def scoptVersion = "3.7.1"
     def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")
     def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
@@ -199,7 +195,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
   )
   trait CrossTests extends ScalaModule with TestModule{
     def platformSegment = SjsonnetCrossModule.this.platformSegment
-    def ivyDeps = super.ivyDeps() ++ Agg(ivy"com.lihaoyi::utest:0.7.4")
+    def ivyDeps = super.ivyDeps() ++ Agg(ivy"com.lihaoyi::utest::0.7.4")
     def testFrameworks = Seq("utest.runner.Framework")
     def sources = T.sources(
       millSourcePath / "src",
@@ -210,6 +206,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
 
 trait CommonJvmNative extends ScalaModule{
   def mainClass = Some("sjsonnet.SjsonnetMain")
+  def scoptVersion: String
   def ivyDeps = super.ivyDeps() ++ Agg(
     ivy"com.lihaoyi::os-lib::0.7.1",
     ivy"com.github.scopt::scopt::3.7.2"
