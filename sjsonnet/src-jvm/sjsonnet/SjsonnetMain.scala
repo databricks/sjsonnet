@@ -75,10 +75,10 @@ object SjsonnetMain {
 
     result match{
       case Left(err) =>
-        if (!err.isEmpty) System.err.println(err)
+        if (!err.isEmpty) stderr.println(err)
         1
       case Right(str) =>
-        if (!str.isEmpty) System.out.println(str)
+        if (!str.isEmpty) stdout.println(str)
         0
     }
   }
