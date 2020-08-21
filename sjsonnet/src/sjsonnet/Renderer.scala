@@ -1,5 +1,5 @@
 package sjsonnet
-import java.io.StringWriter
+import java.io.{StringWriter, Writer}
 import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
@@ -13,7 +13,7 @@ import ujson.BaseRenderer
   * - Custom printing of empty dictionaries and arrays
   *
   */
-class Renderer(out: StringWriter = new java.io.StringWriter(),
+class Renderer(out: Writer = new java.io.StringWriter(),
                indent: Int = -1) extends BaseRenderer(out, indent){
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int) = {
@@ -40,7 +40,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('[')
@@ -48,7 +48,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
 
     depth += 1
     def subVisitor = Renderer.this
-    def visitValue(v: StringWriter, index: Int): Unit = {
+    def visitValue(v: Writer, index: Int): Unit = {
       empty = false
       flushBuffer()
       commaBuffered = true
@@ -65,7 +65,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')
@@ -78,7 +78,7 @@ class Renderer(out: StringWriter = new java.io.StringWriter(),
       flushBuffer()
       out.append(colonSnippet)
     }
-    def visitValue(v: StringWriter, index: Int): Unit = {
+    def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
     def visitEnd(index: Int) = {
@@ -212,7 +212,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
   }
 }
 
-class PythonRenderer(out: StringWriter = new java.io.StringWriter(),
+class PythonRenderer(out: Writer = new java.io.StringWriter(),
                      indent: Int = -1) extends BaseRenderer(out, indent){
 
   override def visitNull(index: Int) = {
