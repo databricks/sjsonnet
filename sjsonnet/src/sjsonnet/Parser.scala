@@ -270,7 +270,18 @@ object Parser{
 
   def objinside[_: P]: P[Expr.ObjBody] = P(
     member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
-  ).map{
+  ).flatMap { case t @ (exprs, _) =>
+    val seen = collection.mutable.Set.empty[String]
+    var overlap: String = null
+    exprs.foreach {
+      case Expr.Member.Field(_, Expr.FieldName.Fixed(n), _, _, _, _) =>
+        if(seen(n)) overlap = n
+        else seen.add(n)
+      case _ =>
+    }
+    if (overlap == null) Pass(t)
+    else Fail.opaque("no duplicate field: " + overlap)
+  }.map{
     case (exprs, None) => Expr.ObjBody.MemberList(exprs)
     case (exprs, Some(comps)) =>
       val preLocals = exprs

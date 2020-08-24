@@ -1,8 +1,10 @@
 package sjsonnet
 import utest._
 import Expr._
+import fastparse.Parsed
 object ParserTests extends TestSuite{
   def parse(s: String) = fastparse.parse(s, Parser.document(_)).get.value._1
+  def parseErr(s: String) = fastparse.parse(s, Parser.document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
   def tests = Tests{
     test("hello") {
       parse("true") ==> True(0)
@@ -41,6 +43,9 @@ object ParserTests extends TestSuite{
 //      parse("[true]") ==> Arr(Seq(True))
 //      parse("[1, 2]") ==> Arr(Seq(Num(1), Num(2)))
 //      parse("[1, [2, 3], 4]") ==> Arr(Seq(Num(1), Arr(Seq(Num(2), Num(3))), Num(4)))
+    }
+    test("duplicateFields") {
+      parseErr("{ a: 1, a: 2 }") ==> """Expected no duplicate field: a:1:14, found "}""""
     }
   }
 }
