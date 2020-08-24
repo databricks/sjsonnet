@@ -1,6 +1,7 @@
 package sjsonnet
 
-import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter}
+import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter, Writer}
+import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
 
 import sjsonnet.Cli.Config
@@ -75,10 +76,10 @@ object SjsonnetMain {
 
     result match{
       case Left(err) =>
-        if (!err.isEmpty) System.err.println(err)
+        if (!err.isEmpty) stderr.println(err)
         1
       case Right(str) =>
-        if (!str.isEmpty) System.out.println(str)
+        if (!str.isEmpty) stdout.println(str)
         0
     }
   }
@@ -105,15 +106,25 @@ object SjsonnetMain {
       config.preserveOrder
     )
 
-    def writeFile(f: os.RelPath, contents: String): Either[String, Unit] = {
-      Try(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
-        .toEither
-        .left
-        .map{
-          case e: NoSuchFileException => s"open $f: no such file or directory"
-          case e => e.toString
-        }
-    }
+    def handleWriteFile[T](f: => T): Either[String, T] =
+      Try(f).toEither.left.map{
+        case e: NoSuchFileException => s"open $f: no such file or directory"
+        case e => e.toString
+      }
+
+    def writeFile(f: os.RelPath, contents: String): Either[String, Unit] =
+      handleWriteFile(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
+
+    def writeToFile[U](f: os.RelPath, contents: Writer => Either[String, U]): Either[String, Unit] =
+      handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
+        try {
+          val buf = new BufferedOutputStream(out)
+          val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
+          val u = contents(wr)
+          wr.flush()
+          u.map(_ => ())
+        } finally out.close()
+      }
 
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
@@ -167,22 +178,20 @@ object SjsonnetMain {
               "whose elements hold the JSON for each document in the stream.")
         }
       case _ =>
-        val materialized = interp.interpret0(
+        def materialize(wr: Writer) = interp.interpret0(
           os.read(path),
           OsPath(path),
-          new Renderer(indent = config.indent)
+          new Renderer(wr, indent = config.indent)
         )
         config.outputFile match{
-          case None => materialized.map(_.toString)
+          case None =>
+            materialize(new StringWriter).map(_.toString)
           case Some(f) =>
             val filePath = os.FilePath(f) match{
               case _: os.Path => os.Path(f).relativeTo(os.pwd)
               case _ => os.RelPath(f)
             }
-            for{
-              materializedStr <- materialized
-              _ <- writeFile(filePath, materializedStr.toString)
-            } yield ""
+            writeToFile(filePath, materialize(_)).map(_ => "")
         }
     }
   }
