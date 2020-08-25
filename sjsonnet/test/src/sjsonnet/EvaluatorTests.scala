@@ -2,16 +2,26 @@ package sjsonnet
 
 import utest._
 object EvaluatorTests extends TestSuite{
-  def eval(s: String) = {
+  def interpret(s: String, strict: Boolean) =
     new Interpreter(
       SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       DummyPath(),
-      (_, _) => None
-    ).interpret(s, DummyPath("(memory)")) match{
+      (_, _) => None,
+      strict = strict
+    ).interpret(s, DummyPath("(memory)"))
+  def eval(s: String, strict: Boolean = false) = {
+    interpret(s, strict) match{
       case Right(x) => x
       case Left(e) => throw new Exception(e)
+    }
+  }
+  def evalErr(s: String, strict: Boolean = false) = {
+    interpret(s, strict) match{
+      case Right(x) => throw new Exception(s"Expected exception, got result: $x")
+      case Left(e) =>
+        e.split('\n').map(_.trim).mkString("\n") // normalize inconsistent indenation on JVM vs JS
     }
   }
   def tests = Tests{
@@ -299,6 +309,17 @@ object EvaluatorTests extends TestSuite{
       eval("'% 5.5f' % -123.456") ==> ujson.Str("-123.45600")
       eval("'%--+5.5f' % -123.456") ==> ujson.Str("-123.45600")
       eval("'%#-0- + 5.5f' % -123.456") ==> ujson.Str("-123.45600")
+    }
+    test("strict") {
+      eval("({ a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
+      evalErr("({ a: 1 } { b: 2 }).a", true) ==>
+        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at .(:1:11)""".stripMargin
+      eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
+      eval("local x = { c: 3 }; (x { a: 1 }).a", true) ==> ujson.Num(1)
+      evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", true) ==>
+        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at .(:1:31)""".stripMargin
     }
   }
 }

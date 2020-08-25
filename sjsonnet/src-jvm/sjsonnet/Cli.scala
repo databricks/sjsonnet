@@ -21,7 +21,8 @@ object Cli{
                     varBinding: Map[String, ujson.Value] = Map(),
                     tlaBinding: Map[String, ujson.Value] = Map(),
                     indent: Int = 3,
-                    preserveOrder: Boolean = false)
+                    preserveOrder: Boolean = false,
+                    strict: Boolean = false)
 
 
   def genericSignature(wd: os.Path) = Seq(
@@ -133,6 +134,11 @@ object Cli{
       "preserve-order", Some('p'),
       "Preserves order of keys in the resulting JSON",
       (c, v) => c.copy(preserveOrder = true)
+    ),
+    Arg[Config, Unit](
+      "strict", None,
+      "Enforce some additional syntax limitations",
+      (c, v) => c.copy(strict = true)
     ),
 
   )

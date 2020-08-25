@@ -103,7 +103,8 @@ object SjsonnetMain {
         config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
         allowedInputs
       ),
-      config.preserveOrder
+      preserveOrder = config.preserveOrder,
+      strict = config.strict
     )
 
     def handleWriteFile[T](f: => T): Either[String, T] =
