@@ -20,7 +20,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 importer: (Path, String) => Option[(Path, String)],
-                override val preserveOrder: Boolean = false) extends EvalScope{
+                override val preserveOrder: Boolean = false,
+                strict: Boolean) extends EvalScope{
   implicit def evalScope: EvalScope = this
 
   val loadedFileContents = mutable.Map.empty[Path, String]
@@ -80,11 +81,19 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Comp(offset, value, first, rest) =>
       Val.Arr(visitComp(first :: rest.toList, Seq(scope)).map(s => Val.Lazy(visitExpr(value)(s, implicitly))))
     case ObjExtend(offset, value, ext) => {
+      if(strict && isObjLiteral(value))
+        Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", offset)
       val original = visitExpr(value).cast[Val.Obj]
       val extension = visitObjBody(ext)
       extension.addSuper(original)
     }
   } catch Error.tryCatch(expr.offset)
+
+  private def isObjLiteral(expr: Expr): Boolean = expr match {
+    case _: Obj => true
+    case _: ObjExtend => true
+    case _ => false
+  }
 
   def visitId(offset: Int, value: Int)(implicit scope: ValScope, fileScope: FileScope): Val = {
     val ref = scope.bindings(value)

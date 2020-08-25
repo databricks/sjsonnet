@@ -14,14 +14,16 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: (Path, String) => Option[(Path, String)],
-                  preserveOrder: Boolean = false) {
+                  preserveOrder: Boolean = false,
+                  strict: Boolean = true) {
 
   val evaluator = new Evaluator(
     parseCache,
     extVars,
     wd,
     importer,
-    preserveOrder
+    preserveOrder,
+    strict
   )
 
   def interpret(txt: String, path: Path): Either[String, ujson.Value] = {
