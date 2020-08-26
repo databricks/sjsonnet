@@ -15,7 +15,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                   wd: Path,
                   importer: (Path, String) => Option[(Path, String)],
                   preserveOrder: Boolean = false,
-                  strict: Boolean = true) {
+                  strict: Boolean = false) {
 
   val evaluator = new Evaluator(
     parseCache,
