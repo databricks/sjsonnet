@@ -20,6 +20,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"com.lihaoyi::ujson::1.2.0",
       ivy"com.lihaoyi::scalatags::0.9.1",
       ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
+      ivy"com.google.re2j:re2j:1.3"
     )
     def publishVersion = sjsonnetVersion
 
@@ -57,7 +58,13 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
   object js extends SjsonnetCrossModule with ScalaJSModule{
     def scalaJSVersion = "1.1.1"
     def platformSegment = "js"
-    object test extends Tests with CrossTests
+    def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"org.webjars.npm:re2:1.10.3"
+    )
+
+    object test extends Tests with CrossTests {
+      override def moduleKind = T(mill.scalajslib.api.ModuleKind.CommonJSModule)
+    }
   }
   object jvm extends SjsonnetCrossModule {
     def mainClass = Some("sjsonnet.SjsonnetMain")
