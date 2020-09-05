@@ -179,11 +179,24 @@ object SjsonnetMain {
               "whose elements hold the JSON for each document in the stream.")
         }
       case _ =>
-        def materialize(wr: Writer) = interp.interpret0(
-          os.read(path),
-          OsPath(path),
-          new Renderer(wr, indent = config.indent)
-        )
+        def materialize(wr: Writer) = {
+          if (config.yamlOut) {
+
+            val str = new java.io.StringWriter
+            val res = interp.interpret0(
+              os.read(path),
+              OsPath(path),
+              new YamlRenderer(str, indent = config.indent)
+            )
+            wr.write(str.toString)
+            res
+          }
+          else interp.interpret0(
+            os.read(path),
+            OsPath(path),
+            new Renderer(wr, indent = config.indent)
+          )
+        }
         config.outputFile match{
           case None =>
             materialize(new StringWriter).map(_.toString)
