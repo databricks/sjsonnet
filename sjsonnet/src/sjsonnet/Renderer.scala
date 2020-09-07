@@ -375,7 +375,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   def write_double_quoted(text: String, split: Boolean = true, allowUnicode: Boolean = false) = {
     out.write('"')
     //      self.write_indicator('"', true)
-    var column = leftHandPrefixOffset + indent * (depth + 1)
+    var column = leftHandPrefixOffset + indent * (depth + 1) + 1 // +1 to include the open quote
     var start = 0
     var end = 0
     while (end <= text.length){
@@ -409,7 +409,6 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
             ???
           }
           column += data.length
-
           out.write(data)
           start = end+1
         }
@@ -417,6 +416,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       if (0 < end && end < text.length -1 && (ch == ' ' || start >= end)
         && column+(end-start) > 80 && split){
         val data = text.slice(start, end) + '\\'
+
         if (start < end){
           start = end
         }
