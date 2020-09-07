@@ -228,19 +228,29 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var firstElementInArray = false
   val newlinePattern = Pattern.compile("\n")
 
+  private def toHex(nibble: Int): Char = (nibble + (if (nibble >= 10) 87 else 48)).toChar
+
   override def visitString(s: CharSequence, index: Int) = {
 
     addSpaceAfterColon()
     flushBuffer()
     val len = s.length()
     if (len == 0) out.append("''")
-    else if (s.toString.contains(" \n")){
+    else if (s.toString == "\n") out.append("|2+\n")
+    else if (s.toString.contains(" \n") || s.toString.exists(c => c > '~')){
 
-      wrapString(ujson.write(s.toString), escapeNewlines = true)
+      wrapString(
+        ujson.write(s.toString).flatMap{
+          case c if c > '~' =>
+            "\\u" + toHex((c >> 12) & 15) + toHex((c >> 8) & 15) + toHex((c >> 4) & 15) + toHex(c & 15)
+          case c => String.valueOf(c)
+        },
+        escapeNewlines = true
+      )
       out
     } else if (s.toString.contains('\n')){
       val splits = newlinePattern.split(s, -1)
-      val blockOffsetNumeral = s.toString.takeWhile(_ == ' ').size match{case 0 => ""; case n => (depth + 1) * indent - n}
+      val blockOffsetNumeral = s.toString.takeWhile(_ == ' ').size match{case 0 => ""; case n => indent}
       val (blockStyle, dropRight) = (s.charAt(len - 1), if (len > 2) Some(s.charAt(len - 2)) else None) match{
         case ('\n', Some('\n')) => (s"|$blockOffsetNumeral+", 1)
         case ('\n', _) => (s"|$blockOffsetNumeral", 1)
@@ -357,7 +367,8 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     str.startsWith(" ")
   }
   def wrapString(s: String, escapeNewlines: Boolean = false) = {
-    val chunks0 = s.split(" ", -1)
+
+    val chunks0 = s.replace(" %", " \\uFF05").split(" ", -1)
     val chunks = collection.mutable.Buffer.empty[String]
     if (escapeNewlines) chunks.appendAll(chunks0)
     else for(chunk <- chunks0){
@@ -373,14 +384,18 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
 
     var currentOffset = leftHandPrefixOffset + indent * (depth + 1)
     var firstInLine = true
+    var firstLine = true
+
     for(chunk <- chunks) {
       // This logic doesn't actually ensure that the text is wrapped to fit within
       // 80 characters width, but instead follows the behavior of the common PyYAML
       // library. Thus it is expected for the wrapped text to over-shoot the 80
       // character mark by up to one token, which can be of varying width
-      if (!firstInLine && currentOffset > 80){
+      val maxWidth = if (!firstLine && escapeNewlines) 78 else 80
+      if (!firstInLine && currentOffset > maxWidth){
         if (escapeNewlines) out.write("\\\n")
         else out.write("\n")
+        firstLine = false
 
         out.write(" " * (indent * (depth + 1)))
         if (escapeNewlines) {
