@@ -228,7 +228,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var firstElementInArray = false
   val newlinePattern = Pattern.compile("\n")
 
-  private def toHex(nibble: Int): Char = (nibble + (if (nibble >= 10) 87 else 48)).toChar
+  private def toHex(nibble: Int): Char = (nibble + (if (nibble >= 10) 87 else 48)).toChar.toUpper
 
   override def visitString(s: CharSequence, index: Int) = {
 
@@ -238,15 +238,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     if (len == 0) out.append("''")
     else if (s.toString == "\n") out.append("|2+\n")
     else if (s.toString.contains(" \n") || s.toString.exists(c => c > '~')){
-
-      wrapString(
-        ujson.write(s.toString).flatMap{
-          case c if c > '~' =>
-            "\\u" + toHex((c >> 12) & 15) + toHex((c >> 8) & 15) + toHex((c >> 4) & 15) + toHex(c & 15)
-          case c => String.valueOf(c)
-        },
-        escapeNewlines = true
-      )
+      write_double_quoted(s.toString)
       out
     } else if (s.toString.contains('\n')){
       val splits = newlinePattern.split(s, -1)
@@ -366,12 +358,95 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     str.endsWith(" ") ||
     str.startsWith(" ")
   }
-  def wrapString(s: String, escapeNewlines: Boolean = false) = {
 
-    val chunks0 = s.replace(" %", " \\uFF05").split(" ", -1)
+  // Transcribed directly from PyYAML implementation
+  // https://github.com/yaml/pyyaml/blob/master/lib/yaml/emitter.py#L915-L985
+  val ESCAPE_REPLACEMENTS = Map(
+    '\0' ->     "0",
+    '\b' ->    "b",
+    '\t' ->    "t",
+    '\n' ->    "n",
+    '\f' ->    "f",
+    '\r' ->    "r",
+    '\"' ->     "\"",
+    '\\' ->     "\\",
+  )
+
+  def write_double_quoted(text: String, split: Boolean = true, allowUnicode: Boolean = false) = {
+    out.write('"')
+    //      self.write_indicator('"', true)
+    var column = leftHandPrefixOffset + indent * (depth + 1)
+    var start = 0
+    var end = 0
+    while (end <= text.length){
+      var ch: Character = null
+      if (end < text.length) {
+        ch = text(end)
+      }
+      if (
+        ch == null ||
+        "\"\\\u0085\u2028\u2029\uFEFF".contains(ch)  ||
+        !('\u0020' <= ch && ch <= '\u007E' ||
+          (allowUnicode && ('\u00A0' <= ch && ch <= '\uD7FF' || '\uE000' <= ch && ch <= '\uFFFD'))
+        )
+      ){
+
+        if (start < end){
+          val data = text.slice(start, end)
+          column += data.length
+          out.write(data)
+          start = end
+        }
+        if (ch != null){
+          var data = ""
+          if (ESCAPE_REPLACEMENTS.contains(ch)){
+            data = "\\"+ESCAPE_REPLACEMENTS(ch)
+          }else if(ch <= '\u00FF'){
+            data = "\\u" + toHex((ch >> 12) & 15) + toHex((ch >> 8) & 15) + toHex((ch >> 4) & 15) + toHex(ch & 15)
+          }else if(ch <= '\uFFFF'){
+            data = "\\u" + toHex((ch >> 12) & 15) + toHex((ch >> 8) & 15) + toHex((ch >> 4) & 15) + toHex(ch & 15)
+          }else{
+            ???
+          }
+          column += data.length
+
+          out.write(data)
+          start = end+1
+        }
+      }
+      if (0 < end && end < text.length -1 && (ch == ' ' || start >= end)
+        && column+(end-start) > 80 && split){
+        val data = text.slice(start, end) + '\\'
+        if (start < end){
+          start = end
+        }
+        column += data.length
+        out.write(data)
+        if (column > 80){
+
+          out.write("\n")
+          out.write(" " * (indent * (depth + 1)))
+          column = indent * (depth + 1)
+        }
+
+        //              self.write_indent()
+
+        if (text(start) == ' ') {
+          val data = "\\"
+          column += data.length
+
+          out.write(data)
+        }
+      }
+      end += 1
+    }
+    out.write('"')
+  }
+
+  def wrapString(s: String) = {
+
     val chunks = collection.mutable.Buffer.empty[String]
-    if (escapeNewlines) chunks.appendAll(chunks0)
-    else for(chunk <- chunks0){
+    for(chunk <- s.split(" ", -1)){
       (chunks.lastOption, chunk) match{
         case (None, "") => chunks.append(" ")
         case (None, v) => chunks.append(v)
@@ -391,16 +466,12 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       // 80 characters width, but instead follows the behavior of the common PyYAML
       // library. Thus it is expected for the wrapped text to over-shoot the 80
       // character mark by up to one token, which can be of varying width
-      val maxWidth = if (!firstLine && escapeNewlines) 78 else 80
+      val maxWidth = 80
       if (!firstInLine && currentOffset > maxWidth){
-        if (escapeNewlines) out.write("\\\n")
-        else out.write("\n")
+        out.write("\n")
         firstLine = false
 
         out.write(" " * (indent * (depth + 1)))
-        if (escapeNewlines) {
-          out.write("\\ ")
-        }
 
         currentOffset = indent * (depth + 1)
 

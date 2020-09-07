@@ -191,27 +191,35 @@ object SjsonnetMain {
         // YAML stream
         interp.interpret(os.read(path), OsPath(path)).flatMap {
           case arr: ujson.Arr =>
-            val renderedFiles: Seq[Either[String, String]] =
-              arr.value.toSeq.map{ v =>
+            val stream = arr.value.toSeq match{
+              case Nil => ""
+              case Seq(single) =>
                 val renderer =
                   if (config.yamlOut) new PrettyYamlRenderer(indent = config.indent)
                   else new Renderer(indent = config.indent)
-                Right(ujson.transform(v, renderer).toString)
-              }
-            renderedFiles.collect{case Left(err) => err} match{
-              case Nil =>
-                val docs = renderedFiles.collect{case Right(yaml) => yaml}
-                val stream = if (docs.isEmpty) "" else docs.mkString("\n---\n") + "\n"
-                config.outputFile match{
-                  case None => Right[String, String](stream)
-
-                  case Some(f) =>
-                    os.write(os.Path(f, os.pwd), stream)
-                    Right("")
+                val suffix =
+                  if (!single.isInstanceOf[ujson.Arr] && !single.isInstanceOf[ujson.Obj]) "\n..."
+                  else ""
+                single.transform(renderer).toString + suffix
+              case multiple =>
+                multiple.zipWithIndex.map{
+                  case (v, i) =>
+                    val renderer =
+                      if (config.yamlOut) new PrettyYamlRenderer(indent = config.indent)
+                      else new Renderer(indent = config.indent)
+                    val rendered = v.transform(renderer).toString
+                    if (!v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]) "--- " + rendered
+                    else if (i != 0) "---\n" + rendered
+                    else rendered
                 }
+                .mkString("\n")
+            }
 
-              case errs =>
-                Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
+            config.outputFile match{
+              case None => Right[String, String](stream)
+              case Some(f) =>
+                os.write(os.Path(f, os.pwd), stream + "\n")
+                Right("")
             }
 
           case _ => renderNormal()
