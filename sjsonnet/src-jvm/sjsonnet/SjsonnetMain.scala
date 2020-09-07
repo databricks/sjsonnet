@@ -127,6 +127,36 @@ object SjsonnetMain {
         } finally out.close()
       }
 
+    def renderNormal() = {
+      def materialize(wr: Writer) = {
+        if (config.yamlOut) {
+          val res = interp.interpret0(
+            os.read(path),
+            OsPath(path),
+            new PrettyYamlRenderer(wr, indent = config.indent)
+          )
+          wr.write('\n')
+          res
+        }
+        else interp.interpret0(
+          os.read(path),
+          OsPath(path),
+          new Renderer(wr, indent = config.indent)
+        )
+      }
+      config.outputFile match{
+        case None =>
+          materialize(new StringWriter).map(_.toString)
+        case Some(f) =>
+          val filePath = os.FilePath(f) match{
+            case _: os.Path => os.Path(f).relativeTo(os.pwd)
+            case _ => os.RelPath(f)
+          }
+          writeToFile(filePath, materialize(_)).map(_ => "")
+      }
+    }
+
+
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
         interp.interpret(os.read(path), OsPath(path)).flatMap{
@@ -163,50 +193,31 @@ object SjsonnetMain {
           case arr: ujson.Arr =>
             val renderedFiles: Seq[Either[String, String]] =
               arr.value.toSeq.map{ v =>
-                Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
+                val renderer =
+                  if (config.yamlOut) new PrettyYamlRenderer(indent = config.indent)
+                  else new Renderer(indent = config.indent)
+                Right(ujson.transform(v, renderer).toString)
               }
             renderedFiles.collect{case Left(err) => err} match{
               case Nil =>
                 val docs = renderedFiles.collect{case Right(yaml) => yaml}
-                val stream = if (docs.isEmpty) "" else docs.mkString("---\n", "\n---\n", "\n...")
-                Right[String, String](stream)
+                val stream = if (docs.isEmpty) "" else docs.mkString("\n---\n") + "\n"
+                config.outputFile match{
+                  case None => Right[String, String](stream)
+
+                  case Some(f) =>
+                    os.write(os.Path(f, os.pwd), stream)
+                    Right("")
+                }
+
               case errs =>
                 Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
             }
 
-          case _ =>
-            Left("error: stream mode: top-level object should be an array " +
-              "whose elements hold the JSON for each document in the stream.")
+          case _ => renderNormal()
         }
-      case _ =>
-        def materialize(wr: Writer) = {
-          if (config.yamlOut) {
+      case _ => renderNormal()
 
-            val str = new java.io.StringWriter
-            val res = interp.interpret0(
-              os.read(path),
-              OsPath(path),
-              new YamlRenderer(str, indent = config.indent)
-            )
-            wr.write(str.toString)
-            res
-          }
-          else interp.interpret0(
-            os.read(path),
-            OsPath(path),
-            new Renderer(wr, indent = config.indent)
-          )
-        }
-        config.outputFile match{
-          case None =>
-            materialize(new StringWriter).map(_.toString)
-          case Some(f) =>
-            val filePath = os.FilePath(f) match{
-              case _: os.Path => os.Path(f).relativeTo(os.pwd)
-              case _ => os.RelPath(f)
-            }
-            writeToFile(filePath, materialize(_)).map(_ => "")
-        }
     }
   }
 }
