@@ -298,6 +298,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
         "`",
         "\"", // ", ' Double and single quote
         "'",
+        " " // leading or trailing empty spaces need quotes to define them
       )
     )
     def yamlKeyword[_: P] = P(
@@ -319,32 +320,34 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       )
     )
 
-    def numerals[_: P] = P( CharsWhileIn("0-9") )
 
-    def yamlNumber[_: P] = P(
-      // Floating point numbers, possibly with exponentials
-      "-".? ~ (numerals.? ~ "." ~ numerals | numerals ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ numerals).? |
-      // Old-style octals
-      "-".? ~ "0" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? |
-      // Integers, octals, and hexadecimals
-      "-".? ~ ("0" ~ ("o" | "x")).? ~ (CharIn("1-9") ~ numerals.? | "0") |
+    def yamlNumber0[_: P] = P(
       // infinity
-      "-".? ~ ".inf"
+      ".inf" |
+      // Floating point numbers, possibly with exponentials
+      (CharsWhileIn("0-9").? ~ "." ~ CharsWhileIn("0-9") | CharsWhileIn("0-9") ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ CharsWhileIn("0-9")).? |
+      // Old-style octals
+      "0" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? |
+      // Integers, octals, and hexadecimals
+      ("0" ~ ("o" | "x")).? ~ (CharIn("1-9") ~ CharsWhileIn("0-9").? | "0")
     )
+
+    // Add a `CharIn` lookahead to bail out quickly if something cannot possibly be a number
+    def yamlNumber[_: P] = P( &(CharIn(".0-9\\-")) ~ "-".? ~ yamlNumber0 )
+
     // Strings and numbers aren't the only scalars that YAML can understand.
     // ISO-formatted date and datetime literals are also parsed.
     // date:                  2002-12-14
     // datetime:              2001-12-15T02:59:43.1Z
     // datetime_with_spaces:  2001-12-14 21:59:43.10 -5
 
-    def d[_: P] = P(CharIn("0-9"))
-
     def yamlDate[_: P] = P(
-      d ~ d ~ d ~ d ~ "-" ~ d ~ d.? ~ "-" ~ d ~ d.? ~
-      (("T" | " ") ~ d ~ d ~ ":" ~ d ~ d ~ ":" ~ d ~ d ~ ("." ~ d.rep).? ~ ((" " | "Z").? ~ ("-".? ~ d ~ d.?).?).?).?
+      CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ "-" ~
+      CharIn("0-9") ~ CharIn("0-9").? ~ "-" ~ CharIn("0-9") ~ CharIn("0-9").? ~
+      (("T" | " ") ~ CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") ~ ("." ~ CharIn("0-9").rep).? ~ ((" " | "Z").? ~ ("-".? ~ CharIn("0-9") ~ CharIn("0-9").?).?).?).?
     )
     // Not in the YAML, but included to match PyYAML behavior
-    def yamlTime[_: P] = P( d ~ d ~ ":" ~ d ~ d )
+    def yamlTime[_: P] = P( CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") )
 
     def parser[_: P] = P(
       yamlPunctuation | (yamlTime | yamlDate | yamlNumber | yamlKeyword) ~ End
@@ -354,9 +357,8 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     fastparse.parse(str, parser(_)).isSuccess ||
     str.contains(": ") ||
     str.contains(" #") ||
-    str.endsWith(":") ||
-    str.endsWith(" ") ||
-    str.startsWith(" ")
+    str.charAt(str.length - 1) == ':' ||
+    str.charAt(str.length - 1) == ' '
   }
 
   // Transcribed directly from PyYAML implementation
