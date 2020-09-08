@@ -321,16 +321,14 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     )
 
 
-    def yamlNumber0[_: P] = P(
-      // infinity
-      ".inf" |
-      // Floating point numbers, possibly with exponentials
-      (CharsWhileIn("0-9").? ~ "." ~ CharsWhileIn("0-9") | CharsWhileIn("0-9") ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ CharsWhileIn("0-9")).? |
-      // Old-style octals
-      "0" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? |
-      // Integers, octals, and hexadecimals
-      ("0" ~ ("o" | "x")).? ~ (CharIn("1-9") ~ CharsWhileIn("0-9").? | "0")
+    def digits[_: P] = P( CharsWhileIn("0-9") )
+    def yamlFloat[_: P] = P(
+      (digits.? ~ "." ~ digits | digits ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ digits).?
     )
+    def yamlOctalSuffix[_: P] = P( "x" ~ CharIn("1-9a-fA-F") ~ CharsWhileIn("0-9a-fA-F").? )
+    def yamlHexSuffix[_: P] = P( "o".? ~ CharIn("1-7") ~ CharsWhileIn("0-7").? )
+    def yamlOctalHex[_: P] = P( "0" ~ (yamlOctalSuffix | yamlHexSuffix) )
+    def yamlNumber0[_: P] = P( ".inf" | yamlFloat | yamlOctalHex | CharIn("1-9") ~ digits.? | "0" )
 
     // Add a `CharIn` lookahead to bail out quickly if something cannot possibly be a number
     def yamlNumber[_: P] = P( &(CharIn(".0-9\\-")) ~ "-".? ~ yamlNumber0 )
@@ -341,13 +339,17 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     // datetime:              2001-12-15T02:59:43.1Z
     // datetime_with_spaces:  2001-12-14 21:59:43.10 -5
 
-    def yamlDate[_: P] = P(
-      CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ "-" ~
-      CharIn("0-9") ~ CharIn("0-9").? ~ "-" ~ CharIn("0-9") ~ CharIn("0-9").? ~
-      (("T" | " ") ~ CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") ~ ("." ~ CharIn("0-9").rep).? ~ ((" " | "Z").? ~ ("-".? ~ CharIn("0-9") ~ CharIn("0-9").?).?).?).?
+    def fourDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") )
+    def oneTwoDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9").? )
+    def twoDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9") )
+    def dateTimeSuffix[_: P] = P(
+      ("T" | " ") ~ twoDigits ~ ":" ~ twoDigits ~ ":" ~ twoDigits ~
+      ("." ~ digits.?).? ~ ((" " | "Z").? ~ ("-".? ~ oneTwoDigits).?).?
     )
+    def yamlDate[_: P] = P( fourDigits ~ "-" ~ oneTwoDigits ~ "-" ~ oneTwoDigits ~ dateTimeSuffix.? )
+
     // Not in the YAML, but included to match PyYAML behavior
-    def yamlTime[_: P] = P( CharIn("0-9") ~ CharIn("0-9") ~ ":" ~ CharIn("0-9") ~ CharIn("0-9") )
+    def yamlTime[_: P] = P( twoDigits ~ ":" ~ twoDigits )
 
     def parser[_: P] = P(
       yamlPunctuation | (yamlTime | yamlDate | yamlNumber | yamlKeyword) ~ End
