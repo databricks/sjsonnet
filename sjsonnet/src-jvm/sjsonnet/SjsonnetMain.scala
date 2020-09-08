@@ -69,7 +69,7 @@ object SjsonnetMain {
         }else if (leftover.nonEmpty) {
           Left("error: Unknown arguments: " + leftover.mkString(" "))
         }else mainConfigured(
-          file, config, parseCache, stdin, stdout, stderr, wd, allowedInputs, importer
+          file, config, parseCache, wd, allowedInputs, importer
         )
       }
     } yield outputStr
@@ -84,12 +84,47 @@ object SjsonnetMain {
     }
   }
 
+  def rendererForConfig(wr: Writer, config: Config) =
+    if (config.yamlOut) new PrettyYamlRenderer(wr, indent = config.indent)
+    else new Renderer(wr, indent = config.indent)
+  def handleWriteFile[T](f: => T): Either[String, T] =
+    Try(f).toEither.left.map{
+      case e: NoSuchFileException => s"open $f: no such file or directory"
+      case e => e.toString
+    }
+
+  def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
+    handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs))
+
+  def writeToFile[U](config: Config, f: os.Path, contents: Writer => Either[String, U]): Either[String, Unit] =
+    handleWriteFile(os.write.over.outputStream(f, createFolders = config.createDirs)).flatMap { out =>
+      try {
+        val buf = new BufferedOutputStream(out)
+        val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
+        val u = contents(wr)
+        wr.flush()
+        u.map(_ => ())
+      } finally out.close()
+    }
+
+  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+    def materialize(wr: Writer) = {
+      val renderer = rendererForConfig(wr, config)
+      val res = interp.interpret0(os.read(path), OsPath(path), renderer)
+      if (config.yamlOut) wr.write('\n')
+      res
+    }
+    config.outputFile match{
+      case None => materialize(new StringWriter).map(_.toString)
+      case Some(f) => writeToFile(config, os.Path(f, wd), materialize(_)).map(_ => "")
+    }
+  }
+
+  def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+
   def mainConfigured(file: String,
                      config: Config,
                      parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
-                     stdin: InputStream,
-                     stdout: PrintStream,
-                     stderr: PrintStream,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
@@ -99,63 +134,13 @@ object SjsonnetMain {
       config.varBinding,
       config.tlaBinding,
       OsPath(wd),
-      importer = resolveImport(
-        config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
-        allowedInputs
-      ),
+      importer = importer match{
+        case Some(i) => (wd: Path, str: String) => i(wd, str).map(p => (OsPath(p), os.read(p)))
+        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
+      },
       preserveOrder = config.preserveOrder,
       strict = config.strict
     )
-
-    def handleWriteFile[T](f: => T): Either[String, T] =
-      Try(f).toEither.left.map{
-        case e: NoSuchFileException => s"open $f: no such file or directory"
-        case e => e.toString
-      }
-
-    def writeFile(f: os.RelPath, contents: String): Either[String, Unit] =
-      handleWriteFile(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
-
-    def writeToFile[U](f: os.RelPath, contents: Writer => Either[String, U]): Either[String, Unit] =
-      handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
-        try {
-          val buf = new BufferedOutputStream(out)
-          val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
-          val u = contents(wr)
-          wr.flush()
-          u.map(_ => ())
-        } finally out.close()
-      }
-
-    def renderNormal() = {
-      def materialize(wr: Writer) = {
-        if (config.yamlOut) {
-          val res = interp.interpret0(
-            os.read(path),
-            OsPath(path),
-            new PrettyYamlRenderer(wr, indent = config.indent)
-          )
-          wr.write('\n')
-          res
-        }
-        else interp.interpret0(
-          os.read(path),
-          OsPath(path),
-          new Renderer(wr, indent = config.indent)
-        )
-      }
-      config.outputFile match{
-        case None =>
-          materialize(new StringWriter).map(_.toString)
-        case Some(f) =>
-          val filePath = os.FilePath(f) match{
-            case _: os.Path => os.Path(f).relativeTo(os.pwd)
-            case _ => os.RelPath(f)
-          }
-          writeToFile(filePath, materialize(_)).map(_ => "")
-      }
-    }
-
 
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
@@ -173,7 +158,7 @@ object SjsonnetMain {
                     } else Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
                   }
                   relPath = os.RelPath(multiPath) / os.RelPath(f)
-                  _ <- writeFile(relPath, rendered)
+                  _ <- writeFile(config, wd / relPath, rendered)
                 } yield relPath
               }
             renderedFiles.collect{case Left(err) => err} match{
@@ -189,30 +174,26 @@ object SjsonnetMain {
         }
       case (None, true) =>
         // YAML stream
+
         interp.interpret(os.read(path), OsPath(path)).flatMap {
           case arr: ujson.Arr =>
             val stream = arr.value.toSeq match{
               case Nil => ""
               case Seq(single) =>
-                val renderer =
-                  if (config.yamlOut) new PrettyYamlRenderer(indent = config.indent)
-                  else new Renderer(indent = config.indent)
-                val suffix =
-                  if (!single.isInstanceOf[ujson.Arr] && !single.isInstanceOf[ujson.Obj]) "\n..."
-                  else ""
+                val renderer = rendererForConfig(new StringWriter(), config)
+                val suffix = if (isScalar(single)) "\n..." else ""
                 single.transform(renderer).toString + suffix
               case multiple =>
-                multiple.zipWithIndex.map{
-                  case (v, i) =>
-                    val renderer =
-                      if (config.yamlOut) new PrettyYamlRenderer(indent = config.indent)
-                      else new Renderer(indent = config.indent)
-                    val rendered = v.transform(renderer).toString
-                    if (!v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]) "--- " + rendered
-                    else if (i != 0) "---\n" + rendered
-                    else rendered
-                }
-                .mkString("\n")
+                multiple.zipWithIndex
+                  .map{
+                    case (v, i) =>
+                      val renderer = rendererForConfig(new StringWriter(), config)
+                      val rendered = v.transform(renderer).toString
+                      if (isScalar(v)) "--- " + rendered
+                      else if (i != 0) "---\n" + rendered
+                      else rendered
+                  }
+                  .mkString("\n")
             }
 
             config.outputFile match{
@@ -222,9 +203,9 @@ object SjsonnetMain {
                 Right("")
             }
 
-          case _ => renderNormal()
+          case _ => renderNormal(config, interp, path, wd)
         }
-      case _ => renderNormal()
+      case _ => renderNormal(config, interp, path, wd)
 
     }
   }
