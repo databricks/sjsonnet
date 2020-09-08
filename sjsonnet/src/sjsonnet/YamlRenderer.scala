@@ -366,7 +366,6 @@ object PrettyYamlRenderer{
     }
 
     def getEscapeSequenceForChar(ch: Char): String = (ch: Char) match{
-      case '\0' => "\\0"
       case '\b' => "\\b"
       case '\t' => "\\t"
       case '\n' => "\\n"
