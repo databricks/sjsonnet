@@ -22,7 +22,8 @@ object Cli{
                     tlaBinding: Map[String, ujson.Value] = Map(),
                     indent: Int = 3,
                     preserveOrder: Boolean = false,
-                    strict: Boolean = false)
+                    strict: Boolean = false,
+                    yamlOut: Boolean = false)
 
 
   def genericSignature(wd: os.Path) = Seq(
@@ -139,6 +140,11 @@ object Cli{
       "strict", None,
       "Enforce some additional syntax limitations",
       (c, v) => c.copy(strict = true)
+    ),
+    Arg[Config, Unit](
+      "yaml-out", None,
+      "Write output as a YAML document",
+      (c, v) => c.copy(yamlOut = true)
     ),
 
   )

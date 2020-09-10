@@ -69,7 +69,7 @@ object SjsonnetMain {
         }else if (leftover.nonEmpty) {
           Left("error: Unknown arguments: " + leftover.mkString(" "))
         }else mainConfigured(
-          file, config, parseCache, stdin, stdout, stderr, wd, allowedInputs, importer
+          file, config, parseCache, wd, allowedInputs, importer
         )
       }
     } yield outputStr
@@ -84,12 +84,49 @@ object SjsonnetMain {
     }
   }
 
+  def rendererForConfig(wr: Writer, config: Config) =
+    if (config.yamlOut) new PrettyYamlRenderer(wr, indent = config.indent)
+    else new Renderer(wr, indent = config.indent)
+  def handleWriteFile[T](f: => T): Either[String, T] =
+    Try(f).toEither.left.map{
+      case e: NoSuchFileException => s"open $f: no such file or directory"
+      case e => e.toString
+    }
+
+  def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
+    handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs))
+
+  def writeToFile[U](config: Config, wd: os.Path)(materialize: Writer => Either[String, U]): Either[String, String] = {
+
+    config.outputFile match{
+      case None => materialize(new StringWriter).map(_.toString)
+      case Some(f) =>
+        handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
+          try {
+            val buf = new BufferedOutputStream(out)
+            val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
+            val u = materialize(wr)
+            wr.flush()
+            u.map(_ => "")
+          } finally out.close()
+        }
+    }
+  }
+
+  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+    writeToFile(config, wd){ writer =>
+      val renderer = rendererForConfig(writer, config)
+      val res = interp.interpret0(os.read(path), OsPath(path), renderer)
+      if (config.yamlOut) writer.write('\n')
+      res
+    }
+  }
+
+  def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+
   def mainConfigured(file: String,
                      config: Config,
                      parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
-                     stdin: InputStream,
-                     stdout: PrintStream,
-                     stderr: PrintStream,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
@@ -99,33 +136,13 @@ object SjsonnetMain {
       config.varBinding,
       config.tlaBinding,
       OsPath(wd),
-      importer = resolveImport(
-        config.jpaths.map(os.Path(_, wd)).map(OsPath(_)),
-        allowedInputs
-      ),
+      importer = importer match{
+        case Some(i) => (wd: Path, str: String) => i(wd, str).map(p => (OsPath(p), os.read(p)))
+        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
+      },
       preserveOrder = config.preserveOrder,
       strict = config.strict
     )
-
-    def handleWriteFile[T](f: => T): Either[String, T] =
-      Try(f).toEither.left.map{
-        case e: NoSuchFileException => s"open $f: no such file or directory"
-        case e => e.toString
-      }
-
-    def writeFile(f: os.RelPath, contents: String): Either[String, Unit] =
-      handleWriteFile(os.write.over(os.Path(f, wd), contents, createFolders = config.createDirs))
-
-    def writeToFile[U](f: os.RelPath, contents: Writer => Either[String, U]): Either[String, Unit] =
-      handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
-        try {
-          val buf = new BufferedOutputStream(out)
-          val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
-          val u = contents(wr)
-          wr.flush()
-          u.map(_ => ())
-        } finally out.close()
-      }
 
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
@@ -143,7 +160,7 @@ object SjsonnetMain {
                     } else Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
                   }
                   relPath = os.RelPath(multiPath) / os.RelPath(f)
-                  _ <- writeFile(relPath, rendered)
+                  _ <- writeFile(config, wd / relPath, rendered)
                 } yield relPath
               }
             renderedFiles.collect{case Left(err) => err} match{
@@ -159,41 +176,34 @@ object SjsonnetMain {
         }
       case (None, true) =>
         // YAML stream
+
         interp.interpret(os.read(path), OsPath(path)).flatMap {
           case arr: ujson.Arr =>
-            val renderedFiles: Seq[Either[String, String]] =
-              arr.value.toSeq.map{ v =>
-                Right(ujson.transform(v, new Renderer(indent = config.indent)).toString)
+            writeToFile(config, wd){ writer =>
+              arr.value.toSeq match {
+                case Nil => //donothing
+                case Seq(single) =>
+                  val renderer = rendererForConfig(writer, config)
+                  single.transform(renderer)
+                  writer.write(if (isScalar(single)) "\n..." else "")
+                case multiple =>
+                  for((v, i) <- multiple.zipWithIndex){
+                    if (i > 0) writer.write('\n')
+                    if (isScalar(v)) writer.write("--- ")
+                    else if (i != 0) writer.write("---\n")
+                    val renderer = rendererForConfig(writer, config)
+                    v.transform(renderer)
+
+                  }
               }
-            renderedFiles.collect{case Left(err) => err} match{
-              case Nil =>
-                val docs = renderedFiles.collect{case Right(yaml) => yaml}
-                val stream = if (docs.isEmpty) "" else docs.mkString("---\n", "\n---\n", "\n...")
-                Right[String, String](stream)
-              case errs =>
-                Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
+              writer.write('\n')
+              Right("")
             }
 
-          case _ =>
-            Left("error: stream mode: top-level object should be an array " +
-              "whose elements hold the JSON for each document in the stream.")
+          case _ => renderNormal(config, interp, path, wd)
         }
-      case _ =>
-        def materialize(wr: Writer) = interp.interpret0(
-          os.read(path),
-          OsPath(path),
-          new Renderer(wr, indent = config.indent)
-        )
-        config.outputFile match{
-          case None =>
-            materialize(new StringWriter).map(_.toString)
-          case Some(f) =>
-            val filePath = os.FilePath(f) match{
-              case _: os.Path => os.Path(f).relativeTo(os.pwd)
-              case _ => os.RelPath(f)
-            }
-            writeToFile(filePath, materialize(_)).map(_ => "")
-        }
+      case _ => renderNormal(config, interp, path, wd)
+
     }
   }
 }

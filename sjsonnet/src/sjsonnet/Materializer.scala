@@ -29,7 +29,7 @@ object Materializer {
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x.force, visitor),
+            apply0(x.force, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
         }
@@ -49,7 +49,7 @@ object Materializer {
             objVisitor.visitValue(
               apply0(
                 obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly),
-                visitor
+                objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
               ),
               -1
             )
