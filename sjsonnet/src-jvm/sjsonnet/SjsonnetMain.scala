@@ -96,27 +96,29 @@ object SjsonnetMain {
   def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
     handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs))
 
-  def writeToFile[U](config: Config, f: os.Path, contents: Writer => Either[String, U]): Either[String, Unit] =
-    handleWriteFile(os.write.over.outputStream(f, createFolders = config.createDirs)).flatMap { out =>
-      try {
-        val buf = new BufferedOutputStream(out)
-        val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
-        val u = contents(wr)
-        wr.flush()
-        u.map(_ => ())
-      } finally out.close()
-    }
+  def writeToFile[U](config: Config, wd: os.Path)(materialize: Writer => Either[String, U]): Either[String, String] = {
 
-  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
-    def materialize(wr: Writer) = {
-      val renderer = rendererForConfig(wr, config)
-      val res = interp.interpret0(os.read(path), OsPath(path), renderer)
-      if (config.yamlOut) wr.write('\n')
-      res
-    }
     config.outputFile match{
       case None => materialize(new StringWriter).map(_.toString)
-      case Some(f) => writeToFile(config, os.Path(f, wd), materialize(_)).map(_ => "")
+      case Some(f) =>
+        handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
+          try {
+            val buf = new BufferedOutputStream(out)
+            val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
+            val u = materialize(wr)
+            wr.flush()
+            u.map(_ => "")
+          } finally out.close()
+        }
+    }
+  }
+
+  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+    writeToFile(config, wd){ writer =>
+      val renderer = rendererForConfig(writer, config)
+      val res = interp.interpret0(os.read(path), OsPath(path), renderer)
+      if (config.yamlOut) writer.write('\n')
+      res
     }
   }
 
@@ -177,30 +179,25 @@ object SjsonnetMain {
 
         interp.interpret(os.read(path), OsPath(path)).flatMap {
           case arr: ujson.Arr =>
-            val stream = arr.value.toSeq match{
-              case Nil => ""
-              case Seq(single) =>
-                val renderer = rendererForConfig(new StringWriter(), config)
-                val suffix = if (isScalar(single)) "\n..." else ""
-                single.transform(renderer).toString + suffix
-              case multiple =>
-                multiple.zipWithIndex
-                  .map{
-                    case (v, i) =>
-                      val renderer = rendererForConfig(new StringWriter(), config)
-                      val rendered = v.transform(renderer).toString
-                      if (isScalar(v)) "--- " + rendered
-                      else if (i != 0) "---\n" + rendered
-                      else rendered
-                  }
-                  .mkString("\n")
-            }
+            writeToFile(config, wd){ writer =>
+              arr.value.toSeq match {
+                case Nil => //donothing
+                case Seq(single) =>
+                  val renderer = rendererForConfig(writer, config)
+                  single.transform(renderer)
+                  writer.write(if (isScalar(single)) "\n..." else "")
+                case multiple =>
+                  for((v, i) <- multiple.zipWithIndex){
+                    if (i > 0) writer.write('\n')
+                    if (isScalar(v)) writer.write("--- ")
+                    else if (i != 0) writer.write("---\n")
+                    val renderer = rendererForConfig(writer, config)
+                    v.transform(renderer)
 
-            config.outputFile match{
-              case None => Right[String, String](stream)
-              case Some(f) =>
-                os.write(os.Path(f, os.pwd), stream + "\n")
-                Right("")
+                  }
+              }
+              writer.write('\n')
+              Right("")
             }
 
           case _ => renderNormal(config, interp, path, wd)

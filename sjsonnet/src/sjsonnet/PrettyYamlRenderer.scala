@@ -22,7 +22,6 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var topLevel = true
   var leftHandPrefixOffset = 0
   var firstElementInArray = false
-  val newlinePattern = Pattern.compile("\n")
 
   override def visitString(s: CharSequence, index: Int) = {
     addSpaceAfterColon()
