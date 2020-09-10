@@ -13,7 +13,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
  */
 class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indentArrayInObject: Boolean = false,
-                         indent: Int = 2,
+                         indent: Int,
                          idealWidth: Int = 80) extends BaseRenderer[Writer](out, indent){
   var newlineBuffered = false
   var dashBuffered = false
