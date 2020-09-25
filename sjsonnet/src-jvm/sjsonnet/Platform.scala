@@ -1,22 +1,35 @@
 package sjsonnet
+
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
+import org.tukaani.xz.LZMA2Options
+import org.tukaani.xz.XZOutputStream
+
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
-    val outputStream = new java.io.ByteArrayOutputStream(b.length)
-    val gzip = new java.util.zip.GZIPOutputStream(outputStream)
+    val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
+    val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
     gzip.write(b)
     gzip.close()
-    val gzippedBase64: String = java.util.Base64.getEncoder.encodeToString(outputStream.toByteArray)
+    val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
     outputStream.close()
     gzippedBase64
   }
   def gzipString(s: String): String = {
-    val outputStream = new java.io.ByteArrayOutputStream(s.length)
-    val gzip = new java.util.zip.GZIPOutputStream(outputStream)
-    gzip.write(s.getBytes())
-    gzip.close()
-    val gzippedBase64: String = java.util.Base64.getEncoder.encodeToString(outputStream.toByteArray)
+    gzipBytes(s.getBytes())
+  }
+  def xzBytes(b: Array[Byte]): String = {
+    val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
+    val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options())
+    xz.write(b)
+    xz.close()
+    val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
     outputStream.close()
-    gzippedBase64
+    xzedBase64
+  }
+  def xzString(s: String): String = {
+    xzBytes(s.getBytes())
   }
   def md5(s: String): String = {
     java.security.MessageDigest.getInstance("MD5")

@@ -65,6 +65,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"com.lihaoyi::os-lib:0.7.1",
       ivy"com.github.scopt::scopt::3.7.1",
+      ivy"org.tukaani:xz::1.8"
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")
@@ -101,7 +102,6 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"net.java.dev.jna:jna:4.5.0",
       ivy"net.java.dev.jna:jna-platform:4.5.0"
     )
-
 
     override def prependShellScript = mill.modules.Jvm.universalScript(
       shellCommands = {
