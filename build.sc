@@ -49,9 +49,16 @@ object sjsonnet extends Module{
     def platformSegment = "js"
     def sources = T.sources(
       millSourcePath / "src",
-      millSourcePath / "src-js"
+      millSourcePath / "src-js",
+      millSourcePath / "src-jvm-js",
     )
-    object test extends Tests with CrossTests
+    object test extends Tests with CrossTests {
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-js",
+        millSourcePath / "src-jvm-js"
+      )
+    }
   }
   object jvm extends Cross[SjsonnetJvmModule](crossScalaVersions:_*)
   class SjsonnetJvmModule(val crossScalaVersion: String) extends SjsonnetCrossModule with CommonJvmNative{
@@ -87,7 +94,8 @@ object sjsonnet extends Module{
       def sources = T.sources(
         millSourcePath / "src",
         millSourcePath / "src-jvm",
-        millSourcePath / "src-jvm-native"
+        millSourcePath / "src-jvm-native",
+        millSourcePath / "src-jvm-js"
       )
       def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
       def scalacOptions = Seq("-P:acyclic:force")
