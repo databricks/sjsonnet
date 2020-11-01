@@ -61,7 +61,6 @@ object FileTests extends TestSuite{
     test("shebang") - check()
     "slice.sugar" - check()
     test("std_all_hidden") - check()
-    test("stdlib") - check()
     test("text_block") - check()
     "tla.simple"- check()
     test("unicode") - check()
