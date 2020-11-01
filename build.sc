@@ -209,6 +209,6 @@ trait CommonJvmNative extends ScalaModule{
   def scoptVersion: String
   def ivyDeps = super.ivyDeps() ++ Agg(
     ivy"com.lihaoyi::os-lib::0.7.1",
-    ivy"com.github.scopt::scopt::3.7.2"
+    ivy"com.github.scopt::scopt::$scoptVersion"
   )
 }
