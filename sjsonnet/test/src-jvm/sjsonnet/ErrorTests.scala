@@ -139,7 +139,7 @@ object ErrorTests extends TestSuite{
     )
 
     test("function_duplicate_arg") - check(
-      """sjsonnet.Error: Function parameter x passed more than once
+      """sjsonnet.Error: binding parameter a second time: x
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |""".stripMargin
@@ -147,12 +147,6 @@ object ErrorTests extends TestSuite{
     test("function_duplicate_param") - check(
       """Parse error: Expected no duplicate parameter: x:17:14, found ") x\n"""".stripMargin
     )
-//    test("function_infinite_default") - check(
-//      """sjsonnet.Error: Parameter passed more than once: x
-//        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:2)
-//        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
-//        |""".stripMargin
-//    )
     test("function_too_many_args") - check(
       """sjsonnet.Error: Too many args, function has 2 parameter(s)
         |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)
@@ -288,20 +282,12 @@ object ErrorTests extends TestSuite{
          |    at .(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
          |""".stripMargin
     )
-    //    test("overflow") - check(
-//      """sjsonnet.Error: my error message
-//        |    at .(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
-//        |""".stripMargin
-//    )
-//    test("overflow2") - check(
-//      """sjsonnet.Error: my error message
-//        |    at .(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
-//        |""".stripMargin
-//    )
-//    test("overflow3") - check(
-//      """sjsonnet.Error: my error message
-//        |    at .(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
-//        |""".stripMargin
-//    )
+
+    test("too_many_arg_with_named_arg") - checkImports(
+      """|sjsonnet.Error: binding parameter a second time: x
+         |    at .(sjsonnet/test/resources/imports/error.too_many_arg_with_named_arg.jsonnet:2:2)
+         |    at .(sjsonnet/test/resources/imports/error.too_many_arg_with_named_arg.jsonnet:2:2)
+         |""".stripMargin
+    )
   }
 }

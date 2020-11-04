@@ -64,10 +64,13 @@ object Error {
 
   def failIfNonEmpty(names: collection.BitSet,
                      outerOffset: Int,
-                     formatMsg: (String, String) => String)
+                     formatMsg: (String, String) => String,
+                     // Allows the use of a custom file scope for computing the error message
+                     // for details see: https://github.com/databricks/sjsonnet/issues/83
+                     customFileScope: Option[FileScope] = None)
                     (implicit fileScope: FileScope, eval: EvalErrorScope) = if (names.nonEmpty){
     val plural = if (names.size > 1) "s" else ""
-    val nameSnippet = names.map(fileScope.indexNames).mkString(", ")
+    val nameSnippet = names.map(customFileScope.getOrElse(fileScope).indexNames).mkString(", ")
     fail(formatMsg(plural, nameSnippet), outerOffset)
   }
 
