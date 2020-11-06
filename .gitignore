@@ -4,4 +4,6 @@ output/
 .DS_STORE
 .idea_modules
 .idea
+.metals
+.vscode
 out/
