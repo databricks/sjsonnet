@@ -291,6 +291,18 @@ object Parser{
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
         .map(_.asInstanceOf[Expr.Member.BindStmt])
+      
+      /* 
+       * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
+       * 
+       * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
+       * Otherwise the field value will be overriden by the multiple iterations of forspec
+       */
+      (lhs, comps) match {
+        case (Expr.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>  
+          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Expr.Str].value}" """)
+        case _ => // do nothing
+      }
       Expr.ObjBody.ObjComp(preLocals, lhs, rhs, postLocals, comps._1, comps._2)
   }
 
