@@ -124,6 +124,7 @@ object Expr{
     case class ObjComp(preLocals: Seq[Member.BindStmt],
                        key: Expr,
                        value: Expr,
+                       plus: Boolean,
                        postLocals: Seq[Member.BindStmt],
                        first: ForSpec,
                        rest: Seq[CompSpec]) extends ObjBody

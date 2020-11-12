@@ -465,7 +465,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       }
       newSelf
 
-    case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
+    case ObjBody.ObjComp(preLocals, key, value, plus, postLocals, first, rest) =>
       lazy val compScope: ValScope = scope.extend(
         newSuper = None
       )
@@ -487,7 +487,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
           visitExpr(key)(s, implicitly) match {
             case Val.Str(k) =>
-              builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
+              builder += (k -> Val.Obj.Member(plus, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
                 visitExpr(value)(
                   s.extend(
                     newBindings,

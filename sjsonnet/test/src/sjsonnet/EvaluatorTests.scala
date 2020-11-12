@@ -327,6 +327,7 @@ object EvaluatorTests extends TestSuite{
 
       eval("{ ['foo']+: x for x in  []}", false) ==> ujson.Obj()
       eval("{ ['foo']+: x for x in  [1]}", false) ==> ujson.Obj("foo" -> 1)
+      eval("{ ['foo']+: [x] for x in [1]} + { ['foo']+: [x] for x in [2]}", false) ==> ujson.Obj("foo" -> ujson.Arr(1,2))
     }
     test("givenNoDuplicateFieldsInListComprehension1_expectSuccess") {
       eval("""{ ["bar"]: x for x in [-876.89]}""") ==> ujson.Obj("bar" -> -876.89)
