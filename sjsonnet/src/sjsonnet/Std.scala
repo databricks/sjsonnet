@@ -55,26 +55,20 @@ object Std {
       v1.getVisibleKeys().get(v2).isDefined
     },
     builtin("objectFields", "o"){ (ev, fs, v1: Val.Obj) =>
-      val keys = v1.getVisibleKeys()
-        .collect{case (k, false) => k}
-        .toSeq
-      val maybeSorted = if(ev.preserveOrder) {
-        keys
-      } else {
-        keys.sorted
-      }
-      Val.Arr(maybeSorted.map(k => Val.Lazy(Val.Str(k))))
+      val keys = getVisibleKeys(ev, v1)
+      Val.Arr(keys.map(k => Val.Lazy(Val.Str(k))))
     },
     builtin("objectFieldsAll", "o"){ (ev, fs, v1: Val.Obj) =>
-      val keys = v1.getVisibleKeys()
-        .collect{case (k, _) => k}
-        .toSeq
-      val maybeSorted = if(ev.preserveOrder) {
-        keys
-      } else {
-        keys.sorted
-      }
-      Val.Arr(maybeSorted.map(k => Val.Lazy(Val.Str(k))))
+      val keys = getAllKeys(ev, v1)
+      Val.Arr(keys.map(k => Val.Lazy(Val.Str(k))))
+    },
+    builtin("objectValues", "o"){ (ev, fs, v1: Val.Obj) =>
+      val keys = getVisibleKeys(ev, v1)
+      getObjValuesFromKeys(ev, fs, v1, keys)
+    },
+    builtin("objectValuesAll", "o"){ (ev, fs, v1: Val.Obj) =>
+      val keys = getAllKeys(ev, v1)
+      getObjValuesFromKeys(ev, fs, v1, keys)
     },
     builtin("type", "x"){ (ev, fs, v1: Val) =>
       v1 match{
@@ -1018,5 +1012,35 @@ object Std {
     var offset = 0
     val output = str.toSeq.sliding(1).toList
     Val.Arr(output.map(s => Val.Lazy(Val.Str(s.toString()))).toSeq)
+  }
+  
+  def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Seq[String] = {
+    val keys = v1.getVisibleKeys()
+      .collect{case (k, false) => k}
+      .toSeq
+    
+    maybeSortKeys(ev, keys)
+  }
+  
+  def getAllKeys(ev: EvalScope, v1: Val.Obj): Seq[String] = {
+    val keys = v1.getVisibleKeys()
+      .collect{case (k, _) => k}
+      .toSeq
+    
+    maybeSortKeys(ev, keys)
+  }
+  
+  def maybeSortKeys(ev: EvalScope, keys: Seq[String]): Seq[String] = {
+    if(ev.preserveOrder) {
+      keys
+    } else {
+      keys.sorted
+    }
+  }
+  
+  def getObjValuesFromKeys(ev: EvalScope, fs: FileScope, v1: Val.Obj, keys: Seq[String]): Val.Arr = {
+    Val.Arr(keys.map { k =>
+      Val.Lazy(v1.value(k, -1)(fs, ev))
+    })
   }
 }
