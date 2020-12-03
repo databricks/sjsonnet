@@ -65,7 +65,10 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"com.lihaoyi::os-lib:0.7.1",
       ivy"com.github.scopt::scopt::3.7.1",
-      ivy"org.tukaani:xz::1.8"
+      ivy"org.tukaani:xz::1.8",
+      ivy"org.openapi4j:openapi-core:1.0.4",
+      ivy"org.openapi4j:openapi-parser:1.0.4",
+      ivy"org.openapi4j:openapi-schema-validator:1.0.4",
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")

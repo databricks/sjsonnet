@@ -23,7 +23,10 @@ object Cli{
                     indent: Int = 3,
                     preserveOrder: Boolean = false,
                     strict: Boolean = false,
-                    yamlOut: Boolean = false)
+                    yamlOut: Boolean = false,
+                    openApiSchemas: Map[String, os.Path] = Map.empty,
+                    outputTypeRef: Option[String] = None,
+                    )
 
 
   def genericSignature(wd: os.Path) = Seq(
@@ -145,6 +148,19 @@ object Cli{
       "yaml-out", None,
       "Write output as a YAML document",
       (c, v) => c.copy(yamlOut = true)
+    ),
+    Arg[Config, String](
+      "openapi-file", None,
+      "<id>=<file> A file containing an OpenAPI schema for output validation (all refs must be local).",
+      (c, v) => v split('=') match{
+        case Array(id, f) =>
+          c.copy(openApiSchemas = c.openApiSchemas ++ Seq(id -> os.Path(f, wd)))
+      }
+    ),
+    Arg[Config, String](
+      "output-type-ref", None,
+      "A ref into one of the OpenAPI schemas that defines the type against which the output is validated.",
+      (c, v) => c.copy(outputTypeRef = Some(v))
     ),
 
   )

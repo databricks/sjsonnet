@@ -6,7 +6,6 @@ import java.nio.file.NoSuchFileException
 
 import sjsonnet.Cli.Config
 
-import scala.collection.mutable
 import scala.util.Try
 
 object SjsonnetMain {
@@ -63,13 +62,14 @@ object SjsonnetMain {
       (file, rest) = t2
       t3 <- Cli.groupArgs(rest, Cli.genericSignature(wd), config0)
       (config, leftover) = t3
+      validator <- Validator(config)
       outputStr <- {
         if (config.interactive){
           Left("error: -i/--interactive must be passed in as the first argument")
         }else if (leftover.nonEmpty) {
           Left("error: Unknown arguments: " + leftover.mkString(" "))
         }else mainConfigured(
-          file, config, parseCache, wd, allowedInputs, importer
+          file, config, parseCache, wd, allowedInputs, importer, validator
         )
       }
     } yield outputStr
@@ -113,10 +113,26 @@ object SjsonnetMain {
     }
   }
 
-  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+  def interpretAndValidate[T](config: Config, interp: Interpreter, validator: Validator,
+                              txt: String, path: Path, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+    config.outputTypeRef match {
+      case Some(tpref) =>
+        val json = interp.interpret0[ujson.Value](txt, path, ujson.Value)
+        json.flatMap(validator.validate(_, tpref)).map { v =>
+          visitor match {
+            case _: ujson.Value => v.asInstanceOf[T]
+            case _ =>
+              ujson.transform(v, visitor)
+          }
+        }
+      case None => interp.interpret0(txt, path, visitor)
+    }
+  }
+
+  def renderNormal(config: Config, interp: Interpreter, validator: Validator, path: os.Path, wd: os.Path) = {
     writeToFile(config, wd){ writer =>
       val renderer = rendererForConfig(writer, config)
-      val res = interp.interpret0(os.read(path), OsPath(path), renderer)
+      val res = interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), renderer)
       if (config.yamlOut) writer.write('\n')
       res
     }
@@ -129,7 +145,8 @@ object SjsonnetMain {
                      parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
-                     importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
+                     importer: Option[(Path, String) => Option[os.Path]] = None,
+                     validator: Validator): Either[String, String] = {
     val path = os.Path(file, wd)
     val interp = new Interpreter(
       parseCache,
@@ -146,7 +163,7 @@ object SjsonnetMain {
 
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
-        interp.interpret(os.read(path), OsPath(path)).flatMap{
+        interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), ujson.Value).flatMap{
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.RelPath]] =
               obj.value.toSeq.map{case (f, v) =>
@@ -177,7 +194,7 @@ object SjsonnetMain {
       case (None, true) =>
         // YAML stream
 
-        interp.interpret(os.read(path), OsPath(path)).flatMap {
+        interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), ujson.Value).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd){ writer =>
               arr.value.toSeq match {
@@ -200,9 +217,9 @@ object SjsonnetMain {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, path, wd)
+          case _ => renderNormal(config, interp, validator, path, wd)
         }
-      case _ => renderNormal(config, interp, path, wd)
+      case _ => renderNormal(config, interp, validator, path, wd)
 
     }
   }
