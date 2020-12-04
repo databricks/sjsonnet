@@ -597,6 +597,14 @@ object Std {
       }
     },
 
+    builtin("xz", "v"){ (offset, ev, fs, v: Val) =>
+      v match{
+        case Val.Str(_, value) => Platform.xzString(value)
+        case Val.Arr(_, bytes) => Platform.xzBytes(bytes.map(_.force.cast[Val.Num].value.toByte).toArray)
+        case x => throw new Error.Delegate("Cannot xz encode " + x.prettyName)
+      }
+    },
+
     builtin("encodeUTF8", "s"){ (offset, ev, fs, s: String) =>
       Val.Arr(Position(fs.currentFile, offset), s.getBytes(UTF_8).map(i => Val.Lazy(Val.Num(Position(fs.currentFile, offset), i & 0xff))))
     },

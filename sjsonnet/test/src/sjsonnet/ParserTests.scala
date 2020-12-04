@@ -17,35 +17,12 @@ object ParserTests extends TestSuite{
 
       parse("1 + 2 * 3") ==>
         BinaryOp(2, Num(0, 1), BinaryOp.`+`, BinaryOp(6, Num(4, 2), BinaryOp.`*`, Num(8, 3)))
-//
-//      parse("2 | 3 * 2 + 3 | 4") ==>
-//        BinaryOp(
-//          BinaryOp(
-//            Num(2),
-//            "|",
-//            BinaryOp(
-//              BinaryOp(
-//                Num(3),
-//                "*",
-//                Num(2)
-//              ),
-//              "+",
-//              Num(3)
-//            )
-//          ),
-//          "|",
-//          Num(4)
-//        )
-//    }
-//
-//    'array - {
-//      parse("[]") ==> Arr(Nil)
-//      parse("[true]") ==> Arr(Seq(True))
-//      parse("[1, 2]") ==> Arr(Seq(Num(1), Num(2)))
-//      parse("[1, [2, 3], 4]") ==> Arr(Seq(Num(1), Arr(Seq(Num(2), Num(3))), Num(4)))
     }
     test("duplicateFields") {
       parseErr("{ a: 1, a: 2 }") ==> """Expected no duplicate field: a:1:14, found "}""""
+    }
+    test("givenDuplicateFieldsInListComprehension_expectError") {
+      parseErr("""{ ["bar"]: x for x in [1, 2]}""") ==> """Expected no duplicate field: "bar" :1:29, found "}""""
     }
   }
 }

@@ -321,5 +321,18 @@ object EvaluatorTests extends TestSuite{
         """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
           |at .(:1:31)""".stripMargin
     }
+    test("objectDeclaration") {
+      eval("{ ['foo']: x for x in  []}", false) ==> ujson.Obj()
+      eval("{ ['foo']: x for x in  [1]}", false) ==> ujson.Obj("foo" -> 1)
+
+      eval("{ ['foo']+: x for x in  []}", false) ==> ujson.Obj()
+      eval("{ ['foo']+: x for x in  [1]}", false) ==> ujson.Obj("foo" -> 1)
+    }
+    test("givenNoDuplicateFieldsInListComprehension1_expectSuccess") {
+      eval("""{ ["bar"]: x for x in [-876.89]}""") ==> ujson.Obj("bar" -> -876.89)
+    }
+    test("givenNoDuplicateFieldsInListComprehension2_expectSuccess") {
+      eval("""{ ["bar_" + x]: x for x in [5,12]}""") ==> ujson.Obj("bar_5" -> 5, "bar_12" -> 12)
+    }
   }
 }

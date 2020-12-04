@@ -296,7 +296,8 @@ object Val{
       Error.failIfNonEmpty(
         repeats,
         outerOffset,
-        (plural, names) => s"Function parameter$plural $names passed more than once"
+        (plural, names) => s"binding parameter a second time: $names",
+        Some(defSiteFileScope)
       )
 
       Error.failIfNonEmpty(
