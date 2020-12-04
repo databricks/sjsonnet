@@ -69,7 +69,7 @@ object SjsonnetMain {
         }else if (leftover.nonEmpty) {
           Left("error: Unknown arguments: " + leftover.mkString(" "))
         }else mainConfigured(
-          file, config, parseCache, wd, allowedInputs, importer, validator
+          file, config, parseCache, wd, allowedInputs, importer, validator, stderr
         )
       }
     } yield outputStr
@@ -113,32 +113,6 @@ object SjsonnetMain {
     }
   }
 
-  def interpretAndValidate[T](config: Config, interp: Interpreter, validator: Validator,
-                              txt: String, path: Path, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
-    config.outputTypeRef match {
-      case Some(tpref) =>
-        for {
-          json <- interp.interpret0[ujson.Value](txt, path, ujson.Value)
-          valres <- validator.validate(json, tpref)
-        } yield {
-          visitor match {
-            case _: ujson.Value => json.asInstanceOf[T]
-            case _ => ujson.transform(json, visitor)
-          }
-        }
-      case None => interp.interpret0(txt, path, visitor)
-    }
-  }
-
-  def renderNormal(config: Config, interp: Interpreter, validator: Validator, path: os.Path, wd: os.Path) = {
-    writeToFile(config, wd){ writer =>
-      val renderer = rendererForConfig(writer, config)
-      val res = interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), renderer)
-      if (config.yamlOut) writer.write('\n')
-      res
-    }
-  }
-
   def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
   def mainConfigured(file: String,
@@ -147,7 +121,8 @@ object SjsonnetMain {
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None,
-                     validator: Validator): Either[String, String] = {
+                     validator: Validator,
+                     stderr: PrintStream): Either[String, String] = {
     val path = os.Path(file, wd)
     val interp = new Interpreter(
       parseCache,
@@ -162,9 +137,58 @@ object SjsonnetMain {
       strict = config.strict
     )
 
+    def interpretAndValidate[T](txt: String, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+      config.outputTypeRef match {
+        case Some(tpref) =>
+          for {
+            json <- interp.interpret0[ujson.Value](txt, OsPath(path), ujson.Value)
+            valres <- validator.validate(json, tpref)
+            _ <- {
+              val (ok, errors) = valres
+              if(errors.nonEmpty) {
+                val sm = interp.interpret0(txt, OsPath(path), new SourceMapVisitor).right.get
+                //sm.positions.toSeq.sortBy(_._1).foreach(println)
+                errors.foreach { ve =>
+                  val prefix = if(ve.sev == ValidationError.Error) "[error]" else "[warn] "
+                  val (posFile, posIdxs) = sm.findNearest(ve.at)
+                  stderr.println(s"$prefix Type error in ${ve.at}:")
+                  stderr.println(s"$prefix     ${ve.msg}")
+                  stderr.println(s"$prefix     at $posFile:$posIdxs")
+                  if(ve.schemaPath.grouped.nonEmpty) {
+                    stderr.println(s"$prefix     via schema ${ve.schemaPath.grouped.head}")
+                    ve.schemaPath.grouped.iterator.drop(1).foreach { s =>
+                      stderr.println(s"$prefix                $s")
+                    }
+                  }
+                  stderr.println(s"$prefix     while compiling $path")
+                  stderr.println(s"$prefix")
+                }
+              }
+              if(!ok) {
+                val errCount = errors.count(_.sev == ValidationError.Error)
+                Left(s"$errCount schema error(s) found.")
+              } else Right(())
+            }
+          } yield {
+            visitor match {
+              case _: ujson.Value => json.asInstanceOf[T]
+              case _ => ujson.transform(json, visitor)
+            }
+          }
+        case None => interp.interpret0(txt, OsPath(path), visitor)
+      }
+    }
+
+    def renderNormal() = writeToFile(config, wd){ writer =>
+      val renderer = rendererForConfig(writer, config)
+      val res = interpretAndValidate(os.read(path), renderer)
+      if (config.yamlOut) writer.write('\n')
+      res
+    }
+
     (config.multi, config.yamlStream) match {
       case (Some(multiPath), _) =>
-        interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), ujson.Value).flatMap{
+        interpretAndValidate(os.read(path), ujson.Value).flatMap{
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.RelPath]] =
               obj.value.toSeq.map{case (f, v) =>
@@ -195,7 +219,7 @@ object SjsonnetMain {
       case (None, true) =>
         // YAML stream
 
-        interpretAndValidate(config, interp, validator, os.read(path), OsPath(path), ujson.Value).flatMap {
+        interpretAndValidate(os.read(path), ujson.Value).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd){ writer =>
               arr.value.toSeq match {
@@ -218,9 +242,9 @@ object SjsonnetMain {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, validator, path, wd)
+          case _ => renderNormal()
         }
-      case _ => renderNormal(config, interp, validator, path, wd)
+      case _ => renderNormal()
 
     }
   }
