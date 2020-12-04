@@ -5,7 +5,10 @@ import java.util.regex.Pattern
 
 import ujson.BaseRenderer
 import upickle.core.{ArrVisitor, ObjVisitor}
+import CurrentPos.currentPos
+import fastparse.IndexedParserInput
 
+import scala.collection.mutable
 /**
  * A version of YamlRenderer that tries its best to make the output YAML as
  * pretty as possible: unquoted strings, de-dented lists, etc. Follows the PyYAML
@@ -22,7 +25,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var topLevel = true
   var leftHandPrefixOffset = 0
   var firstElementInArray = false
-
+  var bufferedComment = ""
   override def visitString(s: CharSequence, index: Int) = {
     addSpaceAfterColon()
     flushBuffer()
@@ -54,6 +57,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       PrettyYamlRenderer.writeWrappedString(str, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = s.length
     }
+    saveCurrentPos()
     out
   }
 
@@ -67,26 +71,44 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     addSpaceAfterColon()
     flushBuffer()
     out.append(RenderUtils.renderDouble(d))
+    saveCurrentPos()
     out
   }
 
+  val loadedFileContents = mutable.Map.empty[Path, IndexedParserInput]
+  def saveCurrentPos() = {
+    val current = currentPos.get()
+    val path = current.currentFile.asInstanceOf[OsPath].p
+    val parserInput = loadedFileContents
+      .getOrElse(current.currentFile, new IndexedParserInput(os.read(path)))
+
+    bufferedComment = " # " + path.relativeTo(os.pwd) + ":" + parserInput.prettyIndex(currentPos.get().offset)
+  }
   override def visitTrue(index: Int) = {
     addSpaceAfterColon()
-    super.visitTrue(index)
+    val out = super.visitTrue(index)
+    saveCurrentPos()
+    out
   }
 
   override def visitFalse(index: Int) = {
     addSpaceAfterColon()
-    super.visitFalse(index)
+    val out = super.visitFalse(index)
+    saveCurrentPos()
+    out
   }
 
   override def visitNull(index: Int) = {
     addSpaceAfterColon()
-    super.visitNull(index)
+    val out = super.visitNull(index)
+    saveCurrentPos()
+    out
   }
   override def flushBuffer() = {
     if (newlineBuffered) {
       afterColon = false
+      out.append(bufferedComment)
+      bufferedComment = ""
       YamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) {
@@ -133,6 +155,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       if (empty) {
         addSpaceAfterColon()
         out.append("[]")
+        saveCurrentPos()
       }
       newlineBuffered = false
       dashBuffered = false
@@ -160,6 +183,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       empty = false
       flushBuffer()
       out.append(":")
+      bufferedComment = ""
       afterKey = true
       afterColon = true
       newlineBuffered = false
@@ -172,6 +196,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       if (empty) {
         addSpaceAfterColon()
         out.append("{}")
+        saveCurrentPos()
       }
       newlineBuffered = false
       depth -= 1
@@ -183,6 +208,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
 
 
 object PrettyYamlRenderer{
+
 
   /**
    * Renders a multi-line string with all indentation and whitespace preserved
