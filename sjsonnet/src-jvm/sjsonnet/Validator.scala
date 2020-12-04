@@ -5,13 +5,14 @@ import java.net.URL
 import com.fasterxml.jackson.databind.JsonNode
 import org.openapi4j.core.model.v3.OAI3Context
 import org.openapi4j.core.util.TreeUtil
+import org.openapi4j.core.validation.ValidationSeverity
 import org.openapi4j.schema.validator.{ValidationContext, ValidationData}
+import org.openapi4j.schema.validator.v3.SchemaValidator
 import sjsonnet.Cli.Config
 
 import scala.util.control.NonFatal
-import org.openapi4j.schema.validator.v3.SchemaValidator
-
 import scala.collection.mutable
+import scala.collection.JavaConverters._
 
 class Validator private(schemas: Map[String, JsonNode]) {
   private val validators = mutable.Map.empty[String, SchemaValidator]
@@ -40,24 +41,33 @@ class Validator private(schemas: Map[String, JsonNode]) {
       }
   }
 
-  def validate(json: ujson.Value, tpref: String): Either[String, ujson.Value] = {
+  def validate(json: ujson.Value, tpref: String): Either[String, (Boolean, Seq[ValidationError])] = {
     //println("--- validating ujson: "+json.toString())
-    val jn = ujson.transform(json, new JacksonVisitor())
-    validate(jn, tpref).map(_ => json)
+    validate(ujson.transform(json, new JacksonVisitor()), tpref)
   }
 
-  def validate(json: JsonNode, tpref: String): Either[String, JsonNode] = {
+  def validate(json: JsonNode, tpref: String): Either[String, (Boolean, Seq[ValidationError])] = {
     for {
       validator <- getValidator(tpref)
-      _ <- {
+      res <- {
         val vd = new ValidationData[Unit]()
         //println("--- validating: "+json.toString())
         validator.validate(json, vd)
         //println("--- results: "+vd.results())
-        if(vd.isValid) Right(())
-        else Left("Schema validation failed: "+vd.results())
+        val errors = vd.results().items().asScala.iterator.collect {
+          case item if item.severity().ge(ValidationSeverity.WARNING) =>
+            var path = item.dataCrumbs()
+            if(path.startsWith(tpref)) path = path.substring(tpref.length)
+            if(path.startsWith(".")) path = path.substring(1)
+            ValidationError(
+              if(item.severity().ge(ValidationSeverity.ERROR)) ValidationError.Error else ValidationError.Warning,
+              JsonPath(path.split('.')),
+              item.message()
+            )
+        }.toSeq
+        Right((vd.isValid, errors))
       }
-    } yield json
+    } yield res
   }
 }
 
@@ -70,4 +80,17 @@ object Validator {
       Right(new Validator(schemas))
     } catch { case NonFatal(ex) => Left(ex.getMessage) }
   }
+}
+
+case class ValidationError(sev: ValidationError.Severity, at: JsonPath, msg: String)
+
+object ValidationError {
+  sealed trait Severity
+  case object Error extends Severity
+  case object Warning extends Severity
+  case object Info extends Severity
+}
+
+case class JsonPath(segments: Seq[String]) {
+  override def toString: String = segments.mkString(".")
 }

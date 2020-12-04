@@ -117,12 +117,13 @@ object SjsonnetMain {
                               txt: String, path: Path, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     config.outputTypeRef match {
       case Some(tpref) =>
-        val json = interp.interpret0[ujson.Value](txt, path, ujson.Value)
-        json.flatMap(validator.validate(_, tpref)).map { v =>
+        for {
+          json <- interp.interpret0[ujson.Value](txt, path, ujson.Value)
+          valres <- validator.validate(json, tpref)
+        } yield {
           visitor match {
-            case _: ujson.Value => v.asInstanceOf[T]
-            case _ =>
-              ujson.transform(v, visitor)
+            case _: ujson.Value => json.asInstanceOf[T]
+            case _ => ujson.transform(json, visitor)
           }
         }
       case None => interp.interpret0(txt, path, visitor)
