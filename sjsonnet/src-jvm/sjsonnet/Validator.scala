@@ -3,11 +3,12 @@ package sjsonnet
 import java.net.URL
 
 import com.fasterxml.jackson.databind.JsonNode
-import org.openapi4j.core.model.v3.OAI3Context
+import org.openapi4j.core.model.v3.OAI3SchemaKeywords.{TYPE_ARRAY, TYPE_BOOLEAN, TYPE_INTEGER, TYPE_NUMBER, TYPE_OBJECT, TYPE_STRING}
+import org.openapi4j.core.model.v3.{OAI3, OAI3Context}
 import org.openapi4j.core.util.TreeUtil
-import org.openapi4j.core.validation.ValidationSeverity
-import org.openapi4j.schema.validator.{ValidationContext, ValidationData}
-import org.openapi4j.schema.validator.v3.SchemaValidator
+import org.openapi4j.core.validation.{ValidationResult, ValidationResults, ValidationSeverity}
+import org.openapi4j.schema.validator.{BaseJsonValidator, JsonValidator, ValidationContext, ValidationData}
+import org.openapi4j.schema.validator.v3.{SchemaValidator, ValidatorInstance}
 import sjsonnet.Cli.Config
 
 import scala.util.control.NonFatal
@@ -17,6 +18,48 @@ import scala.collection.mutable.ArrayBuffer
 
 class Validator private(schemas: Map[String, JsonNode]) {
   private val validators = mutable.Map.empty[String, SchemaValidator]
+
+  object intOrStringFormatVal extends ValidatorInstance {
+    def apply(ctx: ValidationContext[OAI3], schemaNode: JsonNode, schemaParentNode: JsonNode, parentSchema: SchemaValidator): JsonValidator = {
+      val isIntOrString = schemaNode.textValue() == "int-or-string"
+      new BaseJsonValidator[OAI3](ctx, schemaNode, schemaParentNode, parentSchema) {
+        override def validate(valueNode: JsonNode, validation: ValidationData[_]): Boolean = {
+          if(isIntOrString) false // skip default validator (which doesn't know int-or-string)
+          else true
+        }
+      }
+    }
+  }
+
+  object intOrStringTypeVal extends ValidatorInstance {
+    private val ERR = new ValidationResult(ValidationSeverity.ERROR, 1027, "Type expected 'int' or 'string', found '%s'.")
+    private val CRUMB_INFO = new ValidationResults.CrumbInfo("x-int-or-string", true)
+
+    def apply(ctx: ValidationContext[OAI3], schemaNode: JsonNode, schemaParentNode: JsonNode, parentSchema: SchemaValidator): JsonValidator = {
+      val isIntOrString = Option(schemaParentNode.get("format")).map(_.textValue()).getOrElse(null) == "int-or-string"
+      new BaseJsonValidator[OAI3](ctx, schemaNode, schemaParentNode, parentSchema) {
+        override def validate(valueNode: JsonNode, validation: ValidationData[_]): Boolean = {
+          if(isIntOrString) {
+            if(!valueNode.isTextual && !valueNode.isIntegralNumber) {
+              validation.add(CRUMB_INFO, ERR, getTypeFromValue(valueNode))
+            }
+            false
+          } else true
+        }
+      }
+    }
+
+    private def getTypeFromValue(valueNode: JsonNode): String = {
+      if (valueNode.isContainerNode) {
+        if (valueNode.isObject) TYPE_OBJECT else TYPE_ARRAY
+      }
+      else if (valueNode.isTextual) TYPE_STRING
+      else if (valueNode.isIntegralNumber) TYPE_INTEGER
+      else if (valueNode.isNumber) TYPE_NUMBER
+      else if (valueNode.isBoolean) TYPE_BOOLEAN
+      else "null"
+    }
+  }
 
   def getValidator(tpref: String): Either[String, SchemaValidator] = validators.get(tpref) match {
     case Some(v) => Right(v)
@@ -33,7 +76,10 @@ class Validator private(schemas: Map[String, JsonNode]) {
           if(n.isMissingNode) Left(s"Type ref $tpref not found in schema $doc")
           else {
             val ctx = new OAI3Context(new URL("file:/"), root)
-            Right(new SchemaValidator(new ValidationContext(ctx), tpref, n))
+            val valctx = new ValidationContext[OAI3](ctx)
+            valctx.addValidator("format", intOrStringFormatVal)
+            valctx.addValidator("type", intOrStringTypeVal)
+            Right(new SchemaValidator(valctx, tpref, n))
           }
         }
       } yield {

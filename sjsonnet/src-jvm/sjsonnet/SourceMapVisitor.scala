@@ -25,7 +25,7 @@ class SourceMapVisitor extends ujson.JsVisitor[SourceMap, SourceMap] { self =>
 
   def visitArray(length: Int, index: Int): ArrVisitor[SourceMap, SourceMap] = new ArrVisitor[SourceMap, SourceMap] {
     saveCurrentPos()
-    var idx = 1
+    var idx = 0
     path = idx.toString :: path
     def subVisitor: Visitor[_, _] = self
     def visitValue(v: SourceMap, index: Int): Unit = {
