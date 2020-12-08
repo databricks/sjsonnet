@@ -4,7 +4,6 @@ import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStre
 import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
 
-import sjsonnet.Cli.Config
 
 import scala.collection.mutable
 import scala.util.Try
@@ -49,29 +48,28 @@ object SjsonnetMain {
             allowedInputs: Option[Set[os.Path]] = None,
             importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
 
+    val parser = mainargs.ParserForClass[Config]
+    val name = s"Sjsonnet ${sjsonnet.Version.version}"
+    val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
     val result = for{
-      t <- Cli.groupArgs(args.toList, Cli.genericSignature(wd), Cli.Config()).left.map{
-        err => err + "\n" + Cli.help(wd)
+      config <- parser.constructEither(
+        args,
+        customName = name, customDoc = doc,
+        autoPrintHelpAndExit = None
+      ).left.map{
+        err => err + "\n" + parser.helpText(customName = name, customDoc = doc)
       }
-      (config0, leftover) = t
-      t2 <- {
-        leftover match{
-          case file :: rest => Right((file, rest))
-          case _ => Left("error: Need to pass in a jsonnet file to evaluate\n" + Cli.help(wd))
+      file <- {
+        if (config.interactive.value) {
+          Left("error: -i/--interactive must be passed in as the first argument")
+        }else config.rest.value match{
+          case Seq(file) => Right(file)
+          case Seq(file, rest@_*) =>
+            Left("error: Unknown arguments: " + rest.mkString(" "))
+          case _ => Left("error: Need to pass in a jsonnet file to evaluate\n" + parser.helpText(customName = name, customDoc = doc))
         }
       }
-      (file, rest) = t2
-      t3 <- Cli.groupArgs(rest, Cli.genericSignature(wd), config0)
-      (config, leftover) = t3
-      outputStr <- {
-        if (config.interactive){
-          Left("error: -i/--interactive must be passed in as the first argument")
-        }else if (leftover.nonEmpty) {
-          Left("error: Unknown arguments: " + leftover.mkString(" "))
-        }else mainConfigured(
-          file, config, parseCache, wd, allowedInputs, importer
-        )
-      }
+      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer)
     } yield outputStr
 
     result match{
@@ -85,7 +83,7 @@ object SjsonnetMain {
   }
 
   def rendererForConfig(wr: Writer, config: Config) =
-    if (config.yamlOut) new PrettyYamlRenderer(wr, indent = config.indent)
+    if (config.yamlOut.value) new PrettyYamlRenderer(wr, indent = config.indent)
     else new Renderer(wr, indent = config.indent)
   def handleWriteFile[T](f: => T): Either[String, T] =
     Try(f).toEither.left.map{
@@ -94,14 +92,14 @@ object SjsonnetMain {
     }
 
   def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
-    handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs))
+    handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs.value))
 
   def writeToFile[U](config: Config, wd: os.Path)(materialize: Writer => Either[String, U]): Either[String, String] = {
 
     config.outputFile match{
       case None => materialize(new StringWriter).map(_.toString)
       case Some(f) =>
-        handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs)).flatMap { out =>
+        handleWriteFile(os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)).flatMap { out =>
           try {
             val buf = new BufferedOutputStream(out)
             val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
@@ -117,7 +115,7 @@ object SjsonnetMain {
     writeToFile(config, wd){ writer =>
       val renderer = rendererForConfig(writer, config)
       val res = interp.interpret0(os.read(path), OsPath(path), renderer)
-      if (config.yamlOut) writer.write('\n')
+      if (config.yamlOut.value) writer.write('\n')
       res
     }
   }
@@ -131,20 +129,57 @@ object SjsonnetMain {
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
     val path = os.Path(file, wd)
+    var varBinding = Map.empty[String, ujson.Value]
+    config.extStr.map(_.split('=')).foreach{
+      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
+      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.Str(v))
+    }
+    config.extStrFile.map(_.split('=')).foreach {
+      case Array(x, v) =>
+        varBinding = varBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
+    }
+    config.extCode.map(_.split('=')).foreach {
+      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.read(System.getenv(x)))
+      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.read(v))
+    }
+    config.extCodeFile.map(_.split('=')).foreach {
+      case Array(x, v) =>
+        varBinding = varBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
+    }
+
+    var tlaBinding = Map.empty[String, ujson.Value]
+
+    config.tlaStr.map(_.split('=')).foreach{
+      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
+      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(v))
+    }
+    config.tlaStrFile.map(_.split('=')).foreach {
+      case Array(x, v) =>
+        tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
+    }
+    config.tlaCode.map(_.split('=')).foreach {
+      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(System.getenv(x)))
+      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(v))
+    }
+    config.tlaCodeFile.map(_.split('=')).foreach {
+      case Array(x, v) =>
+        tlaBinding = tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
+    }
+
     val interp = new Interpreter(
       parseCache,
-      config.varBinding,
-      config.tlaBinding,
+      varBinding,
+      tlaBinding,
       OsPath(wd),
       importer = importer match{
         case Some(i) => (wd: Path, str: String) => i(wd, str).map(p => (OsPath(p), os.read(p)))
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
-      preserveOrder = config.preserveOrder,
-      strict = config.strict
+      preserveOrder = config.preserveOrder.value,
+      strict = config.strict.value
     )
 
-    (config.multi, config.yamlStream) match {
+    (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
         interp.interpret(os.read(path), OsPath(path)).flatMap{
           case obj: ujson.Obj =>
@@ -152,7 +187,7 @@ object SjsonnetMain {
               obj.value.toSeq.map{case (f, v) =>
                 for{
                   rendered <- {
-                    if (config.expectString) {
+                    if (config.expectString.value) {
                       v match {
                         case ujson.Str(s) => Right(s)
                         case _ => Left("expected string result, got: " + v.getClass)

@@ -64,7 +64,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def platformSegment = "jvm"
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"com.lihaoyi::os-lib:0.7.1",
-      ivy"com.github.scopt::scopt::3.7.1",
+      ivy"com.lihaoyi::mainargs::0.1.4",
       ivy"org.tukaani:xz::1.8"
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
