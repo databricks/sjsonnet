@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.2.7</version>
+    <version>0.2.8</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.2.7" // SBT
-ivy"com.lihaoyi::sjsonnet:0.2.7" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.2.8" // SBT
+ivy"com.lihaoyi::sjsonnet:0.2.m" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/lihaoyi/sjsonnet/releases/download/0.2.7/sjsonnet.jar>
+- <https://github.com/lihaoyi/sjsonnet/releases/download/0.2.8/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.2.7/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.2.8/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.2.7/sjsonnet.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.2.8/sjsonnet.js > sjsonnet.js
 
 $ node
 
@@ -240,6 +240,13 @@ To publish, run the following commands:
 
 ## Changelog
 
+### 0.2.8
+
+- Allow direct YAML output generation via `--yaml-out`
+- Do not allow duplicate field in object when evaluating list list comprehension [#100](https://github.com/databricks/sjsonnet/pull/100)
+- Fix compiler crash when '+' signal is true in a field declaration inside a list comprehension [#98](https://github.com/databricks/sjsonnet/pull/98)
+- Fix error message for too many arguments with at least one named arg [#97](https://github.com/databricks/sjsonnet/pull/97)
+ 
 ### 0.2.7
 
 - Streaming JSON output to disk for lower memory usage [#85](https://github.com/databricks/sjsonnet/pull/85)
