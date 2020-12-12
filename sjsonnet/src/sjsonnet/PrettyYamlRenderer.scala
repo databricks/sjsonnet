@@ -78,11 +78,19 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   val loadedFileContents = mutable.Map.empty[Path, IndexedParserInput]
   def saveCurrentPos() = {
     val current = currentPos.get()
-    val path = current.currentFile.asInstanceOf[OsPath].p
-    val parserInput = loadedFileContents
-      .getOrElse(current.currentFile, new IndexedParserInput(os.read(path)))
+    if (current != null){
 
-    bufferedComment = " # " + path.relativeTo(os.pwd) + ":" + parserInput.prettyIndex(currentPos.get().offset)
+      val path = current.currentFile.asInstanceOf[OsPath].p
+      val offsetStr =
+        if (current.currentFile.toString.contains("(materialize)")) ""
+        else {
+          val parserInput = loadedFileContents
+            .getOrElse(current.currentFile, new IndexedParserInput(os.read(path)))
+          ":" + parserInput.prettyIndex(currentPos.get().offset)
+        }
+
+      bufferedComment = " # " + path.relativeTo(os.pwd) + offsetStr
+    }
   }
   override def visitTrue(index: Int) = {
     addSpaceAfterColon()
@@ -170,6 +178,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     topLevel = false
     def subVisitor = PrettyYamlRenderer.this
     def visitKey(index: Int) = {
+
       if (empty){
         leftHandPrefixOffset = 0
 
@@ -183,6 +192,8 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       empty = false
       flushBuffer()
       out.append(":")
+      if (currentPos.get() != null) saveCurrentPos()
+      out.append(bufferedComment)
       bufferedComment = ""
       afterKey = true
       afterColon = true

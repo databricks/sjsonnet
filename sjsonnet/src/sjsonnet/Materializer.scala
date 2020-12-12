@@ -39,7 +39,7 @@ object Materializer {
         arrVisitor.visitEnd(-1)
 
       case obj: Val.Obj =>
-        currentPos.set(obj.pos);
+        currentPos.set(obj.pos)
         obj.triggerAllAsserts(obj)
 
         val keysUnsorted = obj.getVisibleKeys().toArray
@@ -48,12 +48,22 @@ object Materializer {
 
         for(t <- keys) {
           val (k, hidden) = t
-          if (!hidden){ 
+          if (!hidden){
+            val value = obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly)
+
+            currentPos.set(
+              value match{
+                case v: Val.Obj if v.getVisibleKeys().nonEmpty => value.pos
+                case v: Val.Arr if v.value.nonEmpty => value.pos
+                case _ => null
+              }
+            )
             objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
+
+
+
             objVisitor.visitValue(
-              apply0(
-                obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly),
-                objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
+              apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
               ),
               -1
             )
