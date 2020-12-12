@@ -161,7 +161,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitAssert(offset: Int, value: Expr, msg: Option[Expr], returned: Expr)
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
-    if (visitExpr(value) != Val.True) {
+    if (!visitExpr(value).isInstanceOf[Val.True]) {
       msg match {
         case None => Error.fail("Assertion failed", offset)
         case Some(msg) =>
@@ -418,7 +418,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         value.collect {
           case Member.AssertStmt(value, msg) =>
 
-            if (visitExpr(value)(newScope, fileScope) != Val.True) {
+            if (!visitExpr(value)(newScope, fileScope).isInstanceOf[Val.True]) {
               msg match{
                 case None => Error.fail("Assertion failed", value.offset)
                 case Some(msg) =>

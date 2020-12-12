@@ -227,7 +227,7 @@ object Std {
       v.isInstanceOf[Val.Str]
     },
     builtin("isBoolean", "v"){ (offset, ev, fs, v: Val) =>
-      v == Val.True || v == Val.False
+      v.isInstanceOf[Val.True] || v.isInstanceOf[Val.False]
     },
     builtin("isNumber", "v"){ (offset, ev, fs, v: Val) =>
       v.isInstanceOf[Val.Num]
@@ -251,7 +251,7 @@ object Std {
       Val.Arr(
         Position(fs.currentFile, offset),
         arr.value.filter{ i =>
-          func.apply(i) == Val.True
+          func.apply(i).isInstanceOf[Val.True]
         }
       )
     },
@@ -324,7 +324,7 @@ object Std {
         Position(fs.currentFile, offset),
         arr.value.flatMap { i =>
           val x = i.force
-          if (filter_func.apply(Val.Lazy(x)) != Val.True) None
+          if (!filter_func.apply(Val.Lazy(x)).isInstanceOf[Val.True]) None
           else Some(Val.Lazy(map_func.apply(Val.Lazy(x))))
         }
       )
@@ -739,7 +739,7 @@ object Std {
     builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(0))) { (offset, args, fs, ev) =>
       val keyF = args("keyF")
 
-      if (keyF == Val.False) {
+      if (keyF.isInstanceOf[Val.False]) {
         val ujson.Arr(mArr) = Materializer(args("arr"))(ev)
         val mx = Materializer(args("x"))(ev)
         mArr.contains(mx)
