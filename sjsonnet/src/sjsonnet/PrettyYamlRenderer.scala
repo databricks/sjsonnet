@@ -5,7 +5,6 @@ import java.util.regex.Pattern
 
 import ujson.BaseRenderer
 import upickle.core.{ArrVisitor, ObjVisitor}
-import CurrentPos.currentPos
 import fastparse.IndexedParserInput
 
 import scala.collection.mutable
@@ -17,7 +16,8 @@ import scala.collection.mutable
 class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indentArrayInObject: Boolean = false,
                          indent: Int,
-                         idealWidth: Int = 80) extends BaseRenderer[Writer](out, indent){
+                         idealWidth: Int = 80,
+                         getCurrentPosition: () => Position) extends BaseRenderer[Writer](out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterColon = false
@@ -77,9 +77,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
 
   val loadedFileContents = mutable.Map.empty[Path, IndexedParserInput]
   def saveCurrentPos() = {
-    val current = currentPos.get()
-    if (current != null){
-      bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
+    if (Position.enabled){
+      val current = getCurrentPosition()
+      if (current != null){
+        bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
+      }
     }
   }
   override def visitTrue(index: Int) = {
@@ -105,8 +107,10 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   override def flushBuffer() = {
     if (newlineBuffered) {
       afterColon = false
-      out.append(bufferedComment)
-      bufferedComment = ""
+      if (Position.enabled){
+        out.append(bufferedComment)
+        bufferedComment = ""
+      }
       YamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) {
@@ -182,9 +186,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       empty = false
       flushBuffer()
       out.append(":")
-      if (currentPos.get() != null) saveCurrentPos()
-      out.append(bufferedComment)
-      bufferedComment = ""
+      if (Position.enabled) {
+        saveCurrentPos()
+        out.append(bufferedComment)
+        bufferedComment = ""
+      }
       afterKey = true
       afterColon = true
       newlineBuffered = false

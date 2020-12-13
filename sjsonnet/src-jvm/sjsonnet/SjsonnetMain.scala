@@ -84,8 +84,12 @@ object SjsonnetMain {
     }
   }
 
-  def rendererForConfig(wr: Writer, config: Config) =
-    if (config.yamlOut) new PrettyYamlRenderer(wr, indent = config.indent)
+  def rendererForConfig(wr: Writer, config: Config, getCurrentPosition: () => Position) =
+    if (config.yamlOut) new PrettyYamlRenderer(
+      wr,
+      indent = config.indent,
+      getCurrentPosition = getCurrentPosition
+    )
     else new Renderer(wr, indent = config.indent)
   def handleWriteFile[T](f: => T): Either[String, T] =
     Try(f).toEither.left.map{
@@ -113,9 +117,10 @@ object SjsonnetMain {
     }
   }
 
-  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path,
+                   getCurrentPosition: () => Position) = {
     writeToFile(config, wd){ writer =>
-      val renderer = rendererForConfig(writer, config)
+      val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(os.read(path), OsPath(path), renderer)
       if (config.yamlOut) writer.write('\n')
       res
@@ -131,6 +136,7 @@ object SjsonnetMain {
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
     val path = os.Path(file, wd)
+    var currentPos: Position = null
     val interp = new Interpreter(
       parseCache,
       config.varBinding,
@@ -141,7 +147,8 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
       preserveOrder = config.preserveOrder,
-      strict = config.strict
+      strict = config.strict,
+      storePos = currentPos = _
     )
 
     (config.multi, config.yamlStream) match {
@@ -183,7 +190,7 @@ object SjsonnetMain {
               arr.value.toSeq match {
                 case Nil => //donothing
                 case Seq(single) =>
-                  val renderer = rendererForConfig(writer, config)
+                  val renderer = rendererForConfig(writer, config, () => currentPos)
                   single.transform(renderer)
                   writer.write(if (isScalar(single)) "\n..." else "")
                 case multiple =>
@@ -191,7 +198,7 @@ object SjsonnetMain {
                     if (i > 0) writer.write('\n')
                     if (isScalar(v)) writer.write("--- ")
                     else if (i != 0) writer.write("---\n")
-                    val renderer = rendererForConfig(writer, config)
+                    val renderer = rendererForConfig(writer, config, () => currentPos)
                     v.transform(renderer)
 
                   }
@@ -200,9 +207,9 @@ object SjsonnetMain {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, path, wd)
+          case _ => renderNormal(config, interp, path, wd, () => currentPos)
         }
-      case _ => renderNormal(config, interp, path, wd)
+      case _ => renderNormal(config, interp, path, wd, () => currentPos)
 
     }
   }

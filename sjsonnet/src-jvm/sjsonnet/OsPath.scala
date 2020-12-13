@@ -1,7 +1,6 @@
 package sjsonnet
 
 import fastparse.IndexedParserInput
-import sjsonnet.CurrentPos.currentPos
 
 import scala.collection.mutable
 
@@ -18,7 +17,7 @@ case class OsPath(p: os.Path) extends Path{
       else {
         val parserInput = loadedFileContents
           .getOrElse(this, new IndexedParserInput(os.read(p)))
-        ":" + parserInput.prettyIndex(currentPos.get().offset)
+        ":" + parserInput.prettyIndex(offset)
       }
     p.relativeTo(os.pwd) + offsetStr
   }

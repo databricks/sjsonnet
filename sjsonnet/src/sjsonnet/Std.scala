@@ -130,14 +130,19 @@ object Std {
       val mergePosition = Position(fs.currentFile, offset)
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
-          val kvs = (l.getVisibleKeys().toSeq ++ r.getVisibleKeys().toSeq).distinct.flatMap { case (k, hidden) =>
-            if (hidden) None
-            else (l.valueRaw(k, l, offset)(fs, ev), r.valueRaw(k, r, offset)(fs, ev)) match {
-              case (_, Some((_: Val.Null, _))) => None
-              case (Some((lChild, _)), None) => Some(k -> lChild)
-              case (Some((lChild: ujson.Obj, _)), Some((rChild: ujson.Obj, _))) =>
+          val allVisibleKeys = (l.getVisibleKeys().toSeq ++ r.getVisibleKeys().toSeq)
+            .collect{case (k, false) => k}
+            .distinct
+          val kvs = allVisibleKeys.flatMap { case k =>
+            (
+              l.valueRaw(k, l, offset)(fs, ev).map(_._1),
+              r.valueRaw(k, r, offset)(fs, ev).map(_._1)
+            ) match {
+              case (_, Some(_: Val.Null)) => None
+              case (Some(lChild), None) => Some(k -> lChild)
+              case (Some(lChild: ujson.Obj), Some(rChild: ujson.Obj)) =>
                 Some(k -> recPair(lChild, rChild))
-              case (_, Some((rChild, _))) =>
+              case (_, Some(rChild)) =>
                 Some(k -> recSingle(rChild))
             }
           }
@@ -150,7 +155,6 @@ object Std {
         case (_, _) => recSingle(r)
       }
       def recSingle(v: Val): Val  = v match{
-        case Val.Arr(pos, xs) => Val.Arr(pos, xs.map(x => new Val.Lazy(recSingle(x.force))))
         case obj: Val.Obj =>
           val kvs = obj.getVisibleKeys().flatMap{case (k, hidden) =>
             if (hidden) None

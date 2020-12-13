@@ -1,5 +1,4 @@
 package sjsonnet
-import CurrentPos.currentPos
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
@@ -14,32 +13,32 @@ import scala.collection.mutable
 object Materializer {
 
 
-  def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
+  def apply(v: Val, storePos: Position => Unit = _ => ())(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
     apply0(v, new sjsonnet.Renderer()).toString
   }
 
-  def apply0[T](v: Val, visitor: Visitor[T, T])
+  def apply0[T](v: Val, visitor: Visitor[T, T], storePos: Position => Unit = _ => ())
                (implicit evaluator: EvalScope): T = try {
     v match {
-      case Val.True(pos) => currentPos.set(pos); visitor.visitTrue(-1)
-      case Val.False(pos) => currentPos.set(pos); visitor.visitFalse(-1)
-      case Val.Null(pos) => currentPos.set(pos); visitor.visitNull(-1)
-      case Val.Num(pos, n) => currentPos.set(pos); visitor.visitFloat64(n, -1)
-      case Val.Str(pos, s) => currentPos.set(pos); visitor.visitString(s, -1)
+      case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
+      case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
+      case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
+      case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
+      case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
       case Val.Arr(pos, xs) =>
-        currentPos.set(pos);
+        storePos(pos);
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x.force, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
+            apply0(x.force, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
             -1
           )
         }
         arrVisitor.visitEnd(-1)
 
       case obj: Val.Obj =>
-        currentPos.set(obj.pos)
+        storePos(obj.pos)
         obj.triggerAllAsserts(obj)
 
         val keysUnsorted = obj.getVisibleKeys().toArray
@@ -51,7 +50,7 @@ object Materializer {
           if (!hidden){
             val value = obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly)
 
-            currentPos.set(
+            storePos(
               value match{
                 case v: Val.Obj if v.getVisibleKeys().nonEmpty => value.pos
                 case v: Val.Arr if v.value.nonEmpty => value.pos
@@ -63,8 +62,7 @@ object Materializer {
 
 
             objVisitor.visitValue(
-              apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
-              ),
+              apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
               -1
             )
           }
@@ -74,7 +72,8 @@ object Materializer {
       case f: Val.Func =>
         apply0(
           f.apply(Nil, "(memory)", -1)(evaluator.emptyMaterializeFileScope, implicitly),
-          visitor
+          visitor,
+          storePos
         )
     }
 
