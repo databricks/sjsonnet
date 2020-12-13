@@ -127,39 +127,57 @@ object Std {
       )
     },
     builtin("mergePatch", "target", "patch"){ (offset, ev, fs, target: Val, patch: Val) =>
-      def recPair(l: ujson.Value, r: ujson.Value): ujson.Value = {
+      val mergePosition = Position(fs.currentFile, offset)
+      def recPair(l: Val, r: Val): Val = {
         (l, r) match{
-          case (l: ujson.Obj, r: ujson.Obj) =>
-            val kvs = (l.value.keys ++ r.value.keys).toSeq.distinct.flatMap { k =>
-              (l.value.get(k), r.value.get(k)) match {
-                case (Some(lChild), None) => Some(k -> lChild)
-                case (_, Some(ujson.Null)) => None
-                case (Some(lChild: ujson.Obj), Some(rChild: ujson.Obj)) => Some(k -> recPair(lChild, rChild))
-                case (_, Some(rChild)) => Some(k -> recSingle(rChild))
+          case (l: Val.Obj, r: Val.Obj) =>
+            val kvs = (l.getVisibleKeys() ++ r.getVisibleKeys()).toSeq.distinct.flatMap { case (k, hidden) =>
+              if (hidden) None
+              else (l.valueRaw(k, l, offset)(fs, ev), r.valueRaw(k, r, offset)(fs, ev)) match {
+                case (Some((lChild, _)), None) => Some(k -> lChild)
+                case (_, Some((_: Val.Null, _))) => None
+                case (Some((lChild: ujson.Obj, _)), Some((rChild: ujson.Obj, _))) =>
+                  Some(k -> recPair(lChild, rChild))
+                case (_, Some((rChild, _))) => Some(k -> recSingle(rChild))
               }
             }
-            ujson.Obj.from(kvs)
 
-          case (_, r: ujson.Obj) => recSingle(r)
+            val kvMembers = kvs.map { case (k, v) =>
+              (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
+            }
+            new Val.Obj(
+              mergePosition,
+              mutable.LinkedHashMap(kvMembers:_*),
+              _ => (),
+              None
+            )
+
+          case (_, r: Val.Obj) => recSingle(r)
           case (_, _) => r
         }
       }
-      def recSingle(v: ujson.Value): ujson.Value = {
+      def recSingle(v: Val): Val  = {
         v match{
-          case obj: ujson.Obj =>
-            ujson.Obj.from(
-              obj.value.flatMap{
-                case (k, ujson.Null) => None
-                case (k, v) => Some(k -> recSingle(v))
+          case obj: Val.Obj =>
+            val kvs = obj.getVisibleKeys().flatMap{case (k, hidden) =>
+              if (hidden) None
+              else{
+                val value = obj.value(k, offset)(fs, ev)
+                if (value.isInstanceOf[Val.Null]) None
+                else {
+                  val transformedValue = recSingle(value)
+                  Some((k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => transformedValue)))
+                }
               }
-            )
+            }
+            new Val.Obj(mergePosition, kvs, _ => (), None)
+
           case _ => v
         }
       }
       val left = Materializer(target)(ev)
       val right = Materializer(patch)(ev)
-      val res = recPair(left, right)
-      Materializer.reverse(Position(fs.currentFile, offset), res)
+      recPair(target, patch)
     },
     builtin("sqrt", "x"){ (offset, ev, fs, x: Double) =>
       math.sqrt(x)

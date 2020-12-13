@@ -1,5 +1,7 @@
 package sjsonnet
 
+import fastparse.IndexedParserInput
+
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
@@ -50,4 +52,8 @@ case class JsVirtualPath(path: String) extends Path{
   def last: String = path.split('/').last
 
   def /(s: String): Path = JsVirtualPath(path + "/" + s)
+
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String = {
+    path + ":" + offset
+  }
 }

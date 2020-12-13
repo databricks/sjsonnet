@@ -1,5 +1,9 @@
 package sjsonnet
 
+import fastparse.IndexedParserInput
+
+import scala.collection.mutable
+
 case class DummyPath(segments: String*) extends Path{
   def relativeToString(p: Path): String = ""
 
@@ -12,4 +16,8 @@ case class DummyPath(segments: String*) extends Path{
   def last: String = segments.last
 
   def /(s: String): Path = DummyPath(segments :+ s:_*)
+
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String = {
+    segments.mkString("/") + ":" + offset
+  }
 }

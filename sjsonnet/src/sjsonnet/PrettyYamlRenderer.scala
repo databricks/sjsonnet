@@ -79,17 +79,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   def saveCurrentPos() = {
     val current = currentPos.get()
     if (current != null){
-
-      val path = current.currentFile.asInstanceOf[OsPath].p
-      val offsetStr =
-        if (current.currentFile.toString.contains("(materialize)")) ""
-        else {
-          val parserInput = loadedFileContents
-            .getOrElse(current.currentFile, new IndexedParserInput(os.read(path)))
-          ":" + parserInput.prettyIndex(currentPos.get().offset)
-        }
-
-      bufferedComment = " # " + path.relativeTo(os.pwd) + offsetStr
+      bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
     }
   }
   override def visitTrue(index: Int) = {
