@@ -127,26 +127,39 @@ object Std {
       )
     },
     builtin("mergePatch", "target", "patch"){ (offset, ev, fs, target: Val, patch: Val) =>
-      def rec(l: ujson.Value, r: ujson.Value): ujson.Value = {
+      def recPair(l: ujson.Value, r: ujson.Value): ujson.Value = {
         (l, r) match{
-          case (l0, r: ujson.Obj) =>
-            val l = l0 match{
-              case l: ujson.Obj => l
-              case _ => ujson.Obj()
+          case (l: ujson.Obj, r: ujson.Obj) =>
+            val kvs = (l.value.keys ++ r.value.keys).toSeq.distinct.flatMap { k =>
+              (l.value.get(k), r.value.get(k)) match {
+                case (Some(lChild), None) => Some(k -> lChild)
+                case (_, Some(ujson.Null)) => None
+                case (Some(lChild: ujson.Obj), Some(rChild: ujson.Obj)) => Some(k -> recPair(lChild, rChild))
+                case (_, Some(rChild)) => Some(k -> recSingle(rChild))
+              }
             }
-            for((k, v) <- r.value){
-              if (v == ujson.Null) l.value.remove(k)
-              else if (l.value.contains(k)) l(k) = rec(l(k), r(k))
-              else l(k) = rec(ujson.Obj(), r(k))
-            }
-            l
+            ujson.Obj.from(kvs)
+
+          case (_, r: ujson.Obj) => recSingle(r)
           case (_, _) => r
         }
       }
-      Materializer.reverse(
-        Position(fs.currentFile, offset),
-        rec(Materializer(target)(ev), Materializer(patch)(ev))
-      )
+      def recSingle(v: ujson.Value): ujson.Value = {
+        v match{
+          case obj: ujson.Obj =>
+            ujson.Obj.from(
+              obj.value.flatMap{
+                case (k, ujson.Null) => None
+                case (k, v) => Some(k -> recSingle(v))
+              }
+            )
+          case _ => v
+        }
+      }
+      val left = Materializer(target)(ev)
+      val right = Materializer(patch)(ev)
+      val res = recPair(left, right)
+      Materializer.reverse(Position(fs.currentFile, offset), res)
     },
     builtin("sqrt", "x"){ (offset, ev, fs, x: Double) =>
       math.sqrt(x)
