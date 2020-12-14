@@ -45,7 +45,7 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 2000000){
+    while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- Seq(
         "kube-config/sentry/dev/sentry.jsonnet",
@@ -71,19 +71,17 @@ object SjsonnetTestMain {
             ),
             None
           ),
-          storePos = _ => ()
+          storePos = currentPos = _
         )
         val writer = new java.io.StringWriter
 
-        val res = interp.interpret0(
-          os.read(path),
-          OsPath(path),
-          new PrettyYamlRenderer(
-            writer,
-            indent = 4,
-            getCurrentPosition = () => currentPos
-          )
+        val renderer = new PrettyYamlRenderer(
+          writer,
+          indent = 4,
+          getCurrentPosition = () => currentPos
         )
+
+        val res = interp.interpret0(os.read(path), OsPath(path), renderer)
         assert(res.isRight, name + "\n" + res.left.get)
       }
     }

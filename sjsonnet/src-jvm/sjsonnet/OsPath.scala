@@ -15,7 +15,7 @@ case class OsPath(p: os.Path) extends Path{
     val offsetStr =
       if (p.toString.contains("(materialize)")) ""
       else {
-        val lineStarts = loadedFileContents.getOrElse(
+        val lineStarts = loadedFileContents.getOrElseUpdate(
           this,
           fastparse.internal.Util.lineNumberLookup(os.read(p))
         )
