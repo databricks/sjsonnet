@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.IndexedParserInput
-
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
