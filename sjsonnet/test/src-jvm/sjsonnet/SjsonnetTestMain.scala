@@ -45,7 +45,7 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 20000){
+    while(System.currentTimeMillis() - start < 2000000){
       count += 1
       for(name <- Seq(
         "kube-config/sentry/dev/sentry.jsonnet",
@@ -71,7 +71,7 @@ object SjsonnetTestMain {
             ),
             None
           ),
-          storePos = currentPos = _
+          storePos = _ => ()
         )
         val writer = new java.io.StringWriter
 
