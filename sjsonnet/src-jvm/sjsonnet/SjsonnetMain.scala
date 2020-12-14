@@ -148,7 +148,7 @@ object SjsonnetMain {
       },
       preserveOrder = config.preserveOrder,
       strict = config.strict,
-      storePos = currentPos = _
+      storePos = if (config.sourceLineComments) currentPos = _ else _ => ()
     )
 
     (config.multi, config.yamlStream) match {
