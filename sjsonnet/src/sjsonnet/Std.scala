@@ -128,43 +128,34 @@ object Std {
     },
     builtin("mergePatch", "target", "patch"){ (offset, ev, fs, target: Val, patch: Val) =>
       val mergePosition = Position(fs.currentFile, offset)
+      def getNonHiddenKeys(v: Val.Obj) = v.getVisibleKeys().collect{case (k, false) => k}.toSeq
+      def createMember(v: => Val) = Val.Obj.Member(false, Visibility.Unhide, (_, _, _, _) => v)
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
-          val allVisibleKeys = (l.getVisibleKeys().toSeq ++ r.getVisibleKeys().toSeq)
-            .collect{case (k, false) => k}
-            .distinct
-          val kvs = allVisibleKeys.flatMap { case k =>
-            (
-              l.valueRaw(k, l, offset)(fs, ev).map(_._1),
-              r.valueRaw(k, r, offset)(fs, ev).map(_._1)
-            ) match {
-              case (_, Some(_: Val.Null)) => None
-              case (Some(lChild), None) => Some(k -> lChild)
-              case (Some(lChild: ujson.Obj), Some(rChild: ujson.Obj)) =>
-                Some(k -> recPair(lChild, rChild))
-              case (_, Some(rChild)) =>
-                Some(k -> recSingle(rChild))
-            }
+          val kvs = for {
+            k <- (getNonHiddenKeys(l) ++ getNonHiddenKeys(r)).distinct
+            val lValue = l.valueRaw(k, l, offset)(fs, ev).map(_._1)
+            val rValue = r.valueRaw(k, r, offset)(fs, ev).map(_._1)
+            if !rValue.exists(_.isInstanceOf[Val.Null])
+          } yield (lValue, rValue) match{
+            case (Some(lChild), None) => k -> createMember{lChild}
+            case (Some(lChild: Val.Obj), Some(rChild: Val.Obj)) => k -> createMember{recPair(lChild, rChild)}
+            case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
           }
 
-          val kvMembers = kvs.map { case (k, v) =>
-            (k, Val.Obj.Member(false, Visibility.Unhide, (_, _, _, _) => v))
-          }
-          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvMembers:_*), _ => (), None)
+          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), _ => (), None)
 
         case (_, _) => recSingle(r)
       }
       def recSingle(v: Val): Val  = v match{
         case obj: Val.Obj =>
-          val kvs = obj.getVisibleKeys().flatMap{case (k, hidden) =>
-            if (hidden) None
-            else {
-              val value = obj.value(k, offset, obj)(fs, ev)
-              if (value.isInstanceOf[Val.Null]) None
-              else Some((k, Val.Obj.Member(false, Visibility.Unhide, (_, _, _, _) => recSingle(value))))
-            }
-          }
-          new Val.Obj(obj.pos, kvs, _ => (), None)
+          val kvs = for{
+            k <- getNonHiddenKeys(obj)
+            val value = obj.value(k, offset, obj)(fs, ev)
+            if !value.isInstanceOf[Val.Null]
+          } yield (k, createMember{recSingle(value)})
+
+          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), _ => (), None)
 
         case _ => v
       }
