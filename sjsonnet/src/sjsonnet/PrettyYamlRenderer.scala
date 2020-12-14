@@ -25,7 +25,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var topLevel = true
   var leftHandPrefixOffset = 0
   var firstElementInArray = false
-  var bufferedComment = ""
+  var bufferedComment: String = null
   override def visitString(s: CharSequence, index: Int) = {
     addSpaceAfterColon()
     flushBuffer()
@@ -75,13 +75,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  val loadedFileContents = mutable.Map.empty[Path, IndexedParserInput]
+  val loadedFileContents = mutable.Map.empty[Path, Array[Int]]
   def saveCurrentPos() = {
-    if (Position.enabled){
-      val current = getCurrentPosition()
-      if (current != null){
-        bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
-      }
+    val current = getCurrentPosition()
+    if (current != null){
+      bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
     }
   }
   override def visitTrue(index: Int) = {
@@ -107,9 +105,9 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   override def flushBuffer() = {
     if (newlineBuffered) {
       afterColon = false
-      if (Position.enabled){
+      if (bufferedComment != null){
         out.append(bufferedComment)
-        bufferedComment = ""
+        bufferedComment = null
       }
       YamlRenderer.writeIndentation(out, indent * depth)
     }
@@ -186,10 +184,10 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       empty = false
       flushBuffer()
       out.append(":")
-      if (Position.enabled) {
-        saveCurrentPos()
+      saveCurrentPos()
+      if (bufferedComment != null){
         out.append(bufferedComment)
-        bufferedComment = ""
+        bufferedComment = null
       }
       afterKey = true
       afterColon = true

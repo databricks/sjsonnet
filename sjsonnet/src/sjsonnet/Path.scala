@@ -16,5 +16,5 @@ trait Path {
   def segmentCount(): Int
   def last: String
   def /(s: String): Path
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String
 }

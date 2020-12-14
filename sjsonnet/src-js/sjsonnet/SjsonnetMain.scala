@@ -53,7 +53,7 @@ case class JsVirtualPath(path: String) extends Path{
 
   def /(s: String): Path = JsVirtualPath(path + "/" + s)
 
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String = {
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
     path + ":" + offset
   }
 }

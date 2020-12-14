@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.IndexedParserInput
-
 import scala.collection.mutable
 
 case class OsPath(p: os.Path) extends Path{
@@ -11,14 +9,20 @@ case class OsPath(p: os.Path) extends Path{
   def debugRead(): Option[String] = try Some(os.read(p)) catch{case e: Throwable => None}
   def last: String = p.last
   def /(s: String): Path = OsPath(p / s)
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String = {
+
+
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
     val offsetStr =
       if (p.toString.contains("(materialize)")) ""
       else {
-        val parserInput = loadedFileContents
-          .getOrElse(this, new IndexedParserInput(os.read(p)))
-        ":" + parserInput.prettyIndex(offset)
+        val lineStarts = loadedFileContents.getOrElse(
+          this,
+          fastparse.internal.Util.lineNumberLookup(os.read(p))
+        )
+
+        ":" + Util.prettyIndex(lineStarts, offset)
       }
+
     p.relativeTo(os.pwd) + offsetStr
   }
 }

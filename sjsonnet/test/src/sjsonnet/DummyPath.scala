@@ -17,7 +17,7 @@ case class DummyPath(segments: String*) extends Path{
 
   def /(s: String): Path = DummyPath(segments :+ s:_*)
 
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, IndexedParserInput]): String = {
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
     segments.mkString("/") + ":" + offset
   }
 }

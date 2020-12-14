@@ -32,11 +32,7 @@ object PrettyNamed{
 }
 case class Position(currentFile: Path, offset: Int)
 object Position{
-  def apply(offset: Int)(implicit fileScope: FileScope): Position = {
-    if (enabled) Position(fileScope.currentFile, offset)
-    else null
-  }
-  val enabled = sys.env.contains("SJSONNET_POSITIONS")
+  def apply(offset: Int)(implicit fileScope: FileScope): Position = Position(fileScope.currentFile, offset)
 }
 object Val{
 
