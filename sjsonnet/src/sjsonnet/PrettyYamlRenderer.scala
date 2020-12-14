@@ -37,14 +37,34 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     val str = s.toString
 
     // empty strings and single-newline strings are special-cased
-    if (str.isEmpty) out.append("''")
-    else if (str == "\n") out.append("|2+\n")
+    if (str.isEmpty) {
+      out.append("''")
+      saveCurrentPos()
+    }
+    else if (str == "\n") {
+      out.append("|2+")
+      saveCurrentPos()
+      if (bufferedComment != null) out.append(bufferedComment)
+      bufferedComment = null
+      out.append("\n")
+    }
     // Strings with trailing spaces or with unicode characters are written double-quoted
-    else if (str.contains(" \n") || str.exists(_ > '~'))
+    else if (str.contains(" \n") || str.exists(_ > '~')) {
       PrettyYamlRenderer.writeDoubleQuoted(out, indent * (depth + 1), leftHandPrefixOffset, idealWidth, str)
+      saveCurrentPos()
+    }
     // Other strings with newlines are rendered as blocks
-    else if (str.contains('\n'))
-      PrettyYamlRenderer.writeBlockString(str, out, depth, indent)
+    else if (str.contains('\n')) {
+      saveCurrentPos()
+      PrettyYamlRenderer.writeBlockString(
+        str,
+        out,
+        depth,
+        indent,
+        if (bufferedComment == null) "" else bufferedComment
+      )
+      bufferedComment = null
+    }
     // Strings which look like booleans/nulls/numbers/dates/etc.,
     // or have leading/trailing spaces, are rendered single-quoted
     else if (PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
@@ -53,11 +73,12 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       val quotedStr = "'" + str.replace("'", "''") + "'"
       PrettyYamlRenderer.writeWrappedString(quotedStr, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = quotedStr.length + 2
+      saveCurrentPos()
     } else { // All other strings can be rendered naked without quotes
       PrettyYamlRenderer.writeWrappedString(str, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = s.length
+      saveCurrentPos()
     }
-    saveCurrentPos()
     out
   }
 
@@ -218,7 +239,7 @@ object PrettyYamlRenderer{
   /**
    * Renders a multi-line string with all indentation and whitespace preserved
    */
-  def writeBlockString(str: String, out: Writer, depth: Int, indent: Int) = {
+  def writeBlockString(str: String, out: Writer, depth: Int, indent: Int, lineComment: String) = {
     val len = str.length()
     val splits = YamlRenderer.newlinePattern.split(str, -1)
     val blockOffsetNumeral = if (str.charAt(0) != ' ') "" else indent
@@ -230,6 +251,7 @@ object PrettyYamlRenderer{
       }
 
     out.append(blockStyle)
+    out.append(lineComment)
 
     splits.dropRight(dropRight).foreach { split =>
       if (split.nonEmpty) YamlRenderer.writeIndentation(out, indent * (depth + 1))
