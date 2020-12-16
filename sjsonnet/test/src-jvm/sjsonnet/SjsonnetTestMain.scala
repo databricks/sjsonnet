@@ -45,27 +45,44 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = sjsonnet.SjsonnetMain.createParseCache()
-    while(System.currentTimeMillis() - start < 20000000){
+    while(System.currentTimeMillis() - start < 20000){
       count += 1
       for(name <- Seq(
         "kube-config/sentry/dev/sentry.jsonnet",
+        "kube-config/runbot/staging/runbot-app.jsonnet",
         "kubernetes/config/prometheus/prom-jobs/prod/azure/westus/prometheus.jsonnet",
-        "kube-config/shard/multitenant/aws/dev/us-west-2/shard.jsonnet"
+//        "kube-config/shard/multitenant/aws/test/test-personal-shard.jsonnet"
       )){
 
 //        println(name)
 //
 //        os.proc("jsonnet", FileTests.testSuiteRoot / s"$name.jsonnet").call()
         val path = os.pwd / os.up / "universe" / os.RelPath(name)
+        var currentPos: Position = null
         val interp = new Interpreter(
           parseCache,
-          Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
+          Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2), "isKubecfg" -> true),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),
-          SjsonnetMain.resolveImport(Array(OsPath(os.pwd / os.up / "universe")), None)
+          SjsonnetMain.resolveImport(
+            Array(
+              OsPath(os.pwd / os.up / "universe"),
+              OsPath(os.pwd / os.up / "universe" / "mt-shards" / "dev" / "oregon-dev"),
+            ),
+            None
+          ),
+          storePos = currentPos = _
         )
-        val res = interp.interpret(os.read(path), OsPath(path))
-        assert(res.isRight)
+        val writer = new java.io.StringWriter
+
+        val renderer = new PrettyYamlRenderer(
+          writer,
+          indent = 4,
+          getCurrentPosition = () => currentPos
+        )
+
+        val res = interp.interpret0(os.read(path), OsPath(path), renderer)
+        assert(res.isRight, name + "\n" + res.left.get)
       }
     }
     println(count)

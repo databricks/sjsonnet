@@ -15,7 +15,8 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                   wd: Path,
                   importer: (Path, String) => Option[(Path, String)],
                   preserveOrder: Boolean = false,
-                  strict: Boolean = false) {
+                  strict: Boolean = false,
+                  storePos: Position => Unit = _ => ()) {
 
   val evaluator = new Evaluator(
     parseCache,
@@ -64,7 +65,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         case x => x
       }
       json <-
-        try Right(Materializer.apply0(res, visitor)(evaluator))
+        try Right(Materializer.apply0(res, visitor, storePos = storePos)(evaluator))
         catch{
           case Error.Delegate(msg) => Left(msg)
           case e: Throwable =>

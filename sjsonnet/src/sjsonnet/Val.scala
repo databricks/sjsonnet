@@ -20,6 +20,7 @@ sealed trait Val{
     else throw new Error.Delegate(
       "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
     )
+  def pos: Position
 }
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
@@ -28,6 +29,10 @@ object PrettyNamed{
   implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
   implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
   implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
+}
+case class Position(currentFile: Path, offset: Int)
+object Position{
+  def apply(offset: Int)(implicit fileScope: FileScope): Position = Position(fileScope.currentFile, offset)
 }
 object Val{
 
@@ -43,25 +48,25 @@ object Val{
     def apply(calc0: => Val) = new Lazy(calc0)
   }
 
-  def bool(b: Boolean) = if (b) True else False
+  def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
   sealed trait Bool extends Val{
   }
-  case object True extends Bool{
+  case class True(pos: Position) extends Bool{
     def prettyName = "boolean"
   }
-  case object False extends Bool{
+  case class False(pos: Position) extends Bool{
     def prettyName = "boolean"
   }
-  case object Null extends Val{
+  case class Null(pos: Position) extends Val{
     def prettyName = "null"
   }
-  case class Str(value: String) extends Val{
+  case class Str(pos: Position, value: String) extends Val{
     def prettyName = "string"
   }
-  case class Num(value: Double) extends Val{
+  case class Num(pos: Position, value: Double) extends Val{
     def prettyName = "number"
   }
-  case class Arr(value: Seq[Lazy]) extends Val{
+  case class Arr(pos: Position, value: Seq[Lazy]) extends Val{
     def prettyName = "array"
   }
   object Obj{
@@ -73,7 +78,8 @@ object Val{
 
 
   }
-  final class Obj(value0: mutable.Map[String, Obj.Member],
+  final class Obj(val pos: Position,
+                  value0: mutable.Map[String, Obj.Member],
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Option[Obj]) extends Val{
 
@@ -87,10 +93,10 @@ object Val{
       }
     }
 
-    def addSuper(lhs: Val.Obj): Val.Obj = {
+    def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case None => new Val.Obj(value0, _ => (), Some(lhs))
-        case Some(x) => new Val.Obj(value0, _ => (), Some(x.addSuper(lhs)))
+        case None => new Val.Obj(pos, value0, _ => (), Some(lhs))
+        case Some(x) => new Val.Obj(pos, value0, _ => (), Some(x.addSuper(pos, lhs)))
       }
     }
 
@@ -140,15 +146,15 @@ object Val{
                     r: Val,
                     offset: Int)
                    (implicit fileScope: FileScope, evaluator: EvalScope) = (l, r) match{
-      case (Val.Str(l), Val.Str(r)) => Val.Str(l + r)
-      case (Val.Num(l), Val.Num(r)) => Val.Num(l + r)
-      case (Val.Arr(l), Val.Arr(r)) => Val.Arr(l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => r.addSuper(l)
-      case (Val.Str(l), r) =>
-        try Val.Str(l + evaluator.materialize(r).transform(new Renderer()).toString)
+      case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(Position(fileScope.currentFile, offset), l + r)
+      case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(Position(fileScope.currentFile, offset), l + r)
+      case (Val.Arr(_, l), Val.Arr(_, r)) => Val.Arr(Position(fileScope.currentFile, offset), l ++ r)
+      case (l: Val.Obj, r: Val.Obj) => r.addSuper(Position(fileScope.currentFile, offset), l)
+      case (Val.Str(_, l), r) =>
+        try Val.Str(Position(fileScope.currentFile, offset), l + evaluator.materialize(r).transform(new Renderer()).toString)
         catch Error.tryCatchWrap(offset)
-      case (l, Val.Str(r)) =>
-        try Val.Str(evaluator.materialize(l).transform(new Renderer()).toString + r)
+      case (l, Val.Str(_, r)) =>
+        try Val.Str(Position(fileScope.currentFile, offset), evaluator.materialize(l).transform(new Renderer()).toString + r)
         catch Error.tryCatchWrap(offset)
     }
 
@@ -198,7 +204,8 @@ object Val{
     }
   }
 
-  case class Func(defSiteScopes: Option[(ValScope, FileScope)],
+  case class Func(pos: Position,
+                  defSiteScopes: Option[(ValScope, FileScope)],
                   params: Params,
                   evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{

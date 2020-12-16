@@ -1,0 +1,35 @@
+Virgin Daiquiri: # sjsonnet/test/resources/nontrivial/mixins.jsonnet:42:20
+  garnish: Lime wedge # sjsonnet/test/resources/nontrivial/sours-oo.jsonnet:21:14
+  ingredients: # sjsonnet/test/resources/nontrivial/mixins.jsonnet:23:33
+  - kind: Water # sjsonnet/test/resources/nontrivial/mixins.jsonnet:17:15
+    qty: 2 # sjsonnet/test/resources/nontrivial/templates.libsonnet:22:34
+  - kind: Vanilla Essence # sjsonnet/test/resources/nontrivial/mixins.jsonnet:18:15
+    qty: dash # sjsonnet/test/resources/nontrivial/mixins.jsonnet:18:39
+  - kind: Angustura Bitters # sjsonnet/test/resources/nontrivial/mixins.jsonnet:12:21
+    qty: dash # sjsonnet/test/resources/nontrivial/mixins.jsonnet:19:29
+  - kind: Lime # sjsonnet/test/resources/nontrivial/sours-oo.jsonnet:19:22
+    qty: 1 # sjsonnet/test/resources/nontrivial/templates.libsonnet:11:12
+  - kind: Simple Syrup # sjsonnet/test/resources/nontrivial/templates.libsonnet:14:13
+    qty: 0.5 # sjsonnet/test/resources/nontrivial/templates.libsonnet:15:12
+  served: Straight Up # sjsonnet/test/resources/nontrivial/templates.libsonnet:27:13
+Virgin Whiskey Sour: # sjsonnet/test/resources/nontrivial/mixins.jsonnet:39:27
+  garnish: Lemon Juice twist # sjsonnet/test/resources/nontrivial/templates.libsonnet:26:31
+  ingredients: # sjsonnet/test/resources/nontrivial/mixins.jsonnet:23:33
+  - kind: Water # sjsonnet/test/resources/nontrivial/mixins.jsonnet:14:15
+    qty: 2 # sjsonnet/test/resources/nontrivial/templates.libsonnet:22:34
+  - kind: Angustura Bitters # sjsonnet/test/resources/nontrivial/mixins.jsonnet:12:21
+    qty: tsp # sjsonnet/test/resources/nontrivial/mixins.jsonnet:15:29
+  - kind: Lemon Juice # sjsonnet/test/resources/nontrivial/templates.libsonnet:10:13
+    qty: 1 # sjsonnet/test/resources/nontrivial/templates.libsonnet:11:12
+  - kind: Simple Syrup # sjsonnet/test/resources/nontrivial/templates.libsonnet:14:13
+    qty: 0.5 # sjsonnet/test/resources/nontrivial/templates.libsonnet:15:12
+  served: Straight Up # sjsonnet/test/resources/nontrivial/templates.libsonnet:27:13
+Whiskey Sour: # sjsonnet/test/resources/nontrivial/mixins.jsonnet:36:21
+  ingredients: # sjsonnet/test/resources/nontrivial/templates.libsonnet:22:7
+  - kind: Whiskey # sjsonnet/test/resources/nontrivial/sours-oo.jsonnet:7:13
+    qty: 2 # sjsonnet/test/resources/nontrivial/templates.libsonnet:22:34
+  - kind: Lemon Juice # sjsonnet/test/resources/nontrivial/templates.libsonnet:10:13
+    qty: 1 # sjsonnet/test/resources/nontrivial/templates.libsonnet:11:12
+  - kind: Simple Syrup # sjsonnet/test/resources/nontrivial/templates.libsonnet:14:13
+    qty: 0.5 # sjsonnet/test/resources/nontrivial/templates.libsonnet:15:12
+  served: In a plastic cup

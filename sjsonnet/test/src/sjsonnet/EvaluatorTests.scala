@@ -1,27 +1,15 @@
 package sjsonnet
 
 import utest._
+import TestUtils.eval
 object EvaluatorTests extends TestSuite{
-  def interpret(s: String, strict: Boolean) =
-    new Interpreter(
-      SjsonnetMain.createParseCache(),
-      Map(),
-      Map(),
-      DummyPath(),
-      (_, _) => None,
-      strict = strict
-    ).interpret(s, DummyPath("(memory)"))
-  def eval(s: String, strict: Boolean = false) = {
-    interpret(s, strict) match{
-      case Right(x) => x
-      case Left(e) => throw new Exception(e)
-    }
-  }
+
   def evalErr(s: String, strict: Boolean = false) = {
-    interpret(s, strict) match{
-      case Right(x) => throw new Exception(s"Expected exception, got result: $x")
-      case Left(e) =>
-        e.split('\n').map(_.trim).mkString("\n") // normalize inconsistent indenation on JVM vs JS
+    try {
+      val x = eval(s, strict = strict)
+      throw new Exception (s"Expected exception, got result: $x")
+    }catch{case e: Exception =>
+      e.getMessage.split('\n').map(_.trim).mkString("\n") // normalize inconsistent indenation on JVM vs JS
     }
   }
   def tests = Tests{

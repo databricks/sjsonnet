@@ -23,7 +23,8 @@ object Cli{
                     indent: Int = 3,
                     preserveOrder: Boolean = false,
                     strict: Boolean = false,
-                    yamlOut: Boolean = false)
+                    yamlOut: Boolean = false,
+                    yamlDebug: Boolean = false)
 
 
   def genericSignature(wd: os.Path) = Seq(
@@ -145,6 +146,11 @@ object Cli{
       "yaml-out", None,
       "Write output as a YAML document",
       (c, v) => c.copy(yamlOut = true)
+    ),
+    Arg[Config, Unit](
+      "yaml-debug", None,
+      "Generate source line comments in the output YAML doc to make it easier to figure out where values come from.",
+      (c, v) => c.copy(yamlDebug = true, yamlOut = true)
     ),
 
   )
