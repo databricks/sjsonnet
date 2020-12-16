@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.lihaoyi</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.2.9</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.2.9" // SBT
-ivy"com.lihaoyi::sjsonnet:0.2.9" // Mill
+"com.lihaoyi" %% "sjsonnet" % "0.3.0" // SBT
+ivy"com.lihaoyi::sjsonnet:0.3.0" // Mill
 ```
 
 ```scala
@@ -234,13 +234,13 @@ To publish, run the following commands:
 ```bash
 ./mill -i mill.scalalib.PublishModule/publishAll lihaoyi:$SONATYPE_PASSWORD $GPG_PASSWORD --publishArtifacts __.publishArtifacts --release true
 
-./mill -i show sjsonnet[2.13.0].js.fullOpt
-./mill -i show sjsonnet[2.13.0].jvm.assembly
+./mill -i show sjsonnet[2.13.3].js.fullOpt
+./mill -i show sjsonnet[2.13.3].jvm.assembly
 ```
 
 ## Changelog
 
-### 0.2.9
+### 0.3.0
 
 - Add `--yaml-debug` flag to add source-line comments showing where each line of YAML came from
 - Add `objectValues` and `objectVlauesAll` to stdlib [#104](https://github.com/databricks/sjsonnet/pull/104) 
