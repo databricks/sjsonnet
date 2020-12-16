@@ -146,6 +146,33 @@ std.assertEqual(std.objectFields({ x::: 1 } { x: 1 }), ['x']) &&
 std.assertEqual(std.objectFields({ x::: 1 } { x:: 1 }), []) &&
 std.assertEqual(std.objectFields({ x::: 1 } { x::: 1 }), ['x']) &&
 
+std.assertEqual(std.objectValues({}), []) &&
+std.assertEqual(std.objectValues({ x: 1, y: 2 }), [1, 2]) &&
+std.assertEqual(std.objectValues({ a: 1, b: 2, c: null}), [1, 2, null]) &&
+std.assertEqual(std.objectValues({ x: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x: 1 }), []) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ a: 1, b: "2", c: [1, 2], d: {x: 1, y: [2, 3]}}), [1, "2", [1, 2], {x: 1, y: [2, 3]}]) &&
+
+std.assertEqual(std.objectValuesAll({}), []) &&
+std.assertEqual(std.objectValuesAll({ x: 1, y: 2 }), [1, 2]) &&
+std.assertEqual(std.objectValuesAll({ a: 1, b: 2, c: null}), [1, 2, null]) &&
+std.assertEqual(std.objectValuesAll({ x: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x: 1 } { x:: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x:: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x:: 1 } { x:: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x:: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x::: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x::: 1 } { x:: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ x::: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValuesAll({ a: 1, b: "2", c: [1, 2], d: {x: 1, y: [2, 3]}}), [1, "2", [1, 2], {x: 1, y: [2, 3]}]) &&
 
 std.assertEqual(std.toString({ a: 1, b: 2 }), '{"a": 1, "b": 2}') &&
 std.assertEqual(std.toString({}), '{ }') &&
