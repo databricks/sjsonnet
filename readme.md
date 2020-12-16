@@ -242,7 +242,7 @@ To publish, run the following commands:
 
 ### 0.3.0
 
-- Add `--yaml-debug` flag to add source-line comments showing where each line of YAML came from
+- Add `--yaml-debug` flag to add source-line comments showing where each line of YAML came from [#105]()https://github.com/databricks/sjsonnet/pull/105
 - Add `objectValues` and `objectVlauesAll` to stdlib [#104](https://github.com/databricks/sjsonnet/pull/104) 
 
 ### 0.2.8
