@@ -50,4 +50,8 @@ case class JsVirtualPath(path: String) extends Path{
   def last: String = path.split('/').last
 
   def /(s: String): Path = JsVirtualPath(path + "/" + s)
+
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
+    path + ":" + offset
+  }
 }

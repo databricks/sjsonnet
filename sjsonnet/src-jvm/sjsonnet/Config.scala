@@ -99,7 +99,13 @@ case class Config(
   )
   yamlOut: Flag = Flag(),
   @arg(
-    doc = "The jsonnet file you wish to evaluate"
+    doc = "The jsonnet file you wish to evaluate",
+    positional = true
   )
-  rest: Leftover[String]
+  file: String,
+  @arg(
+    name = "yaml-debug",
+    doc = "Generate source line comments in the output YAML doc to make it easier to figure out where values come from."
+  )
+  yamlDebug: Flag = Flag()
 )

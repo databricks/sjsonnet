@@ -62,12 +62,7 @@ object SjsonnetMain {
       file <- {
         if (config.interactive.value) {
           Left("error: -i/--interactive must be passed in as the first argument")
-        }else config.rest.value match{
-          case Seq(file) => Right(file)
-          case Seq(file, rest@_*) =>
-            Left("error: Unknown arguments: " + rest.mkString(" "))
-          case _ => Left("error: Need to pass in a jsonnet file to evaluate\n" + parser.helpText(customName = name, customDoc = doc))
-        }
+        }else Right(config.file)
       }
       outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer)
     } yield outputStr
@@ -82,9 +77,14 @@ object SjsonnetMain {
     }
   }
 
-  def rendererForConfig(wr: Writer, config: Config) =
-    if (config.yamlOut.value) new PrettyYamlRenderer(wr, indent = config.indent)
+  def rendererForConfig(wr: Writer, config: Config, getCurrentPosition: () => Position) =
+    if (config.yamlOut.value) new PrettyYamlRenderer(
+      wr,
+      indent = config.indent,
+      getCurrentPosition = getCurrentPosition
+    )
     else new Renderer(wr, indent = config.indent)
+
   def handleWriteFile[T](f: => T): Either[String, T] =
     Try(f).toEither.left.map{
       case e: NoSuchFileException => s"open $f: no such file or directory"
@@ -111,9 +111,10 @@ object SjsonnetMain {
     }
   }
 
-  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path) = {
+  def renderNormal(config: Config, interp: Interpreter, path: os.Path, wd: os.Path,
+                   getCurrentPosition: () => Position) = {
     writeToFile(config, wd){ writer =>
-      val renderer = rendererForConfig(writer, config)
+      val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(os.read(path), OsPath(path), renderer)
       if (config.yamlOut.value) writer.write('\n')
       res
@@ -165,7 +166,7 @@ object SjsonnetMain {
       case Array(x, v) =>
         tlaBinding = tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
     }
-
+    var currentPos: Position = null
     val interp = new Interpreter(
       parseCache,
       varBinding,
@@ -176,7 +177,8 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
       preserveOrder = config.preserveOrder.value,
-      strict = config.strict.value
+      strict = config.strict.value,
+      storePos = if (config.yamlDebug.value) currentPos = _ else _ => ()
     )
 
     (config.multi, config.yamlStream.value) match {
@@ -218,7 +220,7 @@ object SjsonnetMain {
               arr.value.toSeq match {
                 case Nil => //donothing
                 case Seq(single) =>
-                  val renderer = rendererForConfig(writer, config)
+                  val renderer = rendererForConfig(writer, config, () => currentPos)
                   single.transform(renderer)
                   writer.write(if (isScalar(single)) "\n..." else "")
                 case multiple =>
@@ -226,7 +228,7 @@ object SjsonnetMain {
                     if (i > 0) writer.write('\n')
                     if (isScalar(v)) writer.write("--- ")
                     else if (i != 0) writer.write("---\n")
-                    val renderer = rendererForConfig(writer, config)
+                    val renderer = rendererForConfig(writer, config, () => currentPos)
                     v.transform(renderer)
 
                   }
@@ -235,9 +237,9 @@ object SjsonnetMain {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, path, wd)
+          case _ => renderNormal(config, interp, path, wd, () => currentPos)
         }
-      case _ => renderNormal(config, interp, path, wd)
+      case _ => renderNormal(config, interp, path, wd, () => currentPos)
 
     }
   }

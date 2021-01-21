@@ -5,7 +5,9 @@ import java.util.regex.Pattern
 
 import ujson.BaseRenderer
 import upickle.core.{ArrVisitor, ObjVisitor}
+import fastparse.IndexedParserInput
 
+import scala.collection.mutable
 /**
  * A version of YamlRenderer that tries its best to make the output YAML as
  * pretty as possible: unquoted strings, de-dented lists, etc. Follows the PyYAML
@@ -14,7 +16,8 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indentArrayInObject: Boolean = false,
                          indent: Int,
-                         idealWidth: Int = 80) extends BaseRenderer[Writer](out, indent){
+                         idealWidth: Int = 80,
+                         getCurrentPosition: () => Position) extends BaseRenderer[Writer](out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterColon = false
@@ -22,7 +25,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
   var topLevel = true
   var leftHandPrefixOffset = 0
   var firstElementInArray = false
-
+  var bufferedComment: String = null
   override def visitString(s: CharSequence, index: Int) = {
     addSpaceAfterColon()
     flushBuffer()
@@ -34,14 +37,34 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     val str = s.toString
 
     // empty strings and single-newline strings are special-cased
-    if (str.isEmpty) out.append("''")
-    else if (str == "\n") out.append("|2+\n")
+    if (str.isEmpty) {
+      out.append("''")
+      saveCurrentPos()
+    }
+    else if (str == "\n") {
+      out.append("|2+")
+      saveCurrentPos()
+      if (bufferedComment != null) out.append(bufferedComment)
+      bufferedComment = null
+      out.append("\n")
+    }
     // Strings with trailing spaces or with unicode characters are written double-quoted
-    else if (str.contains(" \n") || str.exists(_ > '~'))
+    else if (str.contains(" \n") || str.exists(_ > '~')) {
       PrettyYamlRenderer.writeDoubleQuoted(out, indent * (depth + 1), leftHandPrefixOffset, idealWidth, str)
+      saveCurrentPos()
+    }
     // Other strings with newlines are rendered as blocks
-    else if (str.contains('\n'))
-      PrettyYamlRenderer.writeBlockString(str, out, depth, indent)
+    else if (str.contains('\n')) {
+      saveCurrentPos()
+      PrettyYamlRenderer.writeBlockString(
+        str,
+        out,
+        depth,
+        indent,
+        if (bufferedComment == null) "" else bufferedComment
+      )
+      bufferedComment = null
+    }
     // Strings which look like booleans/nulls/numbers/dates/etc.,
     // or have leading/trailing spaces, are rendered single-quoted
     else if (PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
@@ -50,9 +73,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       val quotedStr = "'" + str.replace("'", "''") + "'"
       PrettyYamlRenderer.writeWrappedString(quotedStr, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = quotedStr.length + 2
+      saveCurrentPos()
     } else { // All other strings can be rendered naked without quotes
       PrettyYamlRenderer.writeWrappedString(str, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = s.length
+      saveCurrentPos()
     }
     out
   }
@@ -67,26 +92,44 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     addSpaceAfterColon()
     flushBuffer()
     out.append(RenderUtils.renderDouble(d))
+    saveCurrentPos()
     out
   }
 
+  val loadedFileContents = mutable.Map.empty[Path, Array[Int]]
+  def saveCurrentPos() = {
+    val current = getCurrentPosition()
+    if (current != null){
+      bufferedComment = " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
+    }
+  }
   override def visitTrue(index: Int) = {
     addSpaceAfterColon()
-    super.visitTrue(index)
+    val out = super.visitTrue(index)
+    saveCurrentPos()
+    out
   }
 
   override def visitFalse(index: Int) = {
     addSpaceAfterColon()
-    super.visitFalse(index)
+    val out = super.visitFalse(index)
+    saveCurrentPos()
+    out
   }
 
   override def visitNull(index: Int) = {
     addSpaceAfterColon()
-    super.visitNull(index)
+    val out = super.visitNull(index)
+    saveCurrentPos()
+    out
   }
   override def flushBuffer() = {
     if (newlineBuffered) {
       afterColon = false
+      if (bufferedComment != null){
+        out.append(bufferedComment)
+        bufferedComment = null
+      }
       YamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) {
@@ -133,6 +176,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       if (empty) {
         addSpaceAfterColon()
         out.append("[]")
+        saveCurrentPos()
       }
       newlineBuffered = false
       dashBuffered = false
@@ -147,6 +191,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     topLevel = false
     def subVisitor = PrettyYamlRenderer.this
     def visitKey(index: Int) = {
+
       if (empty){
         leftHandPrefixOffset = 0
 
@@ -160,6 +205,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       empty = false
       flushBuffer()
       out.append(":")
+      saveCurrentPos()
+      if (bufferedComment != null){
+        out.append(bufferedComment)
+        bufferedComment = null
+      }
       afterKey = true
       afterColon = true
       newlineBuffered = false
@@ -172,6 +222,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       if (empty) {
         addSpaceAfterColon()
         out.append("{}")
+        saveCurrentPos()
       }
       newlineBuffered = false
       depth -= 1
@@ -184,10 +235,11 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
 
 object PrettyYamlRenderer{
 
+
   /**
    * Renders a multi-line string with all indentation and whitespace preserved
    */
-  def writeBlockString(str: String, out: Writer, depth: Int, indent: Int) = {
+  def writeBlockString(str: String, out: Writer, depth: Int, indent: Int, lineComment: String) = {
     val len = str.length()
     val splits = YamlRenderer.newlinePattern.split(str, -1)
     val blockOffsetNumeral = if (str.charAt(0) != ' ') "" else indent
@@ -199,6 +251,7 @@ object PrettyYamlRenderer{
       }
 
     out.append(blockStyle)
+    out.append(lineComment)
 
     splits.dropRight(dropRight).foreach { split =>
       if (split.nonEmpty) YamlRenderer.writeIndentation(out, indent * (depth + 1))

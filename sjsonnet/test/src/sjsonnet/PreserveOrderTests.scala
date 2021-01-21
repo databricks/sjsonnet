@@ -1,21 +1,8 @@
 package sjsonnet
 
 import utest._
-
+import TestUtils.eval
 object PreserveOrderTests extends TestSuite {
-  def eval(s: String, preserveOrder: Boolean) = {
-    new Interpreter(
-      SjsonnetMain.createParseCache(),
-      Map(),
-      Map(),
-      DummyPath(),
-      (_, _) => None,
-      preserveOrder
-    ).interpret(s, DummyPath("(memory)")) match {
-      case Right(x) => x
-      case Left(e) => throw new Exception(e)
-    }
-  }
 
   def tests = Tests {
     test("preserveOrder") {
