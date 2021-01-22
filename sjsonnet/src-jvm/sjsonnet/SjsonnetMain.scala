@@ -56,9 +56,7 @@ object SjsonnetMain {
         args,
         customName = name, customDoc = doc,
         autoPrintHelpAndExit = None
-      ).left.map{
-        err => err + "\n" + parser.helpText(customName = name, customDoc = doc)
-      }
+      )
       file <- {
         if (config.interactive.value) {
           Left("error: -i/--interactive must be passed in as the first argument")
