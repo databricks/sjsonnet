@@ -2,11 +2,11 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, mill.scalanativelib.api._
 val sjsonnetVersion = "0.2.7"
 
-val crossScalaVersions = Seq("2.13.3", "2.12.12")
+val crossScalaVersions = Seq("2.13.4", "2.12.13")
 
 object sjsonnet extends Module{
   
-  object native extends Cross[SjsonnetNativeModule]("2.11.12")
+  object native extends Cross[SjsonnetNativeModule](crossScalaVersions:_*)
   class SjsonnetNativeModule(val crossScalaVersion: String) extends SjsonnetCrossModule with CommonJvmNative with ScalaNativeModule{
     def releaseMode = ReleaseMode.ReleaseFast
     def nativeLinkStubs = true
@@ -21,9 +21,8 @@ object sjsonnet extends Module{
       }
     }
     def forkArgs = Seq("-Xmx4g")
-    def scoptVersion = "3.7.1"
     def nativeLinkingOptions = T { libcryptoLinkingOptions() ++ super.nativeLinkingOptions() }
-    def scalaNativeVersion = "0.4.0-M2"
+    def scalaNativeVersion = "0.4.0"
     def platformSegment = "native"
     def sources = T.sources(
       millSourcePath / "src",
@@ -45,7 +44,7 @@ object sjsonnet extends Module{
   }
   object js extends Cross[SjsonnetJsModule](crossScalaVersions:_*)
   class SjsonnetJsModule(val crossScalaVersion: String) extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.1.1"
+    def scalaJSVersion = "1.4.0"
     def platformSegment = "js"
     def sources = T.sources(
       millSourcePath / "src",
@@ -86,7 +85,6 @@ object sjsonnet extends Module{
         ).call()
       PathRef(outPath)
     }
-    def scoptVersion = "3.7.1"
     def compileIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
     def scalacOptions = Seq("-P:acyclic:force")
     def scalacPluginIvyDeps = Agg(ivy"com.lihaoyi::acyclic:0.2.0")
@@ -171,11 +169,11 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
 
   def ivyDeps = T { super.ivyDeps() ++
     Agg(
-      ivy"com.lihaoyi::fastparse::2.2.4",
-      ivy"com.lihaoyi::pprint::0.5.9",
-      ivy"com.lihaoyi::ujson::1.0.0",
-      ivy"com.lihaoyi::scalatags::0.8.6",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
+      ivy"com.lihaoyi::fastparse::2.3.1",
+      ivy"com.lihaoyi::pprint::0.5.10",
+      ivy"com.lihaoyi::ujson::1.2.3",
+      ivy"com.lihaoyi::scalatags::0.9.3",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.4.0"
     )
   }
   def publishVersion = sjsonnetVersion
@@ -214,9 +212,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
 
 trait CommonJvmNative extends ScalaModule{
   def mainClass = Some("sjsonnet.SjsonnetMain")
-  def scoptVersion: String
   def ivyDeps = super.ivyDeps() ++ Agg(
-    ivy"com.lihaoyi::os-lib::0.7.1",
-    ivy"com.github.scopt::scopt::$scoptVersion"
+    ivy"com.lihaoyi::os-lib::0.7.2",
+    ivy"com.github.scopt::scopt::4.0.0"
   )
 }
