@@ -1,4 +1,4 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
 val sjsonnetVersion = "0.3.0"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
@@ -65,6 +65,8 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       millSourcePath / "src-native",
       millSourcePath / "src-jvm-native"
     )
+    def releaseMode = ReleaseMode.ReleaseFast
+    def nativeLTO = LTO.Thin
     object test extends Tests with CrossTests
   }
   object jvm extends SjsonnetCrossModule with SjsonnetJvmNative {
