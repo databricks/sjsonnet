@@ -81,6 +81,18 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         millSourcePath / "src-jvm-native"
       )
     }
+    object bench extends ScalaNativeModule{
+      def releaseMode = ReleaseMode.ReleaseFast
+      def nativeLTO = LTO.Thin
+      def moduleDeps = Seq(native)
+      def scalaNativeVersion = "0.4.0"
+      def scalaVersion = crossScalaVersion
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-native",
+        millSourcePath / "src-jvm-native"
+      )
+    }
   }
   object jvm extends SjsonnetCrossModule with SjsonnetJvmNative {
     def mainClass = Some("sjsonnet.SjsonnetMain")
@@ -101,6 +113,15 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       def scalacOptions = Seq("-P:acyclic:force")
       def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
       def forkOptions = Seq("-Xss100m")
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-jvm",
+        millSourcePath / "src-jvm-native"
+      )
+    }
+    object bench extends ScalaModule {
+      def moduleDeps = Seq(jvm)
+      def scalaVersion = crossScalaVersion
       def sources = T.sources(
         millSourcePath / "src",
         millSourcePath / "src-jvm",
