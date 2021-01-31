@@ -1,25 +1,26 @@
-import mill._, scalalib._, publish._, scalajslib.ScalaJSModule
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
 val sjsonnetVersion = "0.3.0"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.12", "2.13.3")
+object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
   def millSourcePath = super.millSourcePath / ammonite.ops.up
+  trait SjsonnetJvmNative extends SjsonnetCrossModule {
+    def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"com.lihaoyi::os-lib::0.7.2",
+      ivy"com.lihaoyi::mainargs::0.2.0"
+    )
+  }
   trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
 
     def artifactName = "sjsonnet"
-    def platformSegment: String
-    def sources = T.sources(
-      millSourcePath / "src",
-      millSourcePath / s"src-$platformSegment"
-    )
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.3.0",
-      ivy"com.lihaoyi::pprint::0.5.9",
-      ivy"com.lihaoyi::ujson::1.2.0",
-      ivy"com.lihaoyi::scalatags::0.9.1",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.1.4"
+      ivy"com.lihaoyi::fastparse::2.3.1",
+      ivy"com.lihaoyi::pprint::0.6.1",
+      ivy"com.lihaoyi::ujson::1.2.3",
+      ivy"com.lihaoyi::scalatags::0.9.3",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.4.0"
     )
     def publishVersion = sjsonnetVersion
 
@@ -45,26 +46,65 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       )
     )
     trait CrossTests extends ScalaModule with TestModule {
-      def platformSegment = SjsonnetCrossModule.this.platformSegment
-      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.4")
+      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.7")
       def testFrameworks = Seq("utest.runner.Framework")
-      def sources = T.sources(
-        millSourcePath / "src",
-        millSourcePath / s"src-$platformSegment"
-      )
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.1.1"
-    def platformSegment = "js"
-    object test extends Tests with CrossTests
+    def scalaJSVersion = "1.4.0"
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / "src-js",
+      millSourcePath / "src-jvm-js"
+    )
+    object test extends Tests with CrossTests {
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-js",
+        millSourcePath / "src-jvm-js"
+      )
+    }
   }
-  object jvm extends SjsonnetCrossModule {
+  object native extends SjsonnetCrossModule with SjsonnetJvmNative with ScalaNativeModule{
+    def scalaNativeVersion = "0.4.0"
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / "src-native",
+      millSourcePath / "src-jvm-native"
+    )
+    def releaseMode = ReleaseMode.ReleaseFast
+    def nativeLTO = LTO.Thin
+    object test extends Tests with CrossTests {
+      def releaseMode = ReleaseMode.Debug
+      def nativeLTO = LTO.None
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-native",
+        millSourcePath / "src-jvm-native"
+      )
+    }
+    object bench extends ScalaNativeModule{
+      def releaseMode = ReleaseMode.ReleaseFast
+      def nativeLTO = LTO.Thin
+      def moduleDeps = Seq(native)
+      def scalaNativeVersion = "0.4.0"
+      def scalaVersion = crossScalaVersion
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-native",
+        millSourcePath / "src-jvm-native"
+      )
+    }
+  }
+  object jvm extends SjsonnetCrossModule with SjsonnetJvmNative {
     def mainClass = Some("sjsonnet.SjsonnetMain")
-    def platformSegment = "jvm"
+    def sources = T.sources(
+      millSourcePath / "src",
+      millSourcePath / "src-jvm",
+      millSourcePath / "src-jvm-native",
+      millSourcePath / "src-jvm-js"
+    )
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::os-lib:0.7.1",
-      ivy"com.lihaoyi::mainargs::0.1.7",
       ivy"org.tukaani:xz::1.8"
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
@@ -75,6 +115,20 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       def scalacOptions = Seq("-P:acyclic:force")
       def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
       def forkOptions = Seq("-Xss100m")
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-jvm",
+        millSourcePath / "src-jvm-native"
+      )
+    }
+    object bench extends ScalaModule {
+      def moduleDeps = Seq(jvm)
+      def scalaVersion = crossScalaVersion
+      def sources = T.sources(
+        millSourcePath / "src",
+        millSourcePath / "src-jvm",
+        millSourcePath / "src-jvm-native"
+      )
     }
   }
 
