@@ -75,6 +75,8 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def releaseMode = ReleaseMode.ReleaseFast
     def nativeLTO = LTO.Thin
     object test extends Tests with CrossTests {
+      def releaseMode = ReleaseMode.Debug
+      def nativeLTO = LTO.None
       def sources = T.sources(
         millSourcePath / "src",
         millSourcePath / "src-native",
