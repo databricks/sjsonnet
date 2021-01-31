@@ -91,9 +91,6 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
         |""".stripMargin
     )
-    test("array_recursive_manifest") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
-    )
     "assert.fail1" - check(
       """sjsonnet.Error: Assertion failed
         |    at .(sjsonnet/test/resources/test_suite/error.assert.fail1.jsonnet:20:1)
@@ -255,12 +252,6 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
       )
     }
-    test("obj_recursive") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
-    )
-    test("obj_recursive_manifest") - check(
-      """Stackoverflow while materializing, possibly due to recursive value""".stripMargin
-    )
 
     test("import_wrong_nr_args") - checkImports(
       """|sjsonnet.Error: Function parameter y not bound in call
