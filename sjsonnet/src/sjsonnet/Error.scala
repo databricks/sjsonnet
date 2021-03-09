@@ -2,6 +2,8 @@ package sjsonnet
 
 import fastparse.IndexedParserInput
 
+import scala.util.control.NonFatal
+
 /**
   * An exception that can keep track of the Sjsonnet call-stack while it is
   * propagating upwards. This helps provide good error messages with line
@@ -43,7 +45,7 @@ object Error {
     case e: Error.Delegate =>
       throw new Error(e.msg, Nil, None)
         .addFrame(fileScope.currentFile, evaluator.wd, offset)
-    case e: Throwable =>
+    case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e))
         .addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
@@ -53,7 +55,7 @@ object Error {
     case e: Error.Delegate =>
       throw new Error(e.msg, Nil, None)
         .addFrame(fileScope.currentFile, evaluator.wd, offset)
-    case e: Throwable =>
+    case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e))
         .addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
