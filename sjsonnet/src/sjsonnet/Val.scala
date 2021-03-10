@@ -219,7 +219,25 @@ object Val{
         .defaults
         .map{ case (index, default) => (index, Lazy(evalDefault(default, newScope, evaluator)))}
 
-      lazy val passedArgsBindings = try
+      lazy val passedArgsBindings: Seq[(Int, sjsonnet.Val.Lazy)] = try {
+        var i = 0
+        var argsSize = args.size
+        val arr: Array[(Int, sjsonnet.Val.Lazy)] = new Array(argsSize)
+        while (i < argsSize) {
+          args(i) match {
+            case (Some(name), v) =>
+              val argIndex = params.argIndices.getOrElse(
+                name,
+                Error.fail(s"Function has no parameter $name", outerOffset)
+              )
+              arr(i) = (argIndex, v)
+            case (None, v) =>
+              arr(i) = (params.args(i)._3, v)
+          }
+          i += 1
+        }
+        arr
+        /*
         args.zipWithIndex.map{
           case ((Some(name), v), _) =>
             val argIndex = params.argIndices.getOrElse(
@@ -229,7 +247,8 @@ object Val{
             (argIndex, v)
           case ((None, v), i) => (params.args(i)._3, v)
         }
-      catch{ case e: IndexOutOfBoundsException =>
+        */
+      } catch { case e: IndexOutOfBoundsException =>
         Error.fail(
           "Too many args, function has " + params.args.length + " parameter(s)",
           outerOffset
