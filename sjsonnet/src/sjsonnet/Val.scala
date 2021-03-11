@@ -259,17 +259,20 @@ object Val{
 
       lazy val newScope: ValScope = {
         var max = -1
-        val builder = Array.newBuilder[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)]
-        for(t <- defaultArgsBindings){
+        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBindings.size + passedArgsBindings.size)
+        var idx = 0
+        for(t <- defaultArgsBindings) {
           val (i, v) = t
           if (i > max) max = i
-          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          idx += 1
         }
 
-        for(t <- passedArgsBindings){
+        for(t <- passedArgsBindings) {
           val (i, v) = t
           if (i > max) max = i
-          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          idx += 1
         }
 
         defSiteScopes match{
@@ -279,11 +282,11 @@ object Val{
             None,
             {
               val arr = new Array[Lazy](max + 1)
-              for((i, v) <- builder.result()) arr(i) = v(null, None)
+              for((i, v) <- builder) arr(i) = v(null, None)
               arr
             }
           )
-          case Some((s, fs)) => s.extend(builder.result())
+          case Some((s, fs)) => s.extend(builder)
         }
       }
 
