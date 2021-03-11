@@ -1,5 +1,9 @@
 package sjsonnet
 
+import java.util.BitSet
+
+import scala.collection.JavaConverters._
+
 import fastparse.IndexedParserInput
 
 /**
@@ -62,15 +66,15 @@ object Error {
     throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
   }
 
-  def failIfNonEmpty(names: collection.BitSet,
+  def failIfNonEmpty(names: BitSet,
                      outerOffset: Int,
                      formatMsg: (String, String) => String,
                      // Allows the use of a custom file scope for computing the error message
                      // for details see: https://github.com/databricks/sjsonnet/issues/83
                      customFileScope: Option[FileScope] = None)
-                    (implicit fileScope: FileScope, eval: EvalErrorScope) = if (names.nonEmpty){
+                    (implicit fileScope: FileScope, eval: EvalErrorScope) = if (!names.isEmpty) {
     val plural = if (names.size > 1) "s" else ""
-    val nameSnippet = names.map(customFileScope.getOrElse(fileScope).indexNames).mkString(", ")
+    val nameSnippet = names.stream().iterator().asScala.map(i => customFileScope.getOrElse(fileScope).indexNames(i)).mkString(", ")
     fail(formatMsg(plural, nameSnippet), outerOffset)
   }
 
