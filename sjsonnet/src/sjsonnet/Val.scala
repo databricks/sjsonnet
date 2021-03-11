@@ -261,18 +261,25 @@ object Val{
         var max = -1
         val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBindings.size + passedArgsBindings.size)
         var idx = 0
-        for(t <- defaultArgsBindings) {
+
+        var defaultBindingsIdx = 0
+        while (defaultBindingsIdx < defaultArgsBindings.size) {
+          val t = defaultArgsBindings(defaultBindingsIdx)
           val (i, v) = t
           if (i > max) max = i
           builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
           idx += 1
+          defaultBindingsIdx += 1
         }
 
-        for(t <- passedArgsBindings) {
+        var passedArgsBindingsIdx = 0
+        while(passedArgsBindingsIdx < passedArgsBindings.size) {
+          val t = passedArgsBindings(passedArgsBindingsIdx)
           val (i, v) = t
           if (i > max) max = i
           builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
           idx += 1
+          passedArgsBindingsIdx += 1
         }
 
         defSiteScopes match{
