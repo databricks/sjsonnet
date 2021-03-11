@@ -151,8 +151,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   private def visitApply(offset: Int, value: Expr, args: Seq[(Option[String], Expr)])
                         (implicit scope: ValScope, fileScope: FileScope) = {
     val lhs = visitExpr(value)
+    val arr = new Array[(Option[String], Val.Lazy)](args.size)
+    var idx = 0
+    while (idx < args.size) {
+      val (k, v) = args(idx)
+      arr(idx) = (k, Val.Lazy(visitExpr(v)))
+      idx += 1
+    }
+
     try lhs.cast[Val.Func].apply(
-      args.map { case (k, v) => (k, Val.Lazy(visitExpr(v))) },
+      arr,
       fileScope.currentFileLastPathElement,
       offset
     )
