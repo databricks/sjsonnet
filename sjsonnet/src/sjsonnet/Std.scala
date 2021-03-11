@@ -894,15 +894,20 @@ object Std {
   def validate(vs: Array[Val],
                ev: EvalScope,
                fs: FileScope,
-               rs: Array[ReadWriter[_]]) = {
-    for(i <- vs.indices) yield {
+               rs: Array[ReadWriter[_]]): Seq[Any] = {
+    var i = 0
+    val size = vs.size
+    val ret = new Array[Any](size)
+    while (i < size) {
       val v = vs(i)
       val r = rs(i)
       r.apply(v, ev, fs) match {
         case Left(err) => throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + v.prettyName)
-        case Right(x) => x
+        case Right(x) => ret(i) = x
       }
+      i += 1
     }
+    ret
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
