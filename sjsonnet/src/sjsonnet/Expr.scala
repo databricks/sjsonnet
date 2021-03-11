@@ -1,6 +1,7 @@
 package sjsonnet
 
-import scala.collection.{BitSet, mutable}
+import java.util.BitSet
+
 /**
   * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the
   * program mostly as-written, except for resolving local variable names and
@@ -56,9 +57,19 @@ object Expr{
   case class Parened(offset: Int, value: Expr) extends Expr
   case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
     val argIndices: Map[String, Int] = args.map{case (k, d, i) => (k, i)}.toMap
-    val noDefaultIndices: BitSet = mutable.BitSet.empty ++ args.collect{case (_, None, i) => i}
+    val noDefaultIndices: BitSet = {
+      val b = new BitSet(args.size)
+      args.collect {
+        case (_, None, i) => b.set(i)
+      }
+      b
+    }
     val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
-    val allIndices: Set[Int] = args.map{case (_, _, i) => i}.toSet
+    val allIndices: BitSet = {
+      val b = new BitSet(args.size)
+      args.foreach { case (_, _, i) => b.set(i) }
+      b
+    }
   }
   case class Args(args: Seq[(Option[String], Expr)])
 

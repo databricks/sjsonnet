@@ -1,5 +1,7 @@
 package sjsonnet
 
+import java.util
+
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
@@ -303,11 +305,13 @@ object Val{
                              defSiteFileScope: FileScope)
                             (implicit fileScope: FileScope, eval: EvalScope): Unit = {
 
-      val seen = mutable.BitSet.empty
-      val repeats = mutable.BitSet.empty
-      for(t <- passedArgsBindings){
-        if (!seen(t._1)) seen.add(t._1)
-        else repeats.add(t._1)
+      val argListSize = passedArgsBindings.size
+      val seen = new util.BitSet(argListSize)
+      val repeats = new util.BitSet(argListSize)
+
+      for(t <- passedArgsBindings) {
+        if (!seen.get(t._1)) seen.set(t._1)
+        else repeats.set(t._1)
       }
 
       Error.failIfNonEmpty(
@@ -317,14 +321,20 @@ object Val{
         Some(defSiteFileScope)
       )
 
+      val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
+      b.andNot(seen)
       Error.failIfNonEmpty(
-        params.noDefaultIndices.filter(!seen(_)),
+        // params.noDefaultIndices.filter(!seen.get(_)),
+        b,
         outerOffset,
         (plural, names) => s"Function parameter$plural $names not bound in call"
       )(defSiteFileScope, eval) // pass the definition site for the correct error message/names to be resolved
 
+      seen.andNot(params.allIndices)
+
       Error.failIfNonEmpty(
-        seen.filter(!params.allIndices(_)),
+        // seen.filter(!params.allIndices(_)),
+        seen,
         outerOffset,
         (plural, names) => s"Function has no parameter$plural $names"
       )
