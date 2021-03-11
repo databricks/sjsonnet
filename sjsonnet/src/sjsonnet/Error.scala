@@ -100,6 +100,8 @@ class FileScope(val currentFile: Path,
   // Only used for error messages, so in the common case
   // where nothing blows up this does not need to be allocated
   lazy val indexNames = nameIndices.map(_.swap)
+
+  lazy val currentFileLastPathElement = currentFile.last
 }
 
 trait EvalErrorScope {

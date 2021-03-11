@@ -217,9 +217,16 @@ object Val{
               outerOffset: Int)
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
-      lazy val defaultArgsBindings = params
-        .defaults
-        .map{ case (index, default) => (index, Lazy(evalDefault(default, newScope, evaluator)))}
+      lazy val defaultArgsBindings = {
+        var idx = 0
+        val arr = new Array[(Int, Lazy)](params.defaults.size)
+        while (idx < params.defaults.size) {
+          val (index, default) = params.defaults(idx)
+          arr(idx) = (index, Lazy(evalDefault(default, newScope, evaluator)))
+          idx += 1
+        }
+        arr
+      }
 
       lazy val passedArgsBindings: Seq[(Int, sjsonnet.Val.Lazy)] = try {
         var i = 0
@@ -319,9 +326,12 @@ object Val{
       val seen = new util.BitSet(argListSize)
       val repeats = new util.BitSet(argListSize)
 
-      for(t <- passedArgsBindings) {
+      var idx = 0
+      while (idx < passedArgsBindings.size) {
+        val t = passedArgsBindings(idx)
         if (!seen.get(t._1)) seen.set(t._1)
         else repeats.set(t._1)
+        idx += 1
       }
 
       Error.failIfNonEmpty(
