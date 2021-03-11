@@ -24,18 +24,21 @@ object SjsonnetMain {
       .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e: Throwable => None})
   }
   def main(args: Array[String]): Unit = {
-    val exitCode = main0(
-      args match {
-        case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
-        case _ => args
-      },
-      collection.mutable.Map.empty,
-      System.in,
-      System.out,
-      System.err,
-      os.pwd,
-      None
-    )
+    var exitCode = 1
+    (0 to 10).foreach { _ =>
+      exitCode = main0(
+        args match {
+          case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
+          case _ => args
+        },
+        collection.mutable.Map.empty,
+        System.in,
+        System.out,
+        System.err,
+        os.pwd,
+        None
+      )
+    }
     System.exit(exitCode)
   }
 
