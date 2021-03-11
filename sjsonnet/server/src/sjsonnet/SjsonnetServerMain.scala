@@ -9,6 +9,8 @@ import org.scalasbt.ipcsocket._
 import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util => ClientUtil}
 import sun.misc.{Signal, SignalHandler}
 
+import scala.util.control.NonFatal
+
 trait SjsonnetServerMain[T]{
   var stateCache = Option.empty[T]
   def main0(args: Array[String],
@@ -118,7 +120,7 @@ class Server[T](lockBase: String,
                 handleRun(sock)
                 serverSocket.close()
               }
-              catch{case e: Throwable => e.printStackTrace(originalStdout) }
+              catch{case NonFatal(e) => e.printStackTrace(originalStdout) }
           }
         }
         // Make sure you give an opportunity for the client to probe the lock
@@ -231,7 +233,7 @@ object Server{
     try {
       val res =
         try Some(t)
-        catch {case e: Throwable => None}
+        catch {case NonFatal(e) => None}
 
       if (interrupted) None
       else res

@@ -7,6 +7,7 @@ import java.nio.file.NoSuchFileException
 
 import scala.collection.mutable
 import scala.util.Try
+import scala.util.control.NonFatal
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
@@ -21,7 +22,7 @@ object SjsonnetMain {
       })
       .filter(p => allowedInputs.fold(true)(_(p)))
       .find(os.exists)
-      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case e: Throwable => None})
+      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case NonFatal(_) => None})
   }
   def main(args: Array[String]): Unit = {
     val exitCode = main0(

@@ -5,6 +5,8 @@ import java.io.{PrintWriter, StringWriter}
 import fastparse.Parsed
 import sjsonnet.Expr.Params
 
+import scala.util.control.NonFatal
+
 /**
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
@@ -47,7 +49,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
             new FileScope(path, nameIndices)
           )
         )
-        catch{case e: Throwable =>
+        catch{case NonFatal(e) =>
           val s = new StringWriter()
           val p = new PrintWriter(s)
           e.printStackTrace(p)
@@ -68,7 +70,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         try Right(Materializer.apply0(res, visitor, storePos = storePos)(evaluator))
         catch{
           case Error.Delegate(msg) => Left(msg)
-          case e: Throwable =>
+          case NonFatal(e) =>
             val s = new StringWriter()
             val p = new PrintWriter(s)
             e.printStackTrace(p)
