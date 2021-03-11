@@ -1,5 +1,5 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
-val sjsonnetVersion = "0.3.0"
+val sjsonnetVersion = "0.3.1"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
@@ -37,7 +37,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
     def pomSettings = PomSettings(
       description = artifactName(),
-      organization = "com.lihaoyi",
+      organization = "com.databricks",
       url = "https://github.com/lihaoyi/sjsonnet",
       licenses = Seq(License.MIT),
       versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
