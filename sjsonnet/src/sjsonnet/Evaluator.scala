@@ -153,7 +153,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     val lhs = visitExpr(value)
     try lhs.cast[Val.Func].apply(
       args.map { case (k, v) => (k, Val.Lazy(visitExpr(v))) },
-      fileScope.currentFile.last,
+      fileScope.currentFileLastPathElement,
       offset
     )
     catch Error.tryCatchWrap(offset)
