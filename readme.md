@@ -9,7 +9,7 @@ Sjsonnet can be used from Java:
 
 ```xml
 <dependency>
-    <groupId>com.lihaoyi</groupId>
+    <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
     <version>0.3.0</version>
 </dependency>
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.lihaoyi" %% "sjsonnet" % "0.3.0" // SBT
-ivy"com.lihaoyi::sjsonnet:0.3.0" // Mill
+"com.databricks" %% "sjsonnet" % "0.3.1" // SBT
+ivy"com.databricks::sjsonnet:0.3.1" // Mill
 ```
 
 ```scala
@@ -239,6 +239,10 @@ To publish, run the following commands:
 ```
 
 ## Changelog
+
+### 0.3.1
+
+- Avoid catching fatal exceptions during evaluation
 
 ### 0.3.0
 
