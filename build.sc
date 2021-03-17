@@ -108,7 +108,11 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"org.tukaani:xz::1.8"
     )
     def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
-    def scalacOptions = Seq("-P:acyclic:force")
+    def scalacOptions = Seq(
+      "-P:acyclic:force",
+      "-opt:l:method",
+      "-opt:l:inline",
+      "-opt-inline-from:sjsonnet.**")
     def scalacPluginIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
     object test extends Tests with CrossTests{
       def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")

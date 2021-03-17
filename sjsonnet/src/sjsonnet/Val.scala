@@ -228,7 +228,7 @@ object Val{
         arr
       }
 
-      lazy val passedArgsBindings: Seq[(Int, sjsonnet.Val.Lazy)] = try {
+      lazy val passedArgsBindings: Array[(Int, sjsonnet.Val.Lazy)] = try {
         var i = 0
         var argsSize = args.size
         val arr: Array[(Int, sjsonnet.Val.Lazy)] = new Array(argsSize)
@@ -316,7 +316,7 @@ object Val{
       )
     }
 
-    def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
+    def validateFunctionCall(passedArgsBindings: Array[(Int, Lazy)],
                              params: Params,
                              outerOffset: Int,
                              defSiteFileScope: FileScope)
@@ -405,7 +405,7 @@ class ValScope(val dollar0: Option[Val.Obj],
     case v => Some(v)
   }
 
-  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = Nil,
+  def extend(newBindings: util.ArrayList[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = Nil,
              newDollar: Option[Val.Obj] = null,
              newSelf: Option[Val.Obj] = null,
              newSuper: Option[Val.Obj] = null) = {
