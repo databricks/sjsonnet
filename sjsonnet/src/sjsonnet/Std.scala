@@ -492,7 +492,7 @@ object Std {
     },
     builtin("escapeStringJson", "str"){ (offset, ev, fs, str: String) =>
       val out = new StringWriter()
-      ujson.Renderer.escape(out, str, unicode = true)
+      BaseRenderer.escape(out, str, unicode = true)
       out.toString
     },
     builtin("escapeStringBash", "str"){ (offset, ev, fs, str: String) =>

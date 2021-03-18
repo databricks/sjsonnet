@@ -3,7 +3,6 @@ package sjsonnet
 import java.io.{StringWriter, Writer}
 import java.util.regex.Pattern
 
-import ujson.BaseRenderer
 import upickle.core.{ArrVisitor, ObjVisitor}
 import fastparse.IndexedParserInput
 
@@ -69,7 +68,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     // or have leading/trailing spaces, are rendered single-quoted
     else if (PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
       val strWriter = new StringWriter
-      ujson.Renderer.escape(strWriter, s, unicode = true)
+      BaseRenderer.escape(strWriter, s, unicode = true)
       val quotedStr = "'" + str.replace("'", "''") + "'"
       PrettyYamlRenderer.writeWrappedString(quotedStr, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = quotedStr.length + 2

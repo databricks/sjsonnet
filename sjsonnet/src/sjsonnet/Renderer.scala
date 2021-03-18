@@ -2,7 +2,6 @@ package sjsonnet
 import java.io.Writer
 
 import upickle.core.{ArrVisitor, ObjVisitor}
-import ujson.BaseRenderer
 
 /**
   * Custom JSON renderer to try and match the behavior of google/jsonnet's

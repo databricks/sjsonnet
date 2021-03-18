@@ -4,7 +4,6 @@ import java.io.{StringWriter, Writer}
 import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
-import ujson.BaseRenderer
 
 
 
@@ -34,7 +33,7 @@ class YamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayIn
       depth -= 1
       out
     } else {
-      ujson.Renderer.escape(out, s, unicode = true)
+      BaseRenderer.escape(out, s, unicode = true)
       out
     }
   }

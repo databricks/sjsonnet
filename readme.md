@@ -240,6 +240,10 @@ To publish, run the following commands:
 
 ## Changelog
 
+### 0.3.2
+
+- Bump uJson version to 1.3.0
+
 ### 0.3.1
 
 - Avoid catching fatal exceptions during evaluation
