@@ -75,7 +75,7 @@ object Error {
                      // for details see: https://github.com/databricks/sjsonnet/issues/83
                      customFileScope: Option[FileScope] = None)
                     (implicit fileScope: FileScope, eval: EvalErrorScope) = if (!names.isEmpty) {
-    val plural = if (names.size > 1) "s" else ""
+    val plural = if (names.cardinality() > 1) "s" else ""
     val nameSnippet = names.stream().iterator().asScala.map(i => customFileScope.getOrElse(fileScope).indexNames(i)).mkString(", ")
     fail(formatMsg(plural, nameSnippet), outerOffset)
   }
