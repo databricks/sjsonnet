@@ -213,7 +213,8 @@ object Val{
               outerPos: Position)
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
-      lazy val defaultArgsBindings = {
+      val defaultArgsBindingIndices = params.defaultsOnlyIndices
+      lazy val defaultArgsBindings: Array[Lazy] = {
         var idx = 0
         val arr = new Array[Lazy](params.defaultsOnly.length)
         while (idx < params.defaultsOnly.length) {
@@ -221,53 +222,59 @@ object Val{
           arr(idx) = Lazy(evalDefault(default, newScope, evaluator))
           idx += 1
         }
-        (params.defaultsOnlyIndices, arr)
+        arr
       }
 
-      lazy val passedArgsBindings: Seq[(Int, sjsonnet.Val.Lazy)] = try {
+      lazy val (passedArgsBindingsI, newScope) = {
         val argsSize = argVals.length
-        val arr: Array[(Int, sjsonnet.Val.Lazy)] = new Array(argsSize)
-        if(argNames != null) {
+        val (passedArgsBindingsI, passedArgsBindingsV) = if(argNames != null) {
+          val arrI: Array[Int] = new Array(argsSize)
+          val arrV: Array[Lazy] = new Array(argsSize)
           var i = 0
-          while (i < argsSize) {
-            val aname = argNames(i)
-            if(aname != null) {
-              val argIndex = params.argIndices.getOrElse(
-                aname,
-                Error.fail(s"Function has no parameter $aname", outerPos)
-              )
-              arr(i) = (argIndex, argVals(i))
-            } else {
-              arr(i) = (params.indices(i), argVals(i))
+          try {
+            while (i < argsSize) {
+              val aname = argNames(i)
+              arrI(i) = if(aname != null) {
+                val argIndex = params.argIndices.getOrElse(
+                  aname,
+                  Error.fail(s"Function has no parameter $aname", outerPos)
+                )
+                argIndex
+              } else params.indices(i)
+              arrV(i) = argVals(i)
+              i += 1
             }
-            i += 1
+          } catch { case e: IndexOutOfBoundsException =>
+            Error.fail(
+              "Too many args, function has " + params.names.length + " parameter(s)",
+              outerPos
+            )
           }
-          arr
+          (arrI, arrV)
         } else {
+          if(params.indices.length < argsSize)
+            Error.fail(
+              "Too many args, function has " + params.names.length + " parameter(s)",
+              outerPos
+            )
+          val arrV: Array[Lazy] = new Array(argsSize)
           var i = 0
           while (i < argsSize) {
-            arr(i) = (params.indices(i), argVals(i))
+            arrV(i) = argVals(i)
             i += 1
           }
-          arr
+          val arrI = if(params.indices.length == argsSize) params.indices else util.Arrays.copyOf(params.indices, argsSize)
+          (arrI, arrV)
         }
-      } catch { case e: IndexOutOfBoundsException =>
-        Error.fail(
-          "Too many args, function has " + params.names.length + " parameter(s)",
-          outerPos
-        )
-      }
 
-      lazy val newScope: ValScope = {
-        val (defaultArgsBIndices, defaultArgsBVals) = defaultArgsBindings
         var max = -1
-        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBVals.length + passedArgsBindings.size)
+        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBindings.length + passedArgsBindingsV.length)
         var idx = 0
 
         var defaultBindingsIdx = 0
-        while (defaultBindingsIdx < defaultArgsBVals.length) {
-          val i = defaultArgsBIndices(defaultBindingsIdx)
-          val v = defaultArgsBVals(defaultBindingsIdx)
+        while (defaultBindingsIdx < defaultArgsBindings.length) {
+          val i = defaultArgsBindingIndices(defaultBindingsIdx)
+          val v = defaultArgsBindings(defaultBindingsIdx)
           if (i > max) max = i
           builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
           idx += 1
@@ -275,16 +282,16 @@ object Val{
         }
 
         var passedArgsBindingsIdx = 0
-        while(passedArgsBindingsIdx < passedArgsBindings.size) {
-          val t = passedArgsBindings(passedArgsBindingsIdx)
-          val (i, v) = t
+        while(passedArgsBindingsIdx < passedArgsBindingsV.length) {
+          val i = passedArgsBindingsI(passedArgsBindingsIdx)
+          val v = passedArgsBindingsV(passedArgsBindingsIdx)
           if (i > max) max = i
           builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
           idx += 1
           passedArgsBindingsIdx += 1
         }
 
-        defSiteScopes match{
+        val newScope = defSiteScopes match{
           case None => new ValScope(
             None,
             None,
@@ -297,10 +304,11 @@ object Val{
           )
           case Some((s, fs)) => s.extend(builder)
         }
+        (passedArgsBindingsI, newScope)
       }
 
       val funDefFileScope: FileScope = defSiteScopes match {case None => fileScope case Some((s, fs)) => fs}
-      validateFunctionCall(passedArgsBindings, params, outerPos, funDefFileScope)
+      validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
 
       evalRhs(
         newScope,
@@ -311,21 +319,21 @@ object Val{
       )
     }
 
-    def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
+    def validateFunctionCall(passedArgsBindingsI: Array[Int],
                              params: Params,
                              outerPos: Position,
                              defSiteFileScope: FileScope)
                             (implicit fileScope: FileScope, eval: EvalScope): Unit = {
 
-      val argListSize = passedArgsBindings.size
+      val argListSize = passedArgsBindingsI.length
       val seen = new util.BitSet(argListSize)
       val repeats = new util.BitSet(argListSize)
 
       var idx = 0
-      while (idx < passedArgsBindings.size) {
-        val t = passedArgsBindings(idx)
-        if (!seen.get(t._1)) seen.set(t._1)
-        else repeats.set(t._1)
+      while (idx < passedArgsBindingsI.length) {
+        val i = passedArgsBindingsI(idx)
+        if (!seen.get(i)) seen.set(i)
+        else repeats.set(i)
         idx += 1
       }
 
