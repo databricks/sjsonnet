@@ -842,7 +842,7 @@ object Std {
     builtin("asciiLower", "str"){ (pos, ev, fs, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
       null,
-      None,
+      null, null,
       Params.mk(("str", None, 0), ("rest", None, 1)),
       { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(_, msg) = scope.bindings(0).get.force
@@ -853,7 +853,7 @@ object Std {
 
     "extVar" -> Val.Func(
       null,
-      None,
+      null, null,
       Params.mk(("x", None, 0)),
       { (scope, thisFile, ev, fs, outerPos) =>
         val Val.Str(_, x) = scope.bindings(0).get.force
@@ -939,7 +939,7 @@ object Std {
     val paramIndices = params.indices.toArray
     name -> Val.Func(
       null,
-      None,
+      null, null,
       Params.mk(paramData: _*),
       {(scope, thisFile, ev, fs, outerPos) =>
         implicitly[ReadWriter[R]].write(
@@ -960,7 +960,7 @@ object Std {
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
     name -> Val.Func(
       null,
-      None,
+      null, null,
       Params.mk(indexedParams: _*),
       { (scope, thisFile, ev, fs, outerPos) =>
         val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap

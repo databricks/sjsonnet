@@ -205,7 +205,8 @@ object Val{
   }
 
   case class Func(pos: Position,
-                  defSiteScopes: Option[(ValScope, FileScope)],
+                  defSiteValScope: ValScope,
+                  defSiteFileScope: FileScope,
                   params: Params,
                   evalRhs: (ValScope, String, EvalScope, FileScope, Position) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
@@ -270,7 +271,8 @@ object Val{
         }
 
         var max = -1
-        val builder = new Array[(Int, (Val.Obj, Val.Obj) => Lazy)](defaultArgsBindings.length + passedArgsBindingsV.length)
+        val newBindingsI = new Array[Int](defaultArgsBindings.length + passedArgsBindingsV.length)
+        val newBindingsV = new Array[Lazy](newBindingsI.length)
         var idx = 0
 
         var defaultBindingsIdx = 0
@@ -278,7 +280,8 @@ object Val{
           val i = defaultArgsBindingIndices(defaultBindingsIdx)
           val v = defaultArgsBindings(defaultBindingsIdx)
           if (i > max) max = i
-          builder(idx) = (i, (self: Val.Obj, sup: Val.Obj) => v)
+          newBindingsI(idx) = i
+          newBindingsV(idx) = v
           idx += 1
           defaultBindingsIdx += 1
         }
@@ -288,28 +291,33 @@ object Val{
           val i = passedArgsBindingsI(passedArgsBindingsIdx)
           val v = passedArgsBindingsV(passedArgsBindingsIdx)
           if (i > max) max = i
-          builder(idx) = (i, (self: Val.Obj, sup: Val.Obj) => v)
+          newBindingsI(idx) = i
+          newBindingsV(idx) = v
           idx += 1
           passedArgsBindingsIdx += 1
         }
 
-        val newScope = defSiteScopes match{
-          case None => new ValScope(
+        val newScope = defSiteValScope match{
+          case null => new ValScope(
             null,
             null,
             null,
             {
               val arr = new Array[Lazy](max + 1)
-              for((i, v) <- builder) arr(i) = v(null, null)
+              var i = 0
+              while(i < newBindingsI.length) {
+                arr(newBindingsI(i)) = newBindingsV(i)
+                i += 1
+              }
               arr
             }
           )
-          case Some((s, fs)) => s.extend(builder)
+          case s => s.extendSimple(newBindingsI, newBindingsV)
         }
         (passedArgsBindingsI, newScope)
       }
 
-      val funDefFileScope: FileScope = defSiteScopes match {case None => fileScope case Some((s, fs)) => fs}
+      val funDefFileScope: FileScope = defSiteFileScope match { case null => fileScope case fs => fs }
       validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
 
       evalRhs(
@@ -412,7 +420,8 @@ class ValScope(val dollar0: Val.Obj,
     case v => Some(v)
   }
 
-  def extend(newBindings: Array[_ <: (Int, (Val.Obj, Val.Obj) => Val.Lazy)] = null,
+  def extend(newBindingsI: Array[Int] = null,
+             newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
              newDollar: Val.Obj = null,
              newSelf: Val.Obj = null,
              newSuper: Val.Obj = null) = {
@@ -423,12 +432,47 @@ class ValScope(val dollar0: Val.Obj,
       dollar,
       self,
       sup,
-      if (newBindings == null || newBindings.length == 0) bindings0
+      if (newBindingsI == null || newBindingsI.length == 0) bindings0
       else{
-        val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
-        for((i, v) <- newBindings) newArr(i) = v.apply(self, sup)
-        newArr
+        val b = bindings0.clone()
+        var i = 0
+        while(i < newBindingsI.length) {
+          b(newBindingsI(i)) = newBindingsF(i).apply(self, sup)
+          i += 1
+        }
+        b
       }
     )
   }
+
+  def extendSimple(newBindingsI: Array[Int],
+                   newBindingsV: Array[Val.Lazy]) = {
+    if(newBindingsI == null || newBindingsI.length == 0) this
+    else new ValScope(
+      dollar0,
+      self0,
+      super0,
+      {
+        val b = bindings0.clone()
+        var i = 0
+        while(i < newBindingsI.length) {
+          b(newBindingsI(i)) = newBindingsV(i)
+          i += 1
+        }
+        b
+      }
+    )
+  }
+
+  def extendSimple(newBindingI: Int,
+                   newBindingV: Val.Lazy) = new ValScope(
+    dollar0,
+    self0,
+    super0,
+    {
+      val b = bindings0.clone()
+      b(newBindingI) = newBindingV
+      b
+    }
+  )
 }
