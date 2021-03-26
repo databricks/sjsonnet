@@ -69,8 +69,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
     case LocalExpr(pos, bindings, returned) =>
       lazy val newScope: ValScope = {
-        val (i, f) = visitBindings(bindings, (self, sup) => newScope)
-        scope.extend(i, f)
+        val f = visitBindings(bindings, (self, sup) => newScope)
+        scope.extend(bindings, f)
       }
       visitExpr(returned)(newScope)
 
@@ -399,13 +399,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     )
   }
 
-  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): (Array[Int], Array[(Val.Obj, Val.Obj) => Val.Lazy]) = {
-    val arrI = new Array[Int](bindings.length)
+  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Val.Lazy] = {
     val arrF = new Array[(Val.Obj, Val.Obj) => Val.Lazy](bindings.length)
     var i = 0
     while(i < bindings.length) {
       val b = bindings(i)
-      arrI(i) = b.name
       arrF(i) = b.args match {
         case null =>
           (self: Val.Obj, sup: Val.Obj) => () => visitExpr(b.rhs)(scope(self, sup))
@@ -414,11 +412,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       }
       i += 1
     }
-    (arrI, arrF)
+    arrF
   }
 
   def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
+      val binds = value.collect{case Member.BindStmt(b) => b}
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
         asserting = true
@@ -442,18 +441,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
       def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
         scope.extend(
-          newBindings._1,
-          newBindings._2,
+          binds,
+          newBindings,
           newDollar = if(scope.dollar0 != null) scope.dollar0 else self,
           newSelf = self,
           newSuper = sup
         )
       }
 
-      lazy val newBindings = visitBindings(
-        value.collect{case Member.BindStmt(b) => b},
-        (self, sup) => makeNewScope(self, sup)
-      )
+      lazy val newBindings =
+        visitBindings(binds, (self, sup) => makeNewScope(self, sup))
 
       lazy val newSelf: Val.Obj = {
         val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
@@ -477,33 +474,31 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       newSelf
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
+      val binds = (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b}.toArray
       lazy val compScope: ValScope = scope.extend(
         newSuper = null
       )
 
       lazy val newSelf: Val.Obj = {
         val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
-        for(s <- visitComp(first :: rest.toList, Array(compScope))){
+        for(s <- visitComp(first :: rest, Array(compScope))){
           lazy val newScope: ValScope = s.extend(
-            newBindings._1,
-            newBindings._2,
+            binds,
+            newBindings,
             newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
             newSelf = newSelf,
             newSuper = null
           )
 
-          lazy val newBindings = visitBindings(
-            (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b}.toArray,
-            (self, sup) => newScope
-          )
+          lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
 
           visitExpr(key)(s) match {
             case Val.Str(_, k) =>
               builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
                 visitExpr(value)(
                   s.extend(
-                    newBindings._1,
-                    newBindings._2,
+                    binds,
+                    newBindings,
                     newDollar = if(s.dollar0 != null) s.dollar0 else self,
                     newSelf = self,
                   )

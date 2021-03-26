@@ -141,7 +141,7 @@ object Expr{
                        value: Expr,
                        postLocals: Array[Member.BindStmt],
                        first: ForSpec,
-                       rest: Array[CompSpec]) extends ObjBody
+                       rest: List[CompSpec]) extends ObjBody
   }
 
 }

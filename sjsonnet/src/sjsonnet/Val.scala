@@ -419,7 +419,7 @@ class ValScope(val dollar0: Val.Obj,
     case v => Some(v)
   }
 
-  def extend(newBindingsI: Array[Int] = null,
+  def extend(newBindingsI: Array[Expr.Bind] = null,
              newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
              newDollar: Val.Obj = null,
              newSelf: Val.Obj = null,
@@ -436,7 +436,7 @@ class ValScope(val dollar0: Val.Obj,
         val b = bindings0.clone()
         var i = 0
         while(i < newBindingsI.length) {
-          b(newBindingsI(i)) = newBindingsF(i).apply(self, sup)
+          b(newBindingsI(i).name) = newBindingsF(i).apply(self, sup)
           i += 1
         }
         b

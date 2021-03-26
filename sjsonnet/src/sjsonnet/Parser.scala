@@ -323,7 +323,7 @@ class Parser(val currentFile: Path) {
           Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Expr.Str].value}" """)
         case _ => // do nothing
       }
-      Expr.ObjBody.ObjComp(preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toArray)
+      Expr.ObjBody.ObjComp(preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)
   }
 
   def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ assertStmt | field )
