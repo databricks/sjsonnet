@@ -39,11 +39,13 @@ object Val{
     * evaluated dictionary values, array contents, or function parameters
     * are all wrapped in [[Lazy]] and only truly evaluated on-demand
     */
-  class Lazy(calc0: => Val){
-    lazy val force = calc0
-  }
-  object Lazy{
-    def apply(calc0: => Val) = new Lazy(calc0)
+  abstract class Lazy {
+    private[this] var cached: Val = null
+    def compute(): Val
+    def force: Val = {
+      if(cached == null) cached = compute()
+      cached
+    }
   }
 
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
@@ -219,7 +221,7 @@ object Val{
         val arr = new Array[Lazy](params.defaultsOnly.length)
         while (idx < params.defaultsOnly.length) {
           val default = params.defaultsOnly(idx)
-          arr(idx) = Lazy(evalDefault(default, newScope, evaluator))
+          arr(idx) = () => evalDefault(default, newScope, evaluator)
           idx += 1
         }
         arr

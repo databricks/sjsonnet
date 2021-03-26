@@ -56,7 +56,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Num(pos, value) => Val.Num(pos, value)
     case Id(pos, value) => visitId(pos, value)
 
-    case Arr(pos, value) => Val.Arr(pos, value.map(v => Val.Lazy(visitExpr(v))))
+    case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
     case Obj(pos, value) => visitObjBody(pos, value)
 
     case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
@@ -84,7 +84,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Function(pos, params, body) => visitMethod(body, params, pos)
     case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
     case Comp(pos, value, first, rest) =>
-      Val.Arr(pos, visitComp(first :: rest.toList, Seq(scope)).map(s => Val.Lazy(visitExpr(value)(s, implicitly))))
+      Val.Arr(pos, visitComp(first :: rest.toList, Seq(scope)).map(s => (() => visitExpr(value)(s, implicitly)): Val.Lazy))
     case ObjExtend(pos, value, ext) => {
       if(strict && isObjLiteral(value))
         Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
@@ -160,8 +160,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     var idx = 0
     while (idx < argExprs.length) {
       val boundIdx = idx
-      arr(idx) =
-        Val.Lazy(visitExpr(argExprs(boundIdx)))
+      arr(idx) = () => visitExpr(argExprs(boundIdx))
       idx += 1
     }
 
@@ -410,13 +409,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           (
             b.name,
             (self: Val.Obj, sup: Val.Obj) =>
-              Val.Lazy(visitExpr(b.rhs)(scope(self, sup), implicitly))
+              () => visitExpr(b.rhs)(scope(self, sup), implicitly)
           )
         case argSpec =>
           (
             b.name,
             (self: Val.Obj, sup: Val.Obj) =>
-              Val.Lazy(visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup), implicitly))
+              () => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup), implicitly)
 
           )
       }

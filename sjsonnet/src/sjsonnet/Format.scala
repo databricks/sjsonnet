@@ -82,7 +82,7 @@ object Format{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(pos, Seq(Val.Lazy(x)))
+      case x => Val.Arr(pos, Seq[Val.Lazy](() => x))
     }
     val (leading, chunks) = fastparse.parse(s, format(_)).get.value
     val output = new StringBuilder
