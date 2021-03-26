@@ -198,7 +198,12 @@ object Parser{
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case '(' => Pass ~ (args ~ ")").map(x => Expr.Apply(i, _: Expr, x))
+          case '(' => Pass ~ (args ~ ")").map { x =>
+            val argNames =
+              if(x.args.exists(_._1.isDefined)) x.args.map(_._1.getOrElse(null)).toArray[String]
+              else null
+            Expr.Apply(i, _: Expr, argNames, x.args.map(_._2).toArray[Expr])
+          }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
         }
@@ -348,8 +353,10 @@ object Parser{
       else seen.add(k)
     }
     if (overlap == null) {
-      val paramData = x.map{case (k, v) => (k, v, indexFor(k))}.toArray
-      Pass(Expr.Params(paramData))
+      val names = x.map(_._1).toArray[String]
+      val exprs = x.map(_._2.getOrElse(null)).toArray[Expr]
+      val idxs = names.map(indexFor)
+      Pass(Expr.Params(names, exprs, idxs))
     }
     else Fail.opaque("no duplicate parameter: " + overlap)
 

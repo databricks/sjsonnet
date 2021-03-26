@@ -58,12 +58,16 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         }
       res = res0 match{
         case f: Val.Func =>
-          f.copy(params = Params(f.params.args.map{ case (k, default, i) =>
-            (k, tlaVars.get(k) match{
-              case None => default
-              case Some(v) => Some(Materializer.toExpr(v))
-            }, i)
-          }))
+          val defaults2 = f.params.defaultExprs.clone()
+          var i = 0
+          while(i < defaults2.length) {
+            tlaVars.get(f.params.names(i)) match {
+              case Some(v) => defaults2(i) = Materializer.toExpr(v)
+              case None =>
+            }
+            i += 1
+          }
+          f.copy(params = Params(f.params.names, defaults2, f.params.indices))
         case x => x
       }
       json <-

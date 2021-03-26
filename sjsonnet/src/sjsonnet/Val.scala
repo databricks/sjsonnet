@@ -212,67 +212,66 @@ object Val{
                   evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
     def prettyName = "function"
-    def apply(args: Seq[(Option[String], Lazy)],
+    def apply(argNames: Array[String], argVals: Array[Lazy],
               thisFile: String,
               outerOffset: Int)
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
       lazy val defaultArgsBindings = {
         var idx = 0
-        val arr = new Array[(Int, Lazy)](params.defaults.size)
-        while (idx < params.defaults.size) {
-          val (index, default) = params.defaults(idx)
-          arr(idx) = (index, Lazy(evalDefault(default, newScope, evaluator)))
+        val arr = new Array[Lazy](params.defaultsOnly.length)
+        while (idx < params.defaultsOnly.length) {
+          val default = params.defaultsOnly(idx)
+          arr(idx) = Lazy(evalDefault(default, newScope, evaluator))
           idx += 1
         }
-        arr
+        (params.defaultsOnlyIndices, arr)
       }
 
       lazy val passedArgsBindings: Seq[(Int, sjsonnet.Val.Lazy)] = try {
-        var i = 0
-        var argsSize = args.size
+        val argsSize = argVals.length
         val arr: Array[(Int, sjsonnet.Val.Lazy)] = new Array(argsSize)
-        while (i < argsSize) {
-          args(i) match {
-            case (Some(name), v) =>
+        if(argNames != null) {
+          var i = 0
+          while (i < argsSize) {
+            val aname = argNames(i)
+            if(aname != null) {
               val argIndex = params.argIndices.getOrElse(
-                name,
-                Error.fail(s"Function has no parameter $name", outerOffset)
+                aname,
+                Error.fail(s"Function has no parameter $aname", outerOffset)
               )
-              arr(i) = (argIndex, v)
-            case (None, v) =>
-              arr(i) = (params.args(i)._3, v)
+              arr(i) = (argIndex, argVals(i))
+            } else {
+              arr(i) = (params.indices(i), argVals(i))
+            }
+            i += 1
           }
-          i += 1
+          arr
+        } else {
+          var i = 0
+          while (i < argsSize) {
+            arr(i) = (params.indices(i), argVals(i))
+            i += 1
+          }
+          arr
         }
-        arr
-        /*
-        args.zipWithIndex.map{
-          case ((Some(name), v), _) =>
-            val argIndex = params.argIndices.getOrElse(
-              name,
-              Error.fail(s"Function has no parameter $name", outerOffset)
-            )
-            (argIndex, v)
-          case ((None, v), i) => (params.args(i)._3, v)
-        }
-        */
       } catch { case e: IndexOutOfBoundsException =>
         Error.fail(
-          "Too many args, function has " + params.args.length + " parameter(s)",
+          "Too many args, function has " + params.names.length + " parameter(s)",
           outerOffset
         )
       }
 
       lazy val newScope: ValScope = {
+        val (defaultArgsBIndices, defaultArgsBVals) = defaultArgsBindings
         var max = -1
-        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBindings.size + passedArgsBindings.size)
+        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBVals.length + passedArgsBindings.size)
         var idx = 0
 
         var defaultBindingsIdx = 0
-        while (defaultBindingsIdx < defaultArgsBindings.size) {
-          val t = defaultArgsBindings(defaultBindingsIdx)
-          val (i, v) = t
+        while (defaultBindingsIdx < defaultArgsBVals.length) {
+          val i = defaultArgsBIndices(defaultBindingsIdx)
+          val v = defaultArgsBVals(defaultBindingsIdx)
           if (i > max) max = i
           builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
           idx += 1

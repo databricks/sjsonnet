@@ -44,7 +44,7 @@ object Std {
         case Val.Str(_, s) => s.length
         case Val.Arr(_, s) => s.length
         case o: Val.Obj => o.getVisibleKeys().count(!_._2)
-        case o: Val.Func => o.params.args.length
+        case o: Val.Func => o.params.names.length
         case _ => throw new Error.Delegate("Cannot get length of " + v1.prettyName)
       }
     },
@@ -836,7 +836,7 @@ object Std {
     "trace" -> Val.Func(
       null,
       None,
-      Params(Array(("str", None, 0), ("rest", None, 1))),
+      Params.mk(("str", None, 0), ("rest", None, 1)),
       { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(_, msg) = scope.bindings(0).get.force
         System.err.println(s"TRACE: $thisFile " + msg)
@@ -847,7 +847,7 @@ object Std {
     "extVar" -> Val.Func(
       null,
       None,
-      Params(Array(("x", None, 0))),
+      Params.mk(("x", None, 0)),
       { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(_, x) = scope.bindings(0).get.force
         Materializer.reverse(
@@ -933,7 +933,7 @@ object Std {
     name -> Val.Func(
       null,
       None,
-      Params(paramData),
+      Params.mk(paramData: _*),
       {(scope, thisFile, ev, fs, outerOffset) =>
         implicitly[ReadWriter[R]].write(
           Position(fs.currentFile, outerOffset),
@@ -954,7 +954,7 @@ object Std {
     name -> Val.Func(
       null,
       None,
-      Params(indexedParams),
+      Params.mk(indexedParams: _*),
       { (scope, thisFile, ev, fs, outerOffset) =>
         val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap
         implicitly[ReadWriter[R]].write(Position(fs.currentFile, outerOffset), eval(outerOffset, args, fs, ev))

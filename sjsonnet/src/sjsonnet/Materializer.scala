@@ -1,6 +1,7 @@
 package sjsonnet
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.Val.Lazy
 import upickle.core.Visitor
 
 import scala.collection.mutable
@@ -71,7 +72,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(Nil, "(memory)", -1)(evaluator.emptyMaterializeFileScope, implicitly),
+          f.apply(emptyStringArray, emptyLazyArray, "(memory)", -1)(evaluator.emptyMaterializeFileScope, implicitly),
           visitor,
           storePos
         )
@@ -114,5 +115,8 @@ object Materializer {
         )
       )
   }
+
+  val emptyStringArray = new Array[String](0)
+  val emptyLazyArray = new Array[Lazy](0)
 
 }

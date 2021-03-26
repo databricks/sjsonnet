@@ -55,20 +55,26 @@ object Expr{
 
 
   case class Parened(offset: Int, value: Expr) extends Expr
-  case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
-    val argIndices: Map[String, Int] = args.map{case (k, d, i) => (k, i)}.toMap
+  //case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
+  case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
+    val argIndices: Map[String, Int] = (names, indices).zipped.toMap
     val noDefaultIndices: BitSet = {
-      val b = new BitSet(args.size)
-      args.collect {
-        case (_, None, i) => b.set(i)
-      }
+      val b = new BitSet(defaultExprs.size)
+      (defaultExprs, indices).zipped.foreach((e, i) => if(e == null) b.set(i))
       b
     }
-    val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
+    val defaultsOnlyIndices: Array[Int] = (defaultExprs, indices).zipped.collect { case (x, i) if x != null => i }.toArray
+    val defaultsOnly: Array[Expr] = defaultExprs.filter(_ != null).toArray
+    //val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
     val allIndices: BitSet = {
-      val b = new BitSet(args.size)
-      args.foreach { case (_, _, i) => b.set(i) }
+      val b = new BitSet(indices.size)
+      indices.foreach(b.set)
       b
+    }
+  }
+  object Params {
+    def mk(params: (String, Option[Expr], Int)*): Params = {
+      Params(params.map(_._1).toArray, params.map(_._2.getOrElse(null)).toArray, params.map(_._3).toArray)
     }
   }
   case class Args(args: Seq[(Option[String], Expr)])
@@ -111,7 +117,7 @@ object Expr{
   case class Import(offset: Int, value: String) extends Expr
   case class ImportStr(offset: Int, value: String) extends Expr
   case class Error(offset: Int, value: Expr) extends Expr
-  case class Apply(offset: Int, value: Expr, args: Args) extends Expr
+  case class Apply(offset: Int, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
   case class Select(offset: Int, value: Expr, name: String) extends Expr
   case class Lookup(offset: Int, value: Expr, index: Expr) extends Expr
   case class Slice(offset: Int,

@@ -69,7 +69,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Import(offset, value) => visitImport(offset, value)
     case ImportStr(offset, value) => visitImportStr(offset, value)
     case Expr.Error(offset, value) => visitError(offset, value)
-    case Apply(offset, value, Args(args)) => visitApply(offset, value, args)
+    case Apply(offset, value, argNames, argExprs) => visitApply(offset, value, argNames, argExprs)
 
     case Select(offset, value, name) => visitSelect(offset, value, name)
 
@@ -148,19 +148,20 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     }
   }
 
-  private def visitApply(offset: Int, value: Expr, args: Seq[(Option[String], Expr)])
+  private def visitApply(offset: Int, value: Expr, argNames: Array[String], argExprs: Array[Expr])
                         (implicit scope: ValScope, fileScope: FileScope) = {
     val lhs = visitExpr(value)
-    val arr = new Array[(Option[String], Val.Lazy)](args.size)
+    val arr = new Array[Val.Lazy](argExprs.length)
     var idx = 0
-    while (idx < args.size) {
-      val (k, v) = args(idx)
-      arr(idx) = (k, Val.Lazy(visitExpr(v)))
+    while (idx < argExprs.length) {
+      val boundIdx = idx
+      arr(idx) =
+        Val.Lazy(visitExpr(argExprs(boundIdx)))
       idx += 1
     }
 
     try lhs.cast[Val.Func].apply(
-      arr,
+      argNames, arr,
       fileScope.currentFileLastPathElement,
       offset
     )
