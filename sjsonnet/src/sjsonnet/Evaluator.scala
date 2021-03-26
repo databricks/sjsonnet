@@ -84,7 +84,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Function(pos, params, body) => visitMethod(body, params, pos)
     case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
     case Comp(pos, value, first, rest) =>
-      Val.Arr(pos, visitComp(first :: rest.toList, Seq(scope)).map(s => (() => visitExpr(value)(s, implicitly)): Val.Lazy))
+      Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s, implicitly)): Val.Lazy))
     case ObjExtend(pos, value, ext) => {
       if(strict && isObjLiteral(value))
         Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
@@ -200,7 +200,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
             end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt) by
             stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-        Val.Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
+        Val.Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a).toArray)
       case Val.Str(_, s) =>
         val range =
           start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
@@ -487,7 +487,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
       lazy val newSelf: Val.Obj = {
         val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
-        for(s <- visitComp(first :: rest.toList, Seq(compScope))){
+        for(s <- visitComp(first :: rest.toList, Array(compScope))){
           lazy val newScope: ValScope = s.extend(
             newBindings,
             newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
@@ -521,8 +521,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       newSelf
   }
 
-  def visitComp(f: List[CompSpec], scopes: Seq[ValScope])
-               (implicit fileScope: FileScope): Seq[ValScope] = f match{
+  def visitComp(f: List[CompSpec], scopes: Array[ValScope])
+               (implicit fileScope: FileScope): Array[ValScope] = f match{
     case ForSpec(_, name, expr) :: rest =>
       visitComp(
         rest,

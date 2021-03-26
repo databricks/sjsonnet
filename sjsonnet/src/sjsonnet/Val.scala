@@ -66,7 +66,7 @@ object Val{
   case class Num(pos: Position, value: Double) extends Val{
     def prettyName = "number"
   }
-  case class Arr(pos: Position, value: Seq[Lazy]) extends Val{
+  case class Arr(pos: Position, value: Array[Lazy]) extends Val{
     def prettyName = "array"
   }
   object Obj{

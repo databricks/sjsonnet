@@ -23,6 +23,7 @@ import util.control.Breaks._
   */
 object Std {
   private val dummyPos: Position = new Position(null, 0)
+  private val emptyLazyArray = new Array[Val.Lazy](0)
 
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin("assertEqual", "a", "b"){ (offset, ev, fs, v1: Val, v2: Val) =>
@@ -118,7 +119,7 @@ object Std {
     builtin("range", "from", "to"){ (pos, ev, fs, from: Int, to: Int) =>
       Val.Arr(
         pos,
-        (from to to).map(i => (() => Val.Num(pos, i)): Val.Lazy)
+        (from to to).map(i => (() => Val.Num(pos, i)): Val.Lazy).toArray
       )
     },
     builtin("mergePatch", "target", "patch"){ (pos, ev, fs, target: Val, patch: Val) =>
@@ -175,9 +176,16 @@ object Std {
     builtin("makeArray", "sz", "func"){ (pos, ev, fs, sz: Int, func: Applyer) =>
       Val.Arr(
         pos,
-        (0 until sz).map(i =>
-          (() => func.apply((() => Val.Num(pos, i)): Val.Lazy)): Val.Lazy
-        )
+        {
+          val a = new Array[Val.Lazy](sz)
+          var i = 0
+          while(i < sz) {
+            val forcedI = i
+            a(i) = () => func.apply(() => Val.Num(pos, forcedI))
+            i += 1
+          }
+          a
+        }
       )
     },
 
@@ -347,7 +355,7 @@ object Std {
       )
     },
     builtin("findSubstr", "pat", "str") { (pos, ev, fs, pat: String, str: String) =>
-      if (pat.length == 0) Val.Arr(pos, Seq())
+      if (pat.length == 0) Val.Arr(pos, emptyLazyArray)
       else {
         val indices = mutable.ArrayBuffer[Int]()
         var matchIndex = str.indexOf(pat)
@@ -355,7 +363,7 @@ object Std {
           indices.append(matchIndex)
           matchIndex = str.indexOf(pat, matchIndex + 1)
         }
-        Val.Arr(pos, indices.map(x => (() => Val.Num(pos, x)): Val.Lazy).toSeq)
+        Val.Arr(pos, indices.map(x => (() => Val.Num(pos, x)): Val.Lazy).toArray)
       }
     },
     builtin("substr", "s", "from", "len"){ (pos, ev, fs, s: String, from: Int, len: Int) =>
@@ -405,7 +413,7 @@ object Std {
               .mkString(s)
           )
         case Val.Arr(_, sep) =>
-          val out = collection.mutable.Buffer.empty[Val.Lazy]
+          val out = new mutable.ArrayBuffer[Val.Lazy]
           for(x <- arr.value){
             x.force match{
               case Val.Null(_) => // do nothing
@@ -415,7 +423,7 @@ object Std {
               case x => throw new Error.Delegate("Cannot join " + x.prettyName)
             }
           }
-          Val.Arr(pos, out.toSeq)
+          Val.Arr(pos, out.toArray)
         case x => throw new Error.Delegate("Cannot join " + x.prettyName)
       }
       res
@@ -446,18 +454,18 @@ object Std {
           }
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
-          val out = collection.mutable.Buffer.empty[Val.Lazy]
+          val out = new mutable.ArrayBuffer[Val.Lazy]
           for (i <- 1 to count) {
             out.appendAll(a.value)
           }
-          Val.Arr(pos, out.toSeq)
+          Val.Arr(pos, out.toArray)
         case x => throw new Error.Delegate("std.repeat first argument must be an array or a string")
       }
       res
     },
 
     builtin("flattenArrays", "arrs"){ (pos, ev, fs, arrs: Val.Arr) =>
-      val out = collection.mutable.Buffer.empty[Val.Lazy]
+      val out = new mutable.ArrayBuffer[Val.Lazy]
       for(x <- arrs.value){
         x.force match{
           case Val.Null(_) => // do nothing
@@ -465,7 +473,7 @@ object Std {
           case x => throw new Error.Delegate("Cannot call flattenArrays on " + x)
         }
       }
-      Val.Arr(pos, out.toSeq)
+      Val.Arr(pos, out.toArray)
     },
 
     builtin("manifestIni", "v"){ (pos, ev, fs, v: Val) =>
@@ -564,7 +572,7 @@ object Std {
       def rec(v: ujson.Value): Frag = {
         v match {
           case ujson.Str(s) => s
-          case ujson.Arr(collection.mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
+          case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
               attrs.value.map {
                 case (k, ujson.Str(v)) => attr(k) := v
@@ -572,7 +580,7 @@ object Std {
               }.toSeq,
               children.map(rec)
             )
-          case ujson.Arr(collection.mutable.Seq(ujson.Str(t), children@_*)) =>
+          case ujson.Arr(mutable.Seq(ujson.Str(t), children@_*)) =>
             tag(t)(children.map(rec).toSeq)
           case x =>
             throw new Error.Delegate("Cannot call manifestXmlJsonml on " + x.getClass)
@@ -664,7 +672,7 @@ object Std {
       }
 
       val keyF = args("keyF")
-      val out = collection.mutable.Buffer.empty[Val.Lazy]
+      val out = new mutable.ArrayBuffer[Val.Lazy]
 
       for (v <- a) {
         if (keyF.isInstanceOf[Val.False]) {
@@ -695,7 +703,7 @@ object Std {
         }
       }
 
-      sortArr(pos, ev, Val.Arr(pos, out.toSeq), keyF)
+      sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
     builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
 
@@ -711,7 +719,7 @@ object Std {
       }
 
       val keyF = args("keyF")
-      val out = collection.mutable.Buffer.empty[Val.Lazy]
+      val out = new mutable.ArrayBuffer[Val.Lazy]
 
       for (v <- a) {
         if (keyF.isInstanceOf[Val.False]) {
@@ -742,7 +750,7 @@ object Std {
         }
       }
 
-      sortArr(pos, ev, Val.Arr(pos, out.toSeq), keyF)
+      sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
     builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
       val keyF = args("keyF")
@@ -792,7 +800,7 @@ object Std {
           case ujson.Num(value) => Val.Num(pos, value)
           case ujson.Str(value) => Val.Str(pos, value)
           case ujson.Arr(values) =>
-            val transformedValue: Seq[Val.Lazy] = values.map(v => (() => recursiveTransform(v)): Val.Lazy).toSeq
+            val transformedValue: Array[Val.Lazy] = values.map(v => (() => recursiveTransform(v)): Val.Lazy).toArray
             Val.Arr(pos, transformedValue)
           case ujson.Obj(valueMap) =>
             val transformedValue = mutable.LinkedHashMap() ++ valueMap
@@ -977,7 +985,7 @@ object Std {
       case _ => throw new Error.Delegate("Argument must be either array or string")
     }
 
-    val out = collection.mutable.Buffer.empty[Val.Lazy]
+    val out = new mutable.ArrayBuffer[Val.Lazy]
     for (v <- arrValue) {
       if (out.isEmpty) {
         out.append(v)
@@ -1007,7 +1015,7 @@ object Std {
       }
     }
 
-    Val.Arr(pos, out.toSeq)
+    Val.Arr(pos, out.toArray)
   }
 
   def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
@@ -1042,33 +1050,33 @@ object Std {
             ???
           }
         )
-      case Val.Str(pos, s) => Val.Arr(pos, s.sorted.map(c => (() => Val.Str(pos, c.toString)): Val.Lazy))
+      case Val.Str(pos, s) => Val.Arr(pos, s.sorted.map(c => (() => Val.Str(pos, c.toString)): Val.Lazy).toArray)
       case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
     }
   }
 
   def stringChars(pos: Position, str: String): Val.Arr = {
-    val output = str.toSeq.sliding(1).toList
-    Val.Arr(pos, output.map(s => (() => Val.Str(pos, s.toString())): Val.Lazy).toSeq)
+    val output = str.toCharArray
+    Val.Arr(pos, output.map(s => (() => Val.Str(pos, s.toString())): Val.Lazy))
   }
   
-  def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Seq[String] = {
+  def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] = {
     val keys = v1.getVisibleKeys()
       .collect{case (k, false) => k}
-      .toSeq
+      .toArray
     
     maybeSortKeys(ev, keys)
   }
   
-  def getAllKeys(ev: EvalScope, v1: Val.Obj): Seq[String] = {
+  def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] = {
     val keys = v1.getVisibleKeys()
       .collect{case (k, _) => k}
-      .toSeq
+      .toArray
     
     maybeSortKeys(ev, keys)
   }
   
-  def maybeSortKeys(ev: EvalScope, keys: Seq[String]): Seq[String] = {
+  def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] = {
     if(ev.preserveOrder) {
       keys
     } else {
@@ -1076,7 +1084,7 @@ object Std {
     }
   }
   
-  def getObjValuesFromKeys(pos: Position, ev: EvalScope, fs: FileScope, v1: Val.Obj, keys: Seq[String]): Val.Arr = {
+  def getObjValuesFromKeys(pos: Position, ev: EvalScope, fs: FileScope, v1: Val.Obj, keys: Array[String]): Val.Arr = {
     Val.Arr(pos, keys.map { k =>
       (() => v1.value(k, new Position(fs.currentFile, -1))(fs, ev)): Val.Lazy
     })
