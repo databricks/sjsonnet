@@ -31,6 +31,7 @@ lazy val main = (project in file("sjsonnet"))
     (unmanagedSourceDirectories in Test) := Seq(
       baseDirectory.value / "test/src",
       baseDirectory.value / "test/src-jvm",
+      baseDirectory.value / "test/src-jvm-native",
     ),
     (unmanagedResourceDirectories in Test) := Seq(
       baseDirectory.value / "test/resources",

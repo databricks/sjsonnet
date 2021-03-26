@@ -32,10 +32,6 @@ object PrettyNamed{
   implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
   implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
 }
-case class Position(currentFile: Path, offset: Int)
-object Position{
-  def apply(offset: Int)(implicit fileScope: FileScope): Position = Position(fileScope.currentFile, offset)
-}
 object Val{
 
   /**
@@ -125,7 +121,7 @@ object Val{
     }
     private[this] val valueCache = collection.mutable.Map.empty[Any, Val]
     def value(k: String,
-              offset: Int,
+              pos: Position,
               self: Obj = this)
              (implicit fileScope: FileScope, evaluator: EvalScope): Val = {
 
@@ -134,30 +130,30 @@ object Val{
       valueCache.get(cacheKey) match{
         case Some(res) => res
         case None =>
-          valueRaw(k, self, offset) match{
+          valueRaw(k, self, pos) match{
             case Some((x, cached)) =>
               if (cached) valueCache(cacheKey) = x
               x
             case None =>
-              Error.fail("Field does not exist: " + k, offset)
+              Error.fail("Field does not exist: " + k, pos)
           }
       }
     }
 
     def mergeMember(l: Val,
                     r: Val,
-                    offset: Int)
-                   (implicit fileScope: FileScope, evaluator: EvalScope) = (l, r) match{
-      case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(Position(fileScope.currentFile, offset), l + r)
-      case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(Position(fileScope.currentFile, offset), l + r)
-      case (Val.Arr(_, l), Val.Arr(_, r)) => Val.Arr(Position(fileScope.currentFile, offset), l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => r.addSuper(Position(fileScope.currentFile, offset), l)
+                    pos: Position)
+                   (implicit evaluator: EvalScope) = (l, r) match{
+      case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
+      case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
+      case (Val.Arr(_, l), Val.Arr(_, r)) => Val.Arr(pos, l ++ r)
+      case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
       case (Val.Str(_, l), r) =>
-        try Val.Str(Position(fileScope.currentFile, offset), l + evaluator.materialize(r).transform(new Renderer()).toString)
-        catch Error.tryCatchWrap(offset)
+        try Val.Str(pos, l + evaluator.materialize(r).transform(new Renderer()).toString)
+        catch Error.tryCatchWrap(pos)
       case (l, Val.Str(_, r)) =>
-        try Val.Str(Position(fileScope.currentFile, offset), evaluator.materialize(l).transform(new Renderer()).toString + r)
-        catch Error.tryCatchWrap(offset)
+        try Val.Str(pos, evaluator.materialize(l).transform(new Renderer()).toString + r)
+        catch Error.tryCatchWrap(pos)
     }
 
     @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -171,16 +167,16 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 offset: Int)
+                 pos: Position)
                 (implicit fileScope: FileScope, evaluator: EvalScope): Option[(Val, Boolean)] = {
       this.value0.get(k) match{
         case Some(m) =>
           this.`super` match{
             case Some(s) if m.add =>
-              val merged = s.valueRaw(k, self, offset) match{
+              val merged = s.valueRaw(k, self, pos) match{
                 case None => m.invoke(self, this.`super`, fileScope, evaluator)
                 case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), offset)
+                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), pos)
               }
 
               Some(merged -> m.cached)
@@ -191,7 +187,7 @@ object Val{
 
         case None => this.`super` match{
           case None => None
-          case Some(s) => s.valueRaw(k, self, offset)
+          case Some(s) => s.valueRaw(k, self, pos)
         }
       }
     }
@@ -209,12 +205,12 @@ object Val{
   case class Func(pos: Position,
                   defSiteScopes: Option[(ValScope, FileScope)],
                   params: Params,
-                  evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
+                  evalRhs: (ValScope, String, EvalScope, FileScope, Position) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
     def prettyName = "function"
     def apply(argNames: Array[String], argVals: Array[Lazy],
               thisFile: String,
-              outerOffset: Int)
+              outerPos: Position)
              (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
       lazy val defaultArgsBindings = {
@@ -238,7 +234,7 @@ object Val{
             if(aname != null) {
               val argIndex = params.argIndices.getOrElse(
                 aname,
-                Error.fail(s"Function has no parameter $aname", outerOffset)
+                Error.fail(s"Function has no parameter $aname", outerPos)
               )
               arr(i) = (argIndex, argVals(i))
             } else {
@@ -258,7 +254,7 @@ object Val{
       } catch { case e: IndexOutOfBoundsException =>
         Error.fail(
           "Too many args, function has " + params.names.length + " parameter(s)",
-          outerOffset
+          outerPos
         )
       }
 
@@ -304,20 +300,20 @@ object Val{
       }
 
       val funDefFileScope: FileScope = defSiteScopes match {case None => fileScope case Some((s, fs)) => fs}
-      validateFunctionCall(passedArgsBindings, params, outerOffset, funDefFileScope)
+      validateFunctionCall(passedArgsBindings, params, outerPos, funDefFileScope)
 
       evalRhs(
         newScope,
         thisFile,
         evaluator,
         funDefFileScope,
-        outerOffset
+        outerPos
       )
     }
 
     def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
                              params: Params,
-                             outerOffset: Int,
+                             outerPos: Position,
                              defSiteFileScope: FileScope)
                             (implicit fileScope: FileScope, eval: EvalScope): Unit = {
 
@@ -335,9 +331,9 @@ object Val{
 
       Error.failIfNonEmpty(
         repeats,
-        outerOffset,
+        outerPos,
         (plural, names) => s"binding parameter a second time: $names",
-        Some(defSiteFileScope)
+        defSiteFileScope
       )
 
       val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
@@ -345,17 +341,19 @@ object Val{
       Error.failIfNonEmpty(
         // params.noDefaultIndices.filter(!seen.get(_)),
         b,
-        outerOffset,
-        (plural, names) => s"Function parameter$plural $names not bound in call"
-      )(defSiteFileScope, eval) // pass the definition site for the correct error message/names to be resolved
+        outerPos,
+        (plural, names) => s"Function parameter$plural $names not bound in call",
+        defSiteFileScope // pass the definition site for the correct error message/names to be resolved
+      )
 
       seen.andNot(params.allIndices)
 
       Error.failIfNonEmpty(
         // seen.filter(!params.allIndices(_)),
         seen,
-        outerOffset,
-        (plural, names) => s"Function has no parameter$plural $names"
+        outerPos,
+        (plural, names) => s"Function has no parameter$plural $names",
+        fileScope
       )
     }
   }

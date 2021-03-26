@@ -77,12 +77,12 @@ object Format{
   }
   def format(s: String,
              values0: Val,
-             offset: Int)
+             pos: Position)
             (implicit fileScope: FileScope, evaluator: EvalScope): String = {
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(Position(offset), Seq(Val.Lazy(x)))
+      case x => Val.Arr(pos, Seq(Val.Lazy(x)))
     }
     val (leading, chunks) = fastparse.parse(s, format(_)).get.value
     val output = new StringBuilder
@@ -98,7 +98,7 @@ object Format{
             case Some(key) =>
               values match{
                 case v: Val.Arr => Materializer(v.value(i).force)
-                case v: Val.Obj => Materializer(v.value(key, offset))
+                case v: Val.Obj => Materializer(v.value(key, pos))
               }
           }
           i += 1

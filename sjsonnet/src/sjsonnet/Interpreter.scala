@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
+class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, FileScope)]],
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
@@ -36,17 +36,17 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                     path: Path,
                     visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
-      res <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
+      res <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, new Parser(path).document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
         case Parsed.Success(r, index) => Right(r)
       }
-      (parsed, nameIndices) = res
+      (parsed, newFileScope) = res
       _ = evaluator.loadedFileContents(path) = txt
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(
-            Std.scope(nameIndices.size + 1),
-            new FileScope(path, nameIndices)
+            Std.scope(newFileScope.nameIndices.size + 1),
+            newFileScope
           )
         )
         catch{case NonFatal(e) =>

@@ -16,7 +16,7 @@ import scala.collection.mutable
   * imported module to be re-used. Parsing is cached separatedly by an external
   * `parseCache`.
   */
-class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
+class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, FileScope)]],
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 importer: (Path, String) => Option[(Path, String)],
@@ -32,62 +32,62 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   val cachedImportedStrings = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr)
                (implicit scope: ValScope, fileScope: FileScope): Val = try expr match{
-    case Null(offset) => Val.Null(Position(offset))
-    case Parened(offset, inner) => visitExpr(inner)
-    case True(offset) => Val.True(Position(offset))
-    case False(offset) => Val.False(Position(offset))
-    case Self(offset) => scope.self0.getOrElse(Error.fail("Cannot use `self` outside an object", offset))
+    case Null(pos) => Val.Null(pos)
+    case Parened(_, inner) => visitExpr(inner)
+    case True(pos) => Val.True(pos)
+    case False(pos) => Val.False(pos)
+    case Self(pos) => scope.self0.getOrElse(Error.fail("Cannot use `self` outside an object", pos))
 
-    case BinaryOp(offset, lhs, Expr.BinaryOp.`in`, Super(_)) =>
+    case BinaryOp(pos, lhs, Expr.BinaryOp.`in`, Super(_)) =>
       scope.super0 match{
-        case None => Val.False(Position(offset))
+        case None => Val.False(pos)
         case Some(sup) =>
           val key = visitExpr(lhs).cast[Val.Str]
-          Val.bool(Position(offset), sup.containsKey(key.value))
+          Val.bool(pos, sup.containsKey(key.value))
       }
 
-    case $(offset) => scope.dollar0.getOrElse(Error.fail("Cannot use `$` outside an object", offset))
-    case Str(offset, value) => Val.Str(Position(offset), value)
-    case Num(offset, value) => Val.Num(Position(offset), value)
-    case Id(offset, value) => visitId(offset, value)
+    case $(pos) => scope.dollar0.getOrElse(Error.fail("Cannot use `$` outside an object", pos))
+    case Str(pos, value) => Val.Str(pos, value)
+    case Num(pos, value) => Val.Num(pos, value)
+    case Id(pos, value) => visitId(pos, value)
 
-    case Arr(offset, value) => Val.Arr(Position(offset), value.map(v => Val.Lazy(visitExpr(v))))
-    case Obj(offset, value) => visitObjBody(offset, value)
+    case Arr(pos, value) => Val.Arr(pos, value.map(v => Val.Lazy(visitExpr(v))))
+    case Obj(pos, value) => visitObjBody(pos, value)
 
-    case UnaryOp(offset, op, value) => visitUnaryOp(offset, op, value)
+    case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
-    case BinaryOp(offset, lhs, op, rhs) => {
-      visitBinaryOp(offset, lhs, op, rhs)
+    case BinaryOp(pos, lhs, op, rhs) => {
+      visitBinaryOp(pos, lhs, op, rhs)
     }
-    case AssertExpr(offset, Member.AssertStmt(value, msg), returned) =>
-      visitAssert(offset, value, msg, returned)
+    case AssertExpr(pos, Member.AssertStmt(value, msg), returned) =>
+      visitAssert(pos, value, msg, returned)
 
-    case LocalExpr(offset, bindings, returned) =>
+    case LocalExpr(pos, bindings, returned) =>
       lazy val newScope: ValScope = scope.extend(visitBindings(bindings.iterator, (self, sup) => newScope))
       visitExpr(returned)(newScope, implicitly)
 
-    case Import(offset, value) => visitImport(offset, value)
-    case ImportStr(offset, value) => visitImportStr(offset, value)
-    case Expr.Error(offset, value) => visitError(offset, value)
-    case Apply(offset, value, argNames, argExprs) => visitApply(offset, value, argNames, argExprs)
+    case Import(pos, value) => visitImport(pos, value)
+    case ImportStr(pos, value) => visitImportStr(pos, value)
+    case Expr.Error(pos, value) => visitError(pos, value)
+    case Apply(pos, value, argNames, argExprs) => visitApply(pos, value, argNames, argExprs)
 
-    case Select(offset, value, name) => visitSelect(offset, value, name)
+    case Select(pos, value, name) => visitSelect(pos, value, name)
 
-    case Lookup(offset, value, index) => visitLookup(offset, value, index)
+    case Lookup(pos, value, index) => visitLookup(pos, value, index)
 
-    case Slice(offset, value, start, end, stride) => visitSlice(offset, value, start, end, stride)
-    case Function(offset, params, body) => visitMethod(body, params, offset)
-    case IfElse(offset, cond, then, else0) => visitIfElse(offset, cond, then, else0)
-    case Comp(offset, value, first, rest) =>
-      Val.Arr(Position(offset), visitComp(first :: rest.toList, Seq(scope)).map(s => Val.Lazy(visitExpr(value)(s, implicitly))))
-    case ObjExtend(offset, value, ext) => {
+    case Slice(pos, value, start, end, stride) => visitSlice(pos, value, start, end, stride)
+    case Function(pos, params, body) => visitMethod(body, params, pos)
+    case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
+    case Comp(pos, value, first, rest) =>
+      Val.Arr(pos, visitComp(first :: rest.toList, Seq(scope)).map(s => Val.Lazy(visitExpr(value)(s, implicitly))))
+    case ObjExtend(pos, value, ext) => {
       if(strict && isObjLiteral(value))
-        Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", offset)
+        Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
       val original = visitExpr(value).cast[Val.Obj]
-      val extension = visitObjBody(offset, ext)
-      extension.addSuper(Position(offset), original)
+      val extension = visitObjBody(pos, ext)
+      extension.addSuper(pos, original)
     }
-  } catch Error.tryCatch(expr.offset)
+  } catch Error.tryCatch(expr.pos)
 
   private def isObjLiteral(expr: Expr): Boolean = expr match {
     case _: Obj => true
@@ -95,19 +95,19 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case _ => false
   }
 
-  def visitId(offset: Int, value: Int)(implicit scope: ValScope, fileScope: FileScope): Val = {
+  def visitId(pos: Position, value: Int)(implicit scope: ValScope, fileScope: FileScope): Val = {
     val ref = scope.bindings(value)
       .getOrElse(
         Error.fail(
           "Unknown variable " + fileScope.indexNames(value),
-          offset
+          pos
         )
       )
 
-    try ref.force catch Error.tryCatchWrap(offset)
+    try ref.force catch Error.tryCatchWrap(pos)
   }
 
-  def visitIfElse(offset: Int,
+  def visitIfElse(pos: Position,
                   cond: Expr,
                   then: Expr,
                   else0: Option[Expr])
@@ -117,38 +117,38 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       case Val.True(_) => visitExpr(then)
       case Val.False(_) =>
         else0 match{
-          case None => Val.Null(Position(offset))
+          case None => Val.Null(pos)
           case Some(v) => visitExpr(v)
         }
-      case v => Error.fail("Need boolean, found " + v.prettyName, offset)
+      case v => Error.fail("Need boolean, found " + v.prettyName, pos)
     }
   }
 
-  def visitError(offset: Int, value: Expr)
+  def visitError(pos: Position, value: Expr)
                 (implicit scope: ValScope, fileScope: FileScope): Nothing = {
     Error.fail(
       visitExpr(value) match {
         case Val.Str(_, s) => s
         case r =>
           try Materializer.stringify(r)
-          catch Error.tryCatchWrap(offset)
+          catch Error.tryCatchWrap(pos)
       },
-      offset
+      pos
     )
   }
 
-  def visitUnaryOp(offset: Int, op: UnaryOp.Op, value: Expr)
+  def visitUnaryOp(pos: Position, op: UnaryOp.Op, value: Expr)
                   (implicit scope: ValScope, fileScope: FileScope): Val = {
     (op, visitExpr(value)) match {
-      case (Expr.UnaryOp.`-`, Val.Num(_, v)) => Val.Num(Position(offset), -v)
-      case (Expr.UnaryOp.`+`, Val.Num(_, v)) => Val.Num(Position(offset), v)
-      case (Expr.UnaryOp.`~`, Val.Num(_, v)) => Val.Num(Position(offset), ~v.toLong)
-      case (Expr.UnaryOp.`!`, Val.True(_)) => Val.False(Position(offset))
-      case (Expr.UnaryOp.`!`, Val.False(_)) => Val.True(Position(offset))
+      case (Expr.UnaryOp.`-`, Val.Num(_, v)) => Val.Num(pos, -v)
+      case (Expr.UnaryOp.`+`, Val.Num(_, v)) => Val.Num(pos, v)
+      case (Expr.UnaryOp.`~`, Val.Num(_, v)) => Val.Num(pos, ~v.toLong)
+      case (Expr.UnaryOp.`!`, Val.True(_)) => Val.False(pos)
+      case (Expr.UnaryOp.`!`, Val.False(_)) => Val.True(pos)
     }
   }
 
-  private def visitApply(offset: Int, value: Expr, argNames: Array[String], argExprs: Array[Expr])
+  private def visitApply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr])
                         (implicit scope: ValScope, fileScope: FileScope) = {
     val lhs = visitExpr(value)
     val arr = new Array[Val.Lazy](argExprs.length)
@@ -163,27 +163,27 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     try lhs.cast[Val.Func].apply(
       argNames, arr,
       fileScope.currentFileLastPathElement,
-      offset
+      pos
     )
-    catch Error.tryCatchWrap(offset)
+    catch Error.tryCatchWrap(pos)
   }
 
-  def visitAssert(offset: Int, value: Expr, msg: Option[Expr], returned: Expr)
+  def visitAssert(pos: Position, value: Expr, msg: Option[Expr], returned: Expr)
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (!visitExpr(value).isInstanceOf[Val.True]) {
       msg match {
-        case None => Error.fail("Assertion failed", offset)
+        case None => Error.fail("Assertion failed", pos)
         case Some(msg) =>
           Error.fail(
             "Assertion failed: " + visitExpr(msg).cast[Val.Str].value,
-            offset
+            pos
           )
       }
     }
     visitExpr(returned)
   }
 
-  private def visitSlice(offset: Int,
+  private def visitSlice(pos: Position,
                          value: Expr,
                          start: Option[Expr],
                          end: Option[Expr],
@@ -196,93 +196,92 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
             end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt) by
             stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-        Val.Arr(Position(offset), range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
+        Val.Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a))
       case Val.Str(_, s) =>
         val range =
           start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
             end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt) by
             stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-        Val.Str(Position(offset), range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
-      case x => Error.fail("Can only slice array or string, not " + x.prettyName, offset)
+        Val.Str(pos, range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+      case x => Error.fail("Can only slice array or string, not " + x.prettyName, pos)
     }
   }
 
-  def visitLookup(offset: Int, value: Expr, index: Expr)
+  def visitLookup(pos: Position, value: Expr, index: Expr)
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (value.isInstanceOf[Super]) {
       val key = visitExpr(index).cast[Val.Str]
-      scope.super0.getOrElse(scope.self0.getOrElse(Error.fail("Cannot use `super` outside an object", offset))).value(key.value, offset)
+      scope.super0.getOrElse(scope.self0.getOrElse(Error.fail("Cannot use `super` outside an object", pos))).value(key.value, pos)
     } else (visitExpr(value), visitExpr(index)) match {
       case (v: Val.Arr, i: Val.Num) =>
-        if (i.value > v.value.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", offset)
+        if (i.value > v.value.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", pos)
         val int = i.value.toInt
-        if (int != i.value) Error.fail("array index was not integer: " + i.value, offset)
+        if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
         try v.value(int).force
-        catch Error.tryCatchWrap(offset)
-      case (v: Val.Str, i: Val.Num) => Val.Str(Position(offset), new String(Array(v.value(i.value.toInt))))
+        catch Error.tryCatchWrap(pos)
+      case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
-        val ref = v.value(i.value, offset)
+        val ref = v.value(i.value, pos)
         try ref
-        catch Error.tryCatchWrap(offset)
+        catch Error.tryCatchWrap(pos)
       case (lhs, rhs) =>
-        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", offset)
+        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
     }
   }
 
-  def visitSelect(offset: Int, value: Expr, name: String)
+  def visitSelect(pos: Position, value: Expr, name: String)
                  (implicit scope: ValScope, fileScope: FileScope): Val = {
     if (value.isInstanceOf[Super]) {
       scope.super0
-        .getOrElse(Error.fail("Cannot use `super` outside an object", offset))
-        .value(name, offset, scope.self0.get)
+        .getOrElse(Error.fail("Cannot use `super` outside an object", pos))
+        .value(name, pos, scope.self0.get)
     } else visitExpr(value) match {
-      case obj: Val.Obj => obj.value(name, offset)
-      case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", offset)
+      case obj: Val.Obj => obj.value(name, pos)
+      case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", pos)
     }
   }
 
-  def visitImportStr(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
-    val (p, str) = resolveImport(value, offset)
-    Val.Str(Position(offset), cachedImportedStrings.getOrElseUpdate(p, str))
+  def visitImportStr(pos: Position, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
+    val (p, str) = resolveImport(value, pos)
+    Val.Str(pos, cachedImportedStrings.getOrElseUpdate(p, str))
   }
 
-  def visitImport(offset: Int, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
-    val (p, str) = resolveImport(value, offset)
+  def visitImport(pos: Position, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
+    val (p, str) = resolveImport(value, pos)
     loadedFileContents(p) = str
     cachedImports.getOrElseUpdate(
       p,
       {
-        val (doc, nameIndices) = parseCache.getOrElseUpdate(
+        val (doc, newFileScope) = parseCache.getOrElseUpdate(
           str,
-          fastparse.parse(str, Parser.document(_))
+          fastparse.parse(str, new Parser(p).document(_))
         ) match {
           case Parsed.Success((doc, nameIndices), _) => (doc, nameIndices)
           case f @ Parsed.Failure(l, i, e) =>
             Error.fail(
               "Imported file " + pprint.Util.literalize(value) +
                 " had Parse error. " + f.trace().msg,
-              offset
+              pos
             )
         }
-        val newFileScope = new FileScope(p, nameIndices)
-        try visitExpr(doc)(Std.scope(nameIndices.size), newFileScope)
-        catch Error.tryCatchWrap(offset)
+        try visitExpr(doc)(Std.scope(newFileScope.nameIndices.size), newFileScope)
+        catch Error.tryCatchWrap(pos)
       }
     )
   }
 
-  def resolveImport(value: String, offset: Int)
+  def resolveImport(value: String, pos: Position)
                    (implicit scope: ValScope, fileScope: FileScope): (Path, String) = {
     importer(fileScope.currentFile.parent(), value)
       .getOrElse(
         Error.fail(
           "Couldn't import file: " + pprint.Util.literalize(value),
-          offset
+          pos
         )
       )
   }
 
-  def visitBinaryOp(offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr)
+  def visitBinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr)
                    (implicit scope: ValScope, fileScope: FileScope) = {
     op match {
       // && and || are handled specially because unlike the other operators,
@@ -295,82 +294,82 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 visitExpr(rhs) match{
                   case b: Val.Bool => b
                   case unknown =>
-                    Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+                    Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
                 }
-              case Val.False(_) => Val.False(Position(offset))
+              case Val.False(_) => Val.False(pos)
               case unknown =>
-                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", offset)
+                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
             }
           case (lhs, Expr.BinaryOp.`||`) =>
             lhs match{
-              case Val.True(_) => Val.True(Position(offset))
+              case Val.True(_) => Val.True(pos)
               case Val.False(_) =>
                 visitExpr(rhs) match{
                   case b: Val.Bool => b
                   case unknown =>
-                    Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+                    Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
                 }
               case unknown =>
-                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", offset)
+                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
             }
           case _ => visitExpr(rhs)
 
         }
       case _ =>
         (visitExpr(lhs), op, visitExpr(rhs)) match {
-          case (Val.Num(_, l), Expr.BinaryOp.`*`, Val.Num(_, r)) => Val.Num(Position(offset), l * r)
+          case (Val.Num(_, l), Expr.BinaryOp.`*`, Val.Num(_, r)) => Val.Num(pos, l * r)
           case (Val.Num(_, l), Expr.BinaryOp.`/`, Val.Num(_, r)) =>
-            if (r == 0) Error.fail("division by zero", offset)
-            Val.Num(Position(offset), l / r)
-          case (Val.Num(_, l), Expr.BinaryOp.`%`, Val.Num(_, r)) => Val.Num(Position(offset), l % r)
-          case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(Position(offset), l + r)
+            if (r == 0) Error.fail("division by zero", pos)
+            Val.Num(pos, l / r)
+          case (Val.Num(_, l), Expr.BinaryOp.`%`, Val.Num(_, r)) => Val.Num(pos, l % r)
+          case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(pos, l + r)
           case (Val.Str(_, l), Expr.BinaryOp.`%`, r) =>
-            try Val.Str(Position(offset), Format.format(l, r, offset))
-            catch Error.tryCatchWrap(offset)
+            try Val.Str(pos, Format.format(l, r, pos))
+            catch Error.tryCatchWrap(pos)
 
-          case (Val.Str(_, l), Expr.BinaryOp.`+`, Val.Str(_, r)) => Val.Str(Position(offset), l + r)
-          case (Val.Str(_, l), Expr.BinaryOp.`<`, Val.Str(_, r)) => Val.bool(Position(offset), l < r)
-          case (Val.Str(_, l), Expr.BinaryOp.`>`, Val.Str(_, r)) => Val.bool(Position(offset), l > r)
-          case (Val.Str(_, l), Expr.BinaryOp.`<=`, Val.Str(_, r)) => Val.bool(Position(offset), l <= r)
-          case (Val.Str(_, l), Expr.BinaryOp.`>=`, Val.Str(_, r)) => Val.bool(Position(offset), l >= r)
+          case (Val.Str(_, l), Expr.BinaryOp.`+`, Val.Str(_, r)) => Val.Str(pos, l + r)
+          case (Val.Str(_, l), Expr.BinaryOp.`<`, Val.Str(_, r)) => Val.bool(pos, l < r)
+          case (Val.Str(_, l), Expr.BinaryOp.`>`, Val.Str(_, r)) => Val.bool(pos, l > r)
+          case (Val.Str(_, l), Expr.BinaryOp.`<=`, Val.Str(_, r)) => Val.bool(pos, l <= r)
+          case (Val.Str(_, l), Expr.BinaryOp.`>=`, Val.Str(_, r)) => Val.bool(pos, l >= r)
           case (Val.Str(_, l), Expr.BinaryOp.`+`, r) =>
-            try Val.Str(Position(offset), l + Materializer.stringify(r))
-            catch Error.tryCatchWrap(offset)
+            try Val.Str(pos, l + Materializer.stringify(r))
+            catch Error.tryCatchWrap(pos)
           case (l, Expr.BinaryOp.`+`, Val.Str(_, r)) =>
-            try Val.Str(Position(offset), Materializer.stringify(l) + r)
-            catch Error.tryCatchWrap(offset)
-          case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(Position(offset), l - r)
-          case (Val.Num(_, l), Expr.BinaryOp.`<<`, Val.Num(_, r)) => Val.Num(Position(offset), l.toLong << r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(Position(offset), l.toLong >> r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`<`, Val.Num(_, r)) => Val.bool(Position(offset), l < r)
-          case (Val.Num(_, l), Expr.BinaryOp.`>`, Val.Num(_, r)) => Val.bool(Position(offset), l > r)
-          case (Val.Num(_, l), Expr.BinaryOp.`<=`, Val.Num(_, r)) => Val.bool(Position(offset), l <= r)
-          case (Val.Num(_, l), Expr.BinaryOp.`>=`, Val.Num(_, r)) => Val.bool(Position(offset), l >= r)
+            try Val.Str(pos, Materializer.stringify(l) + r)
+            catch Error.tryCatchWrap(pos)
+          case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(pos, l - r)
+          case (Val.Num(_, l), Expr.BinaryOp.`<<`, Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+          case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+          case (Val.Num(_, l), Expr.BinaryOp.`<`, Val.Num(_, r)) => Val.bool(pos, l < r)
+          case (Val.Num(_, l), Expr.BinaryOp.`>`, Val.Num(_, r)) => Val.bool(pos, l > r)
+          case (Val.Num(_, l), Expr.BinaryOp.`<=`, Val.Num(_, r)) => Val.bool(pos, l <= r)
+          case (Val.Num(_, l), Expr.BinaryOp.`>=`, Val.Num(_, r)) => Val.bool(pos, l >= r)
           case (l, Expr.BinaryOp.`==`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Error.fail("cannot test equality of functions", offset)
+              Error.fail("cannot test equality of functions", pos)
             }
-            try Val.bool(Position(offset), Materializer(l) == Materializer(r))
-            catch Error.tryCatchWrap(offset)
+            try Val.bool(pos, Materializer(l) == Materializer(r))
+            catch Error.tryCatchWrap(pos)
           case (l, Expr.BinaryOp.`!=`, r) =>
             if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Error.fail("cannot test equality of functions", offset)
+              Error.fail("cannot test equality of functions", pos)
             }
-            try Val.bool(Position(offset), Materializer(l) != Materializer(r))
-            catch Error.tryCatchWrap(offset)
-          case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(Position(offset), o.containsKey(l))
-          case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(Position(offset), l.toLong & r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(Position(offset), l.toLong ^ r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(Position(offset), l.toLong | r.toLong)
-          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(Position(offset), l)
-          case (Val.Arr(_, l), Expr.BinaryOp.`+`, Val.Arr(_, r)) => Val.Arr(Position(offset),  l ++ r)
+            try Val.bool(pos, Materializer(l) != Materializer(r))
+            catch Error.tryCatchWrap(pos)
+          case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.containsKey(l))
+          case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+          case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+          case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(pos, l)
+          case (Val.Arr(_, l), Expr.BinaryOp.`+`, Val.Arr(_, r)) => Val.Arr(pos,  l ++ r)
           case (l, op, r) =>
-            Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", offset)
+            Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", pos)
         }
     }
   }
 
-  def visitFieldName(fieldName: FieldName, offset: Int)
+  def visitFieldName(fieldName: FieldName, pos: Position)
                     (implicit scope: ValScope, fileScope: FileScope) = {
     fieldName match{
       case FieldName.Fixed(s) => Some(s)
@@ -379,16 +378,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         case Val.Null(_) => None
         case x => Error.fail(
           s"Field name must be string or null, not ${x.prettyName}",
-          offset
+          pos
         )
       }
     }
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerOffset: Int)
+  def visitMethod(rhs: Expr, params: Params, outerPos: Position)
                  (implicit scope: ValScope, fileScope: FileScope) = {
     Val.Func(
-      Position(fileScope.currentFile, outerOffset),
+      outerPos,
       Some(scope -> fileScope),
       params,
       (s, _, _, fs, _) => visitExpr(rhs)(s, fs),
@@ -410,14 +409,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           (
             b.name,
             (self: Option[Val.Obj], sup: Option[Val.Obj]) =>
-              Val.Lazy(visitMethod(b.rhs, argSpec, b.offset)(scope(self, sup), implicitly))
+              Val.Lazy(visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup), implicitly))
 
           )
       }
     }
   }
 
-  def visitObjBody(offset: Int, b: ObjBody)(implicit scope: ValScope, fileScope: FileScope): Val.Obj = b match{
+  def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope, fileScope: FileScope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
@@ -429,11 +428,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
             if (!visitExpr(value)(newScope, fileScope).isInstanceOf[Val.True]) {
               msg match{
-                case None => Error.fail("Assertion failed", value.offset)
+                case None => Error.fail("Assertion failed", value.pos)
                 case Some(msg) =>
                   Error.fail(
                     "Assertion failed: " + visitExpr(msg)(newScope, implicitly).cast[Val.Str].value,
-                    value.offset
+                    value.pos
                   )
               }
             }
@@ -471,7 +470,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case _: Member.AssertStmt => // do nothing
         }
 
-        new Val.Obj(Position(offset), builder.result(), self => assertions(self), None)
+        new Val.Obj(pos, builder.result(), self => assertions(self), None)
       }
       newSelf
 
@@ -510,7 +509,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             case Val.Null(_) => // do nothing
           }
         }
-        new Val.Obj(Position(offset), builder.result(), _ => (), None)
+        new Val.Obj(pos, builder.result(), _ => (), None)
       }
 
       newSelf
@@ -518,7 +517,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitComp(f: List[CompSpec], scopes: Seq[ValScope])
                (implicit fileScope: FileScope): Seq[ValScope] = f match{
-    case ForSpec(offset, name, expr) :: rest =>
+    case ForSpec(_, name, expr) :: rest =>
       visitComp(
         rest,
         for{
@@ -527,7 +526,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             case Val.Arr(_, value) => value
             case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
-              expr.offset
+              expr.pos
             )
           }
         } yield s.extend(Seq(name -> ((self: Option[Val.Obj], sup: Option[Val.Obj]) => e)))
@@ -538,7 +537,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         case Val.False(_) => false
         case other => Error.fail(
           "Condition must be boolean, got " + other.prettyName,
-          expr.offset
+          expr.pos
         )
       }))
     case Nil => scopes

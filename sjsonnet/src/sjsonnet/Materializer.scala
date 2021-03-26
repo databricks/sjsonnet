@@ -12,7 +12,7 @@ import scala.collection.mutable
   * to `String`s
   */
 object Materializer {
-
+  private val dummyPos: Position = new Position(null, 0)
 
   def apply(v: Val, storePos: Position => Unit = _ => ())(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
@@ -49,7 +49,7 @@ object Materializer {
         for(t <- keys) {
           val (k, hidden) = t
           if (!hidden){
-            val value = obj.value(k, -1)(evaluator.emptyMaterializeFileScope, implicitly)
+            val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope.currentFile, -1))(evaluator.emptyMaterializeFileScope, implicitly)
 
             storePos(
               value match{
@@ -72,7 +72,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, "(memory)", -1)(evaluator.emptyMaterializeFileScope, implicitly),
+          f.apply(emptyStringArray, emptyLazyArray, "(memory)", new Position(evaluator.emptyMaterializeFileScope.currentFile, -1))(evaluator.emptyMaterializeFileScope, implicitly),
           visitor,
           storePos
         )
@@ -101,17 +101,17 @@ object Materializer {
   }
 
   def toExpr(v: ujson.Value): Expr = v match{
-    case ujson.True => Expr.True(0)
-    case ujson.False => Expr.False(0)
-    case ujson.Null => Expr.Null(0)
-    case ujson.Num(n) => Expr.Num(0, n)
-    case ujson.Str(s) => Expr.Str(0, s)
-    case ujson.Arr(xs) => Expr.Arr(0, xs.map(toExpr).toArray[Expr])
+    case ujson.True => Expr.True(dummyPos)
+    case ujson.False => Expr.False(dummyPos)
+    case ujson.Null => Expr.Null(dummyPos)
+    case ujson.Num(n) => Expr.Num(dummyPos, n)
+    case ujson.Str(s) => Expr.Str(dummyPos, s)
+    case ujson.Arr(xs) => Expr.Arr(dummyPos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
-      Expr.Obj(0,
+      Expr.Obj(dummyPos,
         ObjBody.MemberList(
           for((k, v) <- kvs.toArray)
-          yield Member.Field(0, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
+          yield Member.Field(dummyPos, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
         )
       )
   }

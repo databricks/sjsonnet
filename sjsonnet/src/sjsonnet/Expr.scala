@@ -11,21 +11,21 @@ import java.util.BitSet
   * integer offset into the file that is later used to provide error messages.
   */
 sealed trait Expr{
-  def offset: Int
+  def pos: Position
 }
 object Expr{
-  case class Null(offset: Int) extends Expr
-  case class True(offset: Int) extends Expr
-  case class False(offset: Int) extends Expr
-  case class Self(offset: Int) extends Expr
-  case class Super(offset: Int) extends Expr
-  case class $(offset: Int) extends Expr
+  case class Null(pos: Position) extends Expr
+  case class True(pos: Position) extends Expr
+  case class False(pos: Position) extends Expr
+  case class Self(pos: Position) extends Expr
+  case class Super(pos: Position) extends Expr
+  case class $(pos: Position) extends Expr
 
-  case class Str(offset: Int, value: String) extends Expr
-  case class Num(offset: Int, value: Double) extends Expr
-  case class Id(offset: Int, value: Int) extends Expr
-  case class Arr(offset: Int, value: Seq[Expr]) extends Expr
-  case class Obj(offset: Int, value: ObjBody) extends Expr
+  case class Str(pos: Position, value: String) extends Expr
+  case class Num(pos: Position, value: Double) extends Expr
+  case class Id(pos: Position, value: Int) extends Expr
+  case class Arr(pos: Position, value: Seq[Expr]) extends Expr
+  case class Obj(pos: Position, value: ObjBody) extends Expr
 
   sealed trait FieldName
 
@@ -43,7 +43,7 @@ object Expr{
       case object Hidden extends Visibility
       case object Unhide extends Visibility
     }
-    case class Field(offset: Int,
+    case class Field(pos: Position,
                      fieldName: FieldName,
                      plus: Boolean,
                      args: Option[Params],
@@ -54,7 +54,7 @@ object Expr{
   }
 
 
-  case class Parened(offset: Int, value: Expr) extends Expr
+  case class Parened(pos: Position, value: Expr) extends Expr
   //case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
   case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
     val argIndices: Map[String, Int] = (names, indices).zipped.toMap
@@ -79,7 +79,7 @@ object Expr{
   }
   case class Args(args: Seq[(Option[String], Expr)])
 
-  case class UnaryOp(offset: Int, op: UnaryOp.Op, value: Expr) extends Expr
+  case class UnaryOp(pos: Position, op: UnaryOp.Op, value: Expr) extends Expr
   object UnaryOp{
     sealed trait Op
     case object `+` extends Op
@@ -87,7 +87,7 @@ object Expr{
     case object `~` extends Op
     case object `!` extends Op
   }
-  case class BinaryOp(offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
+  case class BinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
   object BinaryOp{
     sealed trait Op
     case object `*` extends Op
@@ -110,30 +110,30 @@ object Expr{
     case object `&&` extends Op
     case object `||` extends Op
   }
-  case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
-  case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
+  case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
+  case class LocalExpr(pos: Position, bindings: Seq[Bind], returned: Expr) extends Expr
 
-  case class Bind(offset: Int, name: Int, args: Option[Params], rhs: Expr)
-  case class Import(offset: Int, value: String) extends Expr
-  case class ImportStr(offset: Int, value: String) extends Expr
-  case class Error(offset: Int, value: Expr) extends Expr
-  case class Apply(offset: Int, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
-  case class Select(offset: Int, value: Expr, name: String) extends Expr
-  case class Lookup(offset: Int, value: Expr, index: Expr) extends Expr
-  case class Slice(offset: Int,
+  case class Bind(pos: Position, name: Int, args: Option[Params], rhs: Expr)
+  case class Import(pos: Position, value: String) extends Expr
+  case class ImportStr(pos: Position, value: String) extends Expr
+  case class Error(pos: Position, value: Expr) extends Expr
+  case class Apply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
+  case class Select(pos: Position, value: Expr, name: String) extends Expr
+  case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
+  case class Slice(pos: Position,
                    value: Expr,
                    start: Option[Expr],
                    end: Option[Expr],
                    stride: Option[Expr]) extends Expr
-  case class Function(offset: Int, params: Params, body: Expr) extends Expr
-  case class IfElse(offset: Int, cond: Expr, then: Expr, `else`: Option[Expr]) extends Expr
+  case class Function(pos: Position, params: Params, body: Expr) extends Expr
+  case class IfElse(pos: Position, cond: Expr, then: Expr, `else`: Option[Expr]) extends Expr
 
   sealed trait CompSpec extends Expr
-  case class IfSpec(offset: Int, cond: Expr) extends CompSpec
-  case class ForSpec(offset: Int, name: Int, cond: Expr) extends CompSpec
+  case class IfSpec(pos: Position, cond: Expr) extends CompSpec
+  case class ForSpec(pos: Position, name: Int, cond: Expr) extends CompSpec
 
-  case class Comp(offset: Int, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
-  case class ObjExtend(offset: Int, base: Expr, ext: ObjBody) extends Expr
+  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
+  case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
 
   sealed trait ObjBody
   object ObjBody{

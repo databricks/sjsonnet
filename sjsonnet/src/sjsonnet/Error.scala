@@ -43,41 +43,41 @@ case class Error(msg: String,
 
 
 object Error {
-  def tryCatch[T](offset: Int)
-                 (implicit fileScope: FileScope, evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
+  def tryCatch[T](pos: Position)
+                 (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e
     case e: Error.Delegate =>
       throw new Error(e.msg, Nil, None)
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
     case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
   }
-  def tryCatchWrap[T](offset: Int)
-                     (implicit fileScope: FileScope, evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(fileScope.currentFile, evaluator.wd, offset)
+  def tryCatchWrap[T](pos: Position)
+                     (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
+    case e: Error => throw e.addFrame(pos.currentFile, evaluator.wd, pos.offset)
     case e: Error.Delegate =>
       throw new Error(e.msg, Nil, None)
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
     case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(fileScope.currentFile, evaluator.wd, offset)
+        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
   }
-  def fail(msg: String, offset: Int)
-          (implicit fileScope: FileScope, evaluator: EvalErrorScope) = {
-    throw Error(msg, Nil, None).addFrame(fileScope.currentFile, evaluator.wd, offset)
+  def fail(msg: String, pos: Position)
+          (implicit evaluator: EvalErrorScope) = {
+    throw Error(msg, Nil, None).addFrame(pos.currentFile, evaluator.wd, pos.offset)
   }
 
   def failIfNonEmpty(names: BitSet,
-                     outerOffset: Int,
+                     outerPos: Position,
                      formatMsg: (String, String) => String,
                      // Allows the use of a custom file scope for computing the error message
                      // for details see: https://github.com/databricks/sjsonnet/issues/83
-                     customFileScope: Option[FileScope] = None)
-                    (implicit fileScope: FileScope, eval: EvalErrorScope) = if (!names.isEmpty) {
+                     fileScope: FileScope)
+                    (implicit eval: EvalErrorScope) = if (!names.isEmpty) {
     val plural = if (names.cardinality() > 1) "s" else ""
-    val nameSnippet = names.stream().iterator().asScala.map(i => customFileScope.getOrElse(fileScope).indexNames(i)).mkString(", ")
-    fail(formatMsg(plural, nameSnippet), outerOffset)
+    val nameSnippet = names.stream().iterator().asScala.map(i => fileScope.indexNames(i)).mkString(", ")
+    fail(formatMsg(plural, nameSnippet), outerPos)
   }
 
 
@@ -96,8 +96,8 @@ object Error {
   * which is shared throughout each file.
   */
 class FileScope(val currentFile: Path,
-                val nameIndices: Map[String, Int]){
-  // Only used for error messages, so in the common case
+                val nameIndices: scala.collection.Map[String, Int]){
+                // Only used for error messages, so in the common case
   // where nothing blows up this does not need to be allocated
   lazy val indexNames = nameIndices.map(_.swap)
 

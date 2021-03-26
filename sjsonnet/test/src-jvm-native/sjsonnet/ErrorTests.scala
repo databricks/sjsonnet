@@ -255,7 +255,7 @@ object ErrorTests extends TestSuite{
 
     test("import_wrong_nr_args") - checkImports(
       """|sjsonnet.Error: Function parameter y not bound in call
-         |    at .(sjsonnet/test/resources/imports/defsite.jsonnet:4:23)
+         |    at .(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
          |    at .(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
          |""".stripMargin
     )
