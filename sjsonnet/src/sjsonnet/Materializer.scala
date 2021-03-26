@@ -49,7 +49,7 @@ object Materializer {
         for(t <- keys) {
           val (k, hidden) = t
           if (!hidden){
-            val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope.currentFile, -1))(evaluator.emptyMaterializeFileScope, implicitly)
+            val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope, -1))
 
             storePos(
               value match{
@@ -72,7 +72,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, "(memory)", new Position(evaluator.emptyMaterializeFileScope.currentFile, -1))(evaluator.emptyMaterializeFileScope, implicitly),
+          f.apply(emptyStringArray, emptyLazyArray, "(memory)", new Position(evaluator.emptyMaterializeFileScope, -1)),
           visitor,
           storePos
         )

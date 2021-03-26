@@ -31,7 +31,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   val cachedImportedStrings = collection.mutable.Map.empty[Path, String]
   def visitExpr(expr: Expr)
-               (implicit scope: ValScope, fileScope: FileScope): Val = try expr match{
+               (implicit scope: ValScope): Val = try expr match{
     case Null(pos) => Val.Null(pos)
     case Parened(_, inner) => visitExpr(inner)
     case True(pos) => Val.True(pos)
@@ -72,7 +72,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         val (i, f) = visitBindings(bindings, (self, sup) => newScope)
         scope.extend(i, f)
       }
-      visitExpr(returned)(newScope, implicitly)
+      visitExpr(returned)(newScope)
 
     case Import(pos, value) => visitImport(pos, value)
     case ImportStr(pos, value) => visitImportStr(pos, value)
@@ -87,7 +87,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case Function(pos, params, body) => visitMethod(body, params, pos)
     case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
     case Comp(pos, value, first, rest) =>
-      Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s, implicitly)): Val.Lazy))
+      Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
     case ObjExtend(pos, value, ext) => {
       if(strict && isObjLiteral(value))
         Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
@@ -103,11 +103,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     case _ => false
   }
 
-  def visitId(pos: Position, value: Int)(implicit scope: ValScope, fileScope: FileScope): Val = {
+  def visitId(pos: Position, value: Int)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(value)
       .getOrElse(
         Error.fail(
-          "Unknown variable " + fileScope.indexNames(value),
+          "Unknown variable " + pos.fileScope.indexNames(value),
           pos
         )
       )
@@ -119,8 +119,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                   cond: Expr,
                   then: Expr,
                   else0: Option[Expr])
-                 (implicit scope: ValScope,
-                  fileScope: FileScope): Val = {
+                 (implicit scope: ValScope): Val = {
     visitExpr(cond) match {
       case Val.True(_) => visitExpr(then)
       case Val.False(_) =>
@@ -133,7 +132,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   }
 
   def visitError(pos: Position, value: Expr)
-                (implicit scope: ValScope, fileScope: FileScope): Nothing = {
+                (implicit scope: ValScope): Nothing = {
     Error.fail(
       visitExpr(value) match {
         case Val.Str(_, s) => s
@@ -146,7 +145,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   }
 
   def visitUnaryOp(pos: Position, op: UnaryOp.Op, value: Expr)
-                  (implicit scope: ValScope, fileScope: FileScope): Val = {
+                  (implicit scope: ValScope): Val = {
     (op, visitExpr(value)) match {
       case (Expr.UnaryOp.`-`, Val.Num(_, v)) => Val.Num(pos, -v)
       case (Expr.UnaryOp.`+`, Val.Num(_, v)) => Val.Num(pos, v)
@@ -157,7 +156,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   }
 
   private def visitApply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr])
-                        (implicit scope: ValScope, fileScope: FileScope) = {
+                        (implicit scope: ValScope) = {
     val lhs = visitExpr(value)
     val arr = new Array[Val.Lazy](argExprs.length)
     var idx = 0
@@ -169,14 +168,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
     try lhs.cast[Val.Func].apply(
       argNames, arr,
-      fileScope.currentFileLastPathElement,
+      pos.fileScope.currentFileLastPathElement,
       pos
     )
     catch Error.tryCatchWrap(pos)
   }
 
   def visitAssert(pos: Position, value: Expr, msg: Option[Expr], returned: Expr)
-                 (implicit scope: ValScope, fileScope: FileScope): Val = {
+                 (implicit scope: ValScope): Val = {
     if (!visitExpr(value).isInstanceOf[Val.True]) {
       msg match {
         case None => Error.fail("Assertion failed", pos)
@@ -195,7 +194,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                          start: Option[Expr],
                          end: Option[Expr],
                          stride: Option[Expr])
-                        (implicit scope: ValScope, fileScope: FileScope)= {
+                        (implicit scope: ValScope)= {
     visitExpr(value) match {
       case Val.Arr(_, a) =>
 
@@ -215,7 +214,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   }
 
   def visitLookup(pos: Position, value: Expr, index: Expr)
-                 (implicit scope: ValScope, fileScope: FileScope): Val = {
+                 (implicit scope: ValScope): Val = {
     if (value.isInstanceOf[Super]) {
       val key = visitExpr(index).cast[Val.Str]
       var s = scope.super0
@@ -239,8 +238,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     }
   }
 
-  def visitSelect(pos: Position, value: Expr, name: String)
-                 (implicit scope: ValScope, fileScope: FileScope): Val = {
+  def visitSelect(pos: Position, value: Expr, name: String)(implicit scope: ValScope): Val = {
     if (value.isInstanceOf[Super]) {
       if(scope.super0 == null) Error.fail("Cannot use `super` outside an object", pos)
       else  scope.super0.value(name, pos, scope.self0)
@@ -250,12 +248,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     }
   }
 
-  def visitImportStr(pos: Position, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
+  def visitImportStr(pos: Position, value: String)(implicit scope: ValScope) = {
     val (p, str) = resolveImport(value, pos)
     Val.Str(pos, cachedImportedStrings.getOrElseUpdate(p, str))
   }
 
-  def visitImport(pos: Position, value: String)(implicit scope: ValScope, fileScope: FileScope) = {
+  def visitImport(pos: Position, value: String)(implicit scope: ValScope) = {
     val (p, str) = resolveImport(value, pos)
     loadedFileContents(p) = str
     cachedImports.getOrElseUpdate(
@@ -273,15 +271,15 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               pos
             )
         }
-        try visitExpr(doc)(Std.scope(newFileScope.nameIndices.size), newFileScope)
+        try visitExpr(doc)(Std.scope(newFileScope.nameIndices.size))
         catch Error.tryCatchWrap(pos)
       }
     )
   }
 
   def resolveImport(value: String, pos: Position)
-                   (implicit scope: ValScope, fileScope: FileScope): (Path, String) = {
-    importer(fileScope.currentFile.parent(), value)
+                   (implicit scope: ValScope): (Path, String) = {
+    importer(pos.fileScope.currentFile.parent(), value)
       .getOrElse(
         Error.fail(
           "Couldn't import file: " + pprint.Util.literalize(value),
@@ -290,8 +288,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       )
   }
 
-  def visitBinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr)
-                   (implicit scope: ValScope, fileScope: FileScope) = {
+  def visitBinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr)(implicit scope: ValScope) = {
     op match {
       // && and || are handled specially because unlike the other operators,
       // these short-circuit during evaluation in some cases when the LHS is known.
@@ -378,8 +375,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     }
   }
 
-  def visitFieldName(fieldName: FieldName, pos: Position)
-                    (implicit scope: ValScope, fileScope: FileScope) = {
+  def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope) = {
     fieldName match{
       case FieldName.Fixed(s) => Some(s)
       case FieldName.Dyn(k) => visitExpr(k) match{
@@ -393,20 +389,17 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     }
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerPos: Position)
-                 (implicit scope: ValScope, fileScope: FileScope) = {
+  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope) = {
     Val.Func(
       outerPos,
       scope,
-      fileScope,
       params,
-      (s, _, _, fs, _) => visitExpr(rhs)(s, fs),
-      (default, s, e) => visitExpr(default)(s, fileScope)
+      (s, _, _, fs, _) => visitExpr(rhs)(s),
+      (default, s, e) => visitExpr(default)(s)
     )
   }
 
-  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope)
-                   (implicit fileScope: FileScope): (Array[Int], Array[(Val.Obj, Val.Obj) => Val.Lazy]) = {
+  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): (Array[Int], Array[(Val.Obj, Val.Obj) => Val.Lazy]) = {
     val arrI = new Array[Int](bindings.length)
     val arrF = new Array[(Val.Obj, Val.Obj) => Val.Lazy](bindings.length)
     var i = 0
@@ -415,16 +408,16 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       arrI(i) = b.name
       arrF(i) = b.args match {
         case null =>
-          (self: Val.Obj, sup: Val.Obj) => () => visitExpr(b.rhs)(scope(self, sup), implicitly)
+          (self: Val.Obj, sup: Val.Obj) => () => visitExpr(b.rhs)(scope(self, sup))
         case argSpec =>
-          (self: Val.Obj, sup: Val.Obj) => () => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup), implicitly)
+          (self: Val.Obj, sup: Val.Obj) => () => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup))
       }
       i += 1
     }
     (arrI, arrF)
   }
 
-  def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope, fileScope: FileScope): Val.Obj = b match{
+  def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope): Val.Obj = b match{
     case ObjBody.MemberList(value) =>
       var asserting: Boolean = false
       def assertions(self: Val.Obj) = if (!asserting) {
@@ -434,12 +427,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         value.collect {
           case Member.AssertStmt(value, msg) =>
 
-            if (!visitExpr(value)(newScope, fileScope).isInstanceOf[Val.True]) {
+            if (!visitExpr(value)(newScope).isInstanceOf[Val.True]) {
               msg match{
                 case None => Error.fail("Assertion failed", value.pos)
                 case Some(msg) =>
                   Error.fail(
-                    "Assertion failed: " + visitExpr(msg)(newScope, implicitly).cast[Val.Str].value,
+                    "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
                     value.pos
                   )
               }
@@ -468,12 +461,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
-              visitExpr(rhs)(makeNewScope(self, sup), implicitly)
+              visitExpr(rhs)(makeNewScope(self, sup))
             })).foreach(builder.+=)
           case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
-              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup), implicitly)
+              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             })).foreach(builder.+=)
           case _: Member.BindStmt => // do nothing
           case _: Member.AssertStmt => // do nothing
@@ -504,7 +497,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             (self, sup) => newScope
           )
 
-          visitExpr(key)(s, implicitly) match {
+          visitExpr(key)(s) match {
             case Val.Str(_, k) =>
               builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
                 visitExpr(value)(
@@ -513,8 +506,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                     newBindings._2,
                     newDollar = if(s.dollar0 != null) s.dollar0 else self,
                     newSelf = self,
-                  ),
-                  implicitly
+                  )
                 )
               ))
             case Val.Null(_) => // do nothing
@@ -526,14 +518,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       newSelf
   }
 
-  def visitComp(f: List[CompSpec], scopes: Array[ValScope])
-               (implicit fileScope: FileScope): Array[ValScope] = f match{
+  def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
     case ForSpec(_, name, expr) :: rest =>
       visitComp(
         rest,
         for{
           s <- scopes
-          e <- visitExpr(expr)(s, implicitly) match{
+          e <- visitExpr(expr)(s) match{
             case Val.Arr(_, value) => value
             case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
@@ -543,7 +534,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         } yield s.extendSimple(name, e)
       )
     case IfSpec(offset, expr) :: rest =>
-      visitComp(rest, scopes.filter(visitExpr(expr)(_, implicitly) match {
+      visitComp(rest, scopes.filter(visitExpr(expr)(_) match {
         case Val.True(_) => true
         case Val.False(_) => false
         case other => Error.fail(

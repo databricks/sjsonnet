@@ -5,18 +5,20 @@ import fastparse.Parsed
 object ParserTests extends TestSuite{
   def parse(s: String) = fastparse.parse(s, new Parser(null).document(_)).get.value._1
   def parseErr(s: String) = fastparse.parse(s, new Parser(null).document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
+  val dummyFS = new FileScope(null, Map.empty)
+  def pos(i: Int) = new Position(dummyFS, i)
   def tests = Tests{
     test("hello") {
-      parse("true") ==> True(Position(null, 0))
+      parse("true") ==> True(pos(0))
 
       parse("123 + 456 + 789") ==>
-        BinaryOp(Position(null, 10), BinaryOp(Position(null, 4), Num(Position(null, 0), 123), BinaryOp.`+`, Num(Position(null, 6), 456)), BinaryOp.`+`, Num(Position(null, 12), 789))
+        BinaryOp(pos(10), BinaryOp(pos(4), Num(pos(0), 123), BinaryOp.`+`, Num(pos(6), 456)), BinaryOp.`+`, Num(pos(12), 789))
 
       parse("1 * 2 + 3") ==>
-        BinaryOp(Position(null, 6), BinaryOp(Position(null, 2), Num(Position(null, 0), 1), BinaryOp.`*`, Num(Position(null, 4), 2)), BinaryOp.`+`, Num(Position(null, 8), 3))
+        BinaryOp(pos(6), BinaryOp(pos(2), Num(pos(0), 1), BinaryOp.`*`, Num(pos(4), 2)), BinaryOp.`+`, Num(pos(8), 3))
 
       parse("1 + 2 * 3") ==>
-        BinaryOp(Position(null, 2), Num(Position(null, 0), 1), BinaryOp.`+`, BinaryOp(Position(null, 6), Num(Position(null, 4), 2), BinaryOp.`*`, Num(Position(null, 8), 3)))
+        BinaryOp(pos(2), Num(pos(0), 1), BinaryOp.`+`, BinaryOp(pos(6), Num(pos(4), 2), BinaryOp.`*`, Num(pos(8), 3)))
     }
     test("duplicateFields") {
       parseErr("{ a: 1, a: 2 }") ==> """Expected no duplicate field: a:1:14, found "}""""

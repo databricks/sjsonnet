@@ -73,7 +73,6 @@ object ReadWriter{
 }
 case class Applyer(f: Val.Func, ev: EvalScope, fs: FileScope){
   def apply(args: Val.Lazy*) = {
-    val file = if(fs == null) null else fs.currentFile
-    f.apply(null, args.toArray, "(memory)", new Position(file, -1))(fs, ev)
+    f.apply(null, args.toArray, "(memory)", new Position(fs, -1))(ev)
   }
 }

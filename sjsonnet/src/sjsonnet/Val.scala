@@ -125,7 +125,7 @@ object Val{
     def value(k: String,
               pos: Position,
               self: Obj = this)
-             (implicit fileScope: FileScope, evaluator: EvalScope): Val = {
+             (implicit evaluator: EvalScope): Val = {
 
       val cacheKey = if(self eq this) k else (k, self)
 
@@ -170,21 +170,21 @@ object Val{
     def valueRaw(k: String,
                  self: Obj,
                  pos: Position)
-                (implicit fileScope: FileScope, evaluator: EvalScope): Option[(Val, Boolean)] = {
+                (implicit evaluator: EvalScope): Option[(Val, Boolean)] = {
       this.value0.get(k) match{
         case Some(m) =>
           this.`super` match{
             case s if s != null && m.add =>
               val merged = s.valueRaw(k, self, pos) match{
-                case None => m.invoke(self, this.`super`, fileScope, evaluator)
+                case None => m.invoke(self, this.`super`, pos.fileScope, evaluator)
                 case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), pos)
+                  mergeMember(supValue, m.invoke(self, this.`super`, pos.fileScope, evaluator), pos)
               }
 
               Some(merged -> m.cached)
 
             case _ =>
-              Some(m.invoke(self, this.`super`, fileScope, evaluator) -> m.cached)
+              Some(m.invoke(self, this.`super`, pos.fileScope, evaluator) -> m.cached)
           }
 
         case None => this.`super` match{
@@ -206,7 +206,6 @@ object Val{
 
   case class Func(pos: Position,
                   defSiteValScope: ValScope,
-                  defSiteFileScope: FileScope,
                   params: Params,
                   evalRhs: (ValScope, String, EvalScope, FileScope, Position) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
@@ -214,7 +213,7 @@ object Val{
     def apply(argNames: Array[String], argVals: Array[Lazy],
               thisFile: String,
               outerPos: Position)
-             (implicit fileScope: FileScope, evaluator: EvalScope) = {
+             (implicit evaluator: EvalScope) = {
 
       val defaultArgsBindingIndices = params.defaultsOnlyIndices
       lazy val defaultArgsBindings: Array[Lazy] = {
@@ -317,7 +316,7 @@ object Val{
         (passedArgsBindingsI, newScope)
       }
 
-      val funDefFileScope: FileScope = defSiteFileScope match { case null => fileScope case fs => fs }
+      val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
 
       evalRhs(
@@ -333,7 +332,7 @@ object Val{
                              params: Params,
                              outerPos: Position,
                              defSiteFileScope: FileScope)
-                            (implicit fileScope: FileScope, eval: EvalScope): Unit = {
+                            (implicit eval: EvalScope): Unit = {
 
       val argListSize = passedArgsBindingsI.length
       val seen = new util.BitSet(argListSize)
@@ -371,7 +370,7 @@ object Val{
         seen,
         outerPos,
         (plural, names) => s"Function has no parameter$plural $names",
-        fileScope
+        outerPos.fileScope
       )
     }
   }
@@ -383,7 +382,7 @@ object Val{
   */
 trait EvalScope extends EvalErrorScope{
   def visitExpr(expr: Expr)
-               (implicit scope: ValScope, fileScope: FileScope): Val
+               (implicit scope: ValScope): Val
 
   def materialize(v: Val): ujson.Value
 

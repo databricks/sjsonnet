@@ -78,7 +78,7 @@ object Format{
   def format(s: String,
              values0: Val,
              pos: Position)
-            (implicit fileScope: FileScope, evaluator: EvalScope): String = {
+            (implicit evaluator: EvalScope): String = {
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x

@@ -49,9 +49,9 @@ class Parser(val currentFile: Path) {
 
   private val nameIndices = new mutable.HashMap[String, Int]
   nameIndices("std") = 0
-  private implicit val fileScope = new FileScope(currentFile, nameIndices)
+  private val fileScope = new FileScope(currentFile, nameIndices)
 
-  def Pos[_: P]: P[Position] = Index.map(offset => Position(offset))
+  def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
   def id[_: P] = P(
     CharIn("_a-zA-Z0-9") ~~
@@ -411,7 +411,32 @@ class Parser(val currentFile: Path) {
   }
 }
 
-case class Position(currentFile: Path, offset: Int)
-object Position{
-  def apply(offset: Int)(implicit fileScope: FileScope): Position = Position(fileScope.currentFile, offset)
+class Position(val fileScope: FileScope, val offset: Int) {
+  def currentFile = fileScope.currentFile
+  override def equals(o: Any) = o match {
+    case o: Position => currentFile == o.currentFile && offset == o.offset
+    case _ => false
+  }
+  override def toString = s"Position($fileScope, $offset)"
+}
+
+/**
+  * FileScope models the per-file context that is propagated throughout the
+  * evaluation of a single Jsonnet file. Contains the current file path, as
+  * well as the mapping of local variable names to local variable array indices
+  * which is shared throughout each file.
+  */
+class FileScope(val currentFile: Path,
+                val nameIndices: scala.collection.Map[String, Int]){
+  // Only used for error messages, so in the common case
+  // where nothing blows up this does not need to be allocated
+  lazy val indexNames = nameIndices.map(_.swap)
+
+  lazy val currentFileLastPathElement = currentFile.last
+
+  val noOffsetPos: Position = new Position(this, -1)
+}
+
+object FileScope {
+  val nullFileScope = new FileScope(null, Map.empty)
 }

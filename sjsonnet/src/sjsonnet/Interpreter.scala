@@ -45,8 +45,7 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(
-            Std.scope(newFileScope.nameIndices.size + 1),
-            newFileScope
+            Std.scope(newFileScope.nameIndices.size + 1)
           )
         )
         catch{case NonFatal(e) =>

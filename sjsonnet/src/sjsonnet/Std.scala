@@ -98,7 +98,7 @@ object Std {
         .mkString
     },
     builtin("format", "str", "vals"){ (pos, ev, fs, v1: String, v2: Val) =>
-      Format.format(v1, v2, new Position(fs.currentFile, -1))(fs, ev)
+      Format.format(v1, v2, new Position(fs, -1))(ev)
     },
     builtin("foldl", "func", "arr", "init"){ (pos, ev, fs, func: Applyer, arr: Val.Arr, init: Val) =>
       var current = init
@@ -130,8 +130,8 @@ object Std {
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
             k <- (getNonHiddenKeys(l) ++ getNonHiddenKeys(r)).distinct
-            val lValue = l.valueRaw(k, l, pos)(fs, ev).map(_._1)
-            val rValue = r.valueRaw(k, r, pos)(fs, ev).map(_._1)
+            val lValue = l.valueRaw(k, l, pos)(ev).map(_._1)
+            val rValue = r.valueRaw(k, r, pos)(ev).map(_._1)
             if !rValue.exists(_.isInstanceOf[Val.Null])
           } yield (lValue, rValue) match{
             case (Some(lChild), None) => k -> createMember{lChild}
@@ -147,7 +147,7 @@ object Std {
         case obj: Val.Obj =>
           val kvs = for{
             k <- getNonHiddenKeys(obj)
-            val value = obj.value(k, pos, obj)(fs, ev)
+            val value = obj.value(k, pos, obj)(ev)
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
 
@@ -288,7 +288,7 @@ object Std {
           k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
             func.apply(
               () => Val.Str(pos, k._1),
-              () => obj.value(k._1, new Position(fs.currentFile, -1))(fs,ev)
+              () => obj.value(k._1, fs.noOffsetPos)(ev)
             )
           ))
         },
@@ -827,7 +827,7 @@ object Std {
           val bindings = for{
             (k, hidden) <- o.getVisibleKeys()
             if !hidden
-            v = rec(o.value(k, Position(pos.currentFile, -1))(fs, ev))
+            v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
           new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, _ => (), null)
@@ -841,7 +841,6 @@ object Std {
     builtin("asciiUpper", "str"){ (pos, ev, fs, str: String) => str.toUpperCase},
     builtin("asciiLower", "str"){ (pos, ev, fs, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
-      null,
       null, null,
       Params.mk(("str", None, 0), ("rest", None, 1)),
       { (scope, thisFile, ev, fs, outerOffset) =>
@@ -852,7 +851,6 @@ object Std {
     ),
 
     "extVar" -> Val.Func(
-      null,
       null, null,
       Params.mk(("x", None, 0)),
       { (scope, thisFile, ev, fs, outerPos) =>
@@ -938,7 +936,6 @@ object Std {
     val paramData = params.zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
     val paramIndices = params.indices.toArray
     name -> Val.Func(
-      null,
       null, null,
       Params.mk(paramData: _*),
       {(scope, thisFile, ev, fs, outerPos) =>
@@ -959,7 +956,6 @@ object Std {
     val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
     name -> Val.Func(
-      null,
       null, null,
       Params.mk(indexedParams: _*),
       { (scope, thisFile, ev, fs, outerPos) =>
@@ -967,7 +963,7 @@ object Std {
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, args, fs, ev))
       },
       { (expr, scope, eval) =>
-        eval.visitExpr(expr)(scope, new FileScope(null, Map.empty))
+        eval.visitExpr(expr)(scope)
       }
     )
   }
@@ -1005,7 +1001,7 @@ object Std {
         val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))
 
         val comparisonExpr = Expr.BinaryOp(dummyPos, o1KeyExpr, BinaryOp.`!=`, o2KeyExpr)
-        val exprResult = ev.visitExpr(comparisonExpr)(scope(0), new FileScope(null, Map.empty))
+        val exprResult = ev.visitExpr(comparisonExpr)(scope(0))
 
         val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]
 
@@ -1086,7 +1082,7 @@ object Std {
   
   def getObjValuesFromKeys(pos: Position, ev: EvalScope, fs: FileScope, v1: Val.Obj, keys: Array[String]): Val.Arr = {
     Val.Arr(pos, keys.map { k =>
-      (() => v1.value(k, new Position(fs.currentFile, -1))(fs, ev)): Val.Lazy
+      (() => v1.value(k, fs.noOffsetPos)(ev)): Val.Lazy
     })
   }
 }

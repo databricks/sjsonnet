@@ -89,21 +89,6 @@ object Error {
 
 }
 
-/**
-  * FileScope models the per-file context that is propagated throughout the
-  * evaluation of a single Jsonnet file. Contains the current file path, as
-  * well as the mapping of local variable names to local variable array indices
-  * which is shared throughout each file.
-  */
-class FileScope(val currentFile: Path,
-                val nameIndices: scala.collection.Map[String, Int]){
-                // Only used for error messages, so in the common case
-  // where nothing blows up this does not need to be allocated
-  lazy val indexNames = nameIndices.map(_.swap)
-
-  lazy val currentFileLastPathElement = currentFile.last
-}
-
 trait EvalErrorScope {
   def extVars: Map[String, ujson.Value]
   def loadCachedSource(p: Path): Option[String]
