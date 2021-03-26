@@ -93,7 +93,7 @@ object Materializer {
       val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
       for(x <- xs){
         val v = Val.Obj.Member(false, Visibility.Normal,
-          (_: Val.Obj, _: Option[Val.Obj], _, _) => reverse(pos, x._2)
+          (_: Val.Obj, _: Val.Obj, _, _) => reverse(pos, x._2)
         )
         builder += (x._1 -> v)
       }

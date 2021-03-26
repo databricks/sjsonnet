@@ -402,20 +402,20 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
     )
   }
 
-  def visitBindings(bindings: Array[Bind], scope: (Option[Val.Obj], Option[Val.Obj]) => ValScope)
-                   (implicit fileScope: FileScope): Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = {
+  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope)
+                   (implicit fileScope: FileScope): Array[(Int, (Val.Obj, Val.Obj) => Val.Lazy)] = {
     bindings.map{ b: Bind =>
       b.args match{
         case None =>
           (
             b.name,
-            (self: Option[Val.Obj], sup: Option[Val.Obj]) =>
+            (self: Val.Obj, sup: Val.Obj) =>
               Val.Lazy(visitExpr(b.rhs)(scope(self, sup), implicitly))
           )
         case Some(argSpec) =>
           (
             b.name,
-            (self: Option[Val.Obj], sup: Option[Val.Obj]) =>
+            (self: Val.Obj, sup: Val.Obj) =>
               Val.Lazy(visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup), implicitly))
 
           )
@@ -457,21 +457,21 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
       lazy val newBindings = visitBindings(
         value.collect{case Member.BindStmt(b) => b},
-        (self, sup) => makeNewScope(self.getOrElse(null), sup.getOrElse(null))
+        (self, sup) => makeNewScope(self, sup)
       ).toArray
 
       lazy val newSelf: Val.Obj = {
         val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
         value.foreach {
           case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
+            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
-              visitExpr(rhs)(makeNewScope(self, sup.getOrElse(null)), implicitly)
+              visitExpr(rhs)(makeNewScope(self, sup), implicitly)
             })).foreach(builder.+=)
           case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Option[Val.Obj], _, _) => {
+            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
-              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup.getOrElse(null)), implicitly)
+              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup), implicitly)
             })).foreach(builder.+=)
           case _: Member.BindStmt => // do nothing
           case _: Member.AssertStmt => // do nothing
@@ -503,7 +503,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
           visitExpr(key)(s, implicitly) match {
             case Val.Str(_, k) =>
-              builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
+              builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
                 visitExpr(value)(
                   s.extend(
                     newBindings,
@@ -536,7 +536,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
               expr.pos
             )
           }
-        } yield s.extend(Array(name -> ((self: Option[Val.Obj], sup: Option[Val.Obj]) => e)))
+        } yield s.extend(Array(name -> ((self: Val.Obj, sup: Val.Obj) => e)))
       )
     case IfSpec(offset, expr) :: rest =>
       visitComp(rest, scopes.filter(visitExpr(expr)(_, implicitly) match {

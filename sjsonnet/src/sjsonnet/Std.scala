@@ -277,7 +277,7 @@ object Std {
         pos,
         mutable.LinkedHashMap() ++
         allKeys.map{ k =>
-          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Option[Val.Obj], _, _) =>
+          k._1 -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
             func.apply(
               Val.Lazy(Val.Str(pos, k._1)),
               Val.Lazy(obj.value(k._1, new Position(fs.currentFile, -1))(fs,ev))
@@ -870,7 +870,7 @@ object Std {
             Val.Obj.Member(
               false,
               Visibility.Hidden,
-              (self: Val.Obj, sup: Option[Val.Obj], _, _) => v
+              (self: Val.Obj, sup: Val.Obj, _, _) => v
             )
           )
       } ++ Seq(
@@ -879,7 +879,7 @@ object Std {
         Val.Obj.Member(
           false,
           Visibility.Hidden,
-          { (self: Val.Obj, sup: Option[Val.Obj], fs: FileScope, eval: EvalScope) =>
+          { (self: Val.Obj, sup: Val.Obj, fs: FileScope, eval: EvalScope) =>
             Val.Str(self.pos, fs.currentFile.relativeToString(eval.wd))
           },
           cached = false

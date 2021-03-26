@@ -71,7 +71,7 @@ object Val{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], FileScope, EvalScope) => Val,
+                      invoke: (Obj, Obj, FileScope, EvalScope) => Val,
                       cached: Boolean = true)
 
 
@@ -174,15 +174,15 @@ object Val{
           this.`super` match{
             case s if s != null && m.add =>
               val merged = s.valueRaw(k, self, pos) match{
-                case None => m.invoke(self, Some(this.`super`), fileScope, evaluator)
+                case None => m.invoke(self, this.`super`, fileScope, evaluator)
                 case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, Some(this.`super`), fileScope, evaluator), pos)
+                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), pos)
               }
 
               Some(merged -> m.cached)
 
             case _ =>
-              Some(m.invoke(self, Some(this.`super`), fileScope, evaluator) -> m.cached)
+              Some(m.invoke(self, this.`super`, fileScope, evaluator) -> m.cached)
           }
 
         case None => this.`super` match{
@@ -268,7 +268,7 @@ object Val{
         }
 
         var max = -1
-        val builder = new Array[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)](defaultArgsBindings.length + passedArgsBindingsV.length)
+        val builder = new Array[(Int, (Val.Obj, Val.Obj) => Lazy)](defaultArgsBindings.length + passedArgsBindingsV.length)
         var idx = 0
 
         var defaultBindingsIdx = 0
@@ -276,7 +276,7 @@ object Val{
           val i = defaultArgsBindingIndices(defaultBindingsIdx)
           val v = defaultArgsBindings(defaultBindingsIdx)
           if (i > max) max = i
-          builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          builder(idx) = (i, (self: Val.Obj, sup: Val.Obj) => v)
           idx += 1
           defaultBindingsIdx += 1
         }
@@ -286,7 +286,7 @@ object Val{
           val i = passedArgsBindingsI(passedArgsBindingsIdx)
           val v = passedArgsBindingsV(passedArgsBindingsIdx)
           if (i > max) max = i
-          builder(idx) = (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
+          builder(idx) = (i, (self: Val.Obj, sup: Val.Obj) => v)
           idx += 1
           passedArgsBindingsIdx += 1
         }
@@ -298,7 +298,7 @@ object Val{
             null,
             {
               val arr = new Array[Lazy](max + 1)
-              for((i, v) <- builder) arr(i) = v(null, None)
+              for((i, v) <- builder) arr(i) = v(null, null)
               arr
             }
           )
@@ -410,7 +410,7 @@ class ValScope(val dollar0: Val.Obj,
     case v => Some(v)
   }
 
-  def extend(newBindings: Array[_ <: (Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = null,
+  def extend(newBindings: Array[_ <: (Int, (Val.Obj, Val.Obj) => Val.Lazy)] = null,
              newDollar: Val.Obj = null,
              newSelf: Val.Obj = null,
              newSuper: Val.Obj = null) = {
@@ -424,7 +424,7 @@ class ValScope(val dollar0: Val.Obj,
       if (newBindings == null || newBindings.length == 0) bindings0
       else{
         val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
-        for((i, v) <- newBindings) newArr(i) = v.apply(Option(self), Option(sup))
+        for((i, v) <- newBindings) newArr(i) = v.apply(self, sup)
         newArr
       }
     )
