@@ -406,13 +406,13 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                    (implicit fileScope: FileScope): Array[(Int, (Val.Obj, Val.Obj) => Val.Lazy)] = {
     bindings.map{ b: Bind =>
       b.args match{
-        case None =>
+        case null =>
           (
             b.name,
             (self: Val.Obj, sup: Val.Obj) =>
               Val.Lazy(visitExpr(b.rhs)(scope(self, sup), implicitly))
           )
-        case Some(argSpec) =>
+        case argSpec =>
           (
             b.name,
             (self: Val.Obj, sup: Val.Obj) =>
@@ -463,12 +463,12 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       lazy val newSelf: Val.Obj = {
         val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
         value.foreach {
-          case Member.Field(offset, fieldName, plus, None, sep, rhs) =>
+          case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
               visitExpr(rhs)(makeNewScope(self, sup), implicitly)
             })).foreach(builder.+=)
-          case Member.Field(offset, fieldName, false, Some(argSpec), sep, rhs) =>
+          case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
             visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
               assertions(self)
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup), implicitly)

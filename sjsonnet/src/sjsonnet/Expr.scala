@@ -24,7 +24,7 @@ object Expr{
   case class Str(pos: Position, value: String) extends Expr
   case class Num(pos: Position, value: Double) extends Expr
   case class Id(pos: Position, value: Int) extends Expr
-  case class Arr(pos: Position, value: Seq[Expr]) extends Expr
+  case class Arr(pos: Position, value: Array[Expr]) extends Expr
   case class Obj(pos: Position, value: ObjBody) extends Expr
 
   sealed trait FieldName
@@ -46,7 +46,7 @@ object Expr{
     case class Field(pos: Position,
                      fieldName: FieldName,
                      plus: Boolean,
-                     args: Option[Params],
+                     args: Params,
                      sep: Visibility,
                      rhs: Expr) extends Member
     case class BindStmt(value: Bind) extends Member
@@ -75,7 +75,7 @@ object Expr{
       Params(params.map(_._1).toArray, params.map(_._2.getOrElse(null)).toArray, params.map(_._3).toArray)
     }
   }
-  case class Args(args: Seq[(Option[String], Expr)])
+  case class Args(names: Array[String], exprs: Array[Expr])
 
   case class UnaryOp(pos: Position, op: UnaryOp.Op, value: Expr) extends Expr
   object UnaryOp{
@@ -111,7 +111,7 @@ object Expr{
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr
 
-  case class Bind(pos: Position, name: Int, args: Option[Params], rhs: Expr)
+  case class Bind(pos: Position, name: Int, args: Params, rhs: Expr)
   case class Import(pos: Position, value: String) extends Expr
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr

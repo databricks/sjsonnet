@@ -111,7 +111,7 @@ object Materializer {
       Expr.Obj(dummyPos,
         ObjBody.MemberList(
           for((k, v) <- kvs.toArray)
-          yield Member.Field(dummyPos, FieldName.Fixed(k), false, None, Visibility.Normal, toExpr(v))
+          yield Member.Field(dummyPos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v))
         )
       )
   }

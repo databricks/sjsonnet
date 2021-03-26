@@ -40,6 +40,8 @@ object Parser {
   )
 
   def idStartChar(c: Char) = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+
+  private val emptyExprArray = new Array[Expr](0)
 }
 
 class Parser(val currentFile: Path) {
@@ -129,15 +131,15 @@ class Parser(val currentFile: Path) {
 
 
   def obj[_: P]: P[Expr] = P( (Pos ~~ objinside).map(Expr.Obj.tupled) )
-  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(Expr.Arr(_, Nil)) | arrBody )
+  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(Expr.Arr(_, emptyExprArray)) | arrBody )
   def compSuffix[_: P] = P( forspec ~ compspec ).map(Left(_))
   def arrBody[_: P]: P[Expr] = P(
     Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
-    case (offset, first, None) => Expr.Arr(offset, Seq(first))
+    case (offset, first, None) => Expr.Arr(offset, Array(first))
     case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
-    case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Seq(first) ++ rest)
+    case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 
   def assertExpr[_: P](pos: Position): P[Expr] =
@@ -213,9 +215,9 @@ class Parser(val currentFile: Path) {
           }
           case '(' => Pass ~ (args ~ ")").map { x =>
             val argNames =
-              if(x.args.exists(_._1.isDefined)) x.args.map(_._1.getOrElse(null)).toArray[String]
+              if(x.names.exists(_ != null)) x.names
               else null
-            Expr.Apply(i, _: Expr, argNames, x.args.map(_._2).toArray[Expr])
+            Expr.Apply(i, _: Expr, argNames, x.exprs)
           }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
@@ -305,7 +307,7 @@ class Parser(val currentFile: Path) {
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
         .map(_.asInstanceOf[Expr.Member.BindStmt])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, None, Visibility.Normal, rhs) =
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, null, Visibility.Normal, rhs) =
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
         .map(_.asInstanceOf[Expr.Member.BindStmt])
@@ -328,7 +330,7 @@ class Parser(val currentFile: Path) {
   def field[_: P] = P(
     (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
       case (pos, name, plus, p, h2, e) =>
-        Expr.Member.Field(pos, name, plus.nonEmpty, p, h2, e)
+        Expr.Member.Field(pos, name, plus.nonEmpty, p.getOrElse(null), h2, e)
     }
   )
   def fieldKeySep[_: P] = P( StringIn(":::", "::", ":") ).!.map{
@@ -350,12 +352,12 @@ class Parser(val currentFile: Path) {
     P( expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
-    P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+    P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
-    } else Pass(Expr.Args(x.toArray[(Option[String], Expr)]))
+    } else Pass(Expr.Args(x.map(_._1.getOrElse(null)).toArray, x.map(_._2).toArray))
   }
 
   def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
