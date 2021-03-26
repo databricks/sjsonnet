@@ -55,7 +55,6 @@ object Expr{
 
 
   case class Parened(pos: Position, value: Expr) extends Expr
-  //case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
   case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
     val argIndices: Map[String, Int] = (names, indices).zipped.toMap
     val noDefaultIndices: BitSet = {
@@ -65,7 +64,6 @@ object Expr{
     }
     val defaultsOnlyIndices: Array[Int] = (defaultExprs, indices).zipped.collect { case (x, i) if x != null => i }.toArray
     val defaultsOnly: Array[Expr] = defaultExprs.filter(_ != null).toArray
-    //val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
     val allIndices: BitSet = {
       val b = new BitSet(indices.size)
       indices.foreach(b.set)
@@ -111,7 +109,7 @@ object Expr{
     case object `||` extends Op
   }
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
-  case class LocalExpr(pos: Position, bindings: Seq[Bind], returned: Expr) extends Expr
+  case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr
 
   case class Bind(pos: Position, name: Int, args: Option[Params], rhs: Expr)
   case class Import(pos: Position, value: String) extends Expr
@@ -132,18 +130,18 @@ object Expr{
   case class IfSpec(pos: Position, cond: Expr) extends CompSpec
   case class ForSpec(pos: Position, name: Int, cond: Expr) extends CompSpec
 
-  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
+  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
   case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
 
   sealed trait ObjBody
   object ObjBody{
-    case class MemberList(value: Seq[Member]) extends ObjBody
-    case class ObjComp(preLocals: Seq[Member.BindStmt],
+    case class MemberList(value: Array[Member]) extends ObjBody
+    case class ObjComp(preLocals: Array[Member.BindStmt],
                        key: Expr,
                        value: Expr,
-                       postLocals: Seq[Member.BindStmt],
+                       postLocals: Array[Member.BindStmt],
                        first: ForSpec,
-                       rest: Seq[CompSpec]) extends ObjBody
+                       rest: Array[CompSpec]) extends ObjBody
   }
 
 }

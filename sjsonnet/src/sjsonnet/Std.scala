@@ -138,7 +138,7 @@ object Std {
             case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
           }
 
-          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), _ => (), None)
+          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), _ => (), null)
 
         case (_, _) => recSingle(r)
       }
@@ -150,7 +150,7 @@ object Std {
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
 
-          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), _ => (), None)
+          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), _ => (), null)
 
         case _ => v
       }
@@ -285,7 +285,7 @@ object Std {
           ))
         },
         _ => (),
-        None
+        null
       )
     },
     builtin("mapWithIndex", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val.Arr) =>
@@ -799,7 +799,7 @@ object Std {
               .mapValues { v =>
                 Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
               }
-            new Val.Obj(pos, transformedValue , (x: Val.Obj) => (), None)
+            new Val.Obj(pos, transformedValue , (x: Val.Obj) => (), null)
         }
       }
       recursiveTransform(ujson.read(str))
@@ -822,7 +822,7 @@ object Std {
             v = rec(o.value(k, Position(pos.currentFile, -1))(fs, ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
-          new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, _ => (), None)
+          new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, _ => (), null)
         case a: Val.Arr =>
           Val.Arr(pos, a.value.map(x => rec(x.force)).filter(filter).map(Val.Lazy(_)))
         case _ => x
@@ -887,7 +887,7 @@ object Std {
       )
     ),
     _ => (),
-    None
+    null
   )
 
   def validate(vs: Array[Val],
@@ -966,7 +966,7 @@ object Std {
 
   def scope(size: Int) = {
     new ValScope(
-      None, None, None, Array(Val.Lazy(Std)).padTo(size, null)
+      null, null, null, Array(Val.Lazy(Std)).padTo(size, null)
     )
   }
 

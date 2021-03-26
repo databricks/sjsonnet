@@ -79,29 +79,29 @@ object Val{
   final class Obj(val pos: Position,
                   value0: mutable.Map[String, Obj.Member],
                   triggerAsserts: Val.Obj => Unit,
-                  `super`: Option[Obj]) extends Val{
+                  `super`: Obj) extends Val{
 
     def getSuper = `super`
 
     @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
       triggerAsserts(obj)
       `super` match {
-        case Some(s) => s.triggerAllAsserts(obj)
-        case None => ()
+        case null =>
+        case s => s.triggerAllAsserts(obj)
       }
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case None => new Val.Obj(pos, value0, _ => (), Some(lhs))
-        case Some(x) => new Val.Obj(pos, value0, _ => (), Some(x.addSuper(pos, lhs)))
+        case null => new Val.Obj(pos, value0, _ => (), lhs)
+        case x => new Val.Obj(pos, value0, _ => (), x.addSuper(pos, lhs))
       }
     }
 
     def prettyName = "object"
 
     def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
-      for(s <- this.`super`) s.foreachVisibleKey(output)
+      if(`super` != null) `super`.foreachVisibleKey(output)
       for(t <- value0) output(t._1, t._2.visibility)
     }
 
@@ -160,8 +160,8 @@ object Val{
       case Some(m) => Some(m.cached)
 
       case None => this.`super` match{
-        case None => None
-        case Some(s) => s.valueCached(k)
+        case null => None
+        case s => s.valueCached(k)
       }
     }
 
@@ -172,22 +172,22 @@ object Val{
       this.value0.get(k) match{
         case Some(m) =>
           this.`super` match{
-            case Some(s) if m.add =>
+            case s if s != null && m.add =>
               val merged = s.valueRaw(k, self, pos) match{
-                case None => m.invoke(self, this.`super`, fileScope, evaluator)
+                case None => m.invoke(self, Some(this.`super`), fileScope, evaluator)
                 case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), pos)
+                  mergeMember(supValue, m.invoke(self, Some(this.`super`), fileScope, evaluator), pos)
               }
 
               Some(merged -> m.cached)
 
             case _ =>
-              Some(m.invoke(self, this.`super`, fileScope, evaluator) -> m.cached)
+              Some(m.invoke(self, Some(this.`super`), fileScope, evaluator) -> m.cached)
           }
 
         case None => this.`super` match{
-          case None => None
-          case Some(s) => s.valueRaw(k, self, pos)
+          case null => None
+          case s => s.valueRaw(k, self, pos)
         }
       }
     }
@@ -195,8 +195,8 @@ object Val{
     @tailrec def containsKey(k: String): Boolean = {
       this.value0.contains(k) || {
         this.`super` match {
-          case None => false
-          case Some(s) => s.containsKey(k)
+          case null => false
+          case s => s.containsKey(k)
         }
       }
     }
@@ -293,9 +293,9 @@ object Val{
 
         val newScope = defSiteScopes match{
           case None => new ValScope(
-            None,
-            None,
-            None,
+            null,
+            null,
+            null,
             {
               val arr = new Array[Lazy](max + 1)
               for((i, v) <- builder) arr(i) = v(null, None)
@@ -382,7 +382,7 @@ trait EvalScope extends EvalErrorScope{
   val preserveOrder: Boolean = false
 }
 object ValScope{
-  def empty(size: Int) = new ValScope(None, None, None, new Array(size))
+  def empty(size: Int) = new ValScope(null, null, null, new Array(size))
 }
 
 /**
@@ -400,9 +400,9 @@ object ValScope{
   * which do not change it (e.g. those just updating `dollar0` or `self0`) the
   * bindings array can be shared cheaply.
   */
-class ValScope(val dollar0: Option[Val.Obj],
-               val self0: Option[Val.Obj],
-               val super0: Option[Val.Obj],
+class ValScope(val dollar0: Val.Obj,
+               val self0: Val.Obj,
+               val super0: Val.Obj,
                bindings0: Array[Val.Lazy]) {
 
   def bindings(k: Int): Option[Val.Lazy] = bindings0(k) match{
@@ -410,10 +410,10 @@ class ValScope(val dollar0: Option[Val.Obj],
     case v => Some(v)
   }
 
-  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = Nil,
-             newDollar: Option[Val.Obj] = null,
-             newSelf: Option[Val.Obj] = null,
-             newSuper: Option[Val.Obj] = null) = {
+  def extend(newBindings: Array[_ <: (Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = null,
+             newDollar: Val.Obj = null,
+             newSelf: Val.Obj = null,
+             newSuper: Val.Obj = null) = {
     val dollar = if (newDollar != null) newDollar else dollar0
     val self = if (newSelf != null) newSelf else self0
     val sup = if (newSuper != null) newSuper else super0
@@ -421,10 +421,10 @@ class ValScope(val dollar0: Option[Val.Obj],
       dollar,
       self,
       sup,
-      if (newBindings.isEmpty) bindings0
+      if (newBindings == null || newBindings.length == 0) bindings0
       else{
         val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
-        for((i, v) <- newBindings) newArr(i) = v.apply(self, sup)
+        for((i, v) <- newBindings) newArr(i) = v.apply(Option(self), Option(sup))
         newArr
       }
     )

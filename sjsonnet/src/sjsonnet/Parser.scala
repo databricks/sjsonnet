@@ -136,7 +136,7 @@ class Parser(val currentFile: Path) {
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
     case (offset, first, None) => Expr.Arr(offset, Seq(first))
-    case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2)
+    case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Seq(first) ++ rest)
   }
 
@@ -150,7 +150,7 @@ class Parser(val currentFile: Path) {
     P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).? ).map(Expr.IfElse.tupled)
 
   def localExpr[_: P]: P[Expr] =
-    P( Pos ~~ bind.rep(min=1, sep = ","./) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+    P( Pos ~~ bind.rep(min=1, sep = ","./).map(_.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
   def expr[_: P]: P[Expr] =
     P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
@@ -300,7 +300,7 @@ class Parser(val currentFile: Path) {
     if (overlap == null) Pass(t)
     else Fail.opaque("no duplicate field: " + overlap)
   }.map{
-    case (exprs, None) => Expr.ObjBody.MemberList(exprs)
+    case (exprs, None) => Expr.ObjBody.MemberList(exprs.toArray)
     case (exprs, Some(comps)) =>
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
@@ -321,7 +321,7 @@ class Parser(val currentFile: Path) {
           Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Expr.Str].value}" """)
         case _ => // do nothing
       }
-      Expr.ObjBody.ObjComp(preLocals, lhs, rhs, postLocals, comps._1, comps._2)
+      Expr.ObjBody.ObjComp(preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toArray)
   }
 
   def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ assertStmt | field )
