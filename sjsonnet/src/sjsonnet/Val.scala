@@ -216,12 +216,49 @@ object Val{
                   defSiteValScope: ValScope,
                   params: Params,
                   evalRhs: (ValScope, String, EvalScope, FileScope, Position) => Val,
-                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
+                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val {
+
     def prettyName = "function"
+
     def apply(argNames: Array[String], argVals: Array[Lazy],
               thisFile: String,
               outerPos: Position)
              (implicit evaluator: EvalScope) = {
+
+      val argsSize = argVals.length
+      val (passedArgsBindingsI, passedArgsBindingsV, simple) = if(argNames != null) {
+        val arrI: Array[Int] = new Array(argsSize)
+        val arrV: Array[Lazy] = new Array(argsSize)
+        var i = 0
+        try {
+          while (i < argsSize) {
+            val aname = argNames(i)
+            arrI(i) = if(aname != null) params.argIndices.getOrElse(
+              aname,
+              Error.fail(s"Function has no parameter $aname", outerPos)
+            ) else params.indices(i)
+            arrV(i) = argVals(i)
+            i += 1
+          }
+        } catch { case e: IndexOutOfBoundsException =>
+          Error.fail("Too many args, function has " + params.names.length + " parameter(s)", outerPos)
+        }
+        (arrI, arrV, false)
+      } else {
+        if(params.indices.length < argsSize)
+          Error.fail(
+            "Too many args, function has " + params.names.length + " parameter(s)",
+            outerPos
+          )
+        val arrV: Array[Lazy] = new Array(argsSize)
+        var i = 0
+        while (i < argsSize) {
+          arrV(i) = argVals(i)
+          i += 1
+        }
+        val arrI = if(params.indices.length == argsSize) params.indices else util.Arrays.copyOf(params.indices, argsSize)
+        (arrI, arrV, params.indices.length == argsSize)
+      }
 
       val defaultArgsBindingIndices = params.defaultsOnlyIndices
       lazy val defaultArgsBindings: Array[Lazy] = {
@@ -235,62 +272,23 @@ object Val{
         arr
       }
 
-      lazy val (passedArgsBindingsI, newScope) = {
-        val argsSize = argVals.length
-        val (passedArgsBindingsI, passedArgsBindingsV) = if(argNames != null) {
-          val arrI: Array[Int] = new Array(argsSize)
-          val arrV: Array[Lazy] = new Array(argsSize)
-          var i = 0
-          try {
-            while (i < argsSize) {
-              val aname = argNames(i)
-              arrI(i) = if(aname != null) {
-                val argIndex = params.argIndices.getOrElse(
-                  aname,
-                  Error.fail(s"Function has no parameter $aname", outerPos)
-                )
-                argIndex
-              } else params.indices(i)
-              arrV(i) = argVals(i)
-              i += 1
-            }
-          } catch { case e: IndexOutOfBoundsException =>
-            Error.fail(
-              "Too many args, function has " + params.names.length + " parameter(s)",
-              outerPos
-            )
-          }
-          (arrI, arrV)
-        } else {
-          if(params.indices.length < argsSize)
-            Error.fail(
-              "Too many args, function has " + params.names.length + " parameter(s)",
-              outerPos
-            )
-          val arrV: Array[Lazy] = new Array(argsSize)
-          var i = 0
-          while (i < argsSize) {
-            arrV(i) = argVals(i)
-            i += 1
-          }
-          val arrI = if(params.indices.length == argsSize) params.indices else util.Arrays.copyOf(params.indices, argsSize)
-          (arrI, arrV)
-        }
-
+      lazy val newScope = {
         var max = -1
-        val newBindingsI = new Array[Int](defaultArgsBindings.length + passedArgsBindingsV.length)
+        val newBindingsI = new Array[Int](if(simple) passedArgsBindingsV.length else defaultArgsBindings.length + passedArgsBindingsV.length)
         val newBindingsV = new Array[Lazy](newBindingsI.length)
         var idx = 0
 
-        var defaultBindingsIdx = 0
-        while (defaultBindingsIdx < defaultArgsBindings.length) {
-          val i = defaultArgsBindingIndices(defaultBindingsIdx)
-          val v = defaultArgsBindings(defaultBindingsIdx)
-          if (i > max) max = i
-          newBindingsI(idx) = i
-          newBindingsV(idx) = v
-          idx += 1
-          defaultBindingsIdx += 1
+        if(!simple) {
+          var defaultBindingsIdx = 0
+          while (defaultBindingsIdx < defaultArgsBindings.length) {
+            val i = defaultArgsBindingIndices(defaultBindingsIdx)
+            val v = defaultArgsBindings(defaultBindingsIdx)
+            if (i > max) max = i
+            newBindingsI(idx) = i
+            newBindingsV(idx) = v
+            idx += 1
+            defaultBindingsIdx += 1
+          }
         }
 
         var passedArgsBindingsIdx = 0
@@ -321,19 +319,12 @@ object Val{
           )
           case s => s.extendSimple(newBindingsI, newBindingsV)
         }
-        (passedArgsBindingsI, newScope)
+        newScope
       }
 
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-      validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
-
-      evalRhs(
-        newScope,
-        thisFile,
-        evaluator,
-        funDefFileScope,
-        outerPos
-      )
+      if(!simple) validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
+      evalRhs(newScope, thisFile, evaluator, funDefFileScope, outerPos)
     }
 
     def validateFunctionCall(passedArgsBindingsI: Array[Int],
