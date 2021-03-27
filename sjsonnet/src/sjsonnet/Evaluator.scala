@@ -45,7 +45,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       if(scope.super0 == null) Val.False(pos)
       else {
         val key = visitExpr(lhs).cast[Val.Str]
-        Val.bool(pos, scope.super0.containsKey(key.value))
+        Val.bool(pos, scope.super0.visibleKeys.containsKey(key.value))
       }
 
     case $(pos) =>
@@ -113,14 +113,14 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   def visitIfElse(pos: Position,
                   cond: Expr,
                   then: Expr,
-                  else0: Option[Expr])
+                  else0: Expr)
                  (implicit scope: ValScope): Val = {
     visitExpr(cond) match {
       case Val.True(_) => visitExpr(then)
       case Val.False(_) =>
-        else0 match{
-          case None => Val.Null(pos)
-          case Some(v) => visitExpr(v)
+        else0 match {
+          case null => Val.Null(pos)
+          case v => visitExpr(v)
         }
       case v => Error.fail("Need boolean, found " + v.prettyName, pos)
     }
@@ -358,7 +358,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             }
             try Val.bool(pos, Materializer(l) != Materializer(r))
             catch Error.tryCatchWrap(pos)
-          case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.containsKey(l))
+          case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.visibleKeys.containsKey(l))
           case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
           case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
           case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)

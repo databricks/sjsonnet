@@ -102,19 +102,20 @@ object Val{
 
     def prettyName = "object"
 
-    private def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
-      if(`super` != null) `super`.foreachVisibleKey(output)
-      for(t <- value0) output(t._1, t._2.visibility)
+    private def gatherVisibleKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
+      if(`super` != null) `super`.gatherVisibleKeys(mapping)
+      for((k, m) <- value0) {
+        val vis = m.visibility
+        if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+        else if(vis == Visibility.Hidden) mapping.put(k, true)
+        else if(vis == Visibility.Unhide) mapping.put(k, false)
+      }
     }
 
     lazy val visibleKeys = {
-      val mapping = new util.LinkedHashMap[String, java.lang.Boolean]
-      foreachVisibleKey{ (k, sep) =>
-        if(!mapping.containsKey(k)) mapping.put(k, sep == Visibility.Hidden)
-        else if(sep == Visibility.Hidden) mapping.put(k, true)
-        else if(sep == Visibility.Unhide) mapping.put(k, false)
-      }
-      mapping
+      val m = new util.LinkedHashMap[String, java.lang.Boolean]
+      gatherVisibleKeys(m)
+      m
     }
 
     def getVisibleKeyNamesArray = visibleKeys.keySet().toArray(new Array[String](visibleKeys.size()))
@@ -209,15 +210,6 @@ object Val{
           } else m.invoke(self, s, pos.fileScope, evaluator)
           if(addTo != null && m.cached) addTo(addKey) = v
           v
-      }
-    }
-
-    @tailrec def containsKey(k: String): Boolean = {
-      this.value0.contains(k) || {
-        this.`super` match {
-          case null => false
-          case s => s.containsKey(k)
-        }
       }
     }
   }
