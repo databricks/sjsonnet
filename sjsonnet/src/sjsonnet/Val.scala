@@ -228,9 +228,9 @@ object Val{
              (implicit evaluator: EvalScope) = {
 
       val argsSize = argVals.length
-      val (passedArgsBindingsI, passedArgsBindingsV, simple) = if(argNames != null) {
+      val simple = argNames == null && params.indices.length == argsSize
+      val passedArgsBindingsI = if(argNames != null) {
         val arrI: Array[Int] = new Array(argsSize)
-        val arrV: Array[Lazy] = new Array(argsSize)
         var i = 0
         try {
           while (i < argsSize) {
@@ -239,108 +239,66 @@ object Val{
               aname,
               Error.fail(s"Function has no parameter $aname", outerPos)
             ) else params.indices(i)
-            arrV(i) = argVals(i)
             i += 1
           }
         } catch { case e: IndexOutOfBoundsException =>
           Error.fail("Too many args, function has " + params.names.length + " parameter(s)", outerPos)
         }
-        (arrI, arrV, false)
-      } else {
-        if(params.indices.length < argsSize)
-          Error.fail(
-            "Too many args, function has " + params.names.length + " parameter(s)",
-            outerPos
-          )
-        val arrV: Array[Lazy] = new Array(argsSize)
-        var i = 0
-        while (i < argsSize) {
-          arrV(i) = argVals(i)
-          i += 1
-        }
-        val arrI = if(params.indices.length == argsSize) params.indices else util.Arrays.copyOf(params.indices, argsSize)
-        (arrI, arrV, params.indices.length == argsSize)
-      }
+        arrI
+      } else if(params.indices.length < argsSize) {
+        Error.fail(
+          "Too many args, function has " + params.names.length + " parameter(s)",
+          outerPos
+        )
+      } else params.indices // Don't cut down to size to avoid copying. The correct size is argVals.length!
 
       val defaultArgsBindingIndices = params.defaultsOnlyIndices
-      lazy val defaultArgsBindings: Array[Lazy] = {
-        var idx = 0
-        val arr = new Array[Lazy](params.defaultsOnly.length)
-        while (idx < params.defaultsOnly.length) {
-          val default = params.defaultsOnly(idx)
-          arr(idx) = () => evalDefault(default, newScope, evaluator)
-          idx += 1
-        }
-        arr
-      }
-
-      lazy val newScope = {
-        var max = -1
-        val newBindingsI = new Array[Int](if(simple) passedArgsBindingsV.length else defaultArgsBindings.length + passedArgsBindingsV.length)
-        val newBindingsV = new Array[Lazy](newBindingsI.length)
-        var idx = 0
-
-        if(!simple) {
-          var defaultBindingsIdx = 0
-          while (defaultBindingsIdx < defaultArgsBindings.length) {
-            val i = defaultArgsBindingIndices(defaultBindingsIdx)
-            val v = defaultArgsBindings(defaultBindingsIdx)
-            if (i > max) max = i
-            newBindingsI(idx) = i
-            newBindingsV(idx) = v
-            idx += 1
-            defaultBindingsIdx += 1
-          }
-        }
-
-        var passedArgsBindingsIdx = 0
-        while(passedArgsBindingsIdx < passedArgsBindingsV.length) {
-          val i = passedArgsBindingsI(passedArgsBindingsIdx)
-          val v = passedArgsBindingsV(passedArgsBindingsIdx)
-          if (i > max) max = i
-          newBindingsI(idx) = i
-          newBindingsV(idx) = v
-          idx += 1
-          passedArgsBindingsIdx += 1
-        }
-
-        val newScope = defSiteValScope match{
-          case null => new ValScope(
-            null,
-            null,
-            null,
-            {
-              val arr = new Array[Lazy](max + 1)
-              var i = 0
-              while(i < newBindingsI.length) {
-                arr(newBindingsI(i)) = newBindingsV(i)
-                i += 1
-              }
-              arr
-            }
-          )
-          case s => s.extendSimple(newBindingsI, newBindingsV)
-        }
-        newScope
-      }
-
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-      if(!simple) validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope)
+
+      val newScope: ValScope = {
+        if(simple) {
+          defSiteValScope match {
+            case null => ValScope.createSimple(passedArgsBindingsI, argVals)
+            case s => s.extendSimple(passedArgsBindingsI, argVals)
+          }
+        } else {
+          lazy val newScope: ValScope = {
+            val defaultArgsBindings = new Array[Lazy](params.defaultsOnly.length)
+            var idx = 0
+            while (idx < params.defaultsOnly.length) {
+              val default = params.defaultsOnly(idx)
+              defaultArgsBindings(idx) = () => evalDefault(default, newScope, evaluator)
+              idx += 1
+            }
+            val newBindingsI = util.Arrays.copyOf(defaultArgsBindingIndices, defaultArgsBindings.length + argVals.length)
+            val newBindingsV = util.Arrays.copyOf(defaultArgsBindings, newBindingsI.length)
+            System.arraycopy(passedArgsBindingsI, 0, newBindingsI, defaultArgsBindings.length, argVals.length)
+            System.arraycopy(argVals, 0, newBindingsV, defaultArgsBindings.length, argVals.length)
+            defSiteValScope match {
+              case null => ValScope.createSimple(newBindingsI, newBindingsV)
+              case s => s.extendSimple(newBindingsI, newBindingsV)
+            }
+          }
+          validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope, argsSize)
+          newScope
+        }
+      }
+
       evalRhs(newScope, thisFile, evaluator, funDefFileScope, outerPos)
     }
 
     def validateFunctionCall(passedArgsBindingsI: Array[Int],
                              params: Params,
                              outerPos: Position,
-                             defSiteFileScope: FileScope)
+                             defSiteFileScope: FileScope,
+                             argListSize: Int)
                             (implicit eval: EvalScope): Unit = {
 
-      val argListSize = passedArgsBindingsI.length
       val seen = new util.BitSet(argListSize)
       val repeats = new util.BitSet(argListSize)
 
       var idx = 0
-      while (idx < passedArgsBindingsI.length) {
+      while (idx < argListSize) {
         val i = passedArgsBindingsI(idx)
         if (!seen.get(i)) seen.set(i)
         else repeats.set(i)
@@ -391,8 +349,20 @@ trait EvalScope extends EvalErrorScope{
 
   val preserveOrder: Boolean = false
 }
+
 object ValScope{
   def empty(size: Int) = new ValScope(null, null, null, new Array(size))
+
+  def createSimple(newBindingsI: Array[Int],
+                   newBindingsV: Array[Val.Lazy]) = {
+    val arr = new Array[Val.Lazy](newBindingsI.length)
+    var i = 0
+    while(i < newBindingsI.length) {
+      arr(newBindingsI(i)) = newBindingsV(i)
+      i += 1
+    }
+    new ValScope(null, null, null, arr)
+  }
 }
 
 /**
