@@ -295,42 +295,47 @@ object Val{
                             (implicit eval: EvalScope): Unit = {
 
       val seen = new util.BitSet(argListSize)
-      val repeats = new util.BitSet(argListSize)
-
       var idx = 0
       while (idx < argListSize) {
         val i = passedArgsBindingsI(idx)
-        if (!seen.get(i)) seen.set(i)
-        else repeats.set(i)
+        seen.set(i)
         idx += 1
       }
 
-      Error.failIfNonEmpty(
-        repeats,
-        outerPos,
-        (plural, names) => s"binding parameter a second time: $names",
-        defSiteFileScope
-      )
+      if(argListSize != params.names.length || argListSize != seen.cardinality()) {
+        seen.clear()
+        val repeats = new util.BitSet(argListSize)
 
-      val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
-      b.andNot(seen)
-      Error.failIfNonEmpty(
-        // params.noDefaultIndices.filter(!seen.get(_)),
-        b,
-        outerPos,
-        (plural, names) => s"Function parameter$plural $names not bound in call",
-        defSiteFileScope // pass the definition site for the correct error message/names to be resolved
-      )
+        idx = 0
+        while (idx < argListSize) {
+          val i = passedArgsBindingsI(idx)
+          if (!seen.get(i)) seen.set(i)
+          else repeats.set(i)
+          idx += 1
+        }
 
-      seen.andNot(params.allIndices)
-
-      Error.failIfNonEmpty(
-        // seen.filter(!params.allIndices(_)),
-        seen,
-        outerPos,
-        (plural, names) => s"Function has no parameter$plural $names",
-        outerPos.fileScope
-      )
+        Error.failIfNonEmpty(
+          repeats,
+          outerPos,
+          (plural, names) => s"binding parameter a second time: $names",
+          defSiteFileScope
+        )
+        val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
+        b.andNot(seen)
+        Error.failIfNonEmpty(
+          b,
+          outerPos,
+          (plural, names) => s"Function parameter$plural $names not bound in call",
+          defSiteFileScope // pass the definition site for the correct error message/names to be resolved
+        )
+        seen.andNot(params.allIndices)
+        Error.failIfNonEmpty(
+          seen,
+          outerPos,
+          (plural, names) => s"Function has no parameter$plural $names",
+          outerPos.fileScope
+        )
+      }
     }
   }
 }
