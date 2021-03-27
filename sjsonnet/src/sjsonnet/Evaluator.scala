@@ -28,72 +28,70 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
   def loadCachedSource(p: Path) = loadedFileContents.get(p)
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.Map.empty[Path, Val]
-
   val cachedImportedStrings = collection.mutable.Map.empty[Path, String]
+
   def visitExpr(expr: Expr)
-               (implicit scope: ValScope): Val = try expr match{
-    case Null(pos) => Val.Null(pos)
-    case Parened(_, inner) => visitExpr(inner)
-    case True(pos) => Val.True(pos)
-    case False(pos) => Val.False(pos)
-    case Self(pos) =>
-      val self = scope.self0
-      if(self == null) Error.fail("Cannot use `self` outside an object", pos)
-      self
+               (implicit scope: ValScope): Val = try {
+    expr match {
+      case lit: Val.Literal => lit
+      case Parened(_, inner) => visitExpr(inner)
+      case Self(pos) =>
+        val self = scope.self0
+        if(self == null) Error.fail("Cannot use `self` outside an object", pos)
+        self
 
-    case BinaryOp(pos, lhs, Expr.BinaryOp.`in`, Super(_)) =>
-      if(scope.super0 == null) Val.False(pos)
-      else {
-        val key = visitExpr(lhs).cast[Val.Str]
-        Val.bool(pos, scope.super0.visibleKeys.containsKey(key.value))
+      case BinaryOp(pos, lhs, Expr.BinaryOp.`in`, Super(_)) =>
+        if(scope.super0 == null) Val.False(pos)
+        else {
+          val key = visitExpr(lhs).cast[Val.Str]
+          Val.bool(pos, scope.super0.visibleKeys.containsKey(key.value))
+        }
+
+      case $(pos) =>
+        val dollar = scope.dollar0
+        if(dollar == null) Error.fail("Cannot use `$` outside an object", pos)
+        dollar
+      case Id(pos, value) => visitId(pos, value)
+
+      case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
+      case Obj(pos, value) => visitObjBody(pos, value)
+
+      case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
+
+      case BinaryOp(pos, lhs, op, rhs) => {
+        visitBinaryOp(pos, lhs, op, rhs)
       }
+      case AssertExpr(pos, Member.AssertStmt(value, msg), returned) =>
+        visitAssert(pos, value, msg, returned)
 
-    case $(pos) =>
-      val dollar = scope.dollar0
-      if(dollar == null) Error.fail("Cannot use `$` outside an object", pos)
-      dollar
-    case Str(pos, value) => Val.Str(pos, value)
-    case Num(pos, value) => Val.Num(pos, value)
-    case Id(pos, value) => visitId(pos, value)
+      case LocalExpr(pos, bindings, returned) =>
+        lazy val newScope: ValScope = {
+          val f = visitBindings(bindings, (self, sup) => newScope)
+          scope.extend(bindings, f)
+        }
+        visitExpr(returned)(newScope)
 
-    case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
-    case Obj(pos, value) => visitObjBody(pos, value)
+      case Import(pos, value) => visitImport(pos, value)
+      case ImportStr(pos, value) => visitImportStr(pos, value)
+      case Expr.Error(pos, value) => visitError(pos, value)
+      case Apply(pos, value, argNames, argExprs) => visitApply(pos, value, argNames, argExprs)
 
-    case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
+      case Select(pos, value, name) => visitSelect(pos, value, name)
 
-    case BinaryOp(pos, lhs, op, rhs) => {
-      visitBinaryOp(pos, lhs, op, rhs)
-    }
-    case AssertExpr(pos, Member.AssertStmt(value, msg), returned) =>
-      visitAssert(pos, value, msg, returned)
+      case Lookup(pos, value, index) => visitLookup(pos, value, index)
 
-    case LocalExpr(pos, bindings, returned) =>
-      lazy val newScope: ValScope = {
-        val f = visitBindings(bindings, (self, sup) => newScope)
-        scope.extend(bindings, f)
+      case Slice(pos, value, start, end, stride) => visitSlice(pos, value, start, end, stride)
+      case Function(pos, params, body) => visitMethod(body, params, pos)
+      case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
+      case Comp(pos, value, first, rest) =>
+        Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
+      case ObjExtend(pos, value, ext) => {
+        if(strict && isObjLiteral(value))
+          Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
+        val original = visitExpr(value).cast[Val.Obj]
+        val extension = visitObjBody(pos, ext)
+        extension.addSuper(pos, original)
       }
-      visitExpr(returned)(newScope)
-
-    case Import(pos, value) => visitImport(pos, value)
-    case ImportStr(pos, value) => visitImportStr(pos, value)
-    case Expr.Error(pos, value) => visitError(pos, value)
-    case Apply(pos, value, argNames, argExprs) => visitApply(pos, value, argNames, argExprs)
-
-    case Select(pos, value, name) => visitSelect(pos, value, name)
-
-    case Lookup(pos, value, index) => visitLookup(pos, value, index)
-
-    case Slice(pos, value, start, end, stride) => visitSlice(pos, value, start, end, stride)
-    case Function(pos, params, body) => visitMethod(body, params, pos)
-    case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
-    case Comp(pos, value, first, rest) =>
-      Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
-    case ObjExtend(pos, value, ext) => {
-      if(strict && isObjLiteral(value))
-        Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
-      val original = visitExpr(value).cast[Val.Obj]
-      val extension = visitObjBody(pos, ext)
-      extension.addSuper(pos, original)
     }
   } catch Error.tryCatch(expr.pos)
 

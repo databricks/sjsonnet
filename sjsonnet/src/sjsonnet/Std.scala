@@ -6,7 +6,8 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.{BinaryOp, False, Params}
+import sjsonnet.Expr.{BinaryOp, Params}
+import sjsonnet.Val.False
 
 import scala.collection.mutable
 import scala.collection.compat._
@@ -526,7 +527,7 @@ object Std {
     },
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> None,
-                        "indent_array_in_object" -> Some(Expr.False(dummyPos))){ (pos, args, fs, ev) =>
+                        "indent_array_in_object" -> Some(Val.False(dummyPos))){ (pos, args, fs, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
           case Val.False(_) => false
@@ -540,7 +541,7 @@ object Std {
     },
     builtinWithDefaults("manifestYamlStream",
                         "v" -> None,
-                        "indent_array_in_object" -> Some(Expr.False(dummyPos))){ (pos, args, fs, ev) =>
+                        "indent_array_in_object" -> Some(Val.False(dummyPos))){ (pos, args, fs, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
         case Val.False(_) => false
@@ -627,23 +628,23 @@ object Std {
       new String(arr.value.map(_.force.cast[Val.Num].value.toByte).toArray, UTF_8)
     },
 
-    builtinWithDefaults("uniq", "arr" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("uniq", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
 
       uniqArr(pos, ev, arr, keyF)
     },
-    builtinWithDefaults("sort", "arr" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("sort", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
 
       sortArr(pos, ev, arr, keyF)
     },
 
-    builtinWithDefaults("set", "arr" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("set", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       uniqArr(pos, ev, sortArr(pos, ev, args("arr"), args("keyF")), args("keyF"))
     },
-    builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       val a = args("a") match {
         case arr: Val.Arr => arr.value
         case str: Val.Str => stringChars(pos, str.value).value
@@ -658,7 +659,7 @@ object Std {
       val concat = Val.Arr(pos, a ++ b)
       uniqArr(pos, ev, sortArr(pos, ev, concat, args("keyF")), args("keyF"))
     },
-    builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       val a = args("a") match {
         case arr: Val.Arr => arr.value
         case str: Val.Str => stringChars(pos, str.value).value
@@ -704,7 +705,7 @@ object Std {
 
       sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
-    builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
 
       val a = args("a") match {
         case arr: Val.Arr => arr.value
@@ -751,7 +752,7 @@ object Std {
 
       sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
-    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Expr.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
       val keyF = args("keyF")
 
       if (keyF.isInstanceOf[Val.False]) {

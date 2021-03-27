@@ -15,7 +15,7 @@ import scala.reflect.ClassTag
   * except evaluation of object attributes and array contents are lazy, and
   * the tree can contain functions.
   */
-sealed trait Val{
+sealed abstract class Val {
   def prettyName: String
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
@@ -48,24 +48,27 @@ object Val{
     }
   }
 
+  abstract class Literal extends Val with Expr
+  abstract class Bool extends Literal
+
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
-  sealed trait Bool extends Val{
-  }
-  case class True(pos: Position) extends Bool{
+
+  case class True(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class False(pos: Position) extends Bool{
+  case class False(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class Null(pos: Position) extends Val{
+  case class Null(pos: Position) extends Literal {
     def prettyName = "null"
   }
-  case class Str(pos: Position, value: String) extends Val{
+  case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
   }
-  case class Num(pos: Position, value: Double) extends Val{
+  case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
   }
+
   case class Arr(pos: Position, value: Array[Lazy]) extends Val{
     def prettyName = "array"
   }

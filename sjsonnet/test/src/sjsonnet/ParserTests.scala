@@ -2,6 +2,7 @@ package sjsonnet
 import utest._
 import Expr._
 import fastparse.Parsed
+import Val.{True, Num}
 object ParserTests extends TestSuite{
   def parse(s: String) = fastparse.parse(s, new Parser(null).document(_)).get.value._1
   def parseErr(s: String) = fastparse.parse(s, new Parser(null).document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg

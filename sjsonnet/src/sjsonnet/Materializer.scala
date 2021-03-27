@@ -101,11 +101,11 @@ object Materializer {
   }
 
   def toExpr(v: ujson.Value): Expr = v match{
-    case ujson.True => Expr.True(dummyPos)
-    case ujson.False => Expr.False(dummyPos)
-    case ujson.Null => Expr.Null(dummyPos)
-    case ujson.Num(n) => Expr.Num(dummyPos, n)
-    case ujson.Str(s) => Expr.Str(dummyPos, s)
+    case ujson.True => Val.True(dummyPos)
+    case ujson.False => Val.False(dummyPos)
+    case ujson.Null => Val.Null(dummyPos)
+    case ujson.Num(n) => Val.Num(dummyPos, n)
+    case ujson.Str(s) => Val.Str(dummyPos, s)
     case ujson.Arr(xs) => Expr.Arr(dummyPos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
       Expr.Obj(dummyPos,

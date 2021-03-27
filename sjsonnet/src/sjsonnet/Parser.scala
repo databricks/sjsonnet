@@ -59,13 +59,13 @@ class Parser(val currentFile: Path) {
   ).!.filter(s => !keywords.contains(s))
 
   def break[_: P] = P(!CharIn("_a-zA-Z0-9"))
-  def number[_: P]: P[Expr.Num] = P(
+  def number[_: P]: P[Val.Num] = P(
     Pos ~~ (
       CharsWhileIn("0-9") ~~
       ("." ~ CharsWhileIn("0-9")).? ~~
       (CharIn("eE") ~ CharIn("+\\-").? ~~ CharsWhileIn("0-9")).?
     ).!
-  ).map(s => Expr.Num(s._1, s._2.toDouble))
+  ).map(s => Val.Num(s._1, s._2.toDouble))
 
   def escape[_: P] = P( escape0 | escape1 )
   def escape0[_: P] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
@@ -244,7 +244,7 @@ class Parser(val currentFile: Path) {
     }
   )
 
-  def constructString(pos: Position, lines: Seq[String]) = Expr.Str(pos, lines.mkString)
+  def constructString(pos: Position, lines: Seq[String]) = Val.Str(pos, lines.mkString)
   // Any `expr` that isn't naively left-recursive
   def expr2[_: P]: P[Expr] = P(
     Pos.flatMapX{ pos =>
@@ -267,9 +267,9 @@ class Parser(val currentFile: Path) {
             P.current.index = pos.offset; number
           case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
             x + y match {
-              case "null"      => Pass(Expr.Null(pos))
-              case "true"      => Pass(Expr.True(pos))
-              case "false"     => Pass(Expr.False(pos))
+              case "null"      => Pass(Val.Null(pos))
+              case "true"      => Pass(Val.True(pos))
+              case "false"     => Pass(Val.False(pos))
               case "self"      => Pass(Expr.Self(pos))
               case "super"     => Pass(Expr.Super(pos))
               case "if"        => Pass ~ ifElse(pos)
@@ -319,8 +319,8 @@ class Parser(val currentFile: Path) {
        * Otherwise the field value will be overriden by the multiple iterations of forspec
        */
       (lhs, comps) match {
-        case (Expr.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>  
-          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Expr.Str].value}" """)
+        case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>
+          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
         case _ => // do nothing
       }
       Expr.ObjBody.ObjComp(preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)

@@ -10,19 +10,15 @@ import java.util.BitSet
   * Each [[Expr]] represents an expression in the Jsonnet program, and contains an
   * integer offset into the file that is later used to provide error messages.
   */
-sealed trait Expr{
+trait Expr{
   def pos: Position
 }
 object Expr{
-  case class Null(pos: Position) extends Expr
-  case class True(pos: Position) extends Expr
-  case class False(pos: Position) extends Expr
+
   case class Self(pos: Position) extends Expr
   case class Super(pos: Position) extends Expr
   case class $(pos: Position) extends Expr
 
-  case class Str(pos: Position, value: String) extends Expr
-  case class Num(pos: Position, value: Double) extends Expr
   case class Id(pos: Position, value: Int) extends Expr
   case class Arr(pos: Position, value: Array[Expr]) extends Expr
   case class Obj(pos: Position, value: ObjBody) extends Expr
