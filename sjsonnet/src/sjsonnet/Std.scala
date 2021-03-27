@@ -842,9 +842,9 @@ object Std {
       null, null,
       Params.mk(("str", None, 0), ("rest", None, 1)),
       { (scope, thisFile, ev, fs, outerOffset) =>
-        val Val.Str(_, msg) = scope.bindings(0).get.force
+        val Val.Str(_, msg) = scope.bindings(0).force
         System.err.println(s"TRACE: $thisFile " + msg)
-        scope.bindings(1).get.force
+        scope.bindings(1).force
       }
     ),
 
@@ -852,7 +852,7 @@ object Std {
       null, null,
       Params.mk(("x", None, 0)),
       { (scope, thisFile, ev, fs, outerPos) =>
-        val Val.Str(_, x) = scope.bindings(0).get.force
+        val Val.Str(_, x) = scope.bindings(0).force
         Materializer.reverse(
           outerPos,
           ev.extVars.getOrElse(
@@ -939,7 +939,7 @@ object Std {
       {(scope, thisFile, ev, fs, outerPos) =>
         implicitly[ReadWriter[R]].write(
           outerPos,
-          eval(outerPos, paramIndices.map(i => scope.bindings(i).get.force), ev, fs)
+          eval(outerPos, paramIndices.map(i => scope.bindings(i).force), ev, fs)
         )
       }
     )
@@ -957,7 +957,7 @@ object Std {
       null, null,
       Params.mk(indexedParams: _*),
       { (scope, thisFile, ev, fs, outerPos) =>
-        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).get.force }.toMap
+        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).force }.toMap
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, args, fs, ev))
       },
       { (expr, scope, eval) =>

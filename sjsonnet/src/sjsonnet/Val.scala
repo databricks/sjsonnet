@@ -188,15 +188,6 @@ object Val{
       } else throw new MatchError((l, r))
     }
 
-    @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
-      case Some(m) => Some(m.cached)
-
-      case None => this.`super` match{
-        case null => None
-        case s => s.valueCached(k)
-      }
-    }
-
     def valueRaw(k: String,
                  self: Obj,
                  pos: Position,
@@ -432,10 +423,7 @@ class ValScope(val dollar0: Val.Obj,
                val super0: Val.Obj,
                bindings0: Array[Val.Lazy]) {
 
-  def bindings(k: Int): Option[Val.Lazy] = bindings0(k) match{
-    case null => None
-    case v => Some(v)
-  }
+  def bindings(k: Int): Val.Lazy = bindings0(k)
 
   def extend(newBindingsI: Array[Expr.Bind] = null,
              newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
@@ -465,31 +453,21 @@ class ValScope(val dollar0: Val.Obj,
   def extendSimple(newBindingsI: Array[Int],
                    newBindingsV: Array[Val.Lazy]) = {
     if(newBindingsI == null || newBindingsI.length == 0) this
-    else new ValScope(
-      dollar0,
-      self0,
-      super0,
-      {
-        val b = bindings0.clone()
-        var i = 0
-        while(i < newBindingsI.length) {
-          b(newBindingsI(i)) = newBindingsV(i)
-          i += 1
-        }
-        b
+    else {
+      val b = bindings0.clone()
+      var i = 0
+      while(i < newBindingsI.length) {
+        b(newBindingsI(i)) = newBindingsV(i)
+        i += 1
       }
-    )
+      new ValScope(dollar0, self0, super0, b)
+    }
   }
 
   def extendSimple(newBindingI: Int,
-                   newBindingV: Val.Lazy) = new ValScope(
-    dollar0,
-    self0,
-    super0,
-    {
-      val b = bindings0.clone()
-      b(newBindingI) = newBindingV
-      b
-    }
-  )
+                   newBindingV: Val.Lazy) = {
+    val b = bindings0.clone()
+    b(newBindingI) = newBindingV
+    new ValScope(dollar0, self0, super0, b)
+  }
 }

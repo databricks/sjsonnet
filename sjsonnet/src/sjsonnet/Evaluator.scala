@@ -105,13 +105,8 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
   def visitId(pos: Position, value: Int)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(value)
-      .getOrElse(
-        Error.fail(
-          "Unknown variable " + pos.fileScope.indexNames(value),
-          pos
-        )
-      )
-
+    if(ref == null)
+      Error.fail("Unknown variable " + pos.fileScope.indexNames(value), pos)
     try ref.force catch Error.tryCatchWrap(pos)
   }
 
