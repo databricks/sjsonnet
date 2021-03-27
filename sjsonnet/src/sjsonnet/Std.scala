@@ -130,8 +130,8 @@ object Std {
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
             k <- (getNonHiddenKeys(l) ++ getNonHiddenKeys(r)).distinct
-            val lValue = l.valueRaw(k, l, pos)(ev).map(_._1)
-            val rValue = r.valueRaw(k, r, pos)(ev).map(_._1)
+            val lValue = Option(l.valueRaw(k, l, pos)(ev))
+            val rValue = Option(r.valueRaw(k, r, pos)(ev))
             if !rValue.exists(_.isInstanceOf[Val.Null])
           } yield (lValue, rValue) match{
             case (Some(lChild), None) => k -> createMember{lChild}

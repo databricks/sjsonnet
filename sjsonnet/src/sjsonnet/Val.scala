@@ -121,7 +121,9 @@ object Val{
       }
       mapping
     }
-    private[this] val valueCache = collection.mutable.Map.empty[Any, Val]
+
+    private[this] val valueCache = mutable.HashMap.empty[Any, Val]
+
     def value(k: String,
               pos: Position,
               self: Obj = this)
@@ -129,33 +131,42 @@ object Val{
 
       val cacheKey = if(self eq this) k else (k, self)
 
-      valueCache.get(cacheKey) match{
-        case Some(res) => res
-        case None =>
-          valueRaw(k, self, pos) match{
-            case Some((x, cached)) =>
-              if (cached) valueCache(cacheKey) = x
-              x
-            case None =>
-              Error.fail("Field does not exist: " + k, pos)
-          }
-      }
+      valueCache.getOrElse(cacheKey, {
+        valueRaw(k, self, pos, valueCache, cacheKey) match {
+          case null => Error.fail("Field does not exist: " + k, pos)
+          case x => x
+        }
+      })
+    }
+
+    private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
+      try evaluator.materialize(v).transform(new Renderer()).toString
+      catch Error.tryCatchWrap(pos)
     }
 
     def mergeMember(l: Val,
                     r: Val,
                     pos: Position)
-                   (implicit evaluator: EvalScope) = (l, r) match{
-      case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
-      case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
-      case (Val.Arr(_, l), Val.Arr(_, r)) => Val.Arr(pos, l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
-      case (Val.Str(_, l), r) =>
-        try Val.Str(pos, l + evaluator.materialize(r).transform(new Renderer()).toString)
-        catch Error.tryCatchWrap(pos)
-      case (l, Val.Str(_, r)) =>
-        try Val.Str(pos, evaluator.materialize(l).transform(new Renderer()).toString + r)
-        catch Error.tryCatchWrap(pos)
+                   (implicit evaluator: EvalScope) = {
+      val lStr = l.isInstanceOf[Val.Str]
+      val rStr = r.isInstanceOf[Val.Str]
+      if(lStr || rStr) {
+        val ll = if(lStr) l.asInstanceOf[Val.Str].value else renderString(l)
+        val rr = if(rStr) r.asInstanceOf[Val.Str].value else renderString(r)
+        Val.Str(pos, ll ++ rr)
+      } else if(l.isInstanceOf[Val.Num] && r.isInstanceOf[Val.Num]) {
+        val ll = l.asInstanceOf[Val.Num].value
+        val rr = r.asInstanceOf[Val.Num].value
+        Val.Num(pos, ll + rr)
+      } else if(l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
+        val ll = l.asInstanceOf[Val.Arr].value
+        val rr = r.asInstanceOf[Val.Arr].value
+        Val.Arr(pos, ll ++ rr)
+      } else if(l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
+        val ll = l.asInstanceOf[Val.Obj]
+        val rr = r.asInstanceOf[Val.Obj]
+        rr.addSuper(pos, ll)
+      } else throw new MatchError((l, r))
     }
 
     @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
@@ -169,28 +180,25 @@ object Val{
 
     def valueRaw(k: String,
                  self: Obj,
-                 pos: Position)
-                (implicit evaluator: EvalScope): Option[(Val, Boolean)] = {
-      this.value0.get(k) match{
-        case Some(m) =>
-          this.`super` match{
-            case s if s != null && m.add =>
-              val merged = s.valueRaw(k, self, pos) match{
-                case None => m.invoke(self, this.`super`, pos.fileScope, evaluator)
-                case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, this.`super`, pos.fileScope, evaluator), pos)
-              }
-
-              Some(merged -> m.cached)
-
-            case _ =>
-              Some(m.invoke(self, this.`super`, pos.fileScope, evaluator) -> m.cached)
-          }
-
-        case None => this.`super` match{
-          case null => None
-          case s => s.valueRaw(k, self, pos)
-        }
+                 pos: Position,
+                 addTo: mutable.HashMap[Any, Val] = null,
+                 addKey: Any = null)
+                (implicit evaluator: EvalScope): Val = {
+      val s = this.`super`
+      this.value0.getOrElse(k, null) match{
+        case null =>
+          if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+        case m =>
+          val v = if(s != null && m.add) {
+            val merged = s.valueRaw(k, self, pos, null, null) match{
+              case null => m.invoke(self, s, pos.fileScope, evaluator)
+              case supValue =>
+                mergeMember(supValue, m.invoke(self, s, pos.fileScope, evaluator), pos)
+            }
+            merged
+          } else m.invoke(self, s, pos.fileScope, evaluator)
+          if(addTo != null && m.cached) addTo(addKey) = v
+          v
       }
     }
 
