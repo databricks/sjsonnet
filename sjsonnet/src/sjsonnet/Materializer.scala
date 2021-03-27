@@ -42,7 +42,7 @@ object Materializer {
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
 
-        val keysUnsorted = obj.getVisibleKeys().toArray
+        val keysUnsorted = obj.getVisibleKeys
         val keys = if (!evaluator.preserveOrder) keysUnsorted.sortBy(_._1) else keysUnsorted
         val objVisitor = visitor.visitObject(keys.length , -1)
 
@@ -53,7 +53,7 @@ object Materializer {
 
             storePos(
               value match{
-                case v: Val.Obj if v.getVisibleKeys().nonEmpty => value.pos
+                case v: Val.Obj if !v.visibleKeys.isEmpty => value.pos
                 case v: Val.Arr if v.value.nonEmpty => value.pos
                 case _ => null
               }

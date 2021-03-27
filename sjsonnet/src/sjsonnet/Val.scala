@@ -102,24 +102,43 @@ object Val{
 
     def prettyName = "object"
 
-    def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
+    private def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
       if(`super` != null) `super`.foreachVisibleKey(output)
       for(t <- value0) output(t._1, t._2.visibility)
     }
 
-    def getVisibleKeys() = {
-      val mapping = mutable.LinkedHashMap.empty[String, Boolean]
+    lazy val visibleKeys = {
+      val mapping = new util.LinkedHashMap[String, java.lang.Boolean]
       foreachVisibleKey{ (k, sep) =>
-        (mapping.get(k), sep) match{
-          case (None, Visibility.Hidden) => mapping(k) = true
-          case (None, _)    => mapping(k) = false
-
-          case (Some(false), Visibility.Hidden) => mapping(k) = true
-          case (Some(true), Visibility.Unhide) => mapping(k) = false
-          case (Some(x), _) => mapping(k) = x
-        }
+        if(!mapping.containsKey(k)) mapping.put(k, sep == Visibility.Hidden)
+        else if(sep == Visibility.Hidden) mapping.put(k, true)
+        else if(sep == Visibility.Unhide) mapping.put(k, false)
       }
       mapping
+    }
+
+    def getVisibleKeyNamesArray = visibleKeys.keySet().toArray(new Array[String](visibleKeys.size()))
+
+    def getVisibleKeysNonHiddenCount = {
+      var c = 0
+      visibleKeys.values().forEach(b => if(b == java.lang.Boolean.FALSE) c += 1)
+      c
+    }
+
+    def getVisibleKeys: Array[(String, java.lang.Boolean)] = {
+      val a = new Array[(String, java.lang.Boolean)](visibleKeys.size())
+      var i = 0
+      visibleKeys.forEach { (k, b) =>
+        a(i) = (k, b)
+        i += 1
+      }
+      a
+    }
+
+    def getVisibleKeysNonHidden: Array[String] = {
+      val buf = mutable.ArrayBuilder.make[String]
+      visibleKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
+      buf.result()
     }
 
     private[this] val valueCache = mutable.HashMap.empty[Any, Val]
