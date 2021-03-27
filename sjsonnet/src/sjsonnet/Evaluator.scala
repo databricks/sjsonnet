@@ -464,7 +464,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
           case _: Member.AssertStmt => // do nothing
         }
 
-        new Val.Obj(pos, builder.result(), self => assertions(self), null)
+        new Val.Obj(pos, builder.result(), assertions, null)
       }
       newSelf
 
@@ -502,7 +502,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             case Val.Null(_) => // do nothing
           }
         }
-        new Val.Obj(pos, builder.result(), _ => (), null)
+        new Val.Obj(pos, builder.result(), null, null)
       }
 
       newSelf

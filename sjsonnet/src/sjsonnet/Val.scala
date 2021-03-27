@@ -86,17 +86,14 @@ object Val{
     def getSuper = `super`
 
     @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
-      triggerAsserts(obj)
-      `super` match {
-        case null =>
-        case s => s.triggerAllAsserts(obj)
-      }
+      if(triggerAsserts != null) triggerAsserts(obj)
+      if(`super` != null) `super`.triggerAllAsserts(obj)
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case null => new Val.Obj(pos, value0, _ => (), lhs)
-        case x => new Val.Obj(pos, value0, _ => (), x.addSuper(pos, lhs))
+        case null => new Val.Obj(pos, value0, null, lhs)
+        case x => new Val.Obj(pos, value0, null, x.addSuper(pos, lhs))
       }
     }
 

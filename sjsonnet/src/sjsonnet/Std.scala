@@ -138,7 +138,7 @@ object Std {
             case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
           }
 
-          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), _ => (), null)
+          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), null, null)
 
         case (_, _) => recSingle(r)
       }
@@ -150,7 +150,7 @@ object Std {
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
 
-          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), _ => (), null)
+          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), null, null)
 
         case _ => v
       }
@@ -291,7 +291,7 @@ object Std {
             )
           ))
         },
-        _ => (),
+        null,
         null
       )
     },
@@ -806,7 +806,7 @@ object Std {
               .mapValues { v =>
                 Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
               }
-            new Val.Obj(pos, transformedValue , (x: Val.Obj) => (), null)
+            new Val.Obj(pos, transformedValue , null, null)
         }
       }
       recursiveTransform(ujson.read(str))
@@ -828,7 +828,7 @@ object Std {
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
-          new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, _ => (), null)
+          new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, null, null)
         case a: Val.Arr =>
           Val.Arr(pos, a.value.map(x => rec(x.force)).filter(filter).map(x => (() => x): Val.Lazy))
         case _ => x
@@ -890,7 +890,7 @@ object Std {
         )
       )
     ),
-    _ => (),
+    null,
     null
   )
 
