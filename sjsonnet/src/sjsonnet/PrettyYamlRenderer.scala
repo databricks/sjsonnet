@@ -95,7 +95,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  val loadedFileContents = mutable.Map.empty[Path, Array[Int]]
+  val loadedFileContents = mutable.HashMap.empty[Path, Array[Int]]
   def saveCurrentPos() = {
     val current = getCurrentPosition()
     if (current != null){

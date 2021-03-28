@@ -90,14 +90,14 @@ object Materializer {
     case ujson.Str(s) => Val.Str(pos, s)
     case ujson.Arr(xs) => Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Val.Lazy).toArray[Val.Lazy])
     case ujson.Obj(xs) =>
-      val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
-      for(x <- xs){
+      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      for(x <- xs) {
         val v = Val.Obj.Member(false, Visibility.Normal,
           (_: Val.Obj, _: Val.Obj, _, _) => reverse(pos, x._2)
         )
-        builder += (x._1 -> v)
+        builder.put(x._1, v)
       }
-      new Val.Obj(pos, builder.result(), null, null)
+      new Val.Obj(pos, builder, null, null)
   }
 
   def toExpr(v: ujson.Value): Expr = v match{

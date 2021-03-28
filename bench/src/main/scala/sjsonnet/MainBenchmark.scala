@@ -33,7 +33,7 @@ class MainBenchmark {
   def main(bh: Blackhole): Unit = {
     bh.consume(SjsonnetMain.main0(
       mainArgs,
-      collection.mutable.Map.empty,
+      collection.mutable.HashMap.empty,
       System.in,
       dummyOut,
       System.err,

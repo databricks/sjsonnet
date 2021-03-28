@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, FileScope)]],
+class Interpreter(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]],
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,

@@ -11,7 +11,7 @@ case class OsPath(p: os.Path) extends Path{
   def /(s: String): Path = OsPath(p / s)
 
 
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     val offsetStr =
       if (p.toString.contains("(materialize)")) ""
       else {

@@ -42,7 +42,7 @@ object Val{
   abstract class Lazy {
     private[this] var cached: Val = null
     def compute(): Val
-    def force: Val = {
+    final def force: Val = {
       if(cached == null) cached = compute()
       cached
     }
@@ -79,10 +79,14 @@ object Val{
                       invoke: (Obj, Obj, FileScope, EvalScope) => Val,
                       cached: Boolean = true)
 
-
+    def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
+      val m = new util.LinkedHashMap[String, Obj.Member]()
+      for((k, v) <- members) m.put(k, v)
+      new Obj(pos, m, null, null)
+    }
   }
   final class Obj(val pos: Position,
-                  value0: mutable.Map[String, Obj.Member],
+                  value0: util.LinkedHashMap[String, Obj.Member],
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj) extends Val{
 
@@ -104,7 +108,7 @@ object Val{
 
     private def gatherVisibleKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if(`super` != null) `super`.gatherVisibleKeys(mapping)
-      for((k, m) <- value0) {
+      value0.forEach { (k, m) =>
         val vis = m.visibility
         if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
         else if(vis == Visibility.Hidden) mapping.put(k, true)
@@ -196,17 +200,15 @@ object Val{
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
       val s = this.`super`
-      this.value0.getOrElse(k, null) match{
+      this.value0.get(k) match{
         case null =>
           if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
         case m =>
           val v = if(s != null && m.add) {
-            val merged = s.valueRaw(k, self, pos, null, null) match{
+            s.valueRaw(k, self, pos, null, null) match {
               case null => m.invoke(self, s, pos.fileScope, evaluator)
-              case supValue =>
-                mergeMember(supValue, m.invoke(self, s, pos.fileScope, evaluator), pos)
+              case supValue => mergeMember(supValue, m.invoke(self, s, pos.fileScope, evaluator), pos)
             }
-            merged
           } else m.invoke(self, s, pos.fileScope, evaluator)
           if(addTo != null && m.cached) addTo(addKey) = v
           v
@@ -270,13 +272,9 @@ object Val{
               defaultArgsBindings(idx) = () => evalDefault(default, newScope, evaluator)
               idx += 1
             }
-            val newBindingsI = util.Arrays.copyOf(defaultArgsBindingIndices, defaultArgsBindings.length + argVals.length)
-            val newBindingsV = util.Arrays.copyOf(defaultArgsBindings, newBindingsI.length)
-            System.arraycopy(passedArgsBindingsI, 0, newBindingsI, defaultArgsBindings.length, argVals.length)
-            System.arraycopy(argVals, 0, newBindingsV, defaultArgsBindings.length, argVals.length)
             defSiteValScope match {
-              case null => ValScope.createSimple(newBindingsI, newBindingsV)
-              case s => s.extendSimple(newBindingsI, newBindingsV)
+              case null => ValScope.createSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
+              case s => s.extendSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
             }
           }
           validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope, argsSize)
@@ -368,6 +366,24 @@ object ValScope{
     }
     new ValScope(null, null, null, arr)
   }
+
+  def createSimple(newBindingsI1: Array[Int],
+                   newBindingsV1: Array[Val.Lazy],
+                   newBindingsI2: Array[Int],
+                   newBindingsV2: Array[Val.Lazy]) = {
+    val arr = new Array[Val.Lazy](newBindingsV1.length + newBindingsV2.length)
+    var i = 0
+    while(i < newBindingsV1.length) {
+      arr(newBindingsI1(i)) = newBindingsV1(i)
+      i += 1
+    }
+    i = 0
+    while(i < newBindingsV2.length) {
+      arr(newBindingsI2(i)) = newBindingsV2(i)
+      i += 1
+    }
+    new ValScope(null, null, null, arr)
+  }
 }
 
 /**
@@ -429,6 +445,24 @@ class ValScope(val dollar0: Val.Obj,
       }
       new ValScope(dollar0, self0, super0, b)
     }
+  }
+
+  def extendSimple(newBindingsI1: Array[Int],
+                   newBindingsV1: Array[Val.Lazy],
+                   newBindingsI2: Array[Int],
+                   newBindingsV2: Array[Val.Lazy]) = {
+    val b = bindings0.clone()
+    var i = 0
+    while(i < newBindingsV1.length) {
+      b(newBindingsI1(i)) = newBindingsV1(i)
+      i += 1
+    }
+    i = 0
+    while(i < newBindingsV2.length) {
+      b(newBindingsI2(i)) = newBindingsV2(i)
+      i += 1
+    }
+    new ValScope(dollar0, self0, super0, b)
   }
 
   def extendSimple(newBindingI: Int,

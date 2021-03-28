@@ -139,7 +139,7 @@ object Std {
             case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
           }
 
-          new Val.Obj(mergePosition, mutable.LinkedHashMap(kvs:_*), null, null)
+          Val.Obj.mk(mergePosition, kvs:_*)
 
         case (_, _) => recSingle(r)
       }
@@ -151,7 +151,7 @@ object Std {
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
 
-          new Val.Obj(obj.pos, mutable.LinkedHashMap(kvs:_*), null, null)
+          Val.Obj.mk(obj.pos, kvs:_*)
 
         case _ => v
       }
@@ -281,9 +281,8 @@ object Std {
     },
     builtin("mapWithKey", "func", "obj"){ (pos, ev, fs, func: Applyer, obj: Val.Obj) =>
       val allKeys = obj.getVisibleKeyNamesArray
-      new Val.Obj(
+      Val.Obj.mk(
         pos,
-        mutable.LinkedHashMap() ++
         allKeys.map{ k =>
           k -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
             func.apply(
@@ -291,9 +290,7 @@ object Std {
               () => obj.value(k, fs.noOffsetPos)(ev)
             )
           ))
-        },
-        null,
-        null
+        }: _*
       )
     },
     builtin("mapWithIndex", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val.Arr) =>
@@ -803,11 +800,11 @@ object Std {
             val transformedValue: Array[Val.Lazy] = values.map(v => (() => recursiveTransform(v)): Val.Lazy).toArray
             Val.Arr(pos, transformedValue)
           case ujson.Obj(valueMap) =>
-            val transformedValue = mutable.LinkedHashMap() ++ valueMap
-              .mapValues { v =>
-                Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v))
-              }
-            new Val.Obj(pos, transformedValue , null, null)
+            val m = new java.util.LinkedHashMap[String, Val.Obj.Member]
+            valueMap.foreach { case (k, v) =>
+              m.put(k, Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v)))
+            }
+            new Val.Obj(pos, m, null, null)
         }
       }
       recursiveTransform(ujson.read(str))
@@ -829,7 +826,7 @@ object Std {
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
-          new Val.Obj(pos, mutable.LinkedHashMap() ++ bindings, null, null)
+          Val.Obj.mk(pos, bindings: _*)
         case a: Val.Arr =>
           Val.Arr(pos, a.value.map(x => rec(x.force)).filter(filter).map(x => (() => x): Val.Lazy))
         case _ => x
@@ -864,9 +861,8 @@ object Std {
       }
     )
   )
-  val Std = new Val.Obj(
+  val Std = Val.Obj.mk(
     null,
-    mutable.LinkedHashMap() ++
     functions
       .map{
         case (k, v) =>
@@ -890,9 +886,7 @@ object Std {
           cached = false
         )
       )
-    ),
-    null,
-    null
+    ): _*
   )
 
   def validate(vs: Array[Val],

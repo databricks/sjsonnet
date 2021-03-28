@@ -16,7 +16,7 @@ import scala.collection.mutable
   * imported module to be re-used. Parsing is cached separatedly by an external
   * `parseCache`.
   */
-class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, FileScope)]],
+class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]],
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 importer: (Path, String) => Option[(Path, String)],
@@ -24,11 +24,11 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                 strict: Boolean) extends EvalScope{
   implicit def evalScope: EvalScope = this
 
-  val loadedFileContents = mutable.Map.empty[Path, String]
+  val loadedFileContents = mutable.HashMap.empty[Path, String]
   def loadCachedSource(p: Path) = loadedFileContents.get(p)
   def materialize(v: Val): Value = Materializer.apply(v)
-  val cachedImports = collection.mutable.Map.empty[Path, Val]
-  val cachedImportedStrings = collection.mutable.Map.empty[Path, String]
+  val cachedImports = collection.mutable.HashMap.empty[Path, Val]
+  val cachedImportedStrings = collection.mutable.HashMap.empty[Path, String]
 
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val = try {
@@ -445,23 +445,33 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
         visitBindings(binds, (self, sup) => makeNewScope(self, sup))
 
       lazy val newSelf: Val.Obj = {
-        val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
+        val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
         value.foreach {
           case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-              assertions(self)
-              visitExpr(rhs)(makeNewScope(self, sup))
-            })).foreach(builder.+=)
+            visitFieldName(fieldName, offset) match {
+              case Some(k) =>
+                val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+                  assertions(self)
+                  visitExpr(rhs)(makeNewScope(self, sup))
+                })
+                builder.put(k, v)
+              case None =>
+            }
           case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
-            visitFieldName(fieldName, offset).map(_ -> Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-              assertions(self)
-              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-            })).foreach(builder.+=)
+            visitFieldName(fieldName, offset) match {
+              case Some(k) =>
+                val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+                  assertions(self)
+                  visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+                })
+              builder.put(k, v)
+              case None =>
+            }
           case _: Member.BindStmt => // do nothing
           case _: Member.AssertStmt => // do nothing
         }
 
-        new Val.Obj(pos, builder.result(), assertions, null)
+        new Val.Obj(pos, builder, assertions, null)
       }
       newSelf
 
@@ -472,7 +482,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
       )
 
       lazy val newSelf: Val.Obj = {
-        val builder = mutable.LinkedHashMap.newBuilder[String, Val.Obj.Member]
+        val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
         for(s <- visitComp(first :: rest, Array(compScope))){
           lazy val newScope: ValScope = s.extend(
             binds,
@@ -486,7 +496,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
 
           visitExpr(key)(s) match {
             case Val.Str(_, k) =>
-              builder += (k -> Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
+              builder.put(k, Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
                 visitExpr(value)(
                   s.extend(
                     binds,
@@ -499,7 +509,7 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
             case Val.Null(_) => // do nothing
           }
         }
-        new Val.Obj(pos, builder.result(), null, null)
+        new Val.Obj(pos, builder, null, null)
       }
 
       newSelf
