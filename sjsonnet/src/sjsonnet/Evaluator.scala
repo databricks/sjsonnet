@@ -46,6 +46,34 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
           Val.bool(pos, scope.super0.visibleKeys.containsKey(key.value))
         }
 
+      case BinaryOp(pos, lhs, Expr.BinaryOp.`&&`, rhs) =>
+        visitExpr(lhs) match {
+          case Val.True(_) =>
+            visitExpr(rhs) match{
+              case b: Val.Bool => b
+              case unknown =>
+                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
+            }
+          case Val.False(_) => Val.False(pos)
+          case unknown =>
+            Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
+        }
+
+      case BinaryOp(pos, lhs, Expr.BinaryOp.`||`, rhs) =>
+        visitExpr(lhs) match {
+          case Val.True(_) => Val.True(pos)
+          case Val.False(_) =>
+            visitExpr(rhs) match{
+              case b: Val.Bool => b
+              case unknown =>
+                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
+            }
+          case unknown =>
+            Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
+        }
+
+      case BinaryOp(pos, lhs, op, rhs) => visitBinaryOp(pos, lhs, op, rhs)
+
       case $(pos) =>
         val dollar = scope.dollar0
         if(dollar == null) Error.fail("Cannot use `$` outside an object", pos)
@@ -57,9 +85,6 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
-      case BinaryOp(pos, lhs, op, rhs) => {
-        visitBinaryOp(pos, lhs, op, rhs)
-      }
       case AssertExpr(pos, Member.AssertStmt(value, msg), returned) =>
         visitAssert(pos, value, msg, returned)
 
@@ -281,89 +306,72 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
   }
 
   def visitBinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr)(implicit scope: ValScope) = {
-    op match {
-      // && and || are handled specially because unlike the other operators,
-      // these short-circuit during evaluation in some cases when the LHS is known.
-      case Expr.BinaryOp.`&&` | Expr.BinaryOp.`||` =>
-        (visitExpr(lhs), op) match {
-          case (lhs, Expr.BinaryOp.`&&`) =>
-            lhs match{
-              case Val.True(_) =>
-                visitExpr(rhs) match{
-                  case b: Val.Bool => b
-                  case unknown =>
-                    Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
-                }
-              case Val.False(_) => Val.False(pos)
-              case unknown =>
-                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
-            }
-          case (lhs, Expr.BinaryOp.`||`) =>
-            lhs match{
-              case Val.True(_) => Val.True(pos)
-              case Val.False(_) =>
-                visitExpr(rhs) match{
-                  case b: Val.Bool => b
-                  case unknown =>
-                    Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
-                }
-              case unknown =>
-                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
-            }
-          case _ => visitExpr(rhs)
+    (visitExpr(lhs), op, visitExpr(rhs)) match {
 
+      case (l, Expr.BinaryOp.`==`, r) =>
+        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
+          Error.fail("cannot test equality of functions", pos)
         }
-      case _ =>
-        (visitExpr(lhs), op, visitExpr(rhs)) match {
-          case (Val.Num(_, l), Expr.BinaryOp.`*`, Val.Num(_, r)) => Val.Num(pos, l * r)
-          case (Val.Num(_, l), Expr.BinaryOp.`/`, Val.Num(_, r)) =>
-            if (r == 0) Error.fail("division by zero", pos)
-            Val.Num(pos, l / r)
-          case (Val.Num(_, l), Expr.BinaryOp.`%`, Val.Num(_, r)) => Val.Num(pos, l % r)
-          case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(pos, l + r)
-          case (Val.Str(_, l), Expr.BinaryOp.`%`, r) =>
-            try Val.Str(pos, Format.format(l, r, pos))
-            catch Error.tryCatchWrap(pos)
+        try Val.bool(pos, Materializer(l) == Materializer(r))
+        catch Error.tryCatchWrap(pos)
 
-          case (Val.Str(_, l), Expr.BinaryOp.`+`, Val.Str(_, r)) => Val.Str(pos, l + r)
-          case (Val.Str(_, l), Expr.BinaryOp.`<`, Val.Str(_, r)) => Val.bool(pos, l < r)
-          case (Val.Str(_, l), Expr.BinaryOp.`>`, Val.Str(_, r)) => Val.bool(pos, l > r)
-          case (Val.Str(_, l), Expr.BinaryOp.`<=`, Val.Str(_, r)) => Val.bool(pos, l <= r)
-          case (Val.Str(_, l), Expr.BinaryOp.`>=`, Val.Str(_, r)) => Val.bool(pos, l >= r)
-          case (Val.Str(_, l), Expr.BinaryOp.`+`, r) =>
-            try Val.Str(pos, l + Materializer.stringify(r))
-            catch Error.tryCatchWrap(pos)
-          case (l, Expr.BinaryOp.`+`, Val.Str(_, r)) =>
-            try Val.Str(pos, Materializer.stringify(l) + r)
-            catch Error.tryCatchWrap(pos)
-          case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(pos, l - r)
-          case (Val.Num(_, l), Expr.BinaryOp.`<<`, Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`<`, Val.Num(_, r)) => Val.bool(pos, l < r)
-          case (Val.Num(_, l), Expr.BinaryOp.`>`, Val.Num(_, r)) => Val.bool(pos, l > r)
-          case (Val.Num(_, l), Expr.BinaryOp.`<=`, Val.Num(_, r)) => Val.bool(pos, l <= r)
-          case (Val.Num(_, l), Expr.BinaryOp.`>=`, Val.Num(_, r)) => Val.bool(pos, l >= r)
-          case (l, Expr.BinaryOp.`==`, r) =>
-            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Error.fail("cannot test equality of functions", pos)
-            }
-            try Val.bool(pos, Materializer(l) == Materializer(r))
-            catch Error.tryCatchWrap(pos)
-          case (l, Expr.BinaryOp.`!=`, r) =>
-            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-              Error.fail("cannot test equality of functions", pos)
-            }
-            try Val.bool(pos, Materializer(l) != Materializer(r))
-            catch Error.tryCatchWrap(pos)
-          case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.visibleKeys.containsKey(l))
-          case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
-          case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
-          case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(pos, l)
-          case (Val.Arr(_, l), Expr.BinaryOp.`+`, Val.Arr(_, r)) => Val.Arr(pos,  l ++ r)
-          case (l, op, r) =>
-            Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", pos)
+      case (l, Expr.BinaryOp.`!=`, r) =>
+        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
+          Error.fail("cannot test equality of functions", pos)
         }
+        try Val.bool(pos, Materializer(l) != Materializer(r))
+        catch Error.tryCatchWrap(pos)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(pos, l + r)
+      case (Val.Str(_, l), Expr.BinaryOp.`+`, Val.Str(_, r)) => Val.Str(pos, l + r)
+      case (Val.Str(_, l), Expr.BinaryOp.`+`, r) =>
+        try Val.Str(pos, l + Materializer.stringify(r))
+        catch Error.tryCatchWrap(pos)
+      case (l, Expr.BinaryOp.`+`, Val.Str(_, r)) =>
+        try Val.Str(pos, Materializer.stringify(l) + r)
+        catch Error.tryCatchWrap(pos)
+      case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(pos, l)
+      case (Val.Arr(_, l), Expr.BinaryOp.`+`, Val.Arr(_, r)) => Val.Arr(pos,  l ++ r)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(pos, l - r)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`*`, Val.Num(_, r)) => Val.Num(pos, l * r)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`/`, Val.Num(_, r)) =>
+        if (r == 0) Error.fail("division by zero", pos)
+        Val.Num(pos, l / r)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`%`, Val.Num(_, r)) => Val.Num(pos, l % r)
+      case (Val.Str(_, l), Expr.BinaryOp.`%`, r) =>
+        try Val.Str(pos, Format.format(l, r, pos))
+        catch Error.tryCatchWrap(pos)
+
+      case (Val.Str(_, l), Expr.BinaryOp.`<`, Val.Str(_, r)) => Val.bool(pos, l < r)
+      case (Val.Num(_, l), Expr.BinaryOp.`<`, Val.Num(_, r)) => Val.bool(pos, l < r)
+
+      case (Val.Str(_, l), Expr.BinaryOp.`>`, Val.Str(_, r)) => Val.bool(pos, l > r)
+      case (Val.Num(_, l), Expr.BinaryOp.`>`, Val.Num(_, r)) => Val.bool(pos, l > r)
+
+      case (Val.Str(_, l), Expr.BinaryOp.`<=`, Val.Str(_, r)) => Val.bool(pos, l <= r)
+      case (Val.Num(_, l), Expr.BinaryOp.`<=`, Val.Num(_, r)) => Val.bool(pos, l <= r)
+
+      case (Val.Str(_, l), Expr.BinaryOp.`>=`, Val.Str(_, r)) => Val.bool(pos, l >= r)
+      case (Val.Num(_, l), Expr.BinaryOp.`>=`, Val.Num(_, r)) => Val.bool(pos, l >= r)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`<<`, Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+
+      case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.visibleKeys.containsKey(l))
+
+      case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+
+      case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+
+      case (l, op, r) =>
+        Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", pos)
     }
   }
 
