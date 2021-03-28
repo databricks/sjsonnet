@@ -46,7 +46,7 @@ object Expr{
                      sep: Visibility,
                      rhs: Expr) extends Member
     case class BindStmt(value: Bind) extends Member
-    case class AssertStmt(value: Expr, msg: Option[Expr]) extends Member
+    case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
 

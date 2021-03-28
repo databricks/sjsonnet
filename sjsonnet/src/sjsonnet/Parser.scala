@@ -348,7 +348,7 @@ class Parser(val currentFile: Path) {
     "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]"
   )
   def assertStmt[_: P] =
-    P( expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
+    P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
     P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)

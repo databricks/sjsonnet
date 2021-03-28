@@ -191,12 +191,12 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     catch Error.tryCatchWrap(pos)
   }
 
-  def visitAssert(pos: Position, value: Expr, msg: Option[Expr], returned: Expr)
+  def visitAssert(pos: Position, value: Expr, msg: Expr, returned: Expr)
                  (implicit scope: ValScope): Val = {
     if (!visitExpr(value).isInstanceOf[Val.True]) {
       msg match {
-        case None => Error.fail("Assertion failed", pos)
-        case Some(msg) =>
+        case null => Error.fail("Assertion failed", pos)
+        case msg =>
           Error.fail(
             "Assertion failed: " + visitExpr(msg).cast[Val.Str].value,
             pos
@@ -375,12 +375,12 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     }
   }
 
-  def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope) = {
-    fieldName match{
-      case FieldName.Fixed(s) => Some(s)
+  def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope): String = {
+    fieldName match {
+      case FieldName.Fixed(s) => s
       case FieldName.Dyn(k) => visitExpr(k) match{
-        case Val.Str(_, k1) => Some(k1)
-        case Val.Null(_) => None
+        case Val.Str(_, k1) => k1
+        case Val.Null(_) => null
         case x => Error.fail(
           s"Field name must be string or null, not ${x.prettyName}",
           pos
@@ -428,8 +428,8 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
 
             if (!visitExpr(value)(newScope).isInstanceOf[Val.True]) {
               msg match{
-                case None => Error.fail("Assertion failed", value.pos)
-                case Some(msg) =>
+                case null => Error.fail("Assertion failed", value.pos)
+                case msg =>
                   Error.fail(
                     "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
                     value.pos
@@ -456,24 +456,22 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
         value.foreach {
           case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
-            visitFieldName(fieldName, offset) match {
-              case Some(k) =>
-                val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-                  assertions(self)
-                  visitExpr(rhs)(makeNewScope(self, sup))
-                })
-                builder.put(k, v)
-              case None =>
+            val k = visitFieldName(fieldName, offset)
+            if(k != null) {
+              val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+                assertions(self)
+                visitExpr(rhs)(makeNewScope(self, sup))
+              })
+              builder.put(k, v)
             }
           case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
-            visitFieldName(fieldName, offset) match {
-              case Some(k) =>
-                val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-                  assertions(self)
-                  visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-                })
+            val k = visitFieldName(fieldName, offset)
+            if(k != null) {
+              val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+                assertions(self)
+                visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+              })
               builder.put(k, v)
-              case None =>
             }
           case _: Member.BindStmt => // do nothing
           case _: Member.AssertStmt => // do nothing
