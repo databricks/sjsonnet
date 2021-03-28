@@ -66,8 +66,8 @@ object Expr{
     }
   }
   object Params {
-    def mk(params: (String, Option[Expr], Int)*): Params = {
-      Params(params.map(_._1).toArray, params.map(_._2.getOrElse(null)).toArray, params.map(_._3).toArray)
+    def mk(params: (String, Expr, Int)*): Params = {
+      Params(params.map(_._1).toArray, params.map(_._2).toArray, params.map(_._3).toArray)
     }
   }
   case class Args(names: Array[String], exprs: Array[Expr])

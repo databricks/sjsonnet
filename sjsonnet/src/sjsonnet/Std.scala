@@ -42,21 +42,26 @@ object Std {
     builtin("codepoint", "str"){ (offset, ev, fs, v1: Val) =>
       v1.cast[Val.Str].value.charAt(0).toInt
     },
-    builtin("length", "x"){ (offset, ev, fs, v1: Val) =>
-      v1 match{
+    "length" -> Val.Func(null, null, Params.mk(("x", null, 0)), { (scope, thisFile, ev, fs, pos) =>
+      val x = scope.bindings(0).force
+      Val.Num(pos, x match{
         case Val.Str(_, s) => s.length
         case Val.Arr(_, s) => s.length
         case o: Val.Obj => o.getVisibleKeysNonHiddenCount
         case o: Val.Func => o.params.names.length
-        case _ => throw new Error.Delegate("Cannot get length of " + v1.prettyName)
-      }
-    },
-    builtin("objectHas", "o", "f"){ (pos, ev, fs, v1: Val.Obj, v2: String) =>
-      v1.visibleKeys.get(v2) == java.lang.Boolean.FALSE
-    },
-    builtin("objectHasAll", "o", "f"){ (pos, ev, fs, v1: Val.Obj, v2: String) =>
-      v1.visibleKeys.containsKey(v2)
-    },
+        case _ => throw new Error.Delegate("Cannot get length of " + x.prettyName)
+      })
+    }),
+    "objectHas" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
+      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      Val.bool(pos, o.visibleKeys.get(f) == java.lang.Boolean.FALSE)
+    }),
+    "objectHasAll" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
+      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      Val.bool(pos, o.visibleKeys.containsKey(f))
+    }),
     builtin("objectFields", "o"){ (pos, ev, fs, v1: Val.Obj) =>
       val keys = getVisibleKeys(ev, v1)
       Val.Arr(pos, keys.map(k => (() => Val.Str(pos, k)): Val.Lazy))
@@ -263,22 +268,16 @@ object Std {
       }
       res
     },
-    builtin("filter", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val.Arr) =>
-      Val.Arr(
-        pos,
-        arr.value.filter{ i =>
-          func.apply(i).isInstanceOf[Val.True]
-        }
-      )
-    },
-    builtin("map", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val.Arr) =>
-      Val.Arr(
-        pos,
-        arr.value.map{ i =>
-          (() => func.apply(i)): Val.Lazy
-        }
-      )
-    },
+    "filter" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      Val.Arr(pos, arr.value.filter(v => func.apply(v).isInstanceOf[Val.True]))
+    }),
+    "map" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      Val.Arr(pos, arr.value.map(v => (() => func.apply(v)): Val.Lazy))
+    }),
     builtin("mapWithKey", "func", "obj"){ (pos, ev, fs, func: Applyer, obj: Val.Obj) =>
       val allKeys = obj.getVisibleKeyNamesArray
       Val.Obj.mk(
@@ -395,20 +394,24 @@ object Std {
       str.replaceAll("[" + Regex.quote(chars) + "]+$", "").replaceAll("^[" + Regex.quote(chars) + "]+", "")
     },
 
-    builtin("join", "sep", "arr"){ (pos, ev, fs, sep: Val, arr: Val.Arr) =>
-      val res: Val = sep match{
+    "join" -> Val.Func(null, null, Params.mk(("sep", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val sep = scope.bindings(0).force
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      sep match {
         case Val.Str(_, s) =>
-          Val.Str(
-            pos,
-            arr.value
-              .map(_.force)
-              .filter(!_.isInstanceOf[Val.Null])
-              .map{
-                case Val.Str(_, x) => x
-                case x => throw new Error.Delegate("Cannot join " + x.prettyName)
-              }
-              .mkString(s)
-          )
+          val b = new java.lang.StringBuilder()
+          var i = 0
+          while(i < arr.value.length) {
+            arr.value(i).force match {
+              case _: Val.Null =>
+              case Val.Str(_, x) =>
+                if(b.length() > 0) b.append(s)
+                b.append(x)
+              case x => throw new Error.Delegate("Cannot join " + x.prettyName)
+            }
+            i += 1
+          }
+          Val.Str(pos, b.toString)
         case Val.Arr(_, sep) =>
           val out = new mutable.ArrayBuffer[Val.Lazy]
           for(x <- arr.value){
@@ -423,10 +426,12 @@ object Std {
           Val.Arr(pos, out.toArray)
         case x => throw new Error.Delegate("Cannot join " + x.prettyName)
       }
-      res
-    },
-    builtin("member", "arr", "x"){ (pos, ev, fs, arr: Val, x: Val) =>
-      val res = arr match {
+    }),
+
+    "member" -> Val.Func(null, null, Params.mk(("arr", null, 0), ("x", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val arr = scope.bindings(0).force
+      val x = scope.bindings(1).force
+      Val.bool(pos, arr match {
         case str: Val.Str =>
           val secondArg = x match {
             case Val.Str(_, value) => value
@@ -439,9 +444,9 @@ object Std {
           }
           c > 0
         case x => throw new Error.Delegate("std.member first argument must be an array or a string, got " + arr.prettyName)
-      }
-      res
-    },
+      })
+    }),
+
     builtin("repeat", "what", "count"){ (pos, ev, fs, what: Val, count: Int) =>
       val res: Val = what match {
         case str: Val.Str =>
@@ -523,8 +528,8 @@ object Std {
         .replaceAll("\n[ ]+\n", "\n\n")
     },
     builtinWithDefaults("manifestYamlDoc",
-                        "v" -> None,
-                        "indent_array_in_object" -> Some(Val.False(dummyPos))){ (pos, args, fs, ev) =>
+                        "v" -> null,
+                        "indent_array_in_object" -> Val.False(dummyPos)){ (pos, args, fs, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
           case Val.False(_) => false
@@ -537,8 +542,8 @@ object Std {
       )(ev).toString
     },
     builtinWithDefaults("manifestYamlStream",
-                        "v" -> None,
-                        "indent_array_in_object" -> Some(Val.False(dummyPos))){ (pos, args, fs, ev) =>
+                        "v" -> null,
+                        "indent_array_in_object" -> Val.False(dummyPos)){ (pos, args, fs, ev) =>
       val v = args("v")
       val indentArrayInObject = args("indent_array_in_object")  match {
         case Val.False(_) => false
@@ -625,23 +630,23 @@ object Std {
       new String(arr.value.map(_.force.cast[Val.Num].value.toByte).toArray, UTF_8)
     },
 
-    builtinWithDefaults("uniq", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("uniq", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
 
       uniqArr(pos, ev, arr, keyF)
     },
-    builtinWithDefaults("sort", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       val arr = args("arr")
       val keyF = args("keyF")
 
       sortArr(pos, ev, arr, keyF)
     },
 
-    builtinWithDefaults("set", "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("set", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       uniqArr(pos, ev, sortArr(pos, ev, args("arr"), args("keyF")), args("keyF"))
     },
-    builtinWithDefaults("setUnion", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       val a = args("a") match {
         case arr: Val.Arr => arr.value
         case str: Val.Str => stringChars(pos, str.value).value
@@ -656,7 +661,7 @@ object Std {
       val concat = Val.Arr(pos, a ++ b)
       uniqArr(pos, ev, sortArr(pos, ev, concat, args("keyF")), args("keyF"))
     },
-    builtinWithDefaults("setInter", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       val a = args("a") match {
         case arr: Val.Arr => arr.value
         case str: Val.Str => stringChars(pos, str.value).value
@@ -702,7 +707,7 @@ object Std {
 
       sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
-    builtinWithDefaults("setDiff", "a" -> None, "b" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
 
       val a = args("a") match {
         case arr: Val.Arr => arr.value
@@ -749,7 +754,7 @@ object Std {
 
       sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
     },
-    builtinWithDefaults("setMember", "x" -> None, "arr" -> None, "keyF" -> Some(Val.False(dummyPos))) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
       val keyF = args("keyF")
 
       if (keyF.isInstanceOf[Val.False]) {
@@ -838,7 +843,7 @@ object Std {
     builtin("asciiLower", "str"){ (pos, ev, fs, str: String) => str.toLowerCase()},
     "trace" -> Val.Func(
       null, null,
-      Params.mk(("str", None, 0), ("rest", None, 1)),
+      Params.mk(("str", null, 0), ("rest", null, 1)),
       { (scope, thisFile, ev, fs, outerOffset) =>
         val Val.Str(_, msg) = scope.bindings(0).force
         System.err.println(s"TRACE: $thisFile " + msg)
@@ -848,7 +853,7 @@ object Std {
 
     "extVar" -> Val.Func(
       null, null,
-      Params.mk(("x", None, 0)),
+      Params.mk(("x", null, 0)),
       { (scope, thisFile, ev, fs, outerPos) =>
         val Val.Str(_, x) = scope.bindings(0).force
         Materializer.reverse(
@@ -889,63 +894,56 @@ object Std {
     ): _*
   )
 
-  def validate(vs: Array[Val],
-               ev: EvalScope,
-               fs: FileScope,
-               rs: Array[ReadWriter[_]]): Seq[Any] = {
-    var i = 0
-    val size = vs.size
-    val ret = new Array[Any](size)
-    while (i < size) {
-      val v = vs(i)
-      val r = rs(i)
-      r.apply(v, ev, fs) match {
-        case Left(err) => throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + v.prettyName)
-        case Right(x) => ret(i) = x
-      }
-      i += 1
-    }
-    ret
-  }
-
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
-                                            (eval: (Position, EvalScope, FileScope, T1) => R): (String, Val.Func) = builtin0(name, p1){ (pos, vs, ev, fs) =>
-    val Seq(v: T1) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]]))
-    eval(pos, ev, fs, v)
+                                            (eval: (Position, EvalScope, FileScope, T1) => R): (String, Val.Func) = {
+    val params = Array(p1)
+    (name, Val.Func(
+      null, null,
+      Params(params, new Array[Expr](params.length), params.indices.toArray),
+      { (scope, thisFile, ev, fs, outerPos) =>
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
+        implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1))
+      }
+    ))
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
-                                                            (eval: (Position, EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = builtin0(name, p1, p2){ (pos, vs, ev, fs) =>
-    val Seq(v1: T1, v2: T2) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]]))
-    eval(pos, ev, fs, v1, v2)
+                                                            (eval: (Position, EvalScope, FileScope, T1, T2) => R): (String, Val.Func) = {
+    val params = Array(p1, p2)
+    (name, Val.Func(
+      null, null,
+      Params(params, new Array[Expr](params.length), params.indices.toArray),
+      { (scope, thisFile, ev, fs, outerPos) =>
+        //println("--- calling builtin: "+name)
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
+        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force, ev, fs)
+        implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1, v2))
+      }
+    ))
   }
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
-                                                                            (eval: (Position, EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = builtin0(name, p1, p2, p3){ (pos, vs, ev, fs) =>
-    val Seq(v1: T1, v2: T2, v3: T3) = validate(vs, ev, fs, Array(implicitly[ReadWriter[T1]], implicitly[ReadWriter[T2]], implicitly[ReadWriter[T3]]))
-    eval(pos, ev, fs, v1, v2, v3)
-  }
-  def builtin0[R: ReadWriter](name: String, params: String*)(eval: (Position, Array[Val], EvalScope, FileScope) => R) = {
-    val paramData = params.zipWithIndex.map{case (k, i) => (k, None, i)}.toArray
-    val paramIndices = params.indices.toArray
-    name -> Val.Func(
+                                                                            (eval: (Position, EvalScope, FileScope, T1, T2, T3) => R): (String, Val.Func) = {
+    val params = Array(p1, p2, p3)
+    (name, Val.Func(
       null, null,
-      Params.mk(paramData: _*),
-      {(scope, thisFile, ev, fs, outerPos) =>
-        implicitly[ReadWriter[R]].write(
-          outerPos,
-          eval(outerPos, paramIndices.map(i => scope.bindings(i).force), ev, fs)
-        )
+      Params(params, new Array[Expr](params.length), params.indices.toArray),
+      { (scope, thisFile, ev, fs, outerPos) =>
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
+        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force, ev, fs)
+        val v3: T3 = implicitly[ReadWriter[T3]].apply(scope.bindings(2).force, ev, fs)
+        implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1, v2, v3))
       }
-    )
+    ))
   }
+
   /**
     * Helper function that can define a built-in function with default parameters
     *
     * Arguments of the eval function are (args, ev)
     */
-  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Option[Expr])*)
-                                        (eval: (Position, Map[String, Val], FileScope, EvalScope) => R): (String, Val.Func) = {
+  def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
+                                        (eval: (Position, scala.collection.Map[String, Val], FileScope, EvalScope) => R): (String, Val.Func) = {
     val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
     name -> Val.Func(
@@ -955,9 +953,7 @@ object Std {
         val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).force }.toMap
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, args, fs, ev))
       },
-      { (expr, scope, eval) =>
-        eval.visitExpr(expr)(scope)
-      }
+      { (expr, scope, eval) => expr.asInstanceOf[Val] }
     )
   }
 
