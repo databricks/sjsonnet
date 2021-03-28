@@ -50,7 +50,6 @@ object Expr{
   }
 
 
-  case class Parened(pos: Position, value: Expr) extends Expr
   case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
     val argIndices: Map[String, Int] = (names, indices).zipped.toMap
     val noDefaultIndices: BitSet = {

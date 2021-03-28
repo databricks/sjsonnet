@@ -34,7 +34,6 @@ class Evaluator(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Exp
                (implicit scope: ValScope): Val = try {
     expr match {
       case lit: Val.Literal => lit
-      case Parened(_, inner) => visitExpr(inner)
       case Self(pos) =>
         val self = scope.self0
         if(self == null) Error.fail("Cannot use `self` outside an object", pos)

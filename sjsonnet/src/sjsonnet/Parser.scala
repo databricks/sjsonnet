@@ -227,7 +227,6 @@ class Parser(val currentFile: Path) {
   )
 
   def local[_: P] = P( localExpr )
-  def parened[_: P] = P( (Pos ~~ expr).map(Expr.Parened.tupled) )
   def importStr[_: P](pos: Position) = P( string.map(Expr.ImportStr(pos, _)) )
   def `import`[_: P](pos: Position) = P( string.map(Expr.Import(pos, _)) )
   def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
@@ -253,7 +252,7 @@ class Parser(val currentFile: Path) {
           case '{' => Pass ~ obj ~ "}"
           case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
           case '[' => Pass ~ arr ~ "]"
-          case '(' => Pass ~ parened ~ ")"
+          case '(' => Pass ~ expr ~ ")"
           case '\"' => doubleString.map(constructString(pos, _))
           case '\'' => singleString.map(constructString(pos, _))
           case '@' => SingleChar./.flatMapX{
