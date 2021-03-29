@@ -15,6 +15,7 @@ object FormatTests extends TestSuite{
         def wd: Path = DummyPath()
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
+        def equal(x: Val, y: Val): Boolean = ???
       }
     )
     assert(formatted == expected)

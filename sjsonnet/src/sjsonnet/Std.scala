@@ -241,7 +241,7 @@ object Std {
     builtin("exponent", "x"){ (pos, ev, fs, x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toInt + 1
-      val mantissa = value * Math.pow(2.0, -exponent)
+      //val mantissa = value * Math.pow(2.0, -exponent)
       exponent
     },
     builtin("isString", "v"){ (pos, ev, fs, v: Val) =>
@@ -263,10 +263,7 @@ object Std {
       v.isInstanceOf[Val.Func]
     },
     builtin("count", "arr", "x"){ (pos, ev, fs, arr: Val.Arr, x: Val) =>
-      val res =  arr.value.count{i =>
-        Materializer(i.force)(ev) == Materializer(x)(ev)
-      }
-      res
+      arr.value.count{i => ev.equal(i.force, x) }
     },
     "filter" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
       val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
@@ -346,7 +343,7 @@ object Std {
         pos,
         for (
           (v, i) <- arr.value.zipWithIndex
-          if Materializer(v.force)(ev) == Materializer(value)(ev)
+          if ev.equal(v.force, value)
         ) yield (() => Val.Num(pos, i)): Val.Lazy
       )
     },
@@ -440,7 +437,7 @@ object Std {
           str.value.contains(secondArg)
         case a: Val.Arr =>
           val c = a.value.count {
-            i => Materializer(i.force)(ev) == Materializer(x)(ev)
+            i => ev.equal(i.force, x)
           }
           c > 0
         case x => throw new Error.Delegate("std.member first argument must be an array or a string, got " + arr.prettyName)
@@ -678,27 +675,25 @@ object Std {
 
       for (v <- a) {
         if (keyF.isInstanceOf[Val.False]) {
-          val mv = Materializer.apply(v.force)(ev)
+          val vf = v.force
           if (b.exists(value => {
-            val mValue = Materializer.apply(value.force)(ev)
-            mValue == mv
+            ev.equal(value.force, vf)
           }) && !out.exists(value => {
-            val mValue = Materializer.apply(value.force)(ev)
-            mValue == mv
+            ev.equal(value.force, vf)
           })) {
             out.append(v)
           }
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
           val keyFApplyer = Applyer(keyFFunc, ev, null)
-          val appliedX = Materializer(keyFApplyer.apply(v))(ev)
+          val appliedX = keyFApplyer.apply(v)
 
           if (b.exists(value => {
             val appliedValue = keyFApplyer.apply(value)
-            Materializer(appliedValue)(ev) == appliedX
+            ev.equal(appliedValue, appliedX)
           }) && !out.exists(value => {
             val mValue = keyFApplyer.apply(value)
-            Materializer(mValue)(ev) == appliedX
+            ev.equal(mValue, appliedX)
           })) {
             out.append(v)
           }
@@ -725,27 +720,25 @@ object Std {
 
       for (v <- a) {
         if (keyF.isInstanceOf[Val.False]) {
-          val mv = Materializer.apply(v.force)(ev)
+          val vf = v.force
           if (!b.exists(value => {
-            val mValue = Materializer.apply(value.force)(ev)
-            mValue == mv
+            ev.equal(value.force, vf)
           }) && !out.exists(value => {
-            val mValue = Materializer.apply(value.force)(ev)
-            mValue == mv
+            ev.equal(value.force, vf)
           })) {
             out.append(v)
           }
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
           val keyFApplyer = Applyer(keyFFunc, ev, null)
-          val appliedX = Materializer(keyFApplyer.apply(v))(ev)
+          val appliedX = keyFApplyer.apply(v)
 
           if (!b.exists(value => {
             val appliedValue = keyFApplyer.apply(value)
-            Materializer(appliedValue)(ev) == appliedX
+            ev.equal(appliedValue, appliedX)
           }) && !out.exists(value => {
             val mValue = keyFApplyer.apply(value)
-            Materializer(mValue)(ev) == appliedX
+            ev.equal(mValue, appliedX)
           })) {
             out.append(v)
           }
@@ -769,7 +762,7 @@ object Std {
         val appliedX = keyFApplyer.apply(x)
         arr.exists(value => {
           val appliedValue = keyFApplyer.apply(value)
-          Materializer(appliedValue)(ev) == Materializer(appliedX)(ev)
+          ev.equal(appliedValue, appliedX)
         })
       }
     },
@@ -975,9 +968,7 @@ object Std {
       if (out.isEmpty) {
         out.append(v)
       } else if (keyF.isInstanceOf[Val.False]) {
-        val ol = Materializer.apply(out.last.force)(ev)
-        val mv = Materializer.apply(v.force)(ev)
-        if (ol != mv) {
+        if (!ev.equal(out.last.force, v.force)) {
           out.append(v)
         }
       } else if (!keyF.isInstanceOf[Val.False]) {

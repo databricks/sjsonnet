@@ -348,7 +348,10 @@ trait EvalScope extends EvalErrorScope{
 
   def materialize(v: Val): ujson.Value
 
+  def equal(x: Val, y: Val): Boolean
+
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
+  val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
   val preserveOrder: Boolean = false
 }

@@ -312,14 +312,14 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
-        try Val.bool(pos, Materializer(l) == Materializer(r))
+        try Val.bool(pos, equal(l, r))
         catch Error.tryCatchWrap(pos)
 
       case (l, Expr.BinaryOp.`!=`, r) =>
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
-        try Val.bool(pos, Materializer(l) != Materializer(r))
+        try Val.bool(pos, !equal(l, r))
         catch Error.tryCatchWrap(pos)
 
       case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(pos, l + r)
@@ -547,5 +547,49 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       }))
     case Nil => scopes
   }
+
+  def equal(x: Val, y: Val): Boolean = {
+    def normalize(x: Val): Val = x match {
+      case f: Val.Func => f.apply(Evaluator.emptyStringArray, Evaluator.emptyLazyArray, "(memory)", emptyMaterializeFileScopePos)
+      case x => x
+    }
+    (normalize(x), normalize(y)) match {
+      case (Val.True(_), Val.True(_)) => true
+      case (Val.False(_), Val.False(_)) => true
+      case (Val.Null(_), Val.Null(_)) => true
+      case (Val.Num(_, n1), Val.Num(_, n2)) => n1 == n2
+      case (Val.Str(_, s1), Val.Str(_, s2)) => s1 == s2
+      case (Val.Arr(_, xs), Val.Arr(_, ys)) =>
+        if(xs.length != ys.length) return false
+        var i = 0
+        while(i < xs.length) {
+          if(!equal(xs(i).force, ys(i).force)) return false
+          i += 1
+        }
+        true
+      case (o1: Val.Obj, o2: Val.Obj) =>
+        val k1 = o1.getVisibleKeysNonHidden
+        val k2 = o2.getVisibleKeysNonHidden
+        if(k1.length != k2.length) return false
+        o1.triggerAllAsserts(o1)
+        o2.triggerAllAsserts(o2)
+        val k2s = k2.toSet
+        var i = 0
+        while(i < k1.length) {
+          val k = k1(i)
+          if(!k2s.contains(k)) return false
+          val v1 = o1.value(k, emptyMaterializeFileScopePos)
+          val v2 = o2.value(k, emptyMaterializeFileScopePos)
+          if(!equal(v1, v2)) return false
+          i += 1
+        }
+        true
+      case _ => false
+    }
+  }
 }
 
+object Evaluator {
+  val emptyStringArray = new Array[String](0)
+  val emptyLazyArray = new Array[Val.Lazy](0)
+}
