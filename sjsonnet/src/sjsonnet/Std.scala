@@ -262,9 +262,11 @@ object Std {
     builtin("isFunction", "v"){ (pos, ev, fs, v: Val) =>
       v.isInstanceOf[Val.Func]
     },
-    builtin("count", "arr", "x"){ (pos, ev, fs, arr: Val.Arr, x: Val) =>
-      arr.value.count{i => ev.equal(i.force, x) }
-    },
+    "count" -> Val.Func(null, null, Params.mk(("arr", null, 0), ("x", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(0).force, ev, fs)
+      val x = scope.bindings(1).force
+      Val.Num(pos, arr.value.count{ i => ev.equal(i.force, x) })
+    }),
     "filter" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
       val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
       val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
@@ -338,15 +340,21 @@ object Std {
         }
       )
     },
-    builtin("find", "value","arr"){ (pos, ev, fs, value: Val, arr: Val.Arr) =>
-      Val.Arr(
-        pos,
-        for (
-          (v, i) <- arr.value.zipWithIndex
-          if ev.equal(v.force, value)
-        ) yield (() => Val.Num(pos, i)): Val.Lazy
-      )
-    },
+    "find" -> Val.Func(null, null, Params.mk(("value", null, 0), ("arr", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val value = scope.bindings(0).force
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      val a = arr.value
+      val b = new mutable.ArrayBuilder.ofRef[Val.Lazy]
+      var i = 0
+      while(i < a.length) {
+        if(ev.equal(a(i).force, value)) {
+          val finalI = i
+          b.addOne(() => Val.Num(pos, finalI))
+        }
+        i += 1
+      }
+      Val.Arr(pos, b.result())
+    }),
     builtin("findSubstr", "pat", "str") { (pos, ev, fs, pat: String, str: String) =>
       if (pat.length == 0) Val.Arr(pos, emptyLazyArray)
       else {
@@ -364,12 +372,16 @@ object Std {
       val safeLength = math.min(len, s.length - safeOffset)
       s.substring(safeOffset, safeOffset + safeLength)
     },
-    builtin("startsWith", "a", "b"){ (pos, ev, fs, a: String, b: String) =>
-      a.startsWith(b)
-    },
-    builtin("endsWith", "a", "b"){ (pos, ev, fs, a: String, b: String) =>
-      a.endsWith(b)
-    },
+    "startsWith" -> Val.Func(null, null, Params.mk(("a", null, 0), ("b", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
+      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      Val.bool(pos, a.startsWith(b))
+    }),
+    "endsWith" -> Val.Func(null, null, Params.mk(("a", null, 0), ("b", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
+      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      Val.bool(pos, a.endsWith(b))
+    }),
     builtin("char", "n"){ (pos, ev, fs, n: Double) =>
       n.toInt.toChar.toString
     },
@@ -767,9 +779,25 @@ object Std {
       }
     },
 
-    builtin("split", "str", "c"){ (pos, ev, fs, str: String, c: String) =>
-      Val.Arr(pos, str.split(java.util.regex.Pattern.quote(c), -1).map(s => (() => Val.Str(pos, s)): Val.Lazy))
-    },
+    "split" -> Val.Func(null, null, Params.mk(("str", null, 0), ("c", null, 1)), { (scope, thisFile, ev, fs, pos) =>
+      val str = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
+      val cStr = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      if(cStr.length != 1) throw new Error.Delegate("std.split second parameter should have length 1, got "+cStr.length)
+      val c = cStr.charAt(0)
+      val b = new mutable.ArrayBuilder.ofRef[Val.Lazy]
+      var i = 0
+      var start = 0
+      while(i < str.length) {
+        if(str.charAt(i) == c) {
+          val finalStr = Val.Str(pos, str.substring(start, i))
+          b.addOne(() => finalStr)
+          start = i+1
+        }
+        i += 1
+      }
+      b.addOne(() => Val.Str(pos, str.substring(start, math.min(i, str.length))))
+      Val.Arr(pos, b.result())
+    }),
     builtin("splitLimit", "str", "c", "maxSplits"){ (pos, ev, fs, str: String, c: String, maxSplits: Int) =>
       Val.Arr(pos, str.split(java.util.regex.Pattern.quote(c), maxSplits + 1).map(s => (() => Val.Str(pos, s)): Val.Lazy))
     },
