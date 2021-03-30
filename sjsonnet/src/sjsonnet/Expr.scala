@@ -45,7 +45,6 @@ object Expr{
                      args: Params,
                      sep: Visibility,
                      rhs: Expr) extends Member
-    case class BindStmt(value: Bind) extends Member
     case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
@@ -106,7 +105,7 @@ object Expr{
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr
 
-  case class Bind(pos: Position, name: Int, args: Params, rhs: Expr)
+  case class Bind(pos: Position, name: Int, args: Params, rhs: Expr) extends Member
   case class Import(pos: Position, value: String) extends Expr
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
@@ -130,11 +129,11 @@ object Expr{
 
   sealed trait ObjBody
   object ObjBody{
-    case class MemberList(value: Array[Member]) extends ObjBody
-    case class ObjComp(preLocals: Array[Member.BindStmt],
+    case class MemberList(binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
+    case class ObjComp(preLocals: Array[Bind],
                        key: Expr,
                        value: Expr,
-                       postLocals: Array[Member.BindStmt],
+                       postLocals: Array[Bind],
                        first: ForSpec,
                        rest: List[CompSpec]) extends ObjBody
   }

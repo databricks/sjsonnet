@@ -301,15 +301,19 @@ class Parser(val currentFile: Path) {
     if (overlap == null) Pass(t)
     else Fail.opaque("no duplicate field: " + overlap)
   }.map{
-    case (exprs, None) => Expr.ObjBody.MemberList(exprs.toArray)
+    case (exprs, None) =>
+      val binds = exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+      val fields = exprs.iterator.filter(_.isInstanceOf[Expr.Member.Field]).asInstanceOf[Iterator[Expr.Member.Field]].toArray
+      val asserts = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
+      Expr.ObjBody.MemberList(if(binds.length != 0) binds else null, fields, if(asserts.length != 0) asserts else null)
     case (exprs, Some(comps)) =>
       val preLocals = exprs
-        .takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
-        .map(_.asInstanceOf[Expr.Member.BindStmt])
+        .takeWhile(_.isInstanceOf[Expr.Bind])
+        .map(_.asInstanceOf[Expr.Bind])
       val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, null, Visibility.Normal, rhs) =
         exprs(preLocals.length)
-      val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
-        .map(_.asInstanceOf[Expr.Member.BindStmt])
+      val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
+        .map(_.asInstanceOf[Expr.Bind])
       
       /* 
        * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
@@ -337,7 +341,7 @@ class Parser(val currentFile: Path) {
     case "::" => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
-  def objlocal[_: P] = P( "local" ~~ break ~/ bind ).map(Expr.Member.BindStmt)
+  def objlocal[_: P] = P( "local" ~~ break ~/ bind )
   def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   def forspec[_: P] =
     P( Pos ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)

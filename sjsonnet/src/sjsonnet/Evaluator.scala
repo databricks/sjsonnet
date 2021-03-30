@@ -415,26 +415,26 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
   }
 
   def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope): Val.Obj = b match{
-    case ObjBody.MemberList(value) =>
-      val binds = value.collect{case Member.BindStmt(b) => b}
+    case ObjBody.MemberList(binds, fields, asserts) =>
+
       var asserting: Boolean = false
-      def assertions(self: Val.Obj) = if (!asserting) {
+      def assertions(self: Val.Obj): Unit = if (!asserting) {
         asserting = true
         val newScope: ValScope = makeNewScope(self, self.getSuper)
-
-        value.collect {
-          case Member.AssertStmt(value, msg) =>
-
-            if (!visitExpr(value)(newScope).isInstanceOf[Val.True]) {
-              msg match{
-                case null => Error.fail("Assertion failed", value.pos)
-                case msg =>
-                  Error.fail(
-                    "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
-                    value.pos
-                  )
-              }
+        var i = 0
+        while(i < asserts.length) {
+          val a = asserts(i)
+          if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
+            a.msg match {
+              case null => Error.fail("Assertion failed", a.value.pos)
+              case msg =>
+                Error.fail(
+                  "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
+                  a.value.pos
+                )
             }
+          }
+          i += 1
         }
       }
 
@@ -449,39 +449,34 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       }
 
       lazy val newBindings =
-        visitBindings(binds, (self, sup) => makeNewScope(self, sup))
+        if(binds == null) null
+        else visitBindings(binds, (self, sup) => makeNewScope(self, sup))
 
-      lazy val newSelf: Val.Obj = {
-        val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-        value.foreach {
-          case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
-            val k = visitFieldName(fieldName, offset)
-            if(k != null) {
-              val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-                assertions(self)
-                visitExpr(rhs)(makeNewScope(self, sup))
-              })
-              builder.put(k, v)
-            }
-          case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
-            val k = visitFieldName(fieldName, offset)
-            if(k != null) {
-              val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-                assertions(self)
-                visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-              })
-              builder.put(k, v)
-            }
-          case _: Member.BindStmt => // do nothing
-          case _: Member.AssertStmt => // do nothing
-        }
-
-        new Val.Obj(pos, builder, assertions, null)
+      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      fields.foreach {
+        case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
+          val k = visitFieldName(fieldName, offset)
+          if(k != null) {
+            val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+              if(asserts != null) assertions(self)
+              visitExpr(rhs)(makeNewScope(self, sup))
+            })
+            builder.put(k, v)
+          }
+        case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
+          val k = visitFieldName(fieldName, offset)
+          if(k != null) {
+            val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+              if(asserts != null) assertions(self)
+              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+            })
+            builder.put(k, v)
+          }
       }
-      newSelf
+      new Val.Obj(pos, builder, if(asserts != null) assertions else null, null)
 
     case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
-      val binds = (preLocals.iterator ++ postLocals).collect{ case Member.BindStmt(b) => b}.toArray
+      val binds = preLocals ++ postLocals
       lazy val compScope: ValScope = scope.extend(
         newSuper = null
       )
