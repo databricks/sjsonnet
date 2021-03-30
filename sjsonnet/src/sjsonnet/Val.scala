@@ -204,12 +204,13 @@ object Val{
         case null =>
           if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
         case m =>
+          val vv = m.invoke(self, s, pos.fileScope, evaluator)
           val v = if(s != null && m.add) {
             s.valueRaw(k, self, pos, null, null) match {
-              case null => m.invoke(self, s, pos.fileScope, evaluator)
-              case supValue => mergeMember(supValue, m.invoke(self, s, pos.fileScope, evaluator), pos)
+              case null => vv
+              case supValue => mergeMember(supValue, vv, pos)
             }
-          } else m.invoke(self, s, pos.fileScope, evaluator)
+          } else vv
           if(addTo != null && m.cached) addTo(addKey) = v
           v
       }
