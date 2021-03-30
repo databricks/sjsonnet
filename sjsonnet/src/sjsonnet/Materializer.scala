@@ -12,7 +12,7 @@ import scala.collection.mutable
   * to `String`s
   */
 object Materializer {
-  private val dummyPos: Position = new Position(null, 0)
+  //private val dummyPos: Position = new Position(null, 0)
 
   def apply(v: Val, storePos: Position => Unit = _ => ())(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
@@ -72,7 +72,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, "(memory)", new Position(evaluator.emptyMaterializeFileScope, -1)),
+          f.apply(emptyStringArray, emptyLazyArray, new Position(evaluator.emptyMaterializeFileScope, -1)),
           visitor,
           storePos
         )
@@ -100,18 +100,18 @@ object Materializer {
       new Val.Obj(pos, builder, null, null)
   }
 
-  def toExpr(v: ujson.Value): Expr = v match{
-    case ujson.True => Val.True(dummyPos)
-    case ujson.False => Val.False(dummyPos)
-    case ujson.Null => Val.Null(dummyPos)
-    case ujson.Num(n) => Val.Num(dummyPos, n)
-    case ujson.Str(s) => Val.Str(dummyPos, s)
-    case ujson.Arr(xs) => Expr.Arr(dummyPos, xs.map(toExpr).toArray[Expr])
+  def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match{
+    case ujson.True => Val.True(ev.emptyMaterializeFileScopePos)
+    case ujson.False => Val.False(ev.emptyMaterializeFileScopePos)
+    case ujson.Null => Val.Null(ev.emptyMaterializeFileScopePos)
+    case ujson.Num(n) => Val.Num(ev.emptyMaterializeFileScopePos, n)
+    case ujson.Str(s) => Val.Str(ev.emptyMaterializeFileScopePos, s)
+    case ujson.Arr(xs) => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
-      Expr.Obj(dummyPos,
+      Expr.Obj(ev.emptyMaterializeFileScopePos,
         ObjBody.MemberList(
           for((k, v) <- kvs.toArray)
-          yield Member.Field(dummyPos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v))
+          yield Member.Field(ev.emptyMaterializeFileScopePos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v))
         )
       )
   }

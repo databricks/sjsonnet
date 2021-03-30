@@ -61,7 +61,7 @@ class Interpreter(parseCache: collection.mutable.HashMap[String, fastparse.Parse
           var i = 0
           while(i < defaults2.length) {
             tlaVars.get(f.params.names(i)) match {
-              case Some(v) => defaults2(i) = Materializer.toExpr(v)
+              case Some(v) => defaults2(i) = Materializer.toExpr(v)(evaluator)
               case None =>
             }
             i += 1

@@ -185,7 +185,6 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
 
     try lhs.cast[Val.Func].apply(
       argNames, arr,
-      pos.fileScope.currentFileLastPathElement,
       pos
     )
     catch Error.tryCatchWrap(pos)
@@ -394,7 +393,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       outerPos,
       scope,
       params,
-      (s, _, _, fs, _) => visitExpr(rhs)(s),
+      (s, _, fs, _) => visitExpr(rhs)(s),
       (default, s, e) => visitExpr(default)(s)
     )
   }
@@ -550,7 +549,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
 
   def equal(x: Val, y: Val): Boolean = {
     def normalize(x: Val): Val = x match {
-      case f: Val.Func => f.apply(Evaluator.emptyStringArray, Evaluator.emptyLazyArray, "(memory)", emptyMaterializeFileScopePos)
+      case f: Val.Func => f.apply(Evaluator.emptyStringArray, Evaluator.emptyLazyArray, emptyMaterializeFileScopePos)
       case x => x
     }
     (normalize(x), normalize(y)) match {

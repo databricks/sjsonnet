@@ -435,7 +435,3 @@ class FileScope(val currentFile: Path,
 
   val noOffsetPos: Position = new Position(this, -1)
 }
-
-object FileScope {
-  val nullFileScope = new FileScope(null, Map.empty)
-}

@@ -219,13 +219,12 @@ object Val{
   case class Func(pos: Position,
                   defSiteValScope: ValScope,
                   params: Params,
-                  evalRhs: (ValScope, String, EvalScope, FileScope, Position) => Val,
+                  evalRhs: (ValScope, EvalScope, FileScope, Position) => Val,
                   evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val {
 
     def prettyName = "function"
 
     def apply(argNames: Array[String], argVals: Array[Lazy],
-              thisFile: String,
               outerPos: Position)
              (implicit evaluator: EvalScope) = {
 
@@ -254,7 +253,6 @@ object Val{
         )
       } else params.indices // Don't cut down to size to avoid copying. The correct size is argVals.length!
 
-      val defaultArgsBindingIndices = params.defaultsOnlyIndices
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
 
       val newScope: ValScope = {
@@ -264,6 +262,7 @@ object Val{
             case s => s.extendSimple(passedArgsBindingsI, argVals)
           }
         } else {
+          val defaultArgsBindingIndices = params.defaultsOnlyIndices
           lazy val newScope: ValScope = {
             val defaultArgsBindings = new Array[Lazy](params.defaultsOnly.length)
             var idx = 0
@@ -282,7 +281,7 @@ object Val{
         }
       }
 
-      evalRhs(newScope, thisFile, evaluator, funDefFileScope, outerPos)
+      evalRhs(newScope, evaluator, funDefFileScope, outerPos)
     }
 
     def validateFunctionCall(passedArgsBindingsI: Array[Int],
