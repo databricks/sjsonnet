@@ -81,7 +81,8 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       case Id(pos, value) => visitId(pos, value)
 
       case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
-      case Obj(pos, value) => visitObjBody(pos, value)
+      case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, binds, fields, asserts)
+      case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest)
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
@@ -117,14 +118,18 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         if(strict && isObjLiteral(value))
           Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
         val original = visitExpr(value).cast[Val.Obj]
-        val extension = visitObjBody(pos, ext)
+        val extension = ext match {
+          case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, binds, fields, asserts)
+          case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest)
+        }
         extension.addSuper(pos, original)
       }
     }
   } catch Error.tryCatch(expr.pos)
 
   private def isObjLiteral(expr: Expr): Boolean = expr match {
-    case _: Obj => true
+    case _: ObjBody.MemberList => true
+    case _: ObjBody.ObjComp => true
     case _: ObjExtend => true
     case _ => false
   }
@@ -418,105 +423,104 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     arrF
   }
 
-  def visitObjBody(pos: Position, b: ObjBody)(implicit scope: ValScope): Val.Obj = b match{
-    case ObjBody.MemberList(binds, fields, asserts) =>
-
-      var asserting: Boolean = false
-      def assertions(self: Val.Obj): Unit = if (!asserting) {
-        asserting = true
-        val newScope: ValScope = makeNewScope(self, self.getSuper)
-        var i = 0
-        while(i < asserts.length) {
-          val a = asserts(i)
-          if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
-            a.msg match {
-              case null => Error.fail("Assertion failed", a.value.pos)
-              case msg =>
-                Error.fail(
-                  "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
-                  a.value.pos
-                )
-            }
+  def visitMemberList(pos: Position, binds: Array[Bind], fields: Array[Expr.Member.Field], asserts: Array[Expr.Member.AssertStmt])(implicit scope: ValScope): Val.Obj = {
+    var asserting: Boolean = false
+    def assertions(self: Val.Obj): Unit = if (!asserting) {
+      asserting = true
+      val newScope: ValScope = makeNewScope(self, self.getSuper)
+      var i = 0
+      while(i < asserts.length) {
+        val a = asserts(i)
+        if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
+          a.msg match {
+            case null => Error.fail("Assertion failed", a.value.pos)
+            case msg =>
+              Error.fail(
+                "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
+                a.value.pos
+              )
           }
-          i += 1
         }
+        i += 1
       }
+    }
 
-      def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
-        scope.extend(
+    def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
+      scope.extend(
+        binds,
+        newBindings,
+        newDollar = if(scope.dollar0 != null) scope.dollar0 else self,
+        newSelf = self,
+        newSuper = sup
+      )
+    }
+
+    lazy val newBindings =
+      if(binds == null) null
+      else visitBindings(binds, (self, sup) => makeNewScope(self, sup))
+
+    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    fields.foreach {
+      case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
+        val k = visitFieldName(fieldName, offset)
+        if(k != null) {
+          val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+            if(asserts != null) assertions(self)
+            visitExpr(rhs)(makeNewScope(self, sup))
+          })
+          builder.put(k, v)
+        }
+      case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
+        val k = visitFieldName(fieldName, offset)
+        if(k != null) {
+          val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
+            if(asserts != null) assertions(self)
+            visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+          })
+          builder.put(k, v)
+        }
+    }
+    new Val.Obj(pos, builder, if(asserts != null) assertions else null, null)
+  }
+
+  def visitObjComp(pos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec])(implicit scope: ValScope): Val.Obj = {
+    val binds = preLocals ++ postLocals
+    lazy val compScope: ValScope = scope.extend(
+      newSuper = null
+    )
+
+    lazy val newSelf: Val.Obj = {
+      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      for(s <- visitComp(first :: rest, Array(compScope))){
+        lazy val newScope: ValScope = s.extend(
           binds,
           newBindings,
-          newDollar = if(scope.dollar0 != null) scope.dollar0 else self,
-          newSelf = self,
-          newSuper = sup
+          newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
+          newSelf = newSelf,
+          newSuper = null
         )
-      }
 
-      lazy val newBindings =
-        if(binds == null) null
-        else visitBindings(binds, (self, sup) => makeNewScope(self, sup))
+        lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
 
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-      fields.foreach {
-        case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
-          val k = visitFieldName(fieldName, offset)
-          if(k != null) {
-            val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-              if(asserts != null) assertions(self)
-              visitExpr(rhs)(makeNewScope(self, sup))
-            })
-            builder.put(k, v)
-          }
-        case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
-          val k = visitFieldName(fieldName, offset)
-          if(k != null) {
-            val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-              if(asserts != null) assertions(self)
-              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-            })
-            builder.put(k, v)
-          }
-      }
-      new Val.Obj(pos, builder, if(asserts != null) assertions else null, null)
-
-    case ObjBody.ObjComp(preLocals, key, value, postLocals, first, rest) =>
-      val binds = preLocals ++ postLocals
-      lazy val compScope: ValScope = scope.extend(
-        newSuper = null
-      )
-
-      lazy val newSelf: Val.Obj = {
-        val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-        for(s <- visitComp(first :: rest, Array(compScope))){
-          lazy val newScope: ValScope = s.extend(
-            binds,
-            newBindings,
-            newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
-            newSelf = newSelf,
-            newSuper = null
-          )
-
-          lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
-
-          visitExpr(key)(s) match {
-            case Val.Str(_, k) =>
-              builder.put(k, Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
-                visitExpr(value)(
-                  s.extend(
-                    binds,
-                    newBindings,
-                    newDollar = if(s.dollar0 != null) s.dollar0 else self,
-                    newSelf = self,
-                  )
+        visitExpr(key)(s) match {
+          case Val.Str(_, k) =>
+            builder.put(k, Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
+              visitExpr(value)(
+                s.extend(
+                  binds,
+                  newBindings,
+                  newDollar = if(s.dollar0 != null) s.dollar0 else self,
+                  newSelf = self,
                 )
-              ))
-            case Val.Null(_) => // do nothing
-          }
+              )
+            ))
+          case Val.Null(_) => // do nothing
         }
-        new Val.Obj(pos, builder, null, null)
       }
+      new Val.Obj(pos, builder, null, null)
+    }
 
-      newSelf
+    newSelf
   }
 
   def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{

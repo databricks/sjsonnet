@@ -21,7 +21,6 @@ object Expr{
 
   case class Id(pos: Position, value: Int) extends Expr
   case class Arr(pos: Position, value: Array[Expr]) extends Expr
-  case class Obj(pos: Position, value: ObjBody) extends Expr
 
   sealed trait FieldName
 
@@ -127,10 +126,11 @@ object Expr{
   case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
   case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
 
-  sealed trait ObjBody
+  sealed abstract class ObjBody extends Expr
   object ObjBody{
-    case class MemberList(binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
-    case class ObjComp(preLocals: Array[Bind],
+    case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
+    case class ObjComp(pos: Position,
+                       preLocals: Array[Bind],
                        key: Expr,
                        value: Expr,
                        postLocals: Array[Bind],

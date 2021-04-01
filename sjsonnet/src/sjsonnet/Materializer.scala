@@ -108,13 +108,12 @@ object Materializer {
     case ujson.Str(s) => Val.Str(ev.emptyMaterializeFileScopePos, s)
     case ujson.Arr(xs) => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
-      Expr.Obj(ev.emptyMaterializeFileScopePos,
-        ObjBody.MemberList(
-          null,
-          for((k, v) <- kvs.toArray)
-            yield Member.Field(ev.emptyMaterializeFileScopePos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v)),
-          null
-        )
+      ObjBody.MemberList(
+        ev.emptyMaterializeFileScopePos,
+        null,
+        for((k, v) <- kvs.toArray)
+          yield Member.Field(ev.emptyMaterializeFileScopePos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v)),
+        null
       )
   }
 
