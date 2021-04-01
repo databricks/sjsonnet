@@ -106,8 +106,8 @@ object Val{
 
     def prettyName = "object"
 
-    private def gatherVisibleKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
-      if(`super` != null) `super`.gatherVisibleKeys(mapping)
+    private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
+      if(`super` != null) `super`.gatherKeys(mapping)
       value0.forEach { (k, m) =>
         val vis = m.visibility
         if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
@@ -116,33 +116,23 @@ object Val{
       }
     }
 
-    lazy val visibleKeys = {
+    private lazy val allKeys = {
       val m = new util.LinkedHashMap[String, java.lang.Boolean]
-      gatherVisibleKeys(m)
+      gatherKeys(m)
       m
     }
 
-    def getVisibleKeyNamesArray = visibleKeys.keySet().toArray(new Array[String](visibleKeys.size()))
+    @inline def hasKeys = !allKeys.isEmpty
 
-    def getVisibleKeysNonHiddenCount = {
-      var c = 0
-      visibleKeys.values().forEach(b => if(b == java.lang.Boolean.FALSE) c += 1)
-      c
-    }
+    @inline def containsKey(k: String): Boolean = allKeys.containsKey(k)
 
-    def getVisibleKeys: Array[(String, java.lang.Boolean)] = {
-      val a = new Array[(String, java.lang.Boolean)](visibleKeys.size())
-      var i = 0
-      visibleKeys.forEach { (k, b) =>
-        a(i) = (k, b)
-        i += 1
-      }
-      a
-    }
+    @inline def containsVisibleKey(k: String): Boolean = allKeys.get(k) == java.lang.Boolean.FALSE
 
-    def getVisibleKeysNonHidden: Array[String] = {
+    lazy val allKeyNames: Array[String] = allKeys.keySet().toArray(new Array[String](allKeys.size()))
+
+    lazy val visibleKeyNames: Array[String] = {
       val buf = mutable.ArrayBuilder.make[String]
-      visibleKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
+      allKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
       buf.result()
     }
 

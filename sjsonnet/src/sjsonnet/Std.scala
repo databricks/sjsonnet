@@ -47,7 +47,7 @@ object Std {
       Val.Num(pos, x match{
         case Val.Str(_, s) => s.length
         case Val.Arr(_, s) => s.length
-        case o: Val.Obj => o.getVisibleKeysNonHiddenCount
+        case o: Val.Obj => o.visibleKeyNames.length
         case o: Val.Func => o.params.names.length
         case _ => throw new Error.Delegate("Cannot get length of " + x.prettyName)
       })
@@ -55,12 +55,12 @@ object Std {
     "objectHas" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, ev, fs, pos) =>
       val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
       val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
-      Val.bool(pos, o.visibleKeys.get(f) == java.lang.Boolean.FALSE)
+      Val.bool(pos, o.containsVisibleKey(f))
     }),
     "objectHasAll" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, ev, fs, pos) =>
       val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
       val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
-      Val.bool(pos, o.visibleKeys.containsKey(f))
+      Val.bool(pos, o.containsKey(f))
     }),
     builtin("objectFields", "o"){ (pos, ev, fs, v1: Val.Obj) =>
       val keys = getVisibleKeys(ev, v1)
@@ -134,7 +134,7 @@ object Std {
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
-            k <- (l.getVisibleKeysNonHidden ++ r.getVisibleKeysNonHidden).distinct
+            k <- (l.visibleKeyNames ++ r.visibleKeyNames).distinct
             val lValue = Option(l.valueRaw(k, l, pos)(ev))
             val rValue = Option(r.valueRaw(k, r, pos)(ev))
             if !rValue.exists(_.isInstanceOf[Val.Null])
@@ -151,7 +151,7 @@ object Std {
       def recSingle(v: Val): Val  = v match{
         case obj: Val.Obj =>
           val kvs = for{
-            k <- obj.getVisibleKeysNonHidden
+            k <- obj.visibleKeyNames
             val value = obj.value(k, pos, obj)(ev)
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
@@ -278,7 +278,7 @@ object Std {
       Val.Arr(pos, arr.value.map(v => (() => func.apply(v)): Val.Lazy))
     }),
     builtin("mapWithKey", "func", "obj"){ (pos, ev, fs, func: Applyer, obj: Val.Obj) =>
-      val allKeys = obj.getVisibleKeyNamesArray
+      val allKeys = obj.allKeyNames
       Val.Obj.mk(
         pos,
         allKeys.map{ k =>
@@ -841,14 +841,14 @@ object Std {
     builtin("prune", "x"){ (pos, ev, fs, s: Val) =>
       def filter(x: Val) = x match{
         case c: Val.Arr if c.value.isEmpty => false
-        case c: Val.Obj if c.getVisibleKeysNonHiddenCount == 0 => false
+        case c: Val.Obj if c.visibleKeyNames.length == 0 => false
         case Val.Null(_) => false
         case _ => true
       }
       def rec(x: Val): Val = x match{
         case o: Val.Obj =>
           val bindings = for{
-            k <- o.getVisibleKeysNonHidden
+            k <- o.visibleKeyNames
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
@@ -1065,12 +1065,12 @@ object Std {
   }
   
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
-    maybeSortKeys(ev, v1.getVisibleKeysNonHidden)
+    maybeSortKeys(ev, v1.visibleKeyNames)
 
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
-    maybeSortKeys(ev, v1.getVisibleKeyNamesArray)
+    maybeSortKeys(ev, v1.allKeyNames)
   
-  def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] = {
+  @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] = {
     if(ev.preserveOrder) {
       keys
     } else {

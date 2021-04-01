@@ -43,7 +43,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         if(scope.super0 == null) Val.False(pos)
         else {
           val key = visitExpr(lhs).cast[Val.Str]
-          Val.bool(pos, scope.super0.visibleKeys.containsKey(key.value))
+          Val.bool(pos, scope.super0.containsKey(key.value))
         }
 
       case BinaryOp(pos, lhs, Expr.BinaryOp.`&&`, rhs) =>
@@ -370,7 +370,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
 
       case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
 
-      case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.visibleKeys.containsKey(l))
+      case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.containsKey(l))
 
       case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
 
@@ -570,8 +570,8 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         }
         true
       case (o1: Val.Obj, o2: Val.Obj) =>
-        val k1 = o1.getVisibleKeysNonHidden
-        val k2 = o2.getVisibleKeysNonHidden
+        val k1 = o1.visibleKeyNames
+        val k2 = o2.visibleKeyNames
         if(k1.length != k2.length) return false
         o1.triggerAllAsserts(o1)
         o2.triggerAllAsserts(o2)

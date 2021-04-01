@@ -42,31 +42,28 @@ object Materializer {
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
 
-        val keysUnsorted = obj.getVisibleKeys
-        val keys = if (!evaluator.preserveOrder) keysUnsorted.sortBy(_._1) else keysUnsorted
+        val keysUnsorted = obj.visibleKeyNames
+        val keys = if (!evaluator.preserveOrder) keysUnsorted.sorted else keysUnsorted
         val objVisitor = visitor.visitObject(keys.length , -1)
 
-        for(t <- keys) {
-          val (k, hidden) = t
-          if (!hidden){
-            val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope, -1))
+        for(k <- keys) {
+          val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope, -1))
 
-            storePos(
-              value match{
-                case v: Val.Obj if !v.visibleKeys.isEmpty => value.pos
-                case v: Val.Arr if v.value.nonEmpty => value.pos
-                case _ => null
-              }
-            )
-            objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
+          storePos(
+            value match{
+              case v: Val.Obj if v.hasKeys => value.pos
+              case v: Val.Arr if v.value.nonEmpty => value.pos
+              case _ => null
+            }
+          )
+          objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
 
 
 
-            objVisitor.visitValue(
-              apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
-              -1
-            )
-          }
+          objVisitor.visitValue(
+            apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
+            -1
+          )
         }
         objVisitor.visitEnd(-1)
 
