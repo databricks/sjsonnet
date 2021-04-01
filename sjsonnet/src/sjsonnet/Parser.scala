@@ -152,7 +152,7 @@ class Parser(val currentFile: Path) {
     P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)) ).map(Expr.IfElse.tupled)
 
   def localExpr[_: P]: P[Expr] =
-    P( Pos ~~ bind.rep(min=1, sep = ","./).map(_.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
   def expr[_: P]: P[Expr] =
     P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>

@@ -89,11 +89,15 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         visitAssert(pos, value, msg, returned)
 
       case LocalExpr(pos, bindings, returned) =>
-        lazy val newScope: ValScope = {
-          val f = visitBindings(bindings, (self, sup) => newScope)
-          scope.extend(bindings, f)
-        }
-        visitExpr(returned)(newScope)
+        val s =
+          if(bindings == null) scope else {
+            lazy val newScope: ValScope = {
+              val f = visitBindings(bindings, (self, sup) => newScope)
+              scope.extend(bindings, f)
+            }
+            newScope
+          }
+        visitExpr(returned)(s)
 
       case Import(pos, value) => visitImport(pos, value)
       case ImportStr(pos, value) => visitImportStr(pos, value)
