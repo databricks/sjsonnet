@@ -550,15 +550,15 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     case Nil => scopes
   }
 
-  def equal(x: Val, y: Val): Boolean = {
+  def equal(x: Val, y: Val): Boolean = (x eq y) || {
     def normalize(x: Val): Val = x match {
       case f: Val.Func => f.apply(Evaluator.emptyStringArray, Evaluator.emptyLazyArray, emptyMaterializeFileScopePos)
       case x => x
     }
     (normalize(x), normalize(y)) match {
-      case (Val.True(_), Val.True(_)) => true
-      case (Val.False(_), Val.False(_)) => true
-      case (Val.Null(_), Val.Null(_)) => true
+      case (Val.True(_), y) => y.isInstanceOf[Val.True]
+      case (Val.False(_), y) => y.isInstanceOf[Val.False]
+      case (Val.Null(_), y) => y.isInstanceOf[Val.Null]
       case (Val.Num(_, n1), Val.Num(_, n2)) => n1 == n2
       case (Val.Str(_, s1), Val.Str(_, s2)) => s1 == s2
       case (Val.Arr(_, xs), Val.Arr(_, ys)) =>
@@ -575,11 +575,10 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         if(k1.length != k2.length) return false
         o1.triggerAllAsserts(o1)
         o2.triggerAllAsserts(o2)
-        val k2s = k2.toSet
         var i = 0
         while(i < k1.length) {
           val k = k1(i)
-          if(!k2s.contains(k)) return false
+          if(!o2.containsKey(k)) return false
           val v1 = o1.value(k, emptyMaterializeFileScopePos)
           val v2 = o2.value(k, emptyMaterializeFileScopePos)
           if(!equal(v1, v2)) return false
