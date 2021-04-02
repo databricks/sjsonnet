@@ -47,7 +47,7 @@ object Materializer {
         val objVisitor = visitor.visitObject(keys.length , -1)
 
         for(k <- keys) {
-          val value = obj.value(k, new Position(evaluator.emptyMaterializeFileScope, -1))
+          val value = obj.value(k, evaluator.emptyMaterializeFileScopePos)
 
           storePos(
             value match{
@@ -69,7 +69,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, new Position(evaluator.emptyMaterializeFileScope, -1)),
+          f.apply(emptyStringArray, emptyLazyArray, evaluator.emptyMaterializeFileScopePos),
           visitor,
           storePos
         )

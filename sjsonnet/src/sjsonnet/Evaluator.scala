@@ -81,8 +81,8 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       case Id(pos, value) => visitId(pos, value)
 
       case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
-      case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, binds, fields, asserts)
-      case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest)
+      case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, pos, binds, fields, asserts, null)
+      case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest, null)
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
@@ -114,15 +114,14 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
       case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
       case Comp(pos, value, first, rest) =>
         Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
-      case ObjExtend(pos, value, ext) => {
+      case ObjExtend(superPos, value, ext) => {
         if(strict && isObjLiteral(value))
-          Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", pos)
+          Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", superPos)
         val original = visitExpr(value).cast[Val.Obj]
-        val extension = ext match {
-          case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, binds, fields, asserts)
-          case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest)
+        ext match {
+          case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, superPos, binds, fields, asserts, original)
+          case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(superPos, preLocals, key, value, postLocals, first, rest, original)
         }
-        extension.addSuper(pos, original)
       }
     }
   } catch Error.tryCatch(expr.pos)
@@ -423,7 +422,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     arrF
   }
 
-  def visitMemberList(pos: Position, binds: Array[Bind], fields: Array[Expr.Member.Field], asserts: Array[Expr.Member.AssertStmt])(implicit scope: ValScope): Val.Obj = {
+  def visitMemberList(pos: Position, objPos: Position, binds: Array[Bind], fields: Array[Expr.Member.Field], asserts: Array[Expr.Member.AssertStmt], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     var asserting: Boolean = false
     def assertions(self: Val.Obj): Unit = if (!asserting) {
       asserting = true
@@ -480,10 +479,10 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
           builder.put(k, v)
         }
     }
-    new Val.Obj(pos, builder, if(asserts != null) assertions else null, null)
+    new Val.Obj(objPos, builder, if(asserts != null) assertions else null, sup)
   }
 
-  def visitObjComp(pos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec])(implicit scope: ValScope): Val.Obj = {
+  def visitObjComp(objPos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = preLocals ++ postLocals
     lazy val compScope: ValScope = scope.extend(
       newSuper = null
@@ -517,7 +516,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
           case Val.Null(_) => // do nothing
         }
       }
-      new Val.Obj(pos, builder, null, null)
+      new Val.Obj(objPos, builder, null, sup)
     }
 
     newSelf
