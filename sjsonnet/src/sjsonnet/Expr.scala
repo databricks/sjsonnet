@@ -43,7 +43,9 @@ object Expr{
                      plus: Boolean,
                      args: Params,
                      sep: Visibility,
-                     rhs: Expr) extends Member
+                     rhs: Expr) extends Member {
+      def isStatic = fieldName.isInstanceOf[FieldName.Fixed] && !plus && args == null && sep == Visibility.Normal && rhs.isInstanceOf[Val.Literal]
+    }
     case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
@@ -126,7 +128,7 @@ object Expr{
   case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
   case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
 
-  sealed abstract class ObjBody extends Expr
+  trait ObjBody extends Expr
   object ObjBody{
     case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
     case class ObjComp(pos: Position,

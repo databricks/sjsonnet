@@ -94,7 +94,7 @@ object Materializer {
         )
         builder.put(x._1, v)
       }
-      new Val.Obj(pos, builder, null, null)
+      new Val.Obj(pos, builder, false, null, null)
   }
 
   def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match{

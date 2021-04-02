@@ -301,10 +301,17 @@ class Parser(val currentFile: Path) {
     else Fail.opaque("no duplicate field: " + overlap)
   }.map{
     case (pos, exprs, None) =>
-      val binds = exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+      val binds = {
+        val b = exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+        if(b.isEmpty) null else b
+      }
       val fields = exprs.iterator.filter(_.isInstanceOf[Expr.Member.Field]).asInstanceOf[Iterator[Expr.Member.Field]].toArray
-      val asserts = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
-      Expr.ObjBody.MemberList(pos, if(binds.length != 0) binds else null, fields, if(asserts.length != 0) asserts else null)
+      val asserts = {
+        val a = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
+        if(a.isEmpty) null else a
+      }
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+      else Expr.ObjBody.MemberList(pos, binds, fields, asserts)
     case (pos, exprs, Some(comps)) =>
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])

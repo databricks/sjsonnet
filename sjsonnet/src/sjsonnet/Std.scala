@@ -830,7 +830,7 @@ object Std {
             valueMap.foreach { case (k, v) =>
               m.put(k, Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v)))
             }
-            new Val.Obj(pos, m, null, null)
+            new Val.Obj(pos, m, false, null, null)
         }
       }
       recursiveTransform(ujson.read(str))

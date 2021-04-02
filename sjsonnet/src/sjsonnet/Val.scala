@@ -72,6 +72,7 @@ object Val{
   case class Arr(pos: Position, value: Array[Lazy]) extends Val{
     def prettyName = "array"
   }
+
   object Obj{
 
     case class Member(add: Boolean,
@@ -82,15 +83,31 @@ object Val{
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
       val m = new util.LinkedHashMap[String, Obj.Member]()
       for((k, v) <- members) m.put(k, v)
-      new Obj(pos, m, null, null)
+      new Obj(pos, m, false, null, null)
     }
   }
+
   final class Obj(val pos: Position,
-                  value0: util.LinkedHashMap[String, Obj.Member],
+                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
+                  static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
-                  `super`: Obj) extends Val{
+                  `super`: Obj,
+                  valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
+                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
 
     def getSuper = `super`
+
+    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+      if(value0 == null) {
+        value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        allKeys.forEach { (k, _) =>
+          val v = valueCache(k)
+          val m = Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) => v)
+          value0.put(k, m)
+        }
+      }
+      value0
+    }
 
     @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
       if(triggerAsserts != null) triggerAsserts(obj)
@@ -99,8 +116,8 @@ object Val{
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case null => new Val.Obj(pos, value0, null, lhs)
-        case x => new Val.Obj(pos, value0, null, x.addSuper(pos, lhs))
+        case null => new Val.Obj(pos, getValue0, false, null, lhs)
+        case x => new Val.Obj(pos, getValue0, false, null, x.addSuper(pos, lhs))
       }
     }
 
@@ -108,7 +125,7 @@ object Val{
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if(`super` != null) `super`.gatherKeys(mapping)
-      value0.forEach { (k, m) =>
+      getValue0.forEach { (k, m) =>
         val vis = m.visibility
         if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
         else if(vis == Visibility.Hidden) mapping.put(k, true)
@@ -116,27 +133,27 @@ object Val{
       }
     }
 
-    private lazy val allKeys = {
-      val m = new util.LinkedHashMap[String, java.lang.Boolean]
-      gatherKeys(m)
-      m
+    private def getAllKeys = {
+      if(allKeys == null) {
+        allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+        gatherKeys(allKeys)
+      }
+      allKeys
     }
 
-    @inline def hasKeys = !allKeys.isEmpty
+    @inline def hasKeys = !getAllKeys.isEmpty
 
-    @inline def containsKey(k: String): Boolean = allKeys.containsKey(k)
+    @inline def containsKey(k: String): Boolean = getAllKeys.containsKey(k)
 
-    @inline def containsVisibleKey(k: String): Boolean = allKeys.get(k) == java.lang.Boolean.FALSE
+    @inline def containsVisibleKey(k: String): Boolean = getAllKeys.get(k) == java.lang.Boolean.FALSE
 
-    lazy val allKeyNames: Array[String] = allKeys.keySet().toArray(new Array[String](allKeys.size()))
+    lazy val allKeyNames: Array[String] = getAllKeys.keySet().toArray(new Array[String](getAllKeys.size()))
 
-    lazy val visibleKeyNames: Array[String] = {
+    lazy val visibleKeyNames: Array[String] = if(static) allKeyNames else {
       val buf = mutable.ArrayBuilder.make[String]
-      allKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
+      getAllKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
       buf.result()
     }
-
-    private[this] val valueCache = mutable.HashMap.empty[Any, Val]
 
     def value(k: String,
               pos: Position,
@@ -190,7 +207,7 @@ object Val{
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
       val s = this.`super`
-      this.value0.get(k) match{
+      getValue0.get(k) match{
         case null =>
           if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
         case m =>
@@ -205,6 +222,17 @@ object Val{
           v
       }
     }
+  }
+
+  def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
+    val cache = mutable.HashMap.empty[Any, Val]
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    fields.foreach {
+      case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
+        cache.put(k, rhs)
+        allKeys.put(k, false)
+    }
+    new Val.Obj(pos, null, true, null, null, cache, allKeys)
   }
 
   case class Func(pos: Position,

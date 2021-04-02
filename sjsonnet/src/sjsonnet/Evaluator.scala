@@ -121,6 +121,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
         ext match {
           case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, superPos, binds, fields, asserts, original)
           case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(superPos, preLocals, key, value, postLocals, first, rest, original)
+          case o: Val.Obj => o.addSuper(superPos, original)
         }
       }
     }
@@ -130,6 +131,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
     case _: ObjBody.MemberList => true
     case _: ObjBody.ObjComp => true
     case _: ObjExtend => true
+    case _: Val.Obj => true
     case _ => false
   }
 
@@ -479,7 +481,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
           builder.put(k, v)
         }
     }
-    new Val.Obj(objPos, builder, if(asserts != null) assertions else null, sup)
+    new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
   }
 
   def visitObjComp(objPos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
@@ -516,7 +518,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
           case Val.Null(_) => // do nothing
         }
       }
-      new Val.Obj(objPos, builder, null, sup)
+      new Val.Obj(objPos, builder, false, null, sup)
     }
 
     newSelf
