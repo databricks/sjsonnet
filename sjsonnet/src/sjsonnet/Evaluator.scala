@@ -16,7 +16,7 @@ import scala.collection.mutable
   * imported module to be re-used. Parsing is cached separatedly by an external
   * `parseCache`.
   */
-class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]],
+class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 importer: (Path, String) => Option[(Path, String)],
@@ -280,13 +280,13 @@ class Evaluator(parseCache: collection.mutable.HashMap[String, fastparse.Parsed[
   }
 
   def visitImport(pos: Position, value: String)(implicit scope: ValScope) = {
-    val (p, str) = resolveImport(value, pos)
+    val key @ (p, str) = resolveImport(value, pos)
     loadedFileContents(p) = str
     cachedImports.getOrElseUpdate(
       p,
       {
         val (doc, newFileScope) = parseCache.getOrElseUpdate(
-          str,
+          key,
           fastparse.parse(str, new Parser(p).document(_))
         ) match {
           case Parsed.Success((doc, nameIndices), _) => (doc, nameIndices)
