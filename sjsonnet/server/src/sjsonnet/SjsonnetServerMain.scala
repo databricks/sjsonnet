@@ -24,7 +24,7 @@ trait SjsonnetServerMain[T]{
             wd: os.Path): (Boolean, Option[T])
 }
 
-object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[String, fastparse.Parsed[(Expr, Map[String, Int])]]]{
+object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]]]{
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
@@ -45,7 +45,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[
     ).run()
   }
   def main0(args: Array[String],
-            stateCache: Option[collection.mutable.HashMap[String, fastparse.Parsed[(Expr, Map[String, Int])]]],
+            stateCache: Option[collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]]],
             mainInteractive: Boolean,
             stdin: InputStream,
             stdout: PrintStream,
@@ -55,7 +55,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[
             wd: os.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
-      val p = collection.mutable.HashMap[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
+      val p = collection.mutable.HashMap[String, fastparse.Parsed[(Expr, FileScope)]]()
       this.stateCache = Some(p)
       p
     }

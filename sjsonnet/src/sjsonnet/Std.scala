@@ -349,7 +349,7 @@ object Std {
       while(i < a.length) {
         if(ev.equal(a(i).force, value)) {
           val finalI = i
-          b.addOne(() => Val.Num(pos, finalI))
+          b.+=(() => Val.Num(pos, finalI))
         }
         i += 1
       }
@@ -790,12 +790,12 @@ object Std {
       while(i < str.length) {
         if(str.charAt(i) == c) {
           val finalStr = Val.Str(pos, str.substring(start, i))
-          b.addOne(() => finalStr)
+          b.+=(() => finalStr)
           start = i+1
         }
         i += 1
       }
-      b.addOne(() => Val.Str(pos, str.substring(start, math.min(i, str.length))))
+      b.+=(() => Val.Str(pos, str.substring(start, math.min(i, str.length))))
       Val.Arr(pos, b.result())
     }),
     builtin("splitLimit", "str", "c", "maxSplits"){ (pos, ev, fs, str: String, c: String, maxSplits: Int) =>

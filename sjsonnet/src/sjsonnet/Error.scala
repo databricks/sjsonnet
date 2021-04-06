@@ -2,8 +2,6 @@ package sjsonnet
 
 import java.util.BitSet
 
-import scala.collection.JavaConverters._
-
 import fastparse.IndexedParserInput
 
 import scala.util.control.NonFatal
@@ -76,7 +74,7 @@ object Error {
                      fileScope: FileScope)
                     (implicit eval: EvalErrorScope) = if (!names.isEmpty) {
     val plural = if (names.cardinality() > 1) "s" else ""
-    val nameSnippet = names.stream().iterator().asScala.map(i => fileScope.indexNames(i)).mkString(", ")
+    val nameSnippet = BitSetUtils.iterator(names).map(i => fileScope.indexNames(i)).mkString(", ")
     fail(formatMsg(plural, nameSnippet), outerPos)
   }
 
