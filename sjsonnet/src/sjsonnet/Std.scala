@@ -410,11 +410,13 @@ object Std {
         case Val.Str(_, s) =>
           val b = new java.lang.StringBuilder()
           var i = 0
+          var added = false
           while(i < arr.value.length) {
             arr.value(i).force match {
               case _: Val.Null =>
               case Val.Str(_, x) =>
-                if(b.length() > 0) b.append(s)
+                if(added) b.append(s)
+                added = true
                 b.append(x)
               case x => throw new Error.Delegate("Cannot join " + x.prettyName)
             }
@@ -423,11 +425,13 @@ object Std {
           Val.Str(pos, b.toString)
         case Val.Arr(_, sep) =>
           val out = new mutable.ArrayBuffer[Val.Lazy]
+          var added = false
           for(x <- arr.value){
             x.force match{
               case Val.Null(_) => // do nothing
               case Val.Arr(_, v) =>
-                if (out.nonEmpty) out.appendAll(sep)
+                if (added) out.appendAll(sep)
+                added = true
                 out.appendAll(v)
               case x => throw new Error.Delegate("Cannot join " + x.prettyName)
             }

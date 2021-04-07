@@ -36,5 +36,10 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.repeat('ab', 4)") ==> ujson.Str("abababab")
       eval("std.repeat('a', 0)") ==> ujson.Str("")
     }
+
+    test("join") {
+      eval("std.join(' ', ['', 'foo'])") ==> ujson.Str(" foo")
+      eval("std.join(' ', [null, 'foo'])") ==> ujson.Str("foo")
+    }
   }
 }
