@@ -3,7 +3,9 @@ package sjsonnet
 import fastparse.JsonnetWhitespace._
 import fastparse._
 import Expr.Member.Visibility
+
 import scala.annotation.switch
+import scala.collection.mutable
 
 /**
   * Parses Jsonnet source code `String`s into a [[Expr]] syntax tree, using the
@@ -11,7 +13,8 @@ import scala.annotation.switch
   * operators, and resolves local variable names to array indices during parsing
   * to allow better performance at runtime.
   */
-object Parser{
+
+object Parser {
   val precedenceTable = Seq(
     Seq("*", "/", "%"),
     Seq("+", "-"),
@@ -38,19 +41,31 @@ object Parser{
 
   def idStartChar(c: Char) = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
+  private val emptyExprArray = new Array[Expr](0)
+}
+
+class Parser(val currentFile: Path) {
+  import Parser._
+
+  private val nameIndices = new mutable.HashMap[String, Int]
+  nameIndices("std") = 0
+  private val fileScope = new FileScope(currentFile, nameIndices)
+
+  def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
+
   def id[_: P] = P(
     CharIn("_a-zA-Z0-9") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
   ).!.filter(s => !keywords.contains(s))
 
   def break[_: P] = P(!CharIn("_a-zA-Z0-9"))
-  def number[_: P]: P[Expr.Num] = P(
-    Index ~~ (
+  def number[_: P]: P[Val.Num] = P(
+    Pos ~~ (
       CharsWhileIn("0-9") ~~
       ("." ~ CharsWhileIn("0-9")).? ~~
       (CharIn("eE") ~ CharIn("+\\-").? ~~ CharsWhileIn("0-9")).?
     ).!
-  ).map(s => Expr.Num(s._1, s._2.toDouble))
+  ).map(s => Val.Num(s._1, s._2.toDouble))
 
   def escape[_: P] = P( escape0 | escape1 )
   def escape0[_: P] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
@@ -115,32 +130,31 @@ object Parser{
   )
 
 
-  def obj[_: P]: P[Expr] = P( (Index ~~ objinside).map(Expr.Obj.tupled) )
-  def arr[_: P]: P[Expr] = P( (Index ~~ &("]")).map(Expr.Arr(_, Nil)) | arrBody )
+  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(Expr.Arr(_, emptyExprArray)) | arrBody )
   def compSuffix[_: P] = P( forspec ~ compspec ).map(Left(_))
   def arrBody[_: P]: P[Expr] = P(
-    Index ~~ expr ~
+    Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
-    case (offset, first, None) => Expr.Arr(offset, Seq(first))
-    case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2)
-    case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Seq(first) ++ rest)
+    case (offset, first, None) => Expr.Arr(offset, Array(first))
+    case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
+    case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 
-  def assertExpr[_: P](index: Int): P[Expr] =
-    P( assertStmt ~ ";" ~ expr ).map(t => Expr.AssertExpr(index, t._1, t._2))
+  def assertExpr[_: P](pos: Position): P[Expr] =
+    P( assertStmt ~ ";" ~ expr ).map(t => Expr.AssertExpr(pos, t._1, t._2))
 
-  def function[_: P](index: Int): P[Expr] =
-    P( "(" ~/ params ~ ")" ~ expr ).map(t => Expr.Function(index, t._1, t._2))
+  def function[_: P](pos: Position): P[Expr] =
+    P( "(" ~/ params ~ ")" ~ expr ).map(t => Expr.Function(pos, t._1, t._2))
 
-  def ifElse[_: P](index: Int): P[Expr] =
-    P( Index ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).? ).map(Expr.IfElse.tupled)
+  def ifElse[_: P](pos: Position): P[Expr] =
+    P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)) ).map(Expr.IfElse.tupled)
 
   def localExpr[_: P]: P[Expr] =
-    P( Index ~~ bind.rep(min=1, sep = ","./) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
 
   def expr[_: P]: P[Expr] =
-    P("" ~ expr1 ~ (Index ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
+    P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
       var remaining = fs
       def climb(minPrec: Int, current: Expr): Expr = {
         var result = current
@@ -190,7 +204,7 @@ object Parser{
   }
 
   def exprSuffix2[_: P]: P[Expr => Expr] = P(
-    Index.flatMapX{i =>
+    Pos.flatMapX{i =>
       CharIn(".[({")./.!.map(_(0)).flatMapX{ c =>
         (c: @switch) match{
           case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
@@ -198,7 +212,12 @@ object Parser{
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case '(' => Pass ~ (args ~ ")").map(x => Expr.Apply(i, _: Expr, x))
+          case '(' => Pass ~ (args ~ ")").map { x =>
+            val argNames =
+              if(x.names.exists(_ != null)) x.names
+              else null
+            Expr.Apply(i, _: Expr, argNames, x.exprs)
+          }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
         }
@@ -207,12 +226,11 @@ object Parser{
   )
 
   def local[_: P] = P( localExpr )
-  def parened[_: P] = P( (Index ~~ expr).map(Expr.Parened.tupled) )
-  def importStr[_: P](index: Int) = P( string.map(Expr.ImportStr(index, _)) )
-  def `import`[_: P](index: Int) = P( string.map(Expr.Import(index, _)) )
-  def error[_: P](index: Int) = P(expr.map(Expr.Error(index, _)) )
+  def importStr[_: P](pos: Position) = P( string.map(Expr.ImportStr(pos, _)) )
+  def `import`[_: P](pos: Position) = P( string.map(Expr.Import(pos, _)) )
+  def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
 
-  def unaryOpExpr[_: P](index: Int, op: Char) = P(
+  def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>
       def k2 = op match{
         case '+' => Expr.UnaryOp.`+`
@@ -220,46 +238,46 @@ object Parser{
         case '~' => Expr.UnaryOp.`~`
         case '!' => Expr.UnaryOp.`!`
       }
-      Expr.UnaryOp(index, k2, e)
+      Expr.UnaryOp(pos, k2, e)
     }
   )
 
-  def constructString(index: Int, lines: Seq[String]) = Expr.Str(index, lines.mkString)
+  def constructString(pos: Position, lines: Seq[String]) = Val.Str(pos, lines.mkString)
   // Any `expr` that isn't naively left-recursive
   def expr2[_: P]: P[Expr] = P(
-    Index.flatMapX{ index =>
+    Pos.flatMapX{ pos =>
       SingleChar.flatMapX{ c =>
         (c: @switch) match {
-          case '{' => Pass ~ obj ~ "}"
-          case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(index, c)
+          case '{' => Pass ~ objinside ~ "}"
+          case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
           case '[' => Pass ~ arr ~ "]"
-          case '(' => Pass ~ parened ~ ")"
-          case '\"' => doubleString.map(constructString(index, _))
-          case '\'' => singleString.map(constructString(index, _))
+          case '(' => Pass ~ expr ~ ")"
+          case '\"' => doubleString.map(constructString(pos, _))
+          case '\'' => singleString.map(constructString(pos, _))
           case '@' => SingleChar./.flatMapX{
-            case '\"' => literalDoubleString.map(constructString(index, _))
-            case '\'' => literalSingleString.map(constructString(index, _))
+            case '\"' => literalDoubleString.map(constructString(pos, _))
+            case '\'' => literalSingleString.map(constructString(pos, _))
             case _ => Fail
           }
-          case '|' => tripleBarString.map(constructString(index, _))
-          case '$' => Pass(Expr.$(index))
+          case '|' => tripleBarString.map(constructString(pos, _))
+          case '$' => Pass(Expr.$(pos))
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-            P.current.index = index; number
+            P.current.index = pos.offset; number
           case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
             x + y match {
-              case "null"      => Pass(Expr.Null(index))
-              case "true"      => Pass(Expr.True(index))
-              case "false"     => Pass(Expr.False(index))
-              case "self"      => Pass(Expr.Self(index))
-              case "super"     => Pass(Expr.Super(index))
-              case "if"        => Pass ~ ifElse(index)
-              case "function"  => Pass ~ function(index)
-              case "importstr" => Pass ~ importStr(index)
-              case "import"    => Pass ~ `import`(index)
-              case "error"     => Pass ~ error(index)
-              case "assert"    => Pass ~ assertExpr(index)
+              case "null"      => Pass(Val.Null(pos))
+              case "true"      => Pass(Val.True(pos))
+              case "false"     => Pass(Val.False(pos))
+              case "self"      => Pass(Expr.Self(pos))
+              case "super"     => Pass(Expr.Super(pos))
+              case "if"        => Pass ~ ifElse(pos)
+              case "function"  => Pass ~ function(pos)
+              case "importstr" => Pass ~ importStr(pos)
+              case "import"    => Pass ~ `import`(pos)
+              case "error"     => Pass ~ error(pos)
+              case "assert"    => Pass ~ assertExpr(pos)
               case "local"     => Pass ~ local
-              case x           => Pass(Expr.Id(index, indexFor(x)))
+              case x           => Pass(Expr.Id(pos, indexFor(x)))
             }
           }
           case _ => Fail
@@ -269,8 +287,8 @@ object Parser{
   )
 
   def objinside[_: P]: P[Expr.ObjBody] = P(
-    member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
-  ).flatMap { case t @ (exprs, _) =>
+    Pos ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
+  ).flatMap { case t @ (pos, exprs, _) =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     exprs.foreach {
@@ -282,15 +300,26 @@ object Parser{
     if (overlap == null) Pass(t)
     else Fail.opaque("no duplicate field: " + overlap)
   }.map{
-    case (exprs, None) => Expr.ObjBody.MemberList(exprs)
-    case (exprs, Some(comps)) =>
+    case (pos, exprs, None) =>
+      val binds = {
+        val b = exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+        if(b.isEmpty) null else b
+      }
+      val fields = exprs.iterator.filter(_.isInstanceOf[Expr.Member.Field]).asInstanceOf[Iterator[Expr.Member.Field]].toArray
+      val asserts = {
+        val a = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
+        if(a.isEmpty) null else a
+      }
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+      else Expr.ObjBody.MemberList(pos, binds, fields, asserts)
+    case (pos, exprs, Some(comps)) =>
       val preLocals = exprs
-        .takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
-        .map(_.asInstanceOf[Expr.Member.BindStmt])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, None, Visibility.Normal, rhs) =
+        .takeWhile(_.isInstanceOf[Expr.Bind])
+        .map(_.asInstanceOf[Expr.Bind])
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, null, Visibility.Normal, rhs) =
         exprs(preLocals.length)
-      val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Member.BindStmt])
-        .map(_.asInstanceOf[Expr.Member.BindStmt])
+      val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
+        .map(_.asInstanceOf[Expr.Bind])
       
       /* 
        * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
@@ -299,18 +328,18 @@ object Parser{
        * Otherwise the field value will be overriden by the multiple iterations of forspec
        */
       (lhs, comps) match {
-        case (Expr.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>  
-          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Expr.Str].value}" """)
+        case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>
+          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
         case _ => // do nothing
       }
-      Expr.ObjBody.ObjComp(preLocals, lhs, rhs, postLocals, comps._1, comps._2)
+      Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)
   }
 
   def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ assertStmt | field )
   def field[_: P] = P(
-    (Index ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
-      case (offset, name, plus, p, h2, e) =>
-        Expr.Member.Field(offset, name, plus.nonEmpty, p, h2, e)
+    (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
+      case (pos, name, plus, p, h2, e) =>
+        Expr.Member.Field(pos, name, plus.nonEmpty, p.getOrElse(null), h2, e)
     }
   )
   def fieldKeySep[_: P] = P( StringIn(":::", "::", ":") ).!.map{
@@ -318,26 +347,26 @@ object Parser{
     case "::" => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
-  def objlocal[_: P] = P( "local" ~~ break ~/ bind ).map(Expr.Member.BindStmt)
+  def objlocal[_: P] = P( "local" ~~ break ~/ bind )
   def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   def forspec[_: P] =
-    P( Index ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
-  def ifspec[_: P] = P( Index ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
+    P( Pos ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
+  def ifspec[_: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
   def fieldname[_: P] = P(
     id.map(Expr.FieldName.Fixed) |
     string.map(Expr.FieldName.Fixed) |
     "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]"
   )
   def assertStmt[_: P] =
-    P( expr ~ (":" ~ expr).? ).map(Expr.Member.AssertStmt.tupled)
+    P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
-    P( Index ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+    P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
-    } else Pass(Expr.Args(x.toArray[(Option[String], Expr)]))
+    } else Pass(Expr.Args(x.map(_._1.getOrElse(null)).toArray, x.map(_._2).toArray))
   }
 
   def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
@@ -348,8 +377,10 @@ object Parser{
       else seen.add(k)
     }
     if (overlap == null) {
-      val paramData = x.map{case (k, v) => (k, v, indexFor(k))}.toArray
-      Pass(Expr.Params(paramData))
+      val names = x.map(_._1).toArray[String]
+      val exprs = x.map(_._2.getOrElse(null)).toArray[Expr]
+      val idxs = names.map(indexFor)
+      Pass(Expr.Params(names, exprs, idxs))
     }
     else Fail.opaque("no duplicate parameter: " + overlap)
 
@@ -363,7 +394,7 @@ object Parser{
 
   ).!
 
-  def document[_: P]: P[(Expr, Map[String, Int])] = P( expr ~  Pass(P.current.misc.toMap.asInstanceOf[Map[String, Int]]) ~ End )
+  def document[_: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
 
   /**
     * We assign local identifier names to integer offsets into a local variable
@@ -379,13 +410,38 @@ object Parser{
     * The Jsonnet standard library `std` always lives at slot 0.
     */
   def indexFor[_: P](name: String): Int = {
-    P.current.misc("std") = 0
-    P.current.misc.get(name) match{
+    nameIndices.get(name) match{
       case None =>
-        val index = P.current.misc.size
-        P.current.misc(name) = index
+        val index = nameIndices.size
+        nameIndices(name) = index
         index
-      case Some(index) => index.asInstanceOf[Int]
+      case Some(index) => index
     }
   }
+}
+
+class Position(val fileScope: FileScope, val offset: Int) {
+  def currentFile = fileScope.currentFile
+  override def equals(o: Any) = o match {
+    case o: Position => currentFile == o.currentFile && offset == o.offset
+    case _ => false
+  }
+  override def toString = s"Position($fileScope, $offset)"
+}
+
+/**
+  * FileScope models the per-file context that is propagated throughout the
+  * evaluation of a single Jsonnet file. Contains the current file path, as
+  * well as the mapping of local variable names to local variable array indices
+  * which is shared throughout each file.
+  */
+class FileScope(val currentFile: Path,
+                val nameIndices: scala.collection.Map[String, Int]){
+  // Only used for error messages, so in the common case
+  // where nothing blows up this does not need to be allocated
+  lazy val indexNames = nameIndices.map(_.swap)
+
+  lazy val currentFileLastPathElement = currentFile.last
+
+  val noOffsetPos: Position = new Position(this, -1)
 }

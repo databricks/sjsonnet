@@ -1,6 +1,7 @@
 package sjsonnet
 
-import scala.collection.{BitSet, mutable}
+import java.util.BitSet
+
 /**
   * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the
   * program mostly as-written, except for resolving local variable names and
@@ -9,22 +10,17 @@ import scala.collection.{BitSet, mutable}
   * Each [[Expr]] represents an expression in the Jsonnet program, and contains an
   * integer offset into the file that is later used to provide error messages.
   */
-sealed trait Expr{
-  def offset: Int
+trait Expr{
+  def pos: Position
 }
 object Expr{
-  case class Null(offset: Int) extends Expr
-  case class True(offset: Int) extends Expr
-  case class False(offset: Int) extends Expr
-  case class Self(offset: Int) extends Expr
-  case class Super(offset: Int) extends Expr
-  case class $(offset: Int) extends Expr
 
-  case class Str(offset: Int, value: String) extends Expr
-  case class Num(offset: Int, value: Double) extends Expr
-  case class Id(offset: Int, value: Int) extends Expr
-  case class Arr(offset: Int, value: Seq[Expr]) extends Expr
-  case class Obj(offset: Int, value: ObjBody) extends Expr
+  case class Self(pos: Position) extends Expr
+  case class Super(pos: Position) extends Expr
+  case class $(pos: Position) extends Expr
+
+  case class Id(pos: Position, value: Int) extends Expr
+  case class Arr(pos: Position, value: Array[Expr]) extends Expr
 
   sealed trait FieldName
 
@@ -42,27 +38,41 @@ object Expr{
       case object Hidden extends Visibility
       case object Unhide extends Visibility
     }
-    case class Field(offset: Int,
+    case class Field(pos: Position,
                      fieldName: FieldName,
                      plus: Boolean,
-                     args: Option[Params],
+                     args: Params,
                      sep: Visibility,
-                     rhs: Expr) extends Member
-    case class BindStmt(value: Bind) extends Member
-    case class AssertStmt(value: Expr, msg: Option[Expr]) extends Member
+                     rhs: Expr) extends Member {
+      def isStatic = fieldName.isInstanceOf[FieldName.Fixed] && !plus && args == null && sep == Visibility.Normal && rhs.isInstanceOf[Val.Literal]
+    }
+    case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
 
-  case class Parened(offset: Int, value: Expr) extends Expr
-  case class Params(args: IndexedSeq[(String, Option[Expr], Int)]){
-    val argIndices: Map[String, Int] = args.map{case (k, d, i) => (k, i)}.toMap
-    val noDefaultIndices: BitSet = mutable.BitSet.empty ++ args.collect{case (_, None, i) => i}
-    val defaults: IndexedSeq[(Int, Expr)] = args.collect{case (_, Some(x), i) => (i, x)}
-    val allIndices: Set[Int] = args.map{case (_, _, i) => i}.toSet
+  case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
+    val argIndices: Map[String, Int] = (names, indices).zipped.toMap
+    val noDefaultIndices: BitSet = {
+      val b = new BitSet(defaultExprs.size)
+      (defaultExprs, indices).zipped.foreach((e, i) => if(e == null) b.set(i))
+      b
+    }
+    val defaultsOnlyIndices: Array[Int] = (defaultExprs, indices).zipped.collect { case (x, i) if x != null => i }.toArray
+    val defaultsOnly: Array[Expr] = defaultExprs.filter(_ != null).toArray
+    val allIndices: BitSet = {
+      val b = new BitSet(indices.size)
+      indices.foreach(b.set)
+      b
+    }
   }
-  case class Args(args: Seq[(Option[String], Expr)])
+  object Params {
+    def mk(params: (String, Expr, Int)*): Params = {
+      Params(params.map(_._1).toArray, params.map(_._2).toArray, params.map(_._3).toArray)
+    }
+  }
+  case class Args(names: Array[String], exprs: Array[Expr])
 
-  case class UnaryOp(offset: Int, op: UnaryOp.Op, value: Expr) extends Expr
+  case class UnaryOp(pos: Position, op: UnaryOp.Op, value: Expr) extends Expr
   object UnaryOp{
     sealed trait Op
     case object `+` extends Op
@@ -70,7 +80,7 @@ object Expr{
     case object `~` extends Op
     case object `!` extends Op
   }
-  case class BinaryOp(offset: Int, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
+  case class BinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
   object BinaryOp{
     sealed trait Op
     case object `*` extends Op
@@ -93,40 +103,41 @@ object Expr{
     case object `&&` extends Op
     case object `||` extends Op
   }
-  case class AssertExpr(offset: Int, asserted: Member.AssertStmt, returned: Expr) extends Expr
-  case class LocalExpr(offset: Int, bindings: Seq[Bind], returned: Expr) extends Expr
+  case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
+  case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr
 
-  case class Bind(offset: Int, name: Int, args: Option[Params], rhs: Expr)
-  case class Import(offset: Int, value: String) extends Expr
-  case class ImportStr(offset: Int, value: String) extends Expr
-  case class Error(offset: Int, value: Expr) extends Expr
-  case class Apply(offset: Int, value: Expr, args: Args) extends Expr
-  case class Select(offset: Int, value: Expr, name: String) extends Expr
-  case class Lookup(offset: Int, value: Expr, index: Expr) extends Expr
-  case class Slice(offset: Int,
+  case class Bind(pos: Position, name: Int, args: Params, rhs: Expr) extends Member
+  case class Import(pos: Position, value: String) extends Expr
+  case class ImportStr(pos: Position, value: String) extends Expr
+  case class Error(pos: Position, value: Expr) extends Expr
+  case class Apply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
+  case class Select(pos: Position, value: Expr, name: String) extends Expr
+  case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
+  case class Slice(pos: Position,
                    value: Expr,
                    start: Option[Expr],
                    end: Option[Expr],
                    stride: Option[Expr]) extends Expr
-  case class Function(offset: Int, params: Params, body: Expr) extends Expr
-  case class IfElse(offset: Int, cond: Expr, then: Expr, `else`: Option[Expr]) extends Expr
+  case class Function(pos: Position, params: Params, body: Expr) extends Expr
+  case class IfElse(pos: Position, cond: Expr, then: Expr, `else`: Expr) extends Expr
 
   sealed trait CompSpec extends Expr
-  case class IfSpec(offset: Int, cond: Expr) extends CompSpec
-  case class ForSpec(offset: Int, name: Int, cond: Expr) extends CompSpec
+  case class IfSpec(pos: Position, cond: Expr) extends CompSpec
+  case class ForSpec(pos: Position, name: Int, cond: Expr) extends CompSpec
 
-  case class Comp(offset: Int, value: Expr, first: ForSpec, rest: Seq[CompSpec]) extends Expr
-  case class ObjExtend(offset: Int, base: Expr, ext: ObjBody) extends Expr
+  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
+  case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
 
-  sealed trait ObjBody
+  trait ObjBody extends Expr
   object ObjBody{
-    case class MemberList(value: Seq[Member]) extends ObjBody
-    case class ObjComp(preLocals: Seq[Member.BindStmt],
+    case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
+    case class ObjComp(pos: Position,
+                       preLocals: Array[Bind],
                        key: Expr,
                        value: Expr,
-                       postLocals: Seq[Member.BindStmt],
+                       postLocals: Array[Bind],
                        first: ForSpec,
-                       rest: Seq[CompSpec]) extends ObjBody
+                       rest: List[CompSpec]) extends ObjBody
   }
 
 }

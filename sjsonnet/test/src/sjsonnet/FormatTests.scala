@@ -4,16 +4,18 @@ import ujson.Value
 import utest._
 
 object FormatTests extends TestSuite{
+  val dummyPos = new Position(new FileScope(DummyPath("(unknown)"), Map.empty), -1)
+
   def check(fmt: String, jsonStr: String, expected: String) = {
     val json = ujson.read(jsonStr)
-    val formatted = Format.format(fmt, Materializer.reverse(null, json), -1)(
-      new FileScope(DummyPath("(unknown)"), Map.empty),
+    val formatted = Format.format(fmt, Materializer.reverse(null, json), dummyPos)(
       new EvalScope{
         def extVars: Map[String, Value] = Map()
         def loadCachedSource(p: Path): Option[String] = None
         def wd: Path = DummyPath()
-        def visitExpr(expr: Expr)(implicit scope: ValScope, fileScope: FileScope): Val = ???
+        def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
+        def equal(x: Val, y: Val): Boolean = ???
       }
     )
     assert(formatted == expected)

@@ -17,7 +17,14 @@ case class DummyPath(segments: String*) extends Path{
 
   def /(s: String): Path = DummyPath(segments :+ s:_*)
 
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     segments.mkString("/") + ":" + offset
   }
+
+  override def equals(other: Any): Boolean = other match {
+    case DummyPath(s @ _*) => segments == s
+    case _ => false
+  }
+
+  override def hashCode: Int = segments.hashCode()
 }

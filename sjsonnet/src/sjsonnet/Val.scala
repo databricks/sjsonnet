@@ -1,5 +1,7 @@
 package sjsonnet
 
+import java.util
+
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
@@ -13,7 +15,7 @@ import scala.reflect.ClassTag
   * except evaluation of object attributes and array contents are lazy, and
   * the tree can contain functions.
   */
-sealed trait Val{
+sealed abstract class Val {
   def prettyName: String
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
@@ -30,10 +32,6 @@ object PrettyNamed{
   implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
   implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
 }
-case class Position(currentFile: Path, offset: Int)
-object Position{
-  def apply(offset: Int)(implicit fileScope: FileScope): Position = Position(fileScope.currentFile, offset)
-}
 object Val{
 
   /**
@@ -41,274 +39,319 @@ object Val{
     * evaluated dictionary values, array contents, or function parameters
     * are all wrapped in [[Lazy]] and only truly evaluated on-demand
     */
-  class Lazy(calc0: => Val){
-    lazy val force = calc0
-  }
-  object Lazy{
-    def apply(calc0: => Val) = new Lazy(calc0)
+  abstract class Lazy {
+    private[this] var cached: Val = null
+    def compute(): Val
+    final def force: Val = {
+      if(cached == null) cached = compute()
+      cached
+    }
   }
 
+  abstract class Literal extends Val with Expr
+  abstract class Bool extends Literal
+
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
-  sealed trait Bool extends Val{
-  }
-  case class True(pos: Position) extends Bool{
+
+  case class True(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class False(pos: Position) extends Bool{
+  case class False(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class Null(pos: Position) extends Val{
+  case class Null(pos: Position) extends Literal {
     def prettyName = "null"
   }
-  case class Str(pos: Position, value: String) extends Val{
+  case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
   }
-  case class Num(pos: Position, value: Double) extends Val{
+  case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
   }
-  case class Arr(pos: Position, value: Seq[Lazy]) extends Val{
+
+  case class Arr(pos: Position, value: Array[Lazy]) extends Val{
     def prettyName = "array"
   }
+
   object Obj{
 
     case class Member(add: Boolean,
                       visibility: Visibility,
-                      invoke: (Obj, Option[Obj], FileScope, EvalScope) => Val,
+                      invoke: (Obj, Obj, FileScope, EvalScope) => Val,
                       cached: Boolean = true)
 
-
+    def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
+      val m = new util.LinkedHashMap[String, Obj.Member]()
+      for((k, v) <- members) m.put(k, v)
+      new Obj(pos, m, false, null, null)
+    }
   }
+
   final class Obj(val pos: Position,
-                  value0: mutable.Map[String, Obj.Member],
+                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
+                  static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
-                  `super`: Option[Obj]) extends Val{
+                  `super`: Obj,
+                  valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
+                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
 
     def getSuper = `super`
 
-    @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
-      triggerAsserts(obj)
-      `super` match {
-        case Some(s) => s.triggerAllAsserts(obj)
-        case None => ()
+    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+      if(value0 == null) {
+        value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        allKeys.forEach { (k, _) =>
+          val v = valueCache(k)
+          val m = Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) => v)
+          value0.put(k, m)
+        }
       }
+      value0
+    }
+
+    @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
+      if(triggerAsserts != null) triggerAsserts(obj)
+      if(`super` != null) `super`.triggerAllAsserts(obj)
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case None => new Val.Obj(pos, value0, _ => (), Some(lhs))
-        case Some(x) => new Val.Obj(pos, value0, _ => (), Some(x.addSuper(pos, lhs)))
+        case null => new Val.Obj(pos, getValue0, false, null, lhs)
+        case x => new Val.Obj(pos, getValue0, false, null, x.addSuper(pos, lhs))
       }
     }
 
     def prettyName = "object"
 
-    def foreachVisibleKey(output: (String, Visibility) => Unit): Unit = {
-      for(s <- this.`super`) s.foreachVisibleKey(output)
-      for(t <- value0) output(t._1, t._2.visibility)
-    }
-
-    def getVisibleKeys() = {
-      val mapping = mutable.LinkedHashMap.empty[String, Boolean]
-      foreachVisibleKey{ (k, sep) =>
-        (mapping.get(k), sep) match{
-          case (None, Visibility.Hidden) => mapping(k) = true
-          case (None, _)    => mapping(k) = false
-
-          case (Some(false), Visibility.Hidden) => mapping(k) = true
-          case (Some(true), Visibility.Unhide) => mapping(k) = false
-          case (Some(x), _) => mapping(k) = x
-        }
+    private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
+      if(`super` != null) `super`.gatherKeys(mapping)
+      getValue0.forEach { (k, m) =>
+        val vis = m.visibility
+        if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+        else if(vis == Visibility.Hidden) mapping.put(k, true)
+        else if(vis == Visibility.Unhide) mapping.put(k, false)
       }
-      mapping
     }
-    private[this] val valueCache = collection.mutable.Map.empty[Any, Val]
+
+    private def getAllKeys = {
+      if(allKeys == null) {
+        allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+        gatherKeys(allKeys)
+      }
+      allKeys
+    }
+
+    @inline def hasKeys = !getAllKeys.isEmpty
+
+    @inline def containsKey(k: String): Boolean = getAllKeys.containsKey(k)
+
+    @inline def containsVisibleKey(k: String): Boolean = getAllKeys.get(k) == java.lang.Boolean.FALSE
+
+    lazy val allKeyNames: Array[String] = getAllKeys.keySet().toArray(new Array[String](getAllKeys.size()))
+
+    lazy val visibleKeyNames: Array[String] = if(static) allKeyNames else {
+      val buf = mutable.ArrayBuilder.make[String]
+      getAllKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
+      buf.result()
+    }
+
     def value(k: String,
-              offset: Int,
+              pos: Position,
               self: Obj = this)
-             (implicit fileScope: FileScope, evaluator: EvalScope): Val = {
+             (implicit evaluator: EvalScope): Val = {
 
       val cacheKey = if(self eq this) k else (k, self)
 
-      valueCache.get(cacheKey) match{
-        case Some(res) => res
-        case None =>
-          valueRaw(k, self, offset) match{
-            case Some((x, cached)) =>
-              if (cached) valueCache(cacheKey) = x
-              x
-            case None =>
-              Error.fail("Field does not exist: " + k, offset)
-          }
-      }
+      valueCache.getOrElse(cacheKey, {
+        valueRaw(k, self, pos, valueCache, cacheKey) match {
+          case null => Error.fail("Field does not exist: " + k, pos)
+          case x => x
+        }
+      })
+    }
+
+    private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
+      try evaluator.materialize(v).transform(new Renderer()).toString
+      catch Error.tryCatchWrap(pos)
     }
 
     def mergeMember(l: Val,
                     r: Val,
-                    offset: Int)
-                   (implicit fileScope: FileScope, evaluator: EvalScope) = (l, r) match{
-      case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(Position(fileScope.currentFile, offset), l + r)
-      case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(Position(fileScope.currentFile, offset), l + r)
-      case (Val.Arr(_, l), Val.Arr(_, r)) => Val.Arr(Position(fileScope.currentFile, offset), l ++ r)
-      case (l: Val.Obj, r: Val.Obj) => r.addSuper(Position(fileScope.currentFile, offset), l)
-      case (Val.Str(_, l), r) =>
-        try Val.Str(Position(fileScope.currentFile, offset), l + evaluator.materialize(r).transform(new Renderer()).toString)
-        catch Error.tryCatchWrap(offset)
-      case (l, Val.Str(_, r)) =>
-        try Val.Str(Position(fileScope.currentFile, offset), evaluator.materialize(l).transform(new Renderer()).toString + r)
-        catch Error.tryCatchWrap(offset)
-    }
-
-    @tailrec def valueCached(k: String): Option[Boolean] = this.value0.get(k) match{
-      case Some(m) => Some(m.cached)
-
-      case None => this.`super` match{
-        case None => None
-        case Some(s) => s.valueCached(k)
-      }
+                    pos: Position)
+                   (implicit evaluator: EvalScope) = {
+      val lStr = l.isInstanceOf[Val.Str]
+      val rStr = r.isInstanceOf[Val.Str]
+      if(lStr || rStr) {
+        val ll = if(lStr) l.asInstanceOf[Val.Str].value else renderString(l)
+        val rr = if(rStr) r.asInstanceOf[Val.Str].value else renderString(r)
+        Val.Str(pos, ll ++ rr)
+      } else if(l.isInstanceOf[Val.Num] && r.isInstanceOf[Val.Num]) {
+        val ll = l.asInstanceOf[Val.Num].value
+        val rr = r.asInstanceOf[Val.Num].value
+        Val.Num(pos, ll + rr)
+      } else if(l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
+        val ll = l.asInstanceOf[Val.Arr].value
+        val rr = r.asInstanceOf[Val.Arr].value
+        Val.Arr(pos, ll ++ rr)
+      } else if(l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
+        val ll = l.asInstanceOf[Val.Obj]
+        val rr = r.asInstanceOf[Val.Obj]
+        rr.addSuper(pos, ll)
+      } else throw new MatchError((l, r))
     }
 
     def valueRaw(k: String,
                  self: Obj,
-                 offset: Int)
-                (implicit fileScope: FileScope, evaluator: EvalScope): Option[(Val, Boolean)] = {
-      this.value0.get(k) match{
-        case Some(m) =>
-          this.`super` match{
-            case Some(s) if m.add =>
-              val merged = s.valueRaw(k, self, offset) match{
-                case None => m.invoke(self, this.`super`, fileScope, evaluator)
-                case Some((supValue, supCached)) =>
-                  mergeMember(supValue, m.invoke(self, this.`super`, fileScope, evaluator), offset)
-              }
-
-              Some(merged -> m.cached)
-
-            case _ =>
-              Some(m.invoke(self, this.`super`, fileScope, evaluator) -> m.cached)
-          }
-
-        case None => this.`super` match{
-          case None => None
-          case Some(s) => s.valueRaw(k, self, offset)
-        }
-      }
-    }
-
-    @tailrec def containsKey(k: String): Boolean = {
-      this.value0.contains(k) || {
-        this.`super` match {
-          case None => false
-          case Some(s) => s.containsKey(k)
-        }
+                 pos: Position,
+                 addTo: mutable.HashMap[Any, Val] = null,
+                 addKey: Any = null)
+                (implicit evaluator: EvalScope): Val = {
+      val s = this.`super`
+      getValue0.get(k) match{
+        case null =>
+          if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+        case m =>
+          val vv = m.invoke(self, s, pos.fileScope, evaluator)
+          val v = if(s != null && m.add) {
+            s.valueRaw(k, self, pos, null, null) match {
+              case null => vv
+              case supValue => mergeMember(supValue, vv, pos)
+            }
+          } else vv
+          if(addTo != null && m.cached) addTo(addKey) = v
+          v
       }
     }
   }
 
+  def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
+    val cache = mutable.HashMap.empty[Any, Val]
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    fields.foreach {
+      case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
+        cache.put(k, rhs)
+        allKeys.put(k, false)
+    }
+    new Val.Obj(pos, null, true, null, null, cache, allKeys)
+  }
+
   case class Func(pos: Position,
-                  defSiteScopes: Option[(ValScope, FileScope)],
+                  defSiteValScope: ValScope,
                   params: Params,
-                  evalRhs: (ValScope, String, EvalScope, FileScope, Int) => Val,
-                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val{
+                  evalRhs: (ValScope, EvalScope, FileScope, Position) => Val,
+                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val {
+
     def prettyName = "function"
-    def apply(args: Seq[(Option[String], Lazy)],
-              thisFile: String,
-              outerOffset: Int)
-             (implicit fileScope: FileScope, evaluator: EvalScope) = {
 
-      lazy val defaultArgsBindings = params
-        .defaults
-        .map{ case (index, default) => (index, Lazy(evalDefault(default, newScope, evaluator)))}
+    def apply(argNames: Array[String], argVals: Array[Lazy],
+              outerPos: Position)
+             (implicit evaluator: EvalScope) = {
 
-      lazy val passedArgsBindings = try
-        args.zipWithIndex.map{
-          case ((Some(name), v), _) =>
-            val argIndex = params.argIndices.getOrElse(
-              name,
-              Error.fail(s"Function has no parameter $name", outerOffset)
-            )
-            (argIndex, v)
-          case ((None, v), i) => (params.args(i)._3, v)
+      val argsSize = argVals.length
+      val simple = argNames == null && params.indices.length == argsSize
+      val passedArgsBindingsI = if(argNames != null) {
+        val arrI: Array[Int] = new Array(argsSize)
+        var i = 0
+        try {
+          while (i < argsSize) {
+            val aname = argNames(i)
+            arrI(i) = if(aname != null) params.argIndices.getOrElse(
+              aname,
+              Error.fail(s"Function has no parameter $aname", outerPos)
+            ) else params.indices(i)
+            i += 1
+          }
+        } catch { case e: IndexOutOfBoundsException =>
+          Error.fail("Too many args, function has " + params.names.length + " parameter(s)", outerPos)
         }
-      catch{ case e: IndexOutOfBoundsException =>
+        arrI
+      } else if(params.indices.length < argsSize) {
         Error.fail(
-          "Too many args, function has " + params.args.length + " parameter(s)",
-          outerOffset
+          "Too many args, function has " + params.names.length + " parameter(s)",
+          outerPos
         )
-      }
+      } else params.indices // Don't cut down to size to avoid copying. The correct size is argVals.length!
 
-      lazy val newScope: ValScope = {
-        var max = -1
-        val builder = Array.newBuilder[(Int, (Option[Val.Obj], Option[Val.Obj]) => Lazy)]
-        for(t <- defaultArgsBindings){
-          val (i, v) = t
-          if (i > max) max = i
-          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
-        }
+      val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
 
-        for(t <- passedArgsBindings){
-          val (i, v) = t
-          if (i > max) max = i
-          builder += (i, (self: Option[Val.Obj], sup: Option[Val.Obj]) => v)
-        }
-
-        defSiteScopes match{
-          case None => new ValScope(
-            None,
-            None,
-            None,
-            {
-              val arr = new Array[Lazy](max + 1)
-              for((i, v) <- builder.result()) arr(i) = v(null, None)
-              arr
+      val newScope: ValScope = {
+        if(simple) {
+          defSiteValScope match {
+            case null => ValScope.createSimple(passedArgsBindingsI, argVals)
+            case s => s.extendSimple(passedArgsBindingsI, argVals)
+          }
+        } else {
+          val defaultArgsBindingIndices = params.defaultsOnlyIndices
+          lazy val newScope: ValScope = {
+            val defaultArgsBindings = new Array[Lazy](params.defaultsOnly.length)
+            var idx = 0
+            while (idx < params.defaultsOnly.length) {
+              val default = params.defaultsOnly(idx)
+              defaultArgsBindings(idx) = () => evalDefault(default, newScope, evaluator)
+              idx += 1
             }
-          )
-          case Some((s, fs)) => s.extend(builder.result())
+            defSiteValScope match {
+              case null => ValScope.createSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
+              case s => s.extendSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
+            }
+          }
+          validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope, argsSize)
+          newScope
         }
       }
 
-      val funDefFileScope: FileScope = defSiteScopes match {case None => fileScope case Some((s, fs)) => fs}
-      validateFunctionCall(passedArgsBindings, params, outerOffset, funDefFileScope)
-
-      evalRhs(
-        newScope,
-        thisFile,
-        evaluator,
-        funDefFileScope,
-        outerOffset
-      )
+      evalRhs(newScope, evaluator, funDefFileScope, outerPos)
     }
 
-    def validateFunctionCall(passedArgsBindings: Seq[(Int, Lazy)],
+    def validateFunctionCall(passedArgsBindingsI: Array[Int],
                              params: Params,
-                             outerOffset: Int,
-                             defSiteFileScope: FileScope)
-                            (implicit fileScope: FileScope, eval: EvalScope): Unit = {
+                             outerPos: Position,
+                             defSiteFileScope: FileScope,
+                             argListSize: Int)
+                            (implicit eval: EvalScope): Unit = {
 
-      val seen = mutable.BitSet.empty
-      val repeats = mutable.BitSet.empty
-      for(t <- passedArgsBindings){
-        if (!seen(t._1)) seen.add(t._1)
-        else repeats.add(t._1)
+      val seen = new util.BitSet(argListSize)
+      var idx = 0
+      while (idx < argListSize) {
+        val i = passedArgsBindingsI(idx)
+        seen.set(i)
+        idx += 1
       }
 
-      Error.failIfNonEmpty(
-        repeats,
-        outerOffset,
-        (plural, names) => s"binding parameter a second time: $names",
-        Some(defSiteFileScope)
-      )
+      if(argListSize != params.names.length || argListSize != seen.cardinality()) {
+        seen.clear()
+        val repeats = new util.BitSet(argListSize)
 
-      Error.failIfNonEmpty(
-        params.noDefaultIndices.filter(!seen(_)),
-        outerOffset,
-        (plural, names) => s"Function parameter$plural $names not bound in call"
-      )(defSiteFileScope, eval) // pass the definition site for the correct error message/names to be resolved
+        idx = 0
+        while (idx < argListSize) {
+          val i = passedArgsBindingsI(idx)
+          if (!seen.get(i)) seen.set(i)
+          else repeats.set(i)
+          idx += 1
+        }
 
-      Error.failIfNonEmpty(
-        seen.filter(!params.allIndices(_)),
-        outerOffset,
-        (plural, names) => s"Function has no parameter$plural $names"
-      )
+        Error.failIfNonEmpty(
+          repeats,
+          outerPos,
+          (plural, names) => s"binding parameter a second time: $names",
+          defSiteFileScope
+        )
+        val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
+        b.andNot(seen)
+        Error.failIfNonEmpty(
+          b,
+          outerPos,
+          (plural, names) => s"Function parameter$plural $names not bound in call",
+          defSiteFileScope // pass the definition site for the correct error message/names to be resolved
+        )
+        seen.andNot(params.allIndices)
+        Error.failIfNonEmpty(
+          seen,
+          outerPos,
+          (plural, names) => s"Function has no parameter$plural $names",
+          outerPos.fileScope
+        )
+      }
     }
   }
 }
@@ -319,16 +362,49 @@ object Val{
   */
 trait EvalScope extends EvalErrorScope{
   def visitExpr(expr: Expr)
-               (implicit scope: ValScope, fileScope: FileScope): Val
+               (implicit scope: ValScope): Val
 
   def materialize(v: Val): ujson.Value
 
+  def equal(x: Val, y: Val): Boolean
+
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
+  val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
   val preserveOrder: Boolean = false
 }
+
 object ValScope{
-  def empty(size: Int) = new ValScope(None, None, None, new Array(size))
+  def empty(size: Int) = new ValScope(null, null, null, new Array(size))
+
+  def createSimple(newBindingsI: Array[Int],
+                   newBindingsV: Array[Val.Lazy]) = {
+    val arr = new Array[Val.Lazy](newBindingsI.length)
+    var i = 0
+    while(i < newBindingsI.length) {
+      arr(newBindingsI(i)) = newBindingsV(i)
+      i += 1
+    }
+    new ValScope(null, null, null, arr)
+  }
+
+  def createSimple(newBindingsI1: Array[Int],
+                   newBindingsV1: Array[Val.Lazy],
+                   newBindingsI2: Array[Int],
+                   newBindingsV2: Array[Val.Lazy]) = {
+    val arr = new Array[Val.Lazy](newBindingsV1.length + newBindingsV2.length)
+    var i = 0
+    while(i < newBindingsV1.length) {
+      arr(newBindingsI1(i)) = newBindingsV1(i)
+      i += 1
+    }
+    i = 0
+    while(i < newBindingsV2.length) {
+      arr(newBindingsI2(i)) = newBindingsV2(i)
+      i += 1
+    }
+    new ValScope(null, null, null, arr)
+  }
 }
 
 /**
@@ -346,20 +422,18 @@ object ValScope{
   * which do not change it (e.g. those just updating `dollar0` or `self0`) the
   * bindings array can be shared cheaply.
   */
-class ValScope(val dollar0: Option[Val.Obj],
-               val self0: Option[Val.Obj],
-               val super0: Option[Val.Obj],
+class ValScope(val dollar0: Val.Obj,
+               val self0: Val.Obj,
+               val super0: Val.Obj,
                bindings0: Array[Val.Lazy]) {
 
-  def bindings(k: Int): Option[Val.Lazy] = bindings0(k) match{
-    case null => None
-    case v => Some(v)
-  }
+  def bindings(k: Int): Val.Lazy = bindings0(k)
 
-  def extend(newBindings: TraversableOnce[(Int, (Option[Val.Obj], Option[Val.Obj]) => Val.Lazy)] = Nil,
-             newDollar: Option[Val.Obj] = null,
-             newSelf: Option[Val.Obj] = null,
-             newSuper: Option[Val.Obj] = null) = {
+  def extend(newBindingsI: Array[Expr.Bind] = null,
+             newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
+             newDollar: Val.Obj = null,
+             newSelf: Val.Obj = null,
+             newSuper: Val.Obj = null) = {
     val dollar = if (newDollar != null) newDollar else dollar0
     val self = if (newSelf != null) newSelf else self0
     val sup = if (newSuper != null) newSuper else super0
@@ -367,12 +441,55 @@ class ValScope(val dollar0: Option[Val.Obj],
       dollar,
       self,
       sup,
-      if (newBindings.isEmpty) bindings0
+      if (newBindingsI == null || newBindingsI.length == 0) bindings0
       else{
-        val newArr = java.util.Arrays.copyOf(bindings0, bindings0.length)
-        for((i, v) <- newBindings) newArr(i) = v.apply(self, sup)
-        newArr
+        val b = bindings0.clone()
+        var i = 0
+        while(i < newBindingsI.length) {
+          b(newBindingsI(i).name) = newBindingsF(i).apply(self, sup)
+          i += 1
+        }
+        b
       }
     )
+  }
+
+  def extendSimple(newBindingsI: Array[Int],
+                   newBindingsV: Array[Val.Lazy]) = {
+    if(newBindingsI == null || newBindingsI.length == 0) this
+    else {
+      val b = bindings0.clone()
+      var i = 0
+      while(i < newBindingsI.length) {
+        b(newBindingsI(i)) = newBindingsV(i)
+        i += 1
+      }
+      new ValScope(dollar0, self0, super0, b)
+    }
+  }
+
+  def extendSimple(newBindingsI1: Array[Int],
+                   newBindingsV1: Array[Val.Lazy],
+                   newBindingsI2: Array[Int],
+                   newBindingsV2: Array[Val.Lazy]) = {
+    val b = bindings0.clone()
+    var i = 0
+    while(i < newBindingsV1.length) {
+      b(newBindingsI1(i)) = newBindingsV1(i)
+      i += 1
+    }
+    i = 0
+    while(i < newBindingsV2.length) {
+      b(newBindingsI2(i)) = newBindingsV2(i)
+      i += 1
+    }
+    new ValScope(dollar0, self0, super0, b)
+  }
+
+  def extendSimple(newBindingI: Int,
+                   newBindingV: Val.Lazy) = {
+    val b = bindings0.clone()
+    b(newBindingI) = newBindingV
+    new ValScope(dollar0, self0, super0, b)
   }
 }

@@ -6,7 +6,7 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
+  def createParseCache() = collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]]()
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
@@ -15,7 +15,7 @@ object SjsonnetMain {
                 importer: js.Function2[String, String, js.Array[String]],
                 preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
-      mutable.Map.empty,
+      mutable.HashMap.empty,
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap,
       JsVirtualPath(wd0),
@@ -51,7 +51,7 @@ case class JsVirtualPath(path: String) extends Path{
 
   def /(s: String): Path = JsVirtualPath(path + "/" + s)
 
-  def renderOffsetStr(offset: Int, loadedFileContents: mutable.Map[Path, Array[Int]]): String = {
+  def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     path + ":" + offset
   }
 }

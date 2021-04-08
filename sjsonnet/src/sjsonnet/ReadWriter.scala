@@ -3,76 +3,78 @@ package sjsonnet
 /**
   * Typeclasses for easy conversion between [[Val]]s and Scala data types
   */
-sealed trait ReadWriter[T]{
-  def apply(t: Val, ev: EvalScope, fs: FileScope): Either[String, T]
+sealed abstract class ReadWriter[T] {
+  protected[this] def fail(err: String, v: Val): Nothing =
+    throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + v.prettyName)
+  def apply(t: Val, ev: EvalScope, fs: FileScope): T
   def write(pos: Position, t: T): Val
 }
 object ReadWriter{
   implicit object StringRead extends ReadWriter[String]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case Val.Str(_, s) => Right(s)
-      case _ => Left("String")
+      case Val.Str(_, s) => s
+      case _ => fail("String", t)
     }
     def write(pos: Position, t: String) = Val.Str(pos, t)
   }
   implicit object BooleanRead extends ReadWriter[Boolean]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case Val.True(_) => Right(true)
-      case Val.False(_) => Right(false)
-      case _ => Left("Boolean")
+      case Val.True(_) => true
+      case Val.False(_) => false
+      case _ => fail("Boolean", t)
     }
     def write(pos: Position, t: Boolean) = Val.bool(pos, t)
   }
   implicit object IntRead extends ReadWriter[Int]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case Val.Num(_, s) => Right(s.toInt)
-      case _ => Left("Int")
+      case Val.Num(_, s) => s.toInt
+      case _ => fail("Int", t)
     }
     def write(pos: Position, t: Int) = Val.Num(pos, t)
   }
   implicit object DoubleRead extends ReadWriter[Double]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case Val.Num(_, s) => Right(s)
-      case _ => Left("Number")
+      case Val.Num(_, s) => s
+      case _ => fail("Number", t)
     }
     def write(pos: Position, t: Double) = Val.Num(pos, t)
   }
   implicit object ValRead extends ReadWriter[Val]{
-    def apply(t: Val, ev: EvalScope, fs: FileScope) = Right(t)
+    def apply(t: Val, ev: EvalScope, fs: FileScope) = t
     def write(pos: Position, t: Val) = t
   }
   implicit object ObjRead extends ReadWriter[Val.Obj]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case v: Val.Obj => Right(v)
-      case _ => Left("Object")
+      case v: Val.Obj => v
+      case _ => fail("Object", t)
     }
     def write(pos: Position, t: Val.Obj) = t
   }
   implicit object ArrRead extends ReadWriter[Val.Arr]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case v: Val.Arr => Right(v)
-      case _ => Left("Array")
+      case v: Val.Arr => v
+      case _ => fail("Array", t)
     }
     def write(pos: Position, t: Val.Arr) = t
   }
   implicit object FuncRead extends ReadWriter[Val.Func]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case v: Val.Func => Right(v)
-      case _ => Left("Function")
+      case v: Val.Func => v
+      case _ => fail("Function", t)
     }
     def write(pos: Position, t: Val.Func) = t
   }
 
   implicit object ApplyerRead extends ReadWriter[Applyer]{
     def apply(t: Val, ev: EvalScope, fs: FileScope) = t match{
-      case v: Val.Func => Right(Applyer(v, ev, fs))
-      case _ => Left("Function")
+      case v: Val.Func => Applyer(v, ev, fs)
+      case _ => fail("Function", t)
     }
     def write(pos: Position, t: Applyer) = t.f
   }
 }
 case class Applyer(f: Val.Func, ev: EvalScope, fs: FileScope){
   def apply(args: Val.Lazy*) = {
-    f.apply(args.map((None, _)), "(memory)", -1)(fs, ev)
+    f.apply(null, args.toArray, new Position(fs, -1))(ev)
   }
 }

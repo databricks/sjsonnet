@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
+class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
                   extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
@@ -36,17 +36,16 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
                     path: Path,
                     visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
-      res <- parseCache.getOrElseUpdate(txt, fastparse.parse(txt, Parser.document(_))) match{
+      res <- parseCache.getOrElseUpdate((path, txt), fastparse.parse(txt, new Parser(path).document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
         case Parsed.Success(r, index) => Right(r)
       }
-      (parsed, nameIndices) = res
+      (parsed, newFileScope) = res
       _ = evaluator.loadedFileContents(path) = txt
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(
-            Std.scope(nameIndices.size + 1),
-            new FileScope(path, nameIndices)
+            Std.scope(newFileScope.nameIndices.size + 1)
           )
         )
         catch{case NonFatal(e) =>
@@ -58,12 +57,16 @@ class Interpreter(parseCache: collection.mutable.Map[String, fastparse.Parsed[(E
         }
       res = res0 match{
         case f: Val.Func =>
-          f.copy(params = Params(f.params.args.map{ case (k, default, i) =>
-            (k, tlaVars.get(k) match{
-              case None => default
-              case Some(v) => Some(Materializer.toExpr(v))
-            }, i)
-          }))
+          val defaults2 = f.params.defaultExprs.clone()
+          var i = 0
+          while(i < defaults2.length) {
+            tlaVars.get(f.params.names(i)) match {
+              case Some(v) => defaults2(i) = Materializer.toExpr(v)(evaluator)
+              case None =>
+            }
+            i += 1
+          }
+          f.copy(params = Params(f.params.names, defaults2, f.params.indices))
         case x => x
       }
       json <-

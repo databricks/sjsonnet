@@ -10,7 +10,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]]()
+  def createParseCache() = collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]]()
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
     (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {
@@ -25,12 +25,12 @@ object SjsonnetMain {
       .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case NonFatal(_) => None})
   }
   def main(args: Array[String]): Unit = {
-    val exitCode = main0(
+    var exitCode = main0(
       args match {
         case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
         case _ => args
       },
-      collection.mutable.Map.empty,
+      collection.mutable.HashMap.empty,
       System.in,
       System.out,
       System.err,
@@ -41,7 +41,7 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-            parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
+            parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -124,7 +124,7 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-                     parseCache: collection.mutable.Map[String, fastparse.Parsed[(Expr, Map[String, Int])]],
+                     parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
