@@ -276,7 +276,7 @@ object Val{
 
     def apply(argNames: Array[String], argVals: Array[Lazy],
               outerPos: Position)
-             (implicit evaluator: EvalScope) = {
+             (implicit evaluator: EvalScope): Val = {
 
       val argsSize = argVals.length
       val simple = argNames == null && params.indices.length == argsSize
@@ -332,6 +332,19 @@ object Val{
       }
 
       evalRhs(newScope, evaluator, funDefFileScope, outerPos)
+    }
+
+    def apply(argVal: Lazy, outerPos: Position)(implicit evaluator: EvalScope): Val = {
+      if(params.indices.length != 1) // need to take default values into account
+        apply(null, Array(argVal), outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope match {
+          case null => ValScope.createSimple(argVal)
+          case s => s.extendSimple(params.indices(0), argVal)
+        }
+        evalRhs(newScope, evaluator, funDefFileScope, outerPos)
+      }
     }
 
     def validateFunctionCall(passedArgsBindingsI: Array[Int],
@@ -407,6 +420,12 @@ trait EvalScope extends EvalErrorScope{
 
 object ValScope{
   def empty(size: Int) = new ValScope(null, null, null, new Array(size))
+
+  def createSimple(newBindingV: Val.Lazy) = {
+    val arr = new Array[Val.Lazy](1)
+    arr(0) = newBindingV
+    new ValScope(null, null, null, arr)
+  }
 
   def createSimple(newBindingsI: Array[Int],
                    newBindingsV: Array[Val.Lazy]) = {

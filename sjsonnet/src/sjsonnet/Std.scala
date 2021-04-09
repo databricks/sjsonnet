@@ -53,13 +53,13 @@ object Std {
       })
     }),
     "objectHas" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, ev, fs, pos) =>
-      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
-      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force)
+      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force)
       Val.bool(pos, o.containsVisibleKey(f))
     }),
     "objectHasAll" -> Val.Func(null, null, Params.mk(("o", null, 0), ("f", null, 1)), { (scope, ev, fs, pos) =>
-      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force, ev, fs)
-      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      val o = implicitly[ReadWriter[Val.Obj]].apply(scope.bindings(0).force)
+      val f = implicitly[ReadWriter[String]].apply(scope.bindings(1).force)
       Val.bool(pos, o.containsKey(f))
     }),
     builtin("objectFields", "o"){ (pos, ev, fs, v1: Val.Obj) =>
@@ -106,19 +106,19 @@ object Std {
     builtin("format", "str", "vals"){ (pos, ev, fs, v1: String, v2: Val) =>
       Format.format(v1, v2, new Position(fs, -1))(ev)
     },
-    builtin("foldl", "func", "arr", "init"){ (pos, ev, fs, func: Applyer, arr: Val.Arr, init: Val) =>
+    builtin("foldl", "func", "arr", "init"){ (pos, ev, fs, func: Val.Func, arr: Val.Arr, init: Val) =>
       var current = init
       for(item <- arr.asLazyArray){
         val c = current
-        current = func.apply(() => c, item)
+        current = func.apply(null, Array(() => c, item), fs.noOffsetPos)(ev)
       }
       current
     },
-    builtin("foldr", "func", "arr", "init"){ (pos, ev, fs, func: Applyer, arr: Val.Arr, init: Val) =>
+    builtin("foldr", "func", "arr", "init"){ (pos, ev, fs, func: Val.Func, arr: Val.Arr, init: Val) =>
       var current = init
       for(item <- arr.asLazyArray.reverse){
         val c = current
-        current = func.apply(item, () => c)
+        current = func.apply(null, Array(item, () => c), fs.noOffsetPos)(ev)
       }
       current
     },
@@ -178,7 +178,7 @@ object Std {
       math.max(minVal, math.min(x, maxVal))
     },
 
-    builtin("makeArray", "sz", "func"){ (pos, ev, fs, sz: Int, func: Applyer) =>
+    builtin("makeArray", "sz", "func"){ (pos, ev, fs, sz: Int, func: Val.Func) =>
       new Val.Arr(
         pos,
         {
@@ -186,7 +186,7 @@ object Std {
           var i = 0
           while(i < sz) {
             val forcedI = i
-            a(i) = () => func.apply(() => Val.Num(pos, forcedI))
+            a(i) = () => func.apply(() => Val.Num(pos, forcedI), fs.noOffsetPos)(ev)
             i += 1
           }
           a
@@ -263,50 +263,50 @@ object Std {
       v.isInstanceOf[Val.Func]
     },
     "count" -> Val.Func(null, null, Params.mk(("arr", null, 0), ("x", null, 1)), { (scope, ev, fs, pos) =>
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(0).force, ev, fs)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(0).force)
       val x = scope.bindings(1).force
       var count = 0
       arr.foreach(v => if(ev.equal(v, x)) count += 1)
       Val.Num(pos, count)
     }),
     "filter" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, ev, fs, pos) =>
-      val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
-      new Val.Arr(pos, arr.asLazyArray.filter(v => func.apply(v).isInstanceOf[Val.True]))
+      val func = implicitly[ReadWriter[Val.Func]].apply(scope.bindings(0).force)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force)
+      new Val.Arr(pos, arr.asLazyArray.filter(v => func.apply(v, fs.noOffsetPos)(ev).isInstanceOf[Val.True]))
     }),
     "map" -> Val.Func(null, null, Params.mk(("func", null, 0), ("arr", null, 1)), { (scope, ev, fs, pos) =>
-      val func = implicitly[ReadWriter[Applyer]].apply(scope.bindings(0).force, ev, fs)
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
-      new Val.Arr(pos, arr.asLazyArray.map(v => (() => func.apply(v)): Val.Lazy))
+      val func = implicitly[ReadWriter[Val.Func]].apply(scope.bindings(0).force)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force)
+      new Val.Arr(pos, arr.asLazyArray.map(v => (() => func.apply(v, fs.noOffsetPos)(ev)): Val.Lazy))
     }),
-    builtin("mapWithKey", "func", "obj"){ (pos, ev, fs, func: Applyer, obj: Val.Obj) =>
+    builtin("mapWithKey", "func", "obj"){ (pos, ev, fs, func: Val.Func, obj: Val.Obj) =>
       val allKeys = obj.allKeyNames
       Val.Obj.mk(
         pos,
         allKeys.map{ k =>
           k -> (Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
-            func.apply(
+            func.apply(null, Array(
               () => Val.Str(pos, k),
               () => obj.value(k, fs.noOffsetPos)(ev)
-            )
+            ), fs.noOffsetPos)(ev)
           ))
         }: _*
       )
     },
-    builtin("mapWithIndex", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val.Arr) =>
+    builtin("mapWithIndex", "func", "arr"){ (pos, ev, fs, func: Val.Func, arr: Val.Arr) =>
       new Val.Arr(
         pos,
         arr.asLazyArray.zipWithIndex.map{ case (x, i) =>
-          (() => func.apply(() => Val.Num(pos, i), x)): Val.Lazy
+          (() => func.apply(null, Array(() => Val.Num(pos, i), x), fs.noOffsetPos)(ev)): Val.Lazy
         }
       )
     },
-    builtin("flatMap", "func", "arr"){ (pos, ev, fs, func: Applyer, arr: Val) =>
+    builtin("flatMap", "func", "arr"){ (pos, ev, fs, func: Val.Func, arr: Val) =>
       val res: Val = arr match {
         case a: Val.Arr =>
           val arrResults = a.asLazyArray.flatMap {
             v => {
-              val fres = func.apply(v)
+              val fres = func.apply(v, fs.noOffsetPos)(ev)
               fres match {
                 case va: Val.Arr => va.asLazyArray
                 case unknown => throw new Error.Delegate("flatMap func must return an array, not " + unknown)
@@ -318,7 +318,7 @@ object Std {
         case s: Val.Str =>
           val builder = new StringBuilder()
           for (c: Char <- s.value) {
-            val fres = func.apply(() => Val.Str(pos, c.toString))
+            val fres = func.apply(() => Val.Str(pos, c.toString), fs.noOffsetPos)(ev)
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
@@ -332,19 +332,19 @@ object Std {
       res
     },
 
-    builtin("filterMap", "filter_func", "map_func", "arr"){ (pos, ev, fs, filter_func: Applyer, map_func: Applyer, arr: Val.Arr) =>
+    builtin("filterMap", "filter_func", "map_func", "arr"){ (pos, ev, fs, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
       new Val.Arr(
         pos,
         arr.asLazyArray.flatMap { i =>
-          val x = i.force
-          if (!filter_func.apply(() => x).isInstanceOf[Val.True]) None
-          else Some[Val.Lazy](() => map_func.apply(() => x))
+          i.force
+          if (!filter_func.apply(i, fs.noOffsetPos)(ev).isInstanceOf[Val.True]) None
+          else Some[Val.Lazy](() => map_func.apply(i, fs.noOffsetPos)(ev))
         }
       )
     },
     "find" -> Val.Func(null, null, Params.mk(("value", null, 0), ("arr", null, 1)), { (scope, ev, fs, pos) =>
       val value = scope.bindings(0).force
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force)
       val b = new mutable.ArrayBuilder.ofRef[Val.Lazy]
       var i = 0
       while(i < arr.length) {
@@ -374,13 +374,13 @@ object Std {
       s.substring(safeOffset, safeOffset + safeLength)
     },
     "startsWith" -> Val.Func(null, null, Params.mk(("a", null, 0), ("b", null, 1)), { (scope, ev, fs, pos) =>
-      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
-      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force)
+      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force)
       Val.bool(pos, a.startsWith(b))
     }),
     "endsWith" -> Val.Func(null, null, Params.mk(("a", null, 0), ("b", null, 1)), { (scope, ev, fs, pos) =>
-      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
-      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      val a = implicitly[ReadWriter[String]].apply(scope.bindings(0).force)
+      val b = implicitly[ReadWriter[String]].apply(scope.bindings(1).force)
       Val.bool(pos, a.endsWith(b))
     }),
     builtin("char", "n"){ (pos, ev, fs, n: Double) =>
@@ -406,7 +406,7 @@ object Std {
 
     "join" -> Val.Func(null, null, Params.mk(("sep", null, 0), ("arr", null, 1)), { (scope, ev, fs, pos) =>
       val sep = scope.bindings(0).force
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force, ev, fs)
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(scope.bindings(1).force)
       sep match {
         case Val.Str(_, s) =>
           val b = new java.lang.StringBuilder()
@@ -701,14 +701,13 @@ object Std {
           }
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
-          val keyFApplyer = Applyer(keyFFunc, ev, fs)
-          val appliedX = keyFApplyer.apply(v)
+          val appliedX = keyFFunc.apply(v, fs.noOffsetPos)(ev)
 
           if (b.exists(value => {
-            val appliedValue = keyFApplyer.apply(value)
+            val appliedValue = keyFFunc.apply(value, fs.noOffsetPos)(ev)
             ev.equal(appliedValue, appliedX)
           }) && !out.exists(value => {
-            val mValue = keyFApplyer.apply(value)
+            val mValue = keyFFunc.apply(value, fs.noOffsetPos)(ev)
             ev.equal(mValue, appliedX)
           })) {
             out.append(v)
@@ -746,14 +745,13 @@ object Std {
           }
         } else {
           val keyFFunc = keyF.asInstanceOf[Val.Func]
-          val keyFApplyer = Applyer(keyFFunc, ev, fs)
-          val appliedX = keyFApplyer.apply(v)
+          val appliedX = keyFFunc.apply(v, fs.noOffsetPos)(ev)
 
           if (!b.exists(value => {
-            val appliedValue = keyFApplyer.apply(value)
+            val appliedValue = keyFFunc.apply(value, fs.noOffsetPos)(ev)
             ev.equal(appliedValue, appliedX)
           }) && !out.exists(value => {
-            val mValue = keyFApplyer.apply(value)
+            val mValue = keyFFunc.apply(value, fs.noOffsetPos)(ev)
             ev.equal(mValue, appliedX)
           })) {
             out.append(v)
@@ -774,18 +772,17 @@ object Std {
         val x: Val.Lazy = () => args("x")
         val arr = args("arr").asInstanceOf[Val.Arr].asLazyArray
         val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val keyFApplyer = Applyer(keyFFunc, ev, fs)
-        val appliedX = keyFApplyer.apply(x)
+        val appliedX = keyFFunc.apply(x, fs.noOffsetPos)(ev)
         arr.exists(value => {
-          val appliedValue = keyFApplyer.apply(value)
+          val appliedValue = keyFFunc.apply(value, fs.noOffsetPos)(ev)
           ev.equal(appliedValue, appliedX)
         })
       }
     },
 
     "split" -> Val.Func(null, null, Params.mk(("str", null, 0), ("c", null, 1)), { (scope, ev, fs, pos) =>
-      val str = implicitly[ReadWriter[String]].apply(scope.bindings(0).force, ev, fs)
-      val cStr = implicitly[ReadWriter[String]].apply(scope.bindings(1).force, ev, fs)
+      val str = implicitly[ReadWriter[String]].apply(scope.bindings(0).force)
+      val cStr = implicitly[ReadWriter[String]].apply(scope.bindings(1).force)
       if(cStr.length != 1) throw new Error.Delegate("std.split second parameter should have length 1, got "+cStr.length)
       val c = cStr.charAt(0)
       val b = new mutable.ArrayBuilder.ofRef[Val.Lazy]
@@ -926,7 +923,7 @@ object Std {
       null, null,
       Params(params, new Array[Expr](params.length), params.indices.toArray),
       { (scope, ev, fs, outerPos) =>
-        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force)
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1))
       }
     ))
@@ -940,8 +937,8 @@ object Std {
       Params(params, new Array[Expr](params.length), params.indices.toArray),
       { (scope, ev, fs, outerPos) =>
         //println("--- calling builtin: "+name)
-        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
-        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force, ev, fs)
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force)
+        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force)
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1, v2))
       }
     ))
@@ -954,9 +951,9 @@ object Std {
       null, null,
       Params(params, new Array[Expr](params.length), params.indices.toArray),
       { (scope, ev, fs, outerPos) =>
-        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force, ev, fs)
-        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force, ev, fs)
-        val v3: T3 = implicitly[ReadWriter[T3]].apply(scope.bindings(2).force, ev, fs)
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(scope.bindings(0).force)
+        val v2: T2 = implicitly[ReadWriter[T2]].apply(scope.bindings(1).force)
+        val v3: T3 = implicitly[ReadWriter[T3]].apply(scope.bindings(2).force)
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, fs, v1, v2, v3))
       }
     ))
@@ -1005,10 +1002,9 @@ object Std {
         }
       } else if (!keyF.isInstanceOf[Val.False]) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val keyFApplyer = Applyer(keyFFunc, ev, fs)
 
-        val o1Key = keyFApplyer.apply(v)
-        val o2Key = keyFApplyer.apply(out.last)
+        val o1Key = keyFFunc.apply(v, fs.noOffsetPos)(ev)
+        val o2Key = keyFFunc.apply(out.last, fs.noOffsetPos)(ev)
         val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))(ev)
         val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))(ev)
 
@@ -1043,13 +1039,12 @@ object Std {
               val objs = vs.asStrictArray.map(_.cast[Val.Obj])
 
               val keyFFunc = keyF.asInstanceOf[Val.Func]
-              val keyFApplyer = Applyer(keyFFunc, ev, fs)
-              val keys = objs.map((v) => keyFApplyer((() => v): Val.Lazy))
+              val keys = objs.map((v) => keyFFunc(null, Array((() => v): Val.Lazy), fs.noOffsetPos)(ev))
 
               if (keys.forall(_.isInstanceOf[Val.Str])){
-                objs.sortBy((v) => keyFApplyer((() => v): Val.Lazy).cast[Val.Str].value).map(x => (() => x): Val.Lazy)
+                objs.sortBy((v) => keyFFunc(null, Array((() => v): Val.Lazy), fs.noOffsetPos)(ev).cast[Val.Str].value).map(x => (() => x): Val.Lazy)
               } else if (keys.forall(_.isInstanceOf[Val.Num])) {
-                objs.sortBy((v) => keyFApplyer((() => v): Val.Lazy).cast[Val.Num].value).map(x => (() => x): Val.Lazy)
+                objs.sortBy((v) => keyFFunc(null, Array((() => v): Val.Lazy), fs.noOffsetPos)(ev).cast[Val.Num].value).map(x => (() => x): Val.Lazy)
               } else {
                 throw new Error.Delegate("Cannot sort with key values that are " + keys(0).prettyName + "s")
               }
