@@ -16,14 +16,27 @@ import scala.reflect.ClassTag
   * the tree can contain functions.
   */
 sealed abstract class Val {
+  def pos: Position
   def prettyName: String
+
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
     else throw new Error.Delegate(
       "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
     )
-  def pos: Position
+
+  private[this] def failAs(err: String): Nothing =
+    throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + prettyName)
+
+  def asString: String = failAs("String")
+  def asBoolean: Boolean = failAs("Boolean")
+  def asInt: Int = failAs("Int")
+  def asDouble: Double = failAs("Number")
+  def asObj: Val.Obj = failAs("Object")
+  def asArr: Val.Arr = failAs("Array")
+  def asFunc: Val.Func = failAs("Function")
 }
+
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
   implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
@@ -49,7 +62,9 @@ object Val{
   }
 
   abstract class Literal extends Val with Expr
-  abstract class Bool extends Literal
+  abstract class Bool extends Literal {
+    override def asBoolean: Boolean = this.isInstanceOf[True]
+  }
 
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
 
@@ -64,13 +79,17 @@ object Val{
   }
   case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
+    override def asString: String = value
   }
   case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
+    override def asInt: Int = value.toInt
+    override def asDouble: Double = value
   }
 
   class Arr(val pos: Position, private val value: Array[Lazy]) extends Val{
     def prettyName = "array"
+    override def asArr: Arr = this
     def length: Int = value.length
     def force(i: Int) = value(i).force
 
@@ -153,6 +172,7 @@ object Val{
     }
 
     def prettyName = "object"
+    override def asObj: Val.Obj = this
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if(`super` != null) `super`.gatherKeys(mapping)
@@ -275,6 +295,8 @@ object Val{
     def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = null
 
     def prettyName = "function"
+
+    override def asFunc: Func = this
 
     def apply(argNames: Array[String], argVals: Array[Lazy],
               outerPos: Position)
@@ -484,7 +506,7 @@ object Val{
       else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos.fileScope, outerPos)
   }
 
-  abstract class Builtin1(paramName1: String) extends Builtin(paramName1) {
+  abstract class Builtin1(pn1: String) extends Builtin(pn1) {
     final def evalRhs(args: Array[Val], ev: EvalScope, fs: FileScope, pos: Position): Val =
       evalRhs(args(0), ev, fs, pos)
 
@@ -503,7 +525,7 @@ object Val{
       else super.apply(null, Array(argVal), outerPos)
   }
 
-  abstract class Builtin2(paramName1: String, paramName2: String) extends Builtin(paramName1, paramName2) {
+  abstract class Builtin2(pn1: String, pn2: String) extends Builtin(pn1, pn2) {
     final def evalRhs(args: Array[Val], ev: EvalScope, fs: FileScope, pos: Position): Val =
       evalRhs(args(0), args(1), ev, fs, pos)
 
@@ -520,6 +542,17 @@ object Val{
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.indices.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos.fileScope, outerPos)
       else super.apply(null, Array(argVal1, argVal2), outerPos)
+  }
+
+  abstract class Builtin3(pn1: String, pn2: String, pn3: String) extends Builtin(pn1, pn2, pn3) {
+    final def evalRhs(args: Array[Val], ev: EvalScope, fs: FileScope, pos: Position): Val =
+      evalRhs(args(0), args(1), args(2), ev, fs, pos)
+
+    def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, fs: FileScope, pos: Position): Val
+
+    override def apply(argNames: Array[String], argVals: Array[Lazy], outerPos: Position)(implicit ev: EvalScope): Val =
+      if(argNames == null && argVals.length == 2) apply2(argVals(0).force, argVals(1).force, outerPos)
+      else super.apply(argNames, argVals, outerPos)
   }
 }
 
