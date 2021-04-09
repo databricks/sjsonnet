@@ -395,15 +395,11 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
     }
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope) = {
-    Val.Func(
-      outerPos,
-      scope,
-      params,
-      (s, _, fs, _) => visitExpr(rhs)(s),
-      (default, s, e) => visitExpr(default)(s)
-    )
-  }
+  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope) =
+    new Val.Func(outerPos, scope, params) {
+      def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val = visitExpr(rhs)(vs)
+      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
+    }
 
   def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Val.Lazy] = {
     val arrF = new Array[(Val.Obj, Val.Obj) => Val.Lazy](bindings.length)

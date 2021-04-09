@@ -66,7 +66,10 @@ class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastpar
             }
             i += 1
           }
-          f.copy(params = Params(f.params.names, defaults2, f.params.indices))
+          new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2, f.params.indices)) {
+            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = f.evalRhs(vs, es, fs, pos)
+            override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = f.evalDefault(expr, vs, es)
+          }
         case x => x
       }
       json <-
