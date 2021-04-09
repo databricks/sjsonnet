@@ -82,7 +82,7 @@ object Format{
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(pos, Array[Val.Lazy](() => x))
+      case x => new Val.Arr(pos, Array[Val.Lazy](() => x))
     }
     val (leading, chunks) = fastparse.parse(s, format(_)).get.value
     val output = new StringBuilder
@@ -94,10 +94,10 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.cast[Val.Arr].value(i).force)
+            case None => Materializer(values.cast[Val.Arr].force(i))
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).force)
+                case v: Val.Arr => Materializer(v.force(i))
                 case v: Val.Obj => Materializer(v.value(key, pos))
               }
           }

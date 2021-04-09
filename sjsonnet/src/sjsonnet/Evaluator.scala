@@ -80,7 +80,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
         dollar
       case Id(pos, value) => visitId(pos, value)
 
-      case Arr(pos, value) => Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
+      case Arr(pos, value) => new Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
       case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, pos, binds, fields, asserts, null)
       case ObjBody.ObjComp(pos, preLocals, key, value, postLocals, first, rest) => visitObjComp(pos, preLocals, key, value, postLocals, first, rest, null)
 
@@ -113,7 +113,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       case Function(pos, params, body) => visitMethod(body, params, pos)
       case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
       case Comp(pos, value, first, rest) =>
-        Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
+        new Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
       case ObjExtend(superPos, value, ext) => {
         if(strict && isObjLiteral(value))
           Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", superPos)
@@ -222,13 +222,10 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
                          stride: Option[Expr])
                         (implicit scope: ValScope)= {
     visitExpr(value) match {
-      case Val.Arr(_, a) =>
-
-        val range =
-          start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
-            end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt) by
-            stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-        Val.Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < a.length).map(a).toArray)
+      case a: Val.Arr =>
+        a.slice(start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
+          end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt),
+          stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt))
       case Val.Str(_, s) =>
         val range =
           start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
@@ -249,10 +246,10 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       else s.value(key.value, pos)
     } else (visitExpr(value), visitExpr(index)) match {
       case (v: Val.Arr, i: Val.Num) =>
-        if (i.value > v.value.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.value.length})", pos)
+        if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
         val int = i.value.toInt
         if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
-        try v.value(int).force
+        try v.force(int)
         catch Error.tryCatchWrap(pos)
       case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
@@ -340,7 +337,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
         try Val.Str(pos, Materializer.stringify(l) + r)
         catch Error.tryCatchWrap(pos)
       case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(pos, l)
-      case (Val.Arr(_, l), Expr.BinaryOp.`+`, Val.Arr(_, r)) => Val.Arr(pos,  l ++ r)
+      case (l: Val.Arr, Expr.BinaryOp.`+`, r: Val.Arr) => l.concat(pos, r)
 
       case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(pos, l - r)
 
@@ -531,7 +528,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
         for{
           s <- scopes
           e <- visitExpr(expr)(s) match{
-            case Val.Arr(_, value) => value
+            case a: Val.Arr => a.asLazyArray
             case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
               expr.pos
@@ -562,11 +559,11 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       case (Val.Null(_), y) => y.isInstanceOf[Val.Null]
       case (Val.Num(_, n1), Val.Num(_, n2)) => n1 == n2
       case (Val.Str(_, s1), Val.Str(_, s2)) => s1 == s2
-      case (Val.Arr(_, xs), Val.Arr(_, ys)) =>
+      case (xs: Val.Arr, ys: Val.Arr) =>
         if(xs.length != ys.length) return false
         var i = 0
         while(i < xs.length) {
-          if(!equal(xs(i).force, ys(i).force)) return false
+          if(!equal(xs.force(i), ys.force(i))) return false
           i += 1
         }
         true

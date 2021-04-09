@@ -27,12 +27,12 @@ object Materializer {
       case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
       case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
-      case Val.Arr(pos, xs) =>
-        storePos(pos);
+      case xs: Val.Arr =>
+        storePos(xs.pos);
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x.force, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
+            apply0(x, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
             -1
           )
         }
@@ -52,7 +52,7 @@ object Materializer {
           storePos(
             value match{
               case v: Val.Obj if v.hasKeys => value.pos
-              case v: Val.Arr if v.value.nonEmpty => value.pos
+              case v: Val.Arr if v.length > 0 => value.pos
               case _ => null
             }
           )
@@ -85,7 +85,7 @@ object Materializer {
     case ujson.Null => Val.Null(pos)
     case ujson.Num(n) => Val.Num(pos, n)
     case ujson.Str(s) => Val.Str(pos, s)
-    case ujson.Arr(xs) => Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Val.Lazy).toArray[Val.Lazy])
+    case ujson.Arr(xs) => new Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Val.Lazy).toArray[Val.Lazy])
     case ujson.Obj(xs) =>
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(x <- xs) {

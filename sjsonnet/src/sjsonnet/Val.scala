@@ -69,8 +69,39 @@ object Val{
     def prettyName = "number"
   }
 
-  case class Arr(pos: Position, value: Array[Lazy]) extends Val{
+  class Arr(val pos: Position, private val value: Array[Lazy]) extends Val{
     def prettyName = "array"
+    def length: Int = value.length
+    def force(i: Int) = value(i).force
+
+    def asLazy(i: Int) = value(i)
+    def asLazyArray: Array[Lazy] = value
+    def asStrictArray: Array[Val] = value.map(_.force)
+
+    def concat(newPos: Position, rhs: Arr): Arr =
+      new Arr(newPos, value ++ rhs.value)
+
+    def slice(start: Int, end: Int, stride: Int): Arr = {
+      val range = start until end by stride
+      new Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < value.length).map(value).toArray)
+    }
+
+    def iterator: Iterator[Val] = value.iterator.map(_.force)
+    def foreach[U](f: Val => U) = {
+      var i = 0
+      while(i < value.length) {
+        f(value(i).force)
+        i += 1
+      }
+    }
+    def forall(f: Val => Boolean): Boolean = {
+      var i = 0
+      while(i < value.length) {
+        if(!f(value(i).force)) return false
+        i += 1
+      }
+      true
+    }
   }
 
   object Obj{
@@ -190,9 +221,9 @@ object Val{
         val rr = r.asInstanceOf[Val.Num].value
         Val.Num(pos, ll + rr)
       } else if(l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
-        val ll = l.asInstanceOf[Val.Arr].value
-        val rr = r.asInstanceOf[Val.Arr].value
-        Val.Arr(pos, ll ++ rr)
+        val ll = l.asInstanceOf[Val.Arr].asLazyArray
+        val rr = r.asInstanceOf[Val.Arr].asLazyArray
+        new Val.Arr(pos, ll ++ rr)
       } else if(l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
         val ll = l.asInstanceOf[Val.Obj]
         val rr = r.asInstanceOf[Val.Obj]
