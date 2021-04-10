@@ -577,9 +577,9 @@ object Std {
     },
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
-                        "indent_array_in_object" -> Val.False(dummyPos)){ (pos, args, fs, ev) =>
-      val v = args("v")
-      val indentArrayInObject = args("indent_array_in_object")  match {
+                        "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, fs, ev) =>
+      val v = args(0)
+      val indentArrayInObject = args(1)  match {
           case Val.False(_) => false
           case Val.True(_) => true
           case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
@@ -591,9 +591,9 @@ object Std {
     },
     builtinWithDefaults("manifestYamlStream",
                         "v" -> null,
-                        "indent_array_in_object" -> Val.False(dummyPos)){ (pos, args, fs, ev) =>
-      val v = args("v")
-      val indentArrayInObject = args("indent_array_in_object")  match {
+                        "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, fs, ev) =>
+      val v = args(0)
+      val indentArrayInObject = args(1)  match {
         case Val.False(_) => false
         case Val.True(_) => true
         case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
@@ -680,50 +680,43 @@ object Std {
         new Val.Str(pos, new String(arr.asArr.iterator.map(_.cast[Val.Num].value.toByte).toArray, UTF_8))
     },
 
-    builtinWithDefaults("uniq", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      val arr = args("arr")
-      val keyF = args("keyF")
-
-      uniqArr(pos, ev, arr, keyF, fs)
+    builtinWithDefaults("uniq", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      uniqArr(pos, ev, args(0), args(1), fs)
     },
-    builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      val arr = args("arr")
-      val keyF = args("keyF")
-
-      sortArr(pos, ev, arr, keyF, fs)
+    builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      sortArr(pos, ev, args(0), args(1), fs)
     },
 
-    builtinWithDefaults("set", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      uniqArr(pos, ev, sortArr(pos, ev, args("arr"), args("keyF"), fs), args("keyF"), fs)
+    builtinWithDefaults("set", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      uniqArr(pos, ev, sortArr(pos, ev, args(0), args(1), fs), args(1), fs)
     },
-    builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      val a = args("a") match {
+    builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
-      val b = args("b") match {
+      val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
-
       val concat = new Val.Arr(pos, a ++ b)
-      uniqArr(pos, ev, sortArr(pos, ev, concat, args("keyF"), fs), args("keyF"), fs)
+      uniqArr(pos, ev, sortArr(pos, ev, concat, args(2), fs), args(2), fs)
     },
-    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      val a = args("a") match {
+    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
-      val b = args("b") match {
+      val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
 
-      val keyF = args("keyF")
+      val keyF = args(2)
       val out = new mutable.ArrayBuffer[Val.Lazy]
 
       for (v <- a) {
@@ -754,20 +747,20 @@ object Std {
 
       sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF, fs)
     },
-    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
+    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
 
-      val a = args("a") match {
+      val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
-      val b = args("b") match {
+      val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
         case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
       }
 
-      val keyF = args("keyF")
+      val keyF = args(2)
       val out = new mutable.ArrayBuffer[Val.Lazy]
 
       for (v <- a) {
@@ -798,17 +791,17 @@ object Std {
 
       sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF, fs)
     },
-    builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (pos, args, fs, ev) =>
-      val keyF = args("keyF")
+    builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, fs, ev) =>
+      val keyF = args(2)
 
       if (keyF.isInstanceOf[Val.False]) {
-        val ujson.Arr(mArr) = Materializer(args("arr"))(ev)
-        val mx = Materializer(args("x"))(ev)
+        val ujson.Arr(mArr) = Materializer(args(1))(ev)
+        val mx = Materializer(args(0))(ev)
         mArr.contains(mx)
       } else {
-        val arr = args("arr").asInstanceOf[Val.Arr].asLazyArray
+        val arr = args(1).asInstanceOf[Val.Arr].asLazyArray
         val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val appliedX = keyFFunc.apply1(args("x"), fs.noOffsetPos)(ev)
+        val appliedX = keyFFunc.apply1(args(0), fs.noOffsetPos)(ev)
         arr.exists(value => {
           val appliedValue = keyFFunc.apply1(value, fs.noOffsetPos)(ev)
           ev.equal(appliedValue, appliedX)
@@ -1003,13 +996,19 @@ object Std {
     * Arguments of the eval function are (args, ev)
     */
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
-                                        (eval: (Position, scala.collection.Map[String, Val], FileScope, EvalScope) => R): (String, Val.Func) = {
-    val indexedParams = params.zipWithIndex.map{case ((k, v), i) => (k, v, i)}.toArray
-    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}
-    name -> new Val.Func(null, null, Params.mk(indexedParams: _*)) {
+                                        (eval: (Array[Val], Position, FileScope, EvalScope) => R): (String, Val.Func) = {
+    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}.toArray
+    val p = Params(params.map(_._1).toArray, params.map(_._2).toArray, params.indices.toArray)
+    name -> new Val.Func(null, null, p) {
       def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
-        val args = indexedParamKeys.map {case (k, i) => k -> scope.bindings(i).force }.toMap
-        implicitly[ReadWriter[R]].write(pos, eval(pos, args, fs, ev))
+        //println("--- calling builtin: "+name)
+        val args = new Array[Val](indexedParamKeys.length)
+        var i = 0
+        while(i < args.length) {
+          args(i) = scope.bindings(i).force
+          i += 1
+        }
+        implicitly[ReadWriter[R]].write(pos, eval(args, pos, fs, ev))
       }
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
     }

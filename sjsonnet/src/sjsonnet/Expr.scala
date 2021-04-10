@@ -65,11 +65,6 @@ object Expr{
       b
     }
   }
-  object Params {
-    def mk(params: (String, Expr, Int)*): Params = {
-      Params(params.map(_._1).toArray, params.map(_._2).toArray, params.map(_._3).toArray)
-    }
-  }
   case class Args(names: Array[String], exprs: Array[Expr])
 
   case class UnaryOp(pos: Position, op: UnaryOp.Op, value: Expr) extends Expr
