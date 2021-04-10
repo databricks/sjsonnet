@@ -91,7 +91,7 @@ object Val{
     override def asDouble: Double = value
   }
 
-  class Arr(val pos: Position, private val value: Array[Lazy]) extends Val{
+  class Arr(val pos: Position, private val value: Array[Lazy]) extends Literal {
     def prettyName = "array"
     override def asArr: Arr = this
     def length: Int = value.length
