@@ -53,12 +53,16 @@ object Val{
     * are all wrapped in [[Lazy]] and only truly evaluated on-demand
     */
   abstract class Lazy {
-    private[this] var cached: Val = null
+    protected[this] var cached: Val = null
     def compute(): Val
     final def force: Val = {
       if(cached == null) cached = compute()
       cached
     }
+  }
+  final class Strict(v: Val) extends Lazy {
+    this.cached =v
+    def compute = v
   }
 
   abstract class Literal extends Val with Expr
