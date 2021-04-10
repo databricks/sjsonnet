@@ -420,8 +420,9 @@ class Parser(val currentFile: Path) {
   }
 }
 
-class Position(val fileScope: FileScope, val offset: Int) {
+final class Position(val fileScope: FileScope, val offset: Int) {
   def currentFile = fileScope.currentFile
+  def noOffset = fileScope.noOffsetPos
   override def equals(o: Any) = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _ => false
