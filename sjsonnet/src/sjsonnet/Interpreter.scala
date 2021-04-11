@@ -36,6 +36,13 @@ class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastpar
                     path: Path,
                     visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
     for{
+      v <- evaluate(txt, path)
+      r <- materialize(v, visitor)
+    } yield r
+  }
+
+  def evaluate[T](txt: String, path: Path): Either[String, Val] = {
+    for{
       res <- parseCache.getOrElseUpdate((path, txt), fastparse.parse(txt, new Parser(path).document(_))) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
         case Parsed.Success(r, index) => Right(r)
@@ -72,17 +79,19 @@ class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastpar
           }
         case x => x
       }
-      json <-
-        try Right(Materializer.apply0(res, visitor, storePos = storePos)(evaluator))
-        catch{
-          case Error.Delegate(msg) => Left(msg)
-          case NonFatal(e) =>
-            val s = new StringWriter()
-            val p = new PrintWriter(s)
-            e.printStackTrace(p)
-            p.close()
-            Left(s.toString.replace("\t", "    "))
-        }
-    } yield json
+    } yield res
+  }
+
+  def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+    try Right(Materializer.apply0(res, visitor, storePos = storePos)(evaluator))
+    catch{
+      case Error.Delegate(msg) => Left(msg)
+      case NonFatal(e) =>
+        val s = new StringWriter()
+        val p = new PrintWriter(s)
+        e.printStackTrace(p)
+        p.close()
+        Left(s.toString.replace("\t", "    "))
+    }
   }
 }
