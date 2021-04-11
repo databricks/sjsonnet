@@ -179,12 +179,15 @@ object Val{
     override def asObj: Val.Obj = this
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
-      if(`super` != null) `super`.gatherKeys(mapping)
-      getValue0.forEach { (k, m) =>
-        val vis = m.visibility
-        if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
-        else if(vis == Visibility.Hidden) mapping.put(k, true)
-        else if(vis == Visibility.Unhide) mapping.put(k, false)
+      if(static) mapping.putAll(allKeys)
+      else {
+        if(`super` != null) `super`.gatherKeys(mapping)
+        getValue0.forEach { (k, m) =>
+          val vis = m.visibility
+          if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+          else if(vis == Visibility.Hidden) mapping.put(k, true)
+          else if(vis == Visibility.Unhide) mapping.put(k, false)
+        }
       }
     }
 
@@ -214,15 +217,20 @@ object Val{
               pos: Position,
               self: Obj = this)
              (implicit evaluator: EvalScope): Val = {
-
-      val cacheKey = if(self eq this) k else (k, self)
-
-      valueCache.getOrElse(cacheKey, {
-        valueRaw(k, self, pos, valueCache, cacheKey) match {
+      if(static) {
+        valueCache.getOrElse(k, null) match {
           case null => Error.fail("Field does not exist: " + k, pos)
           case x => x
         }
-      })
+      } else {
+        val cacheKey = if(self eq this) k else (k, self)
+        valueCache.getOrElse(cacheKey, {
+          valueRaw(k, self, pos, valueCache, cacheKey) match {
+            case null => Error.fail("Field does not exist: " + k, pos)
+            case x => x
+          }
+        })
+      }
     }
 
     private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
@@ -261,20 +269,26 @@ object Val{
                  addTo: mutable.HashMap[Any, Val] = null,
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
-      val s = this.`super`
-      getValue0.get(k) match{
-        case null =>
-          if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
-        case m =>
-          val vv = m.invoke(self, s, pos.fileScope, evaluator)
-          val v = if(s != null && m.add) {
-            s.valueRaw(k, self, pos, null, null) match {
-              case null => vv
-              case supValue => mergeMember(supValue, vv, pos)
-            }
-          } else vv
-          if(addTo != null && m.cached) addTo(addKey) = v
-          v
+      if(static) {
+        val v = valueCache.getOrElse(k, null)
+        if(addTo != null && v != null) addTo(addKey) = v
+        v
+      } else {
+        val s = this.`super`
+        getValue0.get(k) match{
+          case null =>
+            if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+          case m =>
+            val vv = m.invoke(self, s, pos.fileScope, evaluator)
+            val v = if(s != null && m.add) {
+              s.valueRaw(k, self, pos, null, null) match {
+                case null => vv
+                case supValue => mergeMember(supValue, vv, pos)
+              }
+            } else vv
+            if(addTo != null && m.cached) addTo(addKey) = v
+            v
+        }
       }
     }
   }
