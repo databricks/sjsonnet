@@ -179,10 +179,10 @@ object Std {
       var i = 0
       while(i < allKeys.length) {
         val k = allKeys(i)
-        val v = Val.Obj.Member(false, Visibility.Normal,
-          (_, _, _, _) =>
+        val v = new Val.Obj.Member(false, Visibility.Normal) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             func.apply2(new Val.Strict(Val.Str(pos, k)), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(ev)
-        )
+        }
         m.put(k, v)
         i += 1
       }
@@ -460,7 +460,9 @@ object Std {
     },
     builtin("mergePatch", "target", "patch"){ (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
-      def createMember(v: => Val) = Val.Obj.Member(false, Visibility.Unhide, (_, _, _, _) => v)
+      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
+        def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+      }
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
@@ -972,7 +974,9 @@ object Std {
           case ujson.Obj(valueMap) =>
             val m = new util.LinkedHashMap[String, Val.Obj.Member]
             valueMap.foreach { case (k, v) =>
-              m.put(k, Val.Obj.Member(false, Expr.Member.Visibility.Normal, (_, _, _, _) => recursiveTransform(v)))
+              m.put(k, new Val.Obj.Member(false, Expr.Member.Visibility.Normal) {
+                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = recursiveTransform(v)
+              })
             }
             new Val.Obj(pos, m, false, null, null)
         }
@@ -993,7 +997,7 @@ object Std {
             k <- o.visibleKeyNames
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
-          }yield (k, Val.Obj.Member(false, Visibility.Normal, (_, _, _, _) => v))
+          }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
           Val.Obj.mk(pos, bindings: _*)
         case a: Val.Arr =>
           new Val.Arr(pos, a.asStrictArray.map(rec).filter(filter).map(new Val.Strict(_)))
@@ -1014,19 +1018,15 @@ object Std {
         case (k, v) =>
           (
             k,
-            Val.Obj.Member(false, Visibility.Hidden, (_, _, _, _) => v)
+            new Val.Obj.ConstMember(false, Visibility.Hidden, v)
           )
       } ++ Seq(
       (
         "thisFile",
-        Val.Obj.Member(
-          false,
-          Visibility.Hidden,
-          { (self: Val.Obj, sup: Val.Obj, fs: FileScope, eval: EvalScope) =>
-            Val.Str(self.pos, fs.currentFile.relativeToString(eval.wd))
-          },
-          cached = false
-        )
+        new Val.Obj.Member(false, Visibility.Hidden, cached = false) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+            Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
+        }
       )
     ): _*
   )

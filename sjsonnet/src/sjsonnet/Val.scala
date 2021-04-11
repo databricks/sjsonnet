@@ -62,7 +62,7 @@ object Val{
   }
   final class Strict(v: Val) extends Lazy {
     this.cached =v
-    def compute = v
+    def compute() = v
   }
 
   abstract class Literal extends Val with Expr
@@ -129,10 +129,14 @@ object Val{
 
   object Obj{
 
-    case class Member(add: Boolean,
-                      visibility: Visibility,
-                      invoke: (Obj, Obj, FileScope, EvalScope) => Val,
-                      cached: Boolean = true)
+    abstract class Member(val add: Boolean, val visibility: Visibility, val cached: Boolean = true) {
+      def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
+    }
+
+    class ConstMember(add: Boolean, visibility: Visibility, v: Val, cached: Boolean = true)
+      extends Member(add, visibility, cached) {
+      def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val = v
+    }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
       val m = new util.LinkedHashMap[String, Obj.Member]()
@@ -155,9 +159,7 @@ object Val{
       if(value0 == null) {
         value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
-          val v = valueCache(k)
-          val m = Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) => v)
-          value0.put(k, m)
+          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
       }
       value0

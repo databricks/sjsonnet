@@ -458,19 +458,23 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if(k != null) {
-          val v = Val.Obj.Member(plus, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-            if(asserts != null) assertions(self)
-            visitExpr(rhs)(makeNewScope(self, sup))
-          })
+          val v = new Val.Obj.Member(plus, sep) {
+            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+              if(asserts != null) assertions(self)
+              visitExpr(rhs)(makeNewScope(self, sup))
+            }
+          }
           builder.put(k, v)
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if(k != null) {
-          val v = Val.Obj.Member(false, sep, (self: Val.Obj, sup: Val.Obj, _, _) => {
-            if(asserts != null) assertions(self)
-            visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-          })
+          val v = new Val.Obj.Member(false, sep) {
+            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+              if(asserts != null) assertions(self)
+              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+            }
+          }
           builder.put(k, v)
         }
     }
@@ -498,16 +502,17 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
 
         visitExpr(key)(s) match {
           case Val.Str(_, k) =>
-            builder.put(k, Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) =>
-              visitExpr(value)(
-                s.extend(
-                  binds,
-                  newBindings,
-                  newDollar = if(s.dollar0 != null) s.dollar0 else self,
-                  newSelf = self,
+            builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
+              def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+                visitExpr(value)(
+                  s.extend(
+                    binds,
+                    newBindings,
+                    newDollar = if(s.dollar0 != null) s.dollar0 else self,
+                    newSelf = self,
+                  )
                 )
-              )
-            ))
+            })
           case Val.Null(_) => // do nothing
         }
       }
