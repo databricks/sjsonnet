@@ -178,25 +178,25 @@ class Parser(val currentFile: Path) {
                 remaining = remaining.tail
                 val rhs = climb(prec + 1, next)
                 val op1 = op match{
-                  case "*" => Expr.BinaryOp.`*`
-                  case "/" => Expr.BinaryOp.`/`
-                  case "%" => Expr.BinaryOp.`%`
-                  case "+" => Expr.BinaryOp.`+`
-                  case "-" => Expr.BinaryOp.`-`
-                  case "<<" => Expr.BinaryOp.`<<`
-                  case ">>" => Expr.BinaryOp.`>>`
-                  case "<" => Expr.BinaryOp.`<`
-                  case ">" => Expr.BinaryOp.`>`
-                  case "<=" => Expr.BinaryOp.`<=`
-                  case ">=" => Expr.BinaryOp.`>=`
-                  case "in" => Expr.BinaryOp.`in`
-                  case "==" => Expr.BinaryOp.`==`
-                  case "!=" => Expr.BinaryOp.`!=`
-                  case "&" => Expr.BinaryOp.`&`
-                  case "^" => Expr.BinaryOp.`^`
-                  case "|" => Expr.BinaryOp.`|`
-                  case "&&" => Expr.BinaryOp.`&&`
-                  case "||" => Expr.BinaryOp.`||`
+                  case "*" => Expr.BinaryOp.OP_*
+                  case "/" => Expr.BinaryOp.OP_/
+                  case "%" => Expr.BinaryOp.OP_%
+                  case "+" => Expr.BinaryOp.OP_+
+                  case "-" => Expr.BinaryOp.OP_-
+                  case "<<" => Expr.BinaryOp.OP_<<
+                  case ">>" => Expr.BinaryOp.OP_>>
+                  case "<" => Expr.BinaryOp.OP_<
+                  case ">" => Expr.BinaryOp.OP_>
+                  case "<=" => Expr.BinaryOp.OP_<=
+                  case ">=" => Expr.BinaryOp.OP_>=
+                  case "in" => Expr.BinaryOp.OP_in
+                  case "==" => Expr.BinaryOp.OP_==
+                  case "!=" => Expr.BinaryOp.OP_!=
+                  case "&" => Expr.BinaryOp.OP_&
+                  case "^" => Expr.BinaryOp.OP_^
+                  case "|" => Expr.BinaryOp.OP_|
+                  case "&&" => Expr.BinaryOp.OP_&&
+                  case "||" => Expr.BinaryOp.OP_||
                 }
                 result = Expr.BinaryOp(offset, result, op1, rhs)
                 true
@@ -243,10 +243,10 @@ class Parser(val currentFile: Path) {
   def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>
       def k2 = op match{
-        case '+' => Expr.UnaryOp.`+`
-        case '-' => Expr.UnaryOp.`-`
-        case '~' => Expr.UnaryOp.`~`
-        case '!' => Expr.UnaryOp.`!`
+        case '+' => Expr.UnaryOp.OP_+
+        case '-' => Expr.UnaryOp.OP_-
+        case '~' => Expr.UnaryOp.OP_~
+        case '!' => Expr.UnaryOp.OP_!
       }
       Expr.UnaryOp(pos, k2, e)
     }

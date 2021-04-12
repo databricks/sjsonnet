@@ -67,36 +67,40 @@ object Expr{
   }
   case class Args(names: Array[String], exprs: Array[Expr])
 
-  case class UnaryOp(pos: Position, op: UnaryOp.Op, value: Expr) extends Expr
+  case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr
   object UnaryOp{
-    sealed trait Op
-    case object `+` extends Op
-    case object `-` extends Op
-    case object `~` extends Op
-    case object `!` extends Op
+    final val OP_! = 0
+    final val OP_- = 1
+    final val OP_~ = 2
+    final val OP_+ = 3
+    private val names = Map(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
+    def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
-  case class BinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr) extends Expr
+  case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr
   object BinaryOp{
-    sealed trait Op
-    case object `*` extends Op
-    case object `/` extends Op
-    case object `%` extends Op
-    case object `+` extends Op
-    case object `-` extends Op
-    case object `<<` extends Op
-    case object `>>` extends Op
-    case object `<` extends Op
-    case object `>` extends Op
-    case object `<=` extends Op
-    case object `>=` extends Op
-    case object `in` extends Op
-    case object `==` extends Op
-    case object `!=` extends Op
-    case object `&` extends Op
-    case object `^` extends Op
-    case object `|` extends Op
-    case object `&&` extends Op
-    case object `||` extends Op
+    final val OP_* = 0
+    final val OP_/ = 1
+    final val OP_% = 2
+    final val OP_+ = 3
+    final val OP_- = 4
+    final val OP_<< = 5
+    final val OP_>> = 6
+    final val OP_< = 7
+    final val OP_> = 8
+    final val OP_<= = 9
+    final val OP_>= = 10
+    final val OP_in = 11
+    final val OP_== = 12
+    final val OP_!= = 13
+    final val OP_& = 14
+    final val OP_^ = 15
+    final val OP_| = 16
+    final val OP_&& = 17
+    final val OP_|| = 18
+    private val names = Map(OP_* -> "*", OP_/ -> "/", OP_% -> "%", OP_+ -> "+", OP_- -> "-", OP_<< -> "<<",
+      OP_>> -> ">>", OP_< -> "<", OP_> -> ">", OP_<= -> "<=", OP_>= -> ">=", OP_in -> "in", OP_== -> "==",
+      OP_!= -> "!=", OP_& -> "&", OP_^ -> "^", OP_| -> "|", OP_&& -> "&&", OP_|| -> "||" )
+    def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr

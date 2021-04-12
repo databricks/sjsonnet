@@ -1120,7 +1120,7 @@ object Std {
         val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))(ev)
         val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))(ev)
 
-        val comparisonExpr = Expr.BinaryOp(dummyPos, o1KeyExpr, BinaryOp.`!=`, o2KeyExpr)
+        val comparisonExpr = Expr.BinaryOp(dummyPos, o1KeyExpr, BinaryOp.OP_!=, o2KeyExpr)
         val exprResult = ev.visitExpr(comparisonExpr)(scope(0))
 
         val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]

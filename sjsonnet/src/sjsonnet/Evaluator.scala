@@ -43,14 +43,14 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
-      case BinaryOp(pos, lhs, Expr.BinaryOp.`in`, Super(_)) =>
+      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_in, Super(_)) =>
         if(scope.super0 == null) Val.False(pos)
         else {
           val key = visitExpr(lhs).cast[Val.Str]
           Val.bool(pos, scope.super0.containsKey(key.value))
         }
 
-      case BinaryOp(pos, lhs, Expr.BinaryOp.`&&`, rhs) =>
+      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_&&, rhs) =>
         visitExpr(lhs) match {
           case Val.True(_) =>
             visitExpr(rhs) match{
@@ -63,7 +63,7 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
             Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
         }
 
-      case BinaryOp(pos, lhs, Expr.BinaryOp.`||`, rhs) =>
+      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_||, rhs) =>
         visitExpr(lhs) match {
           case Val.True(_) => Val.True(pos)
           case Val.False(_) =>
@@ -182,14 +182,29 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
     )
   }
 
-  def visitUnaryOp(pos: Position, op: UnaryOp.Op, value: Expr)
+  def visitUnaryOp(pos: Position, op: Int, value: Expr)
                   (implicit scope: ValScope): Val = {
-    (op, visitExpr(value)) match {
-      case (Expr.UnaryOp.`!`, Val.True(_)) => Val.False(pos)
-      case (Expr.UnaryOp.`!`, Val.False(_)) => Val.True(pos)
-      case (Expr.UnaryOp.`-`, Val.Num(_, v)) => Val.Num(pos, -v)
-      case (Expr.UnaryOp.`~`, Val.Num(_, v)) => Val.Num(pos, ~v.toLong)
-      case (Expr.UnaryOp.`+`, Val.Num(_, v)) => Val.Num(pos, v)
+    val v = visitExpr(value)
+    def fail() = Error.fail(s"Unknown unary operation: ${Expr.UnaryOp.name(op)} ${v.prettyName}", pos)
+    op match {
+      case Expr.UnaryOp.OP_! => v match {
+        case Val.True(_) => Val.False(pos)
+        case Val.False(_) => Val.True(pos)
+        case _ => fail()
+      }
+      case Expr.UnaryOp.OP_- => v match {
+        case Val.Num(_, v) => Val.Num(pos, -v)
+        case _ => fail()
+      }
+      case Expr.UnaryOp.OP_~ => v match {
+        case Val.Num(_, v) => Val.Num(pos, ~v.toLong)
+        case _ => fail()
+      }
+      case Expr.UnaryOp.OP_+ => v match {
+        case Val.Num(_, v) => Val.Num(pos, v)
+        case _ => fail()
+      }
+      case _ => fail()
     }
   }
 
@@ -322,73 +337,120 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       )
   }
 
-  def visitBinaryOp(pos: Position, lhs: Expr, op: BinaryOp.Op, rhs: Expr)(implicit scope: ValScope) = {
-    (visitExpr(lhs), op, visitExpr(rhs)) match {
+  def visitBinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr)(implicit scope: ValScope) = {
+    val l = visitExpr(lhs)
+    val r = visitExpr(rhs)
+    def fail() = Error.fail(s"Unknown binary operation: ${l.prettyName} ${Expr.BinaryOp.name(op)} ${r.prettyName}", pos)
+    op match {
 
-      case (l, Expr.BinaryOp.`==`, r) =>
+      case Expr.BinaryOp.OP_== =>
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
         try Val.bool(pos, equal(l, r))
         catch Error.tryCatchWrap(pos)
 
-      case (l, Expr.BinaryOp.`!=`, r) =>
+      case Expr.BinaryOp.OP_!= =>
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
         try Val.bool(pos, !equal(l, r))
         catch Error.tryCatchWrap(pos)
 
-      case (Val.Num(_, l), Expr.BinaryOp.`+`, Val.Num(_, r)) => Val.Num(pos, l + r)
-      case (Val.Str(_, l), Expr.BinaryOp.`+`, Val.Str(_, r)) => Val.Str(pos, l + r)
-      case (Val.Str(_, l), Expr.BinaryOp.`+`, r) =>
-        try Val.Str(pos, l + Materializer.stringify(r))
-        catch Error.tryCatchWrap(pos)
-      case (l, Expr.BinaryOp.`+`, Val.Str(_, r)) =>
-        try Val.Str(pos, Materializer.stringify(l) + r)
-        catch Error.tryCatchWrap(pos)
-      case (l: Val.Obj, Expr.BinaryOp.`+`, r: Val.Obj) => r.addSuper(pos, l)
-      case (l: Val.Arr, Expr.BinaryOp.`+`, r: Val.Arr) => l.concat(pos, r)
+      case Expr.BinaryOp.OP_+ => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
+        case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
+        case (Val.Str(_, l), r) =>
+          try Val.Str(pos, l + Materializer.stringify(r))
+          catch Error.tryCatchWrap(pos)
+        case (l, Val.Str(_, r)) =>
+          try Val.Str(pos, Materializer.stringify(l) + r)
+          catch Error.tryCatchWrap(pos)
+        case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
+        case (l: Val.Arr, r: Val.Arr) => l.concat(pos, r)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`-`, Val.Num(_, r)) => Val.Num(pos, l - r)
+      case Expr.BinaryOp.OP_- => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l - r)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`*`, Val.Num(_, r)) => Val.Num(pos, l * r)
+      case Expr.BinaryOp.OP_* => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l * r)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`/`, Val.Num(_, r)) =>
-        if (r == 0) Error.fail("division by zero", pos)
-        Val.Num(pos, l / r)
+      case Expr.BinaryOp.OP_/ => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) =>
+          if (r == 0) Error.fail("division by zero", pos)
+          Val.Num(pos, l / r)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`%`, Val.Num(_, r)) => Val.Num(pos, l % r)
-      case (Val.Str(_, l), Expr.BinaryOp.`%`, r) =>
-        try Val.Str(pos, Format.format(l, r, pos))
-        catch Error.tryCatchWrap(pos)
+      case Expr.BinaryOp.OP_% => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
+        case (Val.Str(_, l), r) =>
+          try Val.Str(pos, Format.format(l, r, pos))
+          catch Error.tryCatchWrap(pos)
+        case _ => fail()
+      }
 
-      case (Val.Str(_, l), Expr.BinaryOp.`<`, Val.Str(_, r)) => Val.bool(pos, l < r)
-      case (Val.Num(_, l), Expr.BinaryOp.`<`, Val.Num(_, r)) => Val.bool(pos, l < r)
+      case Expr.BinaryOp.OP_< => (l, r) match {
+        case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l < r)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
+        case _ => fail()
+      }
 
-      case (Val.Str(_, l), Expr.BinaryOp.`>`, Val.Str(_, r)) => Val.bool(pos, l > r)
-      case (Val.Num(_, l), Expr.BinaryOp.`>`, Val.Num(_, r)) => Val.bool(pos, l > r)
+      case Expr.BinaryOp.OP_> => (l, r) match {
+        case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l > r)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
+        case _ => fail()
+      }
 
-      case (Val.Str(_, l), Expr.BinaryOp.`<=`, Val.Str(_, r)) => Val.bool(pos, l <= r)
-      case (Val.Num(_, l), Expr.BinaryOp.`<=`, Val.Num(_, r)) => Val.bool(pos, l <= r)
+      case Expr.BinaryOp.OP_<= => (l, r) match {
+        case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l <= r)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
+        case _ => fail()
+      }
 
-      case (Val.Str(_, l), Expr.BinaryOp.`>=`, Val.Str(_, r)) => Val.bool(pos, l >= r)
-      case (Val.Num(_, l), Expr.BinaryOp.`>=`, Val.Num(_, r)) => Val.bool(pos, l >= r)
+      case Expr.BinaryOp.OP_>= => (l, r) match {
+        case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l >= r)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`<<`, Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+      case Expr.BinaryOp.OP_<< => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`>>`, Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+      case Expr.BinaryOp.OP_>> => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+        case _ => fail()
+      }
 
-      case (Val.Str(_, l), Expr.BinaryOp.`in`, o: Val.Obj) => Val.bool(pos, o.containsKey(l))
+      case Expr.BinaryOp.OP_in => (l, r) match {
+        case (Val.Str(_, l), o: Val.Obj) => Val.bool(pos, o.containsKey(l))
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`&`, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+      case Expr.BinaryOp.OP_& => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`^`, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+      case Expr.BinaryOp.OP_^ => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+        case _ => fail()
+      }
 
-      case (Val.Num(_, l), Expr.BinaryOp.`|`, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+      case Expr.BinaryOp.OP_| => (l, r) match {
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+        case _ => fail()
+      }
 
-      case (l, op, r) =>
-        Error.fail(s"Unknown binary operation: ${l.prettyName} $op ${r.prettyName}", pos)
+      case _ => fail()
     }
   }
 
