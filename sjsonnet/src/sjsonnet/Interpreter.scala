@@ -43,7 +43,10 @@ class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastpar
 
   def evaluate[T](txt: String, path: Path): Either[String, Val] = {
     for{
-      res <- parseCache.getOrElseUpdate((path, txt), fastparse.parse(txt, new Parser(path).document(_))) match{
+      res <- parseCache.getOrElseUpdate((path, txt),
+        fastparse.parse(txt, new Parser(path).document(_).map { case (expr, fs) =>
+          ((new StaticOptimizer()(evaluator)).transform(expr), fs)
+        })) match{
         case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
         case Parsed.Success(r, index) => Right(r)
       }

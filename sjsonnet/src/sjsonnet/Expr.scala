@@ -14,13 +14,18 @@ trait Expr{
   def pos: Position
 }
 object Expr{
+  private final def arrStr(a: Array[_]): String = {
+    if(a == null) "null" else a.mkString("[", ", ", "]")
+  }
 
   case class Self(pos: Position) extends Expr
   case class Super(pos: Position) extends Expr
   case class $(pos: Position) extends Expr
 
   case class Id(pos: Position, value: Int) extends Expr
-  case class Arr(pos: Position, value: Array[Expr]) extends Expr
+  case class Arr(pos: Position, value: Array[Expr]) extends Expr {
+    override def toString = s"Arr($pos, ${arrStr(value)})"
+  }
 
   sealed trait FieldName
 
@@ -64,6 +69,7 @@ object Expr{
       indices.foreach(b.set)
       b
     }
+    override def toString = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)}, ${arrStr(indices)})"
   }
   case class Args(names: Array[String], exprs: Array[Expr])
 
@@ -103,13 +109,18 @@ object Expr{
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
-  case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr
+  case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr {
+    override def toString = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
+  }
 
   case class Bind(pos: Position, name: Int, args: Params, rhs: Expr) extends Member
   case class Import(pos: Position, value: String) extends Expr
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
   case class Apply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
+  case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr
+  case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr) extends Expr
+  case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
   case class Select(pos: Position, value: Expr, name: String) extends Expr
   case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
   case class Slice(pos: Position,

@@ -37,6 +37,9 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
 
       case Select(pos, value, name) => visitSelect(pos, value, name)
 
+      case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
+      case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
+      case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
       case Apply(pos, value, argNames, argExprs) => visitApply(pos, value, argNames, argExprs)
 
       case lit: Val.Literal => lit
@@ -218,12 +221,27 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       arr(idx) = () => visitExpr(argExprs(boundIdx))
       idx += 1
     }
+    try lhs.cast[Val.Func].apply(argNames, arr, pos) catch Error.tryCatchWrap(pos)
+  }
 
-    try lhs.cast[Val.Func].apply(
-      argNames, arr,
-      pos
-    )
-    catch Error.tryCatchWrap(pos)
+  private def visitApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr)
+                                (implicit scope: ValScope) =
+    try func.evalRhs(visitExpr(a1), this, pos) catch Error.tryCatchWrap(pos)
+
+  private def visitApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr)
+                                (implicit scope: ValScope) =
+    try func.evalRhs(visitExpr(a1), visitExpr(a2), this, pos) catch Error.tryCatchWrap(pos)
+
+  private def visitApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr])
+                               (implicit scope: ValScope) = {
+    val arr = new Array[Val](argExprs.length)
+    var idx = 0
+    while (idx < argExprs.length) {
+      val boundIdx = idx
+      arr(idx) = visitExpr(argExprs(boundIdx))
+      idx += 1
+    }
+    try func.evalRhs(arr, this, pos) catch Error.tryCatchWrap(pos)
   }
 
   def visitAssert(pos: Position, value: Expr, msg: Expr, returned: Expr)
@@ -310,7 +328,9 @@ class Evaluator(parseCache: collection.mutable.HashMap[(Path, String), fastparse
       {
         val (doc, newFileScope) = parseCache.getOrElseUpdate(
           key,
-          fastparse.parse(str, new Parser(p).document(_))
+          fastparse.parse(str, new Parser(p).document(_).map { case (expr, fs) =>
+            ((new StaticOptimizer).transform(expr), fs)
+          })
         ) match {
           case Parsed.Success((doc, nameIndices), _) => (doc, nameIndices)
           case f @ Parsed.Failure(l, i, e) =>

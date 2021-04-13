@@ -439,7 +439,7 @@ final class Position(val fileScope: FileScope, val offset: Int) {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _ => false
   }
-  override def toString = s"Position($fileScope, $offset)"
+  override def toString = s"Position(${fileScope.currentFileLastPathElement}, $offset)"
 }
 
 /**

@@ -417,7 +417,7 @@ object Std {
     }
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functions: Map[String, Val.Func] = Map(
     "assertEqual" -> AssertEqual,
     "toString" -> ToString,
     "codepoint" -> Codepoint,
@@ -1013,7 +1013,7 @@ object Std {
   )
   val Std = Val.Obj.mk(
     null,
-    functions
+    functions.toSeq
       .map{
         case (k, v) =>
           (
