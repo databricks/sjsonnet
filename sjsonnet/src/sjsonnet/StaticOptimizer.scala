@@ -1,14 +1,13 @@
 package sjsonnet
 
 import Expr._
-import sjsonnet.Expr.ObjBody.{MemberList, ObjComp}
 
-class StaticOptimizer(implicit eval: EvalErrorScope) extends ExprTransform {
-  var scope = new java.util.BitSet()
+class StaticOptimizer(scopeSize: Int)(implicit eval: EvalErrorScope) extends ScopedExprTransform(scopeSize) {
+  //println(s"----- scopeSize: $scopeSize")
 
-  def transform(e: Expr): Expr = e match {
-    case Apply(pos, Select(_, Id(_, 0), name), null, args) if(!scope.get(0)) =>
-      //println(s"----- std.$name(#${argExprs.length}) call")
+  override def transform(e: Expr): Expr = e match {
+    case Apply(pos, Select(_, Id(_, 0), name), null, args) if(scope(0) == null) =>
+      //println(s"----- std.$name(#${args.length}) call")
       Std.functions.getOrElse(name, null) match {
         case f: Val.Builtin =>
           val rargs = transformArr(args)
@@ -22,89 +21,42 @@ class StaticOptimizer(implicit eval: EvalErrorScope) extends ExprTransform {
         case _ => rec(e)
       }
 
-//    case Id(pos, name) =>
-//      if(!scope.get(name) && name != 0)
-//        sjsonnet.Error.fail("Unknown variable " + pos.fileScope.indexNames(name) + s": $scope", pos)
-//      e
-
-    case LocalExpr(pos, bindings, returned) =>
-      nestedBindings(bindings)(rec(e))
-
-    case MemberList(pos, binds, fields, asserts) =>
-      nestedBindings(binds)(rec(e))
-      //TODO methods
-
-    case Function(pos, params, body) =>
-      nestedIndices(params.indices)(rec(e))
-
-    case ObjComp(pos, preLocals, key, value, postLocals, first, rest) =>
-      val (f2 :: r2, (pre2, post2, k2, v2)) = compSpecs(first :: rest.toList, { () =>
-        nestedBindings(preLocals ++ postLocals) {
-          (transformBinds(preLocals), transformBinds(postLocals), transform(key), transform(value))
-        }
-      })
-      if((f2 eq first) && (k2 eq key) && (v2 eq value) && (pre2 eq preLocals) && (post2 eq postLocals) && (r2, rest).zipped.forall(_ eq _)) e
-      else ObjComp(pos, pre2, k2, v2, post2, f2.asInstanceOf[ForSpec], r2)
-
-    case Comp(pos, value, first, rest) =>
-      val (f2 :: r2, v2) = compSpecs(first :: rest.toList, () => transform(value))
-      if((f2 eq first) && (v2 eq value) && (r2, rest).zipped.forall(_ eq _)) e
-      else Comp(pos, v2, f2.asInstanceOf[ForSpec], r2.toArray)
-
-    case e => rec(e)
-  }
-
-  override protected[this] def transformBind(b: Bind): Bind = {
-    val args = b.args
-    val rhs = b.rhs
-    nestedIndices(if(args == null) null else args.indices) {
-      val args2 = transformParams(args)
-      val rhs2 = transform(rhs)
-      if((args2 eq args) && (rhs2 eq rhs)) b
-      else b.copy(args = args2, rhs = rhs2)
-    }
-  }
-
-  override protected[this] def transformField(f: Member.Field): Member.Field = {
-    if(f.args == null) super.transformField(f)
-    else nestedIndices(f.args.indices)(super.transformField(f))
-  }
-
-  private def compSpecs[T](a: List[CompSpec], value: () => T): (List[CompSpec], T) = a match {
-    case (c @ ForSpec(pos, name, cond)) :: cs =>
-      val c2 = rec(c).asInstanceOf[ForSpec]
-      nested {
-        scope.set(c2.name)
-        val (cs2, value2) = compSpecs(cs, value)
-        (c2 :: cs2, value2)
+    case Id(pos, name) =>
+      val v = scope(name)
+      v match {
+        case v: Val with Expr =>
+          //println(s"----- Id($pos, $name) -> $v")
+          v
+        case _ => e
       }
-    case (c @ IfSpec(pos, cond)) :: cs =>
-      val c2 = rec(c).asInstanceOf[CompSpec]
-      val (cs2, value2) = compSpecs(cs, value)
-      (c2 :: cs2, value2)
-    case Nil =>
-      (Nil, value())
+
+    case a: Arr =>
+      super.transform(a) match {
+        case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
+          new Val.Arr(a.pos, a.value.map(e => new Val.Strict(e.asInstanceOf[Val])))
+        case other => other
+      }
+
+    case m: ObjBody.MemberList =>
+      super.transform(m) match {
+        case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
+          if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+          else m
+        case other => other
+      }
+
+    case e => super.transform(e)
   }
 
-  private def nested[T](f: => T): T = {
-    val oldScope = scope
-    scope = scope.clone().asInstanceOf[java.util.BitSet]
-    try f finally { scope = oldScope }
-  }
-
-  private def nestedBindings[T](a: Array[Bind])(f: => T): T = {
-    if(a == null || a.length == 0) f
-    else nested {
-      a.foreach(b => scope.set(b.name))
-      f
-    }
-  }
-
-  private def nestedIndices[T](a: Array[Int])(f: => T): T = {
-    if(a == null || a.length == 0) f
-    else nested {
-      a.foreach(b => scope.set(b))
-      f
-    }
+  override protected[this] def transformFieldName(f: FieldName): FieldName = f match {
+    case FieldName.Dyn(x) =>
+      transform(x) match {
+        case x2: Val.Str =>
+          //println(s"----- Fixing FieldName: "+x2.value)
+          FieldName.Fixed(x2.value)
+        case x2 if x2 eq x => f
+        case x2 => FieldName.Dyn(x2)
+      }
+    case _ => f
   }
 }

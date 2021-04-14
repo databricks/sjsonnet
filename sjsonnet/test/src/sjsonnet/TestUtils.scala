@@ -3,7 +3,6 @@ package sjsonnet
 object TestUtils {
   def eval(s: String, preserveOrder: Boolean = false, strict: Boolean = false) = {
     new Interpreter(
-      SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       DummyPath(),

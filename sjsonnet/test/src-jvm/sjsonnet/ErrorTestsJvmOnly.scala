@@ -6,7 +6,6 @@ object ErrorTestsJvmOnly extends TestSuite {
   val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path) = {
     val interp = new Interpreter(
-      sjsonnet.SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       OsPath(os.pwd),

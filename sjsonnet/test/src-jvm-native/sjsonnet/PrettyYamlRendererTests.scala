@@ -7,7 +7,6 @@ object PrettyYamlRendererTests extends TestSuite{
   def eval(path: os.Path, comments: Boolean) = {
     var currentPos: Position = null
     val interp = new Interpreter(
-      sjsonnet.SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       OsPath(testSuiteRoot),

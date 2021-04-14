@@ -10,7 +10,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]]()
+  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
     (wd +: searchRoots0)
       .flatMap(base => os.FilePath(str) match {
@@ -41,7 +41,7 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-            parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
+            parseCache: collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -124,7 +124,7 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-                     parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
+                     parseCache: collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]],
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
@@ -167,7 +167,6 @@ object SjsonnetMain {
     }
     var currentPos: Position = null
     val interp = new Interpreter(
-      parseCache,
       varBinding,
       tlaBinding,
       OsPath(wd),
@@ -177,7 +176,8 @@ object SjsonnetMain {
       },
       preserveOrder = config.preserveOrder.value,
       strict = config.strict.value,
-      storePos = if (config.yamlDebug.value) currentPos = _ else _ => ()
+      storePos = if (config.yamlDebug.value) currentPos = _ else _ => (),
+      parseCache
     )
 
     (config.multi, config.yamlStream.value) match {

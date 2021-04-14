@@ -5,23 +5,33 @@ import java.io.{PrintWriter, StringWriter}
 import fastparse.Parsed
 import sjsonnet.Expr.Params
 
+import scala.collection.mutable
 import scala.util.control.NonFatal
 
 /**
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]],
-                  extVars: Map[String, ujson.Value],
+class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: (Path, String) => Option[(Path, String)],
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
-                  storePos: Position => Unit = _ => ()) {
+                  storePos: Position => Unit = _ => (),
+                  val parseCache: mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]] = new mutable.HashMap,
+                  staticOpt: Boolean = true) {
 
-  val evaluator = new Evaluator(
-    parseCache,
+  val resolver = new CachedResolver(parseCache) {
+    override def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] = {
+      if(staticOpt)
+        Right(((new StaticOptimizer(fs.nameIndices.size)(evaluator)).transform(expr), fs))
+      else Right((expr, fs))
+    }
+  }
+
+  val evaluator: Evaluator = new Evaluator(
+    resolver,
     extVars,
     wd,
     importer,
@@ -43,12 +53,9 @@ class Interpreter(parseCache: collection.mutable.HashMap[(Path, String), fastpar
 
   def evaluate[T](txt: String, path: Path): Either[String, Val] = {
     for{
-      res <- parseCache.getOrElseUpdate((path, txt),
-        fastparse.parse(txt, new Parser(path).document(_).map { case (expr, fs) =>
-          ((new StaticOptimizer()(evaluator)).transform(expr), fs)
-        })) match{
-        case f @ Parsed.Failure(l, i, e) => Left("Parse error: " + f.trace().msg)
-        case Parsed.Success(r, index) => Right(r)
+      res <- resolver.resolve(path, txt) match {
+        case Left(msg) => Left("Parse error: " + msg)
+        case r => r
       }
       (parsed, newFileScope) = res
       _ = evaluator.loadedFileContents(path) = txt

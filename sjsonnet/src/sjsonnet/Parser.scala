@@ -454,7 +454,7 @@ class FileScope(val currentFile: Path,
   // where nothing blows up this does not need to be allocated
   lazy val indexNames = nameIndices.map(_.swap)
 
-  lazy val currentFileLastPathElement = currentFile.last
+  lazy val currentFileLastPathElement = if(currentFile == null) null else currentFile.last
 
   val noOffsetPos: Position = new Position(this, -1)
 }

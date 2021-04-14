@@ -147,7 +147,9 @@ object Expr{
                        value: Expr,
                        postLocals: Array[Bind],
                        first: ForSpec,
-                       rest: List[CompSpec]) extends ObjBody
+                       rest: List[CompSpec]) extends ObjBody {
+      override def toString = s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
+    }
   }
 
 }
