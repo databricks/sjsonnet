@@ -6,7 +6,7 @@ object TestUtils {
       Map(),
       Map(),
       DummyPath(),
-      (_, _) => None,
+      Importer.empty,
       preserveOrder = preserveOrder,
       strict = strict
     ).interpret(s, DummyPath("(memory)")) match {

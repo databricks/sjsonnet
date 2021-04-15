@@ -15,17 +15,17 @@ import scala.util.control.NonFatal
 class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
-                  importer: (Path, String) => Option[(Path, String)],
+                  importer: Importer,
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
                   storePos: Position => Unit = _ => (),
                   val parseCache: mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]] = new mutable.HashMap,
                   staticOpt: Boolean = true) {
 
-  val resolver = new CachedResolver(parseCache) {
+  val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] = {
       if(staticOpt)
-        Right(((new StaticOptimizer(fs.nameIndices.size)(evaluator)).transform(expr), fs))
+        Right(((new StaticOptimizer(fs)(evaluator)).transform(expr), fs))
       else Right((expr, fs))
     }
   }
@@ -34,7 +34,6 @@ class Interpreter(extVars: Map[String, ujson.Value],
     resolver,
     extVars,
     wd,
-    importer,
     preserveOrder,
     strict
   )
@@ -52,17 +51,17 @@ class Interpreter(extVars: Map[String, ujson.Value],
   }
 
   def evaluate[T](txt: String, path: Path): Either[String, Val] = {
+    resolver.cache(path) = txt
     for{
-      res <- resolver.resolve(path, txt) match {
+      res <- resolver.parse(path, txt) match {
         case Left(msg) => Left("Parse error: " + msg)
         case r => r
       }
-      (parsed, newFileScope) = res
-      _ = evaluator.loadedFileContents(path) = txt
+      (parsed, fs) = res
       res0 <-
         try Right(
           evaluator.visitExpr(parsed)(
-            Std.scope(newFileScope.nameIndices.size + 1)
+            Std.scope(fs.nameIndices.size + 1)
           )
         )
         catch{case NonFatal(e) =>

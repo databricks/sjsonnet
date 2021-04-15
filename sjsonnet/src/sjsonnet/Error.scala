@@ -17,7 +17,7 @@ case class Error(msg: String,
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
   def addFrame(fileName: Path, wd: Path, offset: Int)(implicit ev: EvalErrorScope) = {
-    val newFrame = ev.loadCachedSource(fileName) match{
+    val newFrame = ev.importer.read(fileName) match{
       case None =>
         new StackTraceElement(
           "", "",
@@ -89,6 +89,6 @@ object Error {
 
 trait EvalErrorScope {
   def extVars: Map[String, ujson.Value]
-  def loadCachedSource(p: Path): Option[String]
+  def importer: CachedImporter
   def wd: Path
 }

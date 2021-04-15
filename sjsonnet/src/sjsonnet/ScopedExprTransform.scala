@@ -3,8 +3,9 @@ package sjsonnet
 import sjsonnet.Expr.ObjBody.{MemberList, ObjComp}
 import sjsonnet.Expr._
 
-class ScopedExprTransform(scopeSize: Int) extends ExprTransform {
-  var scope = new Array[AnyRef](scopeSize)
+class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
+  final case class ScopedVal(val v: AnyRef, val sc: Array[ScopedVal])
+  var scope = new Array[ScopedVal](rootFileScope.nameIndices.size)
 
   // Marker for Exprs in the scope that should not be used because they need to be evaluated in a different scope
   val dynamicExpr = new Expr { def pos: Position = ??? }
@@ -78,7 +79,7 @@ class ScopedExprTransform(scopeSize: Int) extends ExprTransform {
     case (c @ ForSpec(pos, name, cond)) :: cs =>
       val c2 = rec(c).asInstanceOf[ForSpec]
       nested {
-        scope(c2.name) = dynamicExpr
+        scope(c2.name) = new ScopedVal(dynamicExpr, scope)
         val (cs2, value2) = compSpecs(cs, value)
         (c2 :: cs2, value2)
       }
@@ -96,10 +97,22 @@ class ScopedExprTransform(scopeSize: Int) extends ExprTransform {
     try f finally { scope = oldScope }
   }
 
+  protected[this] def nested[T](sc: Array[ScopedVal])(f: => T): T = {
+    val oldScope = scope
+    scope = sc
+    try f finally { scope = oldScope }
+  }
+
+  protected[this] def nestedFileScope[T](fs: FileScope)(f: => T): T = {
+    val oldScope = scope
+    scope = new Array[ScopedVal](fs.nameIndices.size)
+    try f finally { scope = oldScope }
+  }
+
   protected[this] def nestedBindings[T](a: Array[Bind])(f: => T): T = {
     if(a == null || a.length == 0) f
     else nested {
-      a.foreach(b => scope(b.name) = if(b.args == null) b.rhs else b)
+      a.foreach(b => scope(b.name) = new ScopedVal(if(b.args == null) b.rhs else b, scope))
       f
     }
   }
@@ -107,7 +120,7 @@ class ScopedExprTransform(scopeSize: Int) extends ExprTransform {
   protected[this] def nestedIndices[T](a: Array[Int])(f: => T): T = {
     if(a == null || a.length == 0) f
     else nested {
-      a.foreach(b => scope(b) = dynamicExpr)
+      a.foreach(b => scope(b) = new ScopedVal(dynamicExpr, scope))
       f
     }
   }

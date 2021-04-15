@@ -11,19 +11,24 @@ import scala.util.control.NonFatal
 
 object SjsonnetMain {
   def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
-  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None)(wd: Path, str: String) = {
-    (wd +: searchRoots0)
-      .flatMap(base => os.FilePath(str) match {
-        case r: os.SubPath => Some(base.asInstanceOf[OsPath].p / r)
-        case r: os.RelPath =>
-          if (r.ups > base.segmentCount()) None
-          else Some(base.asInstanceOf[OsPath].p / r)
-        case a: os.Path => Some(a)
-      })
-      .filter(p => allowedInputs.fold(true)(_(p)))
-      .find(os.exists)
-      .flatMap(p => try Some((OsPath(p), os.read(p))) catch{case NonFatal(_) => None})
+
+  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
+    def resolve(docBase: Path, importName: String): Option[Path] =
+      (docBase +: searchRoots0)
+        .flatMap(base => os.FilePath(importName) match {
+          case r: os.SubPath => Some(base.asInstanceOf[OsPath].p / r)
+          case r: os.RelPath =>
+            if (r.ups > base.segmentCount()) None
+            else Some(base.asInstanceOf[OsPath].p / r)
+          case a: os.Path => Some(a)
+        })
+        .filter(p => allowedInputs.fold(true)(_(p)))
+        .find(os.exists)
+        .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
+    def read(path: Path): Option[String] =
+      try Some(os.read(path.asInstanceOf[OsPath].p)) catch { case NonFatal(_) => None }
   }
+
   def main(args: Array[String]): Unit = {
     var exitCode = main0(
       args match {
@@ -171,7 +176,12 @@ object SjsonnetMain {
       tlaBinding,
       OsPath(wd),
       importer = importer match{
-        case Some(i) => (wd: Path, str: String) => i(wd, str).map(p => (OsPath(p), os.read(p)))
+        case Some(i) => new Importer {
+          def resolve(docBase: Path, importName: String): Option[Path] =
+            i(docBase, importName).map(OsPath)
+          def read(path: Path): Option[String] =
+            try Some(os.read(path.asInstanceOf[OsPath].p)) catch { case NonFatal(_) => None }
+        }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
       preserveOrder = config.preserveOrder.value,

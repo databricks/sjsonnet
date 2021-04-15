@@ -2,8 +2,10 @@ package sjsonnet
 
 import Expr._
 
-class StaticOptimizer(scopeSize: Int)(implicit eval: EvalErrorScope) extends ScopedExprTransform(scopeSize) {
-  //println(s"----- scopeSize: $scopeSize")
+import scala.collection.mutable
+
+class StaticOptimizer(rootFileScope: FileScope)(implicit eval: EvalErrorScope)
+  extends ScopedExprTransform(rootFileScope) {
 
   override def transform(e: Expr): Expr = e match {
     case Apply(pos, Select(_, Id(_, 0), name), null, args) if(scope(0) == null) =>
@@ -24,7 +26,7 @@ class StaticOptimizer(scopeSize: Int)(implicit eval: EvalErrorScope) extends Sco
     case Id(pos, name) =>
       val v = scope(name)
       v match {
-        case v: Val with Expr =>
+        case ScopedVal(v: Val with Expr, _) =>
           //println(s"----- Id($pos, $name) -> $v")
           v
         case _ => e

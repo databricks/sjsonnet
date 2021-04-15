@@ -1,7 +1,6 @@
 package sjsonnet
 
 import Expr.{Error => _, _}
-import fastparse.Parsed
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
 
@@ -16,19 +15,16 @@ import scala.collection.mutable
   * imported module to be re-used. Parsing is cached separatedly by an external
   * `parseCache`.
   */
-class Evaluator(resolver: Resolver,
+class Evaluator(resolver: CachedResolver,
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
-                importer: (Path, String) => Option[(Path, String)],
                 override val preserveOrder: Boolean = false,
                 strict: Boolean) extends EvalScope{
   implicit def evalScope: EvalScope = this
+  def importer: CachedImporter = resolver
 
-  val loadedFileContents = mutable.HashMap.empty[Path, String]
-  def loadCachedSource(p: Path) = loadedFileContents.get(p)
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.HashMap.empty[Path, Val]
-  val cachedImportedStrings = collection.mutable.HashMap.empty[Path, String]
 
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val = try {
@@ -315,41 +311,19 @@ class Evaluator(resolver: Resolver,
     }
   }
 
-  def visitImportStr(pos: Position, value: String)(implicit scope: ValScope) = {
-    val (p, str) = resolveImport(value, pos)
-    Val.Str(pos, cachedImportedStrings.getOrElseUpdate(p, str))
-  }
+  def visitImportStr(pos: Position, value: String)(implicit scope: ValScope) =
+    Val.Str(pos, importer.resolveAndReadOrFail(value, pos)._2)
 
   def visitImport(pos: Position, value: String)(implicit scope: ValScope) = {
-    val (p, str) = resolveImport(value, pos)
-    loadedFileContents(p) = str
+    val (p, str) = importer.resolveAndReadOrFail(value, pos)
     cachedImports.getOrElseUpdate(
       p,
       {
-        val (doc, newFileScope) = resolver.resolve(p, str) match {
-          case Right(x) => x
-          case Left(msg) =>
-            Error.fail(
-              "Imported file " + pprint.Util.literalize(value) +
-                " had Parse error. " + msg,
-              pos
-            )
-        }
+        val (doc, newFileScope) = resolver.parseOrFail(pos, value, p, str)
         try visitExpr(doc)(Std.scope(newFileScope.nameIndices.size))
         catch Error.tryCatchWrap(pos)
       }
     )
-  }
-
-  def resolveImport(value: String, pos: Position)
-                   (implicit scope: ValScope): (Path, String) = {
-    importer(pos.fileScope.currentFile.parent(), value)
-      .getOrElse(
-        Error.fail(
-          "Couldn't import file: " + pprint.Util.literalize(value),
-          pos
-        )
-      )
   }
 
   def visitBinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr)(implicit scope: ValScope) = {
