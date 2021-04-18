@@ -1,14 +1,13 @@
 package sjsonnet
 
 import Expr._
-
-import scala.collection.mutable
+import ScopedExprTransform._
 
 class StaticOptimizer(rootFileScope: FileScope)(implicit eval: EvalErrorScope)
   extends ScopedExprTransform(rootFileScope) {
 
   override def transform(e: Expr): Expr = e match {
-    case Apply(pos, Select(_, Id(_, 0), name), null, args) if(scope(0) == null) =>
+    case Apply(pos, Select(_, Id(_, "std", _), name), args, null) if(scope.get("std") == null) =>
       //println(s"----- std.$name(#${args.length}) call")
       Std.functions.getOrElse(name, null) match {
         case f: Val.Builtin =>
@@ -17,18 +16,24 @@ class StaticOptimizer(rootFileScope: FileScope)(implicit eval: EvalErrorScope)
           f match {
             case f: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f, rargs(0))
             case f: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f, rargs(0), rargs(1))
-            case _ if f.params.indices.length == alen => Expr.ApplyBuiltin(pos, f, rargs)
+            case _ if f.params.names.length == alen => Expr.ApplyBuiltin(pos, f, rargs)
             case _ => rec(e)
           }
         case _ => rec(e)
       }
 
-    case Id(pos, name) =>
-      val v = scope(name)
+    case Select(_, Id(_, "std", _), name) if(scope.get("std") == null) =>
+      Std.functions.getOrElse(name, null) match {
+        case null => rec(e)
+        case f => f
+      }
+
+    case Id(pos, name, _) =>
+      val v = scope.get(name)
       v match {
-        case ScopedVal(v: Val with Expr, _) =>
-          //println(s"----- Id($pos, $name) -> $v")
-          v
+        case ScopedVal(v: Val with Expr, _, _) => v
+        case ScopedVal(e, _, idx) => ValidId(pos, idx)
+        case null if name == "std" => Std.Std
         case _ => e
       }
 

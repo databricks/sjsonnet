@@ -1075,7 +1075,7 @@ object Std {
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}.toArray
-    val p = Params(params.map(_._1).toArray, params.map(_._2).toArray, params.indices.toArray)
+    val p = Params(params.map(_._1).toArray, params.map(_._2).toArray)
     name -> new Val.Func(null, null, p) {
       def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
         //println("--- calling builtin: "+name)
@@ -1089,12 +1089,6 @@ object Std {
       }
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
     }
-  }
-
-  def scope(size: Int) = {
-    new ValScope(
-      null, null, null, Array[Val.Lazy](new Val.Strict(Std)).padTo(size, null)
-    )
   }
 
   def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
@@ -1121,7 +1115,7 @@ object Std {
         val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))(ev)
 
         val comparisonExpr = Expr.BinaryOp(dummyPos, o1KeyExpr, BinaryOp.OP_!=, o2KeyExpr)
-        val exprResult = ev.visitExpr(comparisonExpr)(scope(0))
+        val exprResult = ev.visitExpr(comparisonExpr)(ValScope.empty)
 
         val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]
 
@@ -1151,12 +1145,12 @@ object Std {
               val objs = vs.asStrictArray.map(_.cast[Val.Obj])
 
               val keyFFunc = keyF.asInstanceOf[Val.Func]
-              val keys = objs.map((v) => keyFFunc(null, Array(new Val.Strict(v)), pos.noOffset)(ev))
+              val keys = objs.map((v) => keyFFunc(Array(new Val.Strict(v)), null, pos.noOffset)(ev))
 
               if (keys.forall(_.isInstanceOf[Val.Str])){
-                objs.sortBy((v) => keyFFunc(null, Array(new Val.Strict(v)), pos.noOffset)(ev).cast[Val.Str].value).map(x => (() => x): Val.Lazy)
+                objs.sortBy((v) => keyFFunc(Array(new Val.Strict(v)), null, pos.noOffset)(ev).cast[Val.Str].value).map(x => (() => x): Val.Lazy)
               } else if (keys.forall(_.isInstanceOf[Val.Num])) {
-                objs.sortBy((v) => keyFFunc(null, Array(new Val.Strict(v)), pos.noOffset)(ev).cast[Val.Num].value).map(x => (() => x): Val.Lazy)
+                objs.sortBy((v) => keyFFunc(Array(new Val.Strict(v)), null, pos.noOffset)(ev).cast[Val.Num].value).map(x => (() => x): Val.Lazy)
               } else {
                 throw new Error.Delegate("Cannot sort with key values that are " + keys(0).prettyName + "s")
               }

@@ -47,9 +47,7 @@ object Parser {
 class Parser(val currentFile: Path) {
   import Parser._
 
-  private val nameIndices = new mutable.HashMap[String, Int]
-  nameIndices("std") = 0
-  private val fileScope = new FileScope(currentFile, nameIndices)
+  private val fileScope = new FileScope(currentFile)
 
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
@@ -222,11 +220,8 @@ class Parser(val currentFile: Path) {
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case '(' => Pass ~ (args ~ ")").map { x =>
-            val argNames =
-              if(x.names.exists(_ != null)) x.names
-              else null
-            Expr.Apply(i, _: Expr, argNames, x.exprs)
+          case '(' => Pass ~ (args ~ ")").map { case (args, namedNames) =>
+            Expr.Apply(i, _: Expr, args, if(namedNames.length == 0) null else namedNames)
           }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
@@ -287,7 +282,7 @@ class Parser(val currentFile: Path) {
               case "error"     => Pass ~ error(pos)
               case "assert"    => Pass ~ assertExpr(pos)
               case "local"     => Pass ~ local
-              case x           => Pass(Expr.Id(pos, indexFor(x)))
+              case x           => Pass(Expr.Id(pos, x, ValScope.INVALID_IDX))
             }
           }
           case _ => Fail
@@ -362,7 +357,7 @@ class Parser(val currentFile: Path) {
   def objlocal[_: P] = P( "local" ~~ break ~/ bind )
   def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   def forspec[_: P] =
-    P( Pos ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
+    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
   def ifspec[_: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
   def fieldname[_: P] = P(
     id.map(Expr.FieldName.Fixed) |
@@ -373,12 +368,16 @@ class Parser(val currentFile: Path) {
     P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
-    P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
-    } else Pass(Expr.Args(x.map(_._1.getOrElse(null)).toArray, x.map(_._2).toArray))
+    } else {
+      val args = x.iterator.map(_._2).toArray
+      val namedNames = x.iterator.dropWhile(_._1.isEmpty).map(_._1.get).toArray
+      Pass((args, namedNames))
+    }
   }
 
   def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
@@ -391,8 +390,7 @@ class Parser(val currentFile: Path) {
     if (overlap == null) {
       val names = x.map(_._1).toArray[String]
       val exprs = x.map(_._2.getOrElse(null)).toArray[Expr]
-      val idxs = names.map(indexFor)
-      Pass(Expr.Params(names, exprs, idxs))
+      Pass(Expr.Params(names, exprs))
     }
     else Fail.opaque("no duplicate parameter: " + overlap)
 
@@ -407,29 +405,6 @@ class Parser(val currentFile: Path) {
   ).!
 
   def document[_: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
-
-  /**
-    * We assign local identifier names to integer offsets into a local variable
-    * array at parse time, to avoid having to make a separate pass over the AST
-    * to replace them. This is sub-optimal, since we do not keep track of the
-    * fact that identifiers in unrelated scopes could share slots in the array,
-    * but it's good enough for now since the number of local variables in a
-    * particular file tends to be pretty small.
-    *
-    * We do not bother releasing a slot when backtracking after a parse fails,
-    * because this parser uses cuts to aggressively prevent backtracking.
-    *
-    * The Jsonnet standard library `std` always lives at slot 0.
-    */
-  def indexFor[_: P](name: String): Int = {
-    nameIndices.get(name) match{
-      case None =>
-        val index = nameIndices.size
-        nameIndices(name) = index
-        index
-      case Some(index) => index
-    }
-  }
 }
 
 final class Position(val fileScope: FileScope, val offset: Int) {
@@ -448,13 +423,7 @@ final class Position(val fileScope: FileScope, val offset: Int) {
   * well as the mapping of local variable names to local variable array indices
   * which is shared throughout each file.
   */
-class FileScope(val currentFile: Path,
-                val nameIndices: scala.collection.Map[String, Int]){
-  // Only used for error messages, so in the common case
-  // where nothing blows up this does not need to be allocated
-  lazy val indexNames = nameIndices.map(_.swap)
-
+class FileScope(val currentFile: Path) {
   lazy val currentFileLastPathElement = if(currentFile == null) null else currentFile.last
-
   val noOffsetPos: Position = new Position(this, -1)
 }

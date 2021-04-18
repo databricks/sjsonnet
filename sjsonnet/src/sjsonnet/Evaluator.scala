@@ -29,16 +29,18 @@ class Evaluator(resolver: CachedResolver,
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val = try {
     expr match {
-      case Id(pos, value) => visitId(pos, value)
+      case ValidId(pos, nameIdx) =>
+        val ref = scope.bindings(nameIdx)
+        try ref.force catch Error.tryCatchWrap(pos)
 
       case Select(pos, value, name) => visitSelect(pos, value, name)
 
       case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
       case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
       case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
-      case Apply(pos, value, argNames, argExprs) => visitApply(pos, value, argNames, argExprs)
+      case Apply(pos, value, args, namedNames) => visitApply(pos, value, args, namedNames)
 
-      case lit: Val.Literal => lit
+      case lit: Val => lit
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
@@ -89,9 +91,16 @@ class Evaluator(resolver: CachedResolver,
       case LocalExpr(pos, bindings, returned) =>
         val s =
           if(bindings == null) scope else {
-            lazy val newScope: ValScope = {
-              val f = visitBindings(bindings, (self, sup) => newScope)
-              scope.extend(bindings, f)
+            val base = scope.length
+            val newScope = scope.extendBy(bindings.length)
+            var i = 0
+            while(i < bindings.length) {
+              val b = bindings(i)
+              newScope.bindings(base+i) = b.args match {
+                case null => () => visitExpr(b.rhs)(newScope)
+                case argSpec => () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
+              }
+              i += 1
             }
             newScope
           }
@@ -134,6 +143,9 @@ class Evaluator(resolver: CachedResolver,
       case ImportStr(pos, value) => visitImportStr(pos, value)
 
       case Expr.Error(pos, value) => visitError(pos, value)
+
+      case Id(pos, name, _) =>
+        Error.fail("Unknown variable " + name, pos)
     }
   } catch Error.tryCatch(expr.pos)
 
@@ -143,13 +155,6 @@ class Evaluator(resolver: CachedResolver,
     case _: ObjExtend => true
     case _: Val.Obj => true
     case _ => false
-  }
-
-  def visitId(pos: Position, value: Int)(implicit scope: ValScope): Val = {
-    val ref = scope.bindings(value)
-    if(ref == null)
-      Error.fail("Unknown variable " + pos.fileScope.indexNames(value), pos)
-    try ref.force catch Error.tryCatchWrap(pos)
   }
 
   def visitIfElse(pos: Position,
@@ -207,17 +212,17 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr])
+  private def visitApply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String])
                         (implicit scope: ValScope) = {
     val lhs = visitExpr(value)
-    val arr = new Array[Val.Lazy](argExprs.length)
+    val argsL = new Array[Val.Lazy](args.length)
     var idx = 0
-    while (idx < argExprs.length) {
-      val boundIdx = idx
-      arr(idx) = () => visitExpr(argExprs(boundIdx))
+    while (idx < args.length) {
+      val a = args(idx)
+      argsL(idx) = () => visitExpr(a)
       idx += 1
     }
-    try lhs.cast[Val.Func].apply(argNames, arr, pos) catch Error.tryCatchWrap(pos)
+    try lhs.cast[Val.Func].apply(argsL, namedNames, pos) catch Error.tryCatchWrap(pos)
   }
 
   private def visitApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr)
@@ -320,7 +325,7 @@ class Evaluator(resolver: CachedResolver,
       p,
       {
         val (doc, newFileScope) = resolver.parseOrFail(pos, value, p, str)
-        try visitExpr(doc)(Std.scope(newFileScope.nameIndices.size))
+        try visitExpr(doc)(ValScope.empty)
         catch Error.tryCatchWrap(pos)
       }
     )
@@ -502,18 +507,26 @@ class Evaluator(resolver: CachedResolver,
     }
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
-      scope.extend(
-        binds,
-        newBindings,
-        newDollar = if(scope.dollar0 != null) scope.dollar0 else self,
-        newSelf = self,
-        newSuper = sup
-      )
+      if(binds == null)
+        scope.extend(null, if(scope.dollar0 != null) scope.dollar0 else self, self, sup)
+      else {
+        val scopeLen = scope.length
+        val newScope = scope.extendBy(binds.length, if(scope.dollar0 != null) scope.dollar0 else self, self, sup)
+        val arrF = newScope.bindings
+        var i = 0
+        while(i < binds.length) {
+          val b = binds(i)
+          arrF(scopeLen+i) = b.args match {
+            case null =>
+              () => visitExpr(b.rhs)(makeNewScope(self, sup))
+            case argSpec =>
+              () => visitMethod(b.rhs, argSpec, b.pos)(makeNewScope(self, sup))
+          }
+          i += 1
+        }
+        newScope
+      }
     }
-
-    lazy val newBindings =
-      if(binds == null) null
-      else visitBindings(binds, (self, sup) => makeNewScope(self, sup))
 
     val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
     fields.foreach {
@@ -553,7 +566,6 @@ class Evaluator(resolver: CachedResolver,
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(s <- visitComp(first :: rest, Array(compScope))){
         lazy val newScope: ValScope = s.extend(
-          binds,
           newBindings,
           newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
           newSelf = newSelf,
@@ -568,7 +580,6 @@ class Evaluator(resolver: CachedResolver,
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
                 visitExpr(value)(
                   s.extend(
-                    binds,
                     newBindings,
                     newDollar = if(s.dollar0 != null) s.dollar0 else self,
                     newSelf = self,
@@ -597,7 +608,7 @@ class Evaluator(resolver: CachedResolver,
               expr.pos
             )
           }
-        } yield s.extendSimple(name, e)
+        } yield s.extendSimple(e)
       )
     case IfSpec(offset, expr) :: rest =>
       visitComp(rest, scopes.filter(visitExpr(expr)(_) match {
@@ -613,7 +624,7 @@ class Evaluator(resolver: CachedResolver,
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || {
     def normalize(x: Val): Val = x match {
-      case f: Val.Func => f.apply(Evaluator.emptyStringArray, Evaluator.emptyLazyArray, emptyMaterializeFileScopePos)
+      case f: Val.Func => f.apply(null, null, emptyMaterializeFileScopePos)
       case x => x
     }
     (normalize(x), normalize(y)) match {

@@ -3,9 +3,11 @@ package sjsonnet
 import sjsonnet.Expr.ObjBody.{MemberList, ObjComp}
 import sjsonnet.Expr._
 
+import scala.collection.immutable.HashMap
+
 class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
-  final case class ScopedVal(val v: AnyRef, val sc: Array[ScopedVal])
-  var scope = new Array[ScopedVal](rootFileScope.nameIndices.size)
+  import ScopedExprTransform._
+  var scope: Scope = emptyScope
 
   // Marker for Exprs in the scope that should not be used because they need to be evaluated in a different scope
   val dynamicExpr = new Expr { def pos: Position = ??? }
@@ -25,7 +27,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
       }
 
     case Function(pos, params, body) =>
-      nestedIndices(params.indices)(rec(e))
+      nestedNames(params.names)(rec(e))
 
     case ObjComp(pos, preLocals, key, value, postLocals, first, rest) =>
       val (f2 :: r2, (k2, (pre2, post2, v2))) = compSpecs(first :: rest, { () =>
@@ -47,7 +49,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
   override protected[this] def transformBind(b: Bind): Bind = {
     val args = b.args
     val rhs = b.rhs
-    nestedIndices(if(args == null) null else args.indices) {
+    nestedNames(if(args == null) null else args.names) {
       val args2 = transformParams(args)
       val rhs2 = transform(rhs)
       if((args2 eq args) && (rhs2 eq rhs)) b
@@ -70,7 +72,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
       if((y2 eq y) && (z2 eq z)) f else f.copy(args = y2, rhs = z2)
     }
     if(f.args == null) g
-    else nestedIndices(f.args.indices)(g)
+    else nestedNames(f.args.names)(g)
   }
 
   override protected[this] def transformField(f: Member.Field): Member.Field = ???
@@ -78,8 +80,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
   protected[this] def compSpecs[T](a: List[CompSpec], value: () => T): (List[CompSpec], T) = a match {
     case (c @ ForSpec(pos, name, cond)) :: cs =>
       val c2 = rec(c).asInstanceOf[ForSpec]
-      nested {
-        scope(c2.name) = new ScopedVal(dynamicExpr, scope)
+      nestedWith(c2.name, dynamicExpr) {
         val (cs2, value2) = compSpecs(cs, value)
         (c2 :: cs2, value2)
       }
@@ -91,37 +92,42 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
       (Nil, value())
   }
 
-  protected[this] def nested[T](f: => T): T = {
-    val oldScope = scope
-    scope = scope.clone()
-    try f finally { scope = oldScope }
-  }
-
-  protected[this] def nested[T](sc: Array[ScopedVal])(f: => T): T = {
+  protected[this] def nestedNew[T](sc: Scope)(f: => T): T = {
     val oldScope = scope
     scope = sc
     try f finally { scope = oldScope }
   }
 
-  protected[this] def nestedFileScope[T](fs: FileScope)(f: => T): T = {
-    val oldScope = scope
-    scope = new Array[ScopedVal](fs.nameIndices.size)
-    try f finally { scope = oldScope }
-  }
+  protected[this] def nestedWith[T](n: String, e: Expr)(f: => T): T =
+    nestedNew(new Scope(scope.mappings.updated(n, new ScopedVal(e, scope, scope.size)), scope.size+1))(f)
+
+  protected[this] def nestedFileScope[T](fs: FileScope)(f: => T): T =
+    nestedNew(emptyScope)(f)
 
   protected[this] def nestedBindings[T](a: Array[Bind])(f: => T): T = {
     if(a == null || a.length == 0) f
-    else nested {
-      a.foreach(b => scope(b.name) = new ScopedVal(if(b.args == null) b.rhs else b, scope))
-      f
+    else {
+      val newm = a.zipWithIndex.map { case (b, idx) =>
+        //println(s"Binding ${b.name} to ${scope.size + idx}")
+        (b.name, new ScopedVal(if(b.args == null) b.rhs else b, scope, scope.size + idx))
+      }
+      nestedNew(new Scope(scope.mappings ++ newm, scope.size + a.length))(f)
     }
   }
 
-  protected[this] def nestedIndices[T](a: Array[Int])(f: => T): T = {
+  protected[this] def nestedNames[T](a: Array[String])(f: => T): T = {
     if(a == null || a.length == 0) f
-    else nested {
-      a.foreach(b => scope(b) = new ScopedVal(dynamicExpr, scope))
-      f
+    else {
+      val newm = a.zipWithIndex.map { case (n, idx) => (n, new ScopedVal(dynamicExpr, scope, scope.size + idx)) }
+      nestedNew(new Scope(scope.mappings ++ newm, scope.size + a.length))(f)
     }
   }
+}
+
+object ScopedExprTransform {
+  final case class ScopedVal(v: AnyRef, sc: Scope, idx: Int)
+  final class Scope(val mappings: HashMap[String, ScopedVal], val size: Int) {
+    def get(s: String): ScopedVal = mappings.getOrElse(s, null)
+  }
+  def emptyScope: Scope = new Scope(HashMap.empty, 0)
 }

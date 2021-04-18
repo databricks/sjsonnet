@@ -59,11 +59,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
       }
       (parsed, fs) = res
       res0 <-
-        try Right(
-          evaluator.visitExpr(parsed)(
-            Std.scope(fs.nameIndices.size + 1)
-          )
-        )
+        try Right(evaluator.visitExpr(parsed)(ValScope.empty))
         catch{case NonFatal(e) =>
           val s = new StringWriter()
           val p = new PrintWriter(s)
@@ -82,7 +78,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
             }
             i += 1
           }
-          new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2, f.params.indices)) {
+          new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
             def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = f.evalRhs(vs, es, fs, pos)
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = f.evalDefault(expr, vs, es)
           }

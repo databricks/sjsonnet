@@ -6,7 +6,7 @@ import Val.{True, Num}
 object ParserTests extends TestSuite{
   def parse(s: String) = fastparse.parse(s, new Parser(null).document(_)).get.value._1
   def parseErr(s: String) = fastparse.parse(s, new Parser(null).document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
-  val dummyFS = new FileScope(null, Map.empty)
+  val dummyFS = new FileScope(null)
   def pos(i: Int) = new Position(dummyFS, i)
   def tests = Tests{
     test("hello") {

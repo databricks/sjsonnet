@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.{OutputStream, PrintStream}
+import java.io.{OutputStream, PrintStream, StringWriter}
 import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
@@ -12,6 +12,23 @@ object MainBenchmark {
     "-J", "../../universe2",
     "-J", "../../universe2/mt-shards/dev/az-westus-c2",
   )
+
+  def findFiles(): IndexedSeq[(Path, String)] = {
+    val parser = mainargs.ParserForClass[Config]
+    val config = parser.constructEither(MainBenchmark.mainArgs, autoPrintHelpAndExit = None).getOrElse(???)
+    val file = config.file
+    val wd = os.pwd
+    val path = OsPath(os.Path(file, wd))
+    val interp = new Interpreter(
+      Map.empty[String, ujson.Value],
+      Map.empty[String, ujson.Value],
+      OsPath(wd),
+      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None)
+    )
+    val renderer = new Renderer(new StringWriter, indent = 3)
+    interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
+    interp.parseCache.keySet.toIndexedSeq
+  }
 }
 
 @BenchmarkMode(Array(Mode.AverageTime))

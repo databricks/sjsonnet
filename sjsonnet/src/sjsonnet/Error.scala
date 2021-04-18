@@ -66,19 +66,6 @@ object Error {
     throw Error(msg, Nil, None).addFrame(pos.currentFile, evaluator.wd, pos.offset)
   }
 
-  def failIfNonEmpty(names: BitSet,
-                     outerPos: Position,
-                     formatMsg: (String, String) => String,
-                     // Allows the use of a custom file scope for computing the error message
-                     // for details see: https://github.com/databricks/sjsonnet/issues/83
-                     fileScope: FileScope)
-                    (implicit eval: EvalErrorScope) = if (!names.isEmpty) {
-    val plural = if (names.cardinality() > 1) "s" else ""
-    val nameSnippet = BitSetUtils.iterator(names).map(i => fileScope.indexNames(i)).mkString(", ")
-    fail(formatMsg(plural, nameSnippet), outerPos)
-  }
-
-
   /**
     * An exception containing a message, which is expected to get caught by
     * the nearest enclosing try-catch and converted into an [[Error]]

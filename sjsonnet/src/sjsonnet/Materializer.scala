@@ -69,7 +69,7 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, evaluator.emptyMaterializeFileScopePos),
+          f.apply(emptyLazyArray, null, evaluator.emptyMaterializeFileScopePos),
           visitor,
           storePos
         )

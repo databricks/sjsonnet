@@ -4,7 +4,7 @@ import ujson.Value
 import utest._
 
 object FormatTests extends TestSuite{
-  val dummyPos = new Position(new FileScope(DummyPath("(unknown)"), Map.empty), -1)
+  val dummyPos = new Position(new FileScope(DummyPath("(unknown)")), -1)
 
   def check(fmt: String, jsonStr: String, expected: String) = {
     val json = ujson.read(jsonStr)

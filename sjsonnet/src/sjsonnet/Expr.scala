@@ -2,6 +2,8 @@ package sjsonnet
 
 import java.util.BitSet
 
+import scala.collection.mutable
+
 /**
   * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the
   * program mostly as-written, except for resolving local variable names and
@@ -22,7 +24,8 @@ object Expr{
   case class Super(pos: Position) extends Expr
   case class $(pos: Position) extends Expr
 
-  case class Id(pos: Position, value: Int) extends Expr
+  case class Id(pos: Position, name: String, nameIdx: Int) extends Expr
+  case class ValidId(pos: Position, nameIdx: Int) extends Expr
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
     override def toString = s"Arr($pos, ${arrStr(value)})"
   }
@@ -54,24 +57,10 @@ object Expr{
     case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
-
-  case class Params(names: Array[String], defaultExprs: Array[Expr], indices: Array[Int]){
-    val argIndices: Map[String, Int] = (names, indices).zipped.toMap
-    val noDefaultIndices: BitSet = {
-      val b = new BitSet(defaultExprs.size)
-      (defaultExprs, indices).zipped.foreach((e, i) => if(e == null) b.set(i))
-      b
-    }
-    val defaultsOnlyIndices: Array[Int] = (defaultExprs, indices).zipped.collect { case (x, i) if x != null => i }.toArray
-    val defaultsOnly: Array[Expr] = defaultExprs.filter(_ != null).toArray
-    val allIndices: BitSet = {
-      val b = new BitSet(indices.size)
-      indices.foreach(b.set)
-      b
-    }
-    override def toString = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)}, ${arrStr(indices)})"
+  case class Params(names: Array[String], defaultExprs: Array[Expr]){
+    val paramMap = names.zipWithIndex.toMap
+    override def toString = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
-  case class Args(names: Array[String], exprs: Array[Expr])
 
   case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr
   object UnaryOp{
@@ -113,11 +102,11 @@ object Expr{
     override def toString = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
   }
 
-  case class Bind(pos: Position, name: Int, args: Params, rhs: Expr) extends Member
+  case class Bind(pos: Position, name: String, args: Params, rhs: Expr) extends Member
   case class Import(pos: Position, value: String) extends Expr
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
-  case class Apply(pos: Position, value: Expr, argNames: Array[String], argExprs: Array[Expr]) extends Expr
+  case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String]) extends Expr
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr
   case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr) extends Expr
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
@@ -133,7 +122,7 @@ object Expr{
 
   sealed trait CompSpec extends Expr
   case class IfSpec(pos: Position, cond: Expr) extends CompSpec
-  case class ForSpec(pos: Position, name: Int, cond: Expr) extends CompSpec
+  case class ForSpec(pos: Position, name: String, cond: Expr) extends CompSpec
 
   case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
   case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
