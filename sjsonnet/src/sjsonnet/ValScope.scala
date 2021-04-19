@@ -20,11 +20,11 @@ import java.util.Arrays
 class ValScope(val dollar0: Val.Obj,
                val self0: Val.Obj,
                val super0: Val.Obj,
-               val bindings: Array[Val.Lazy]) {
+               val bindings: Array[Lazy]) {
 
   def length: Int = bindings.length
 
-  def extend(newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
+  def extend(newBindingsF: Array[(Val.Obj, Val.Obj) => Lazy] = null,
              newDollar: Val.Obj = null,
              newSelf: Val.Obj = null,
              newSuper: Val.Obj = null) = {
@@ -57,7 +57,7 @@ class ValScope(val dollar0: Val.Obj,
     new ValScope(dollar, self, sup, Arrays.copyOf(bindings, bindings.length + num))
   }
 
-  def extendSimple(newBindingsV: Array[Val.Lazy]) = {
+  def extendSimple(newBindingsV: Array[_ <: Lazy]) = {
     if(newBindingsV == null || newBindingsV.length == 0) this
     else {
       val b = Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
@@ -70,13 +70,13 @@ class ValScope(val dollar0: Val.Obj,
     if(num == 0) this
     else new ValScope(dollar0, self0, super0, Arrays.copyOf(bindings, bindings.length + num))
 
-  def extendSimple(l1: Val.Lazy) = {
+  def extendSimple(l1: Lazy) = {
     val b = Arrays.copyOf(bindings, bindings.length+1)
     b(bindings.length) = l1
     new ValScope(dollar0, self0, super0, b)
   }
 
-  def extendSimple(l1: Val.Lazy, l2: Val.Lazy) = {
+  def extendSimple(l1: Lazy, l2: Lazy) = {
     val b = Arrays.copyOf(bindings, bindings.length+2)
     b(bindings.length) = l1
     b(bindings.length+1) = l2
@@ -85,20 +85,20 @@ class ValScope(val dollar0: Val.Obj,
 }
 
 object ValScope{
-  private[this] val emptyArr = new Array[Val.Lazy](0)
+  private[this] val emptyArr = new Array[Lazy](0)
   def empty = new ValScope(null, null, null, emptyArr)
 
-  def createSimple(newBindingV: Val.Lazy) = {
-    val arr = new Array[Val.Lazy](1)
+  def createSimple(newBindingV: Lazy) = {
+    val arr = new Array[Lazy](1)
     arr(0) = newBindingV
     new ValScope(null, null, null, arr)
   }
 
-  def createSimple(newBindingsV: Array[Val.Lazy]) =
-    new ValScope(null, null, null, newBindingsV)
+  def createSimple(newBindingsV: Array[_ <: Lazy]) =
+    new ValScope(null, null, null, newBindingsV.asInstanceOf[Array[Lazy]])
 
   def createSimple(len: Int) =
-    new ValScope(null, null, null, new Array[Val.Lazy](len))
+    new ValScope(null, null, null, new Array[Lazy](len))
 
   final val INVALID_IDX = -1
 }

@@ -11,12 +11,29 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 /**
+ * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily
+ * evaluated dictionary values, array contents, or function parameters
+ * are all wrapped in [[Lazy]] and only truly evaluated on-demand
+ */
+abstract class Lazy {
+  protected[this] var cached: Val = null
+  def compute(): Val
+  final def force: Val = {
+    if(cached == null)  cached = compute()
+    cached
+  }
+}
+
+/**
   * [[Val]]s represented Jsonnet values that are the result of evaluating
   * a Jsonnet program. The [[Val]] data structure is essentially a JSON tree,
   * except evaluation of object attributes and array contents are lazy, and
   * the tree can contain functions.
   */
-sealed abstract class Val {
+sealed abstract class Val extends Lazy {
+  cached = this
+  final def compute() = this
+
   def pos: Position
   def prettyName: String
 
@@ -48,24 +65,6 @@ object PrettyNamed{
 }
 object Val{
 
-  /**
-    * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily
-    * evaluated dictionary values, array contents, or function parameters
-    * are all wrapped in [[Lazy]] and only truly evaluated on-demand
-    */
-  abstract class Lazy {
-    protected[this] var cached: Val = null
-    def compute(): Val
-    final def force: Val = {
-      if(cached == null) cached = compute()
-      cached
-    }
-  }
-  final class Strict(v: Val) extends Lazy {
-    this.cached =v
-    def compute() = v
-  }
-
   abstract class Literal extends Val with Expr
   abstract class Bool extends Literal {
     override def asBoolean: Boolean = this.isInstanceOf[True]
@@ -92,14 +91,14 @@ object Val{
     override def asDouble: Double = value
   }
 
-  class Arr(val pos: Position, private val value: Array[Lazy]) extends Literal {
+  class Arr(val pos: Position, private val value: Array[_ <: Lazy]) extends Literal {
     def prettyName = "array"
     override def asArr: Arr = this
     def length: Int = value.length
     def force(i: Int) = value(i).force
 
     def asLazy(i: Int) = value(i)
-    def asLazyArray: Array[Lazy] = value
+    def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
     def asStrictArray: Array[Val] = value.map(_.force)
 
     def concat(newPos: Position, rhs: Arr): Arr =
@@ -319,7 +318,7 @@ object Val{
 
     override def asFunc: Func = this
 
-    def apply(argsL: Array[Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
@@ -393,9 +392,6 @@ object Val{
       }
     }
 
-    def apply1(argVal: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      apply1(new Val.Strict(argVal), outerPos)
-
     def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
@@ -407,9 +403,6 @@ object Val{
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
-
-    def apply2(argVal1: Val, argVal2: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      apply2(new Val.Strict(argVal1), new Val.Strict(argVal2), outerPos)
   }
 
   abstract class Builtin(paramNames: String*)
@@ -428,17 +421,9 @@ object Val{
 
     def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val
 
-    override def apply1(argVal: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      if(params.names.length != 1) apply(Array(new Val.Strict(argVal)), null, outerPos)
-      else evalRhs(Array(argVal), ev, outerPos)
-
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
       else evalRhs(Array(argVal.force), ev, outerPos)
-
-    override def apply2(argVal1: Val, argVal2: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      if(params.names.length != 2) apply(Array(new Val.Strict(argVal1), new Val.Strict(argVal2)), null, outerPos)
-      else evalRhs(Array(argVal1, argVal2), ev, outerPos)
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
@@ -451,13 +436,9 @@ object Val{
 
     def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
-
-    override def apply1(argVal: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      if(params.names.length == 1) evalRhs(argVal, ev, outerPos)
-      else super.apply(Array(new Val.Strict(argVal)), null, outerPos)
 
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length == 1) evalRhs(argVal.force, ev, outerPos)
@@ -470,14 +451,10 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
-
-    override def apply2(argVal1: Val, argVal2: Val, outerPos: Position)(implicit ev: EvalScope): Val =
-      if(params.names.length == 2) evalRhs(argVal1, argVal2, ev, outerPos)
-      else super.apply(Array(new Val.Strict(argVal1), new Val.Strict(argVal2)), null, outerPos)
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos)
@@ -490,7 +467,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)

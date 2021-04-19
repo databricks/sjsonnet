@@ -114,9 +114,9 @@ class Evaluator(resolver: CachedResolver,
         visitAssert(pos, value, msg, returned)
 
       case Comp(pos, value, first, rest) =>
-        new Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Val.Lazy))
+        new Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Lazy))
 
-      case Arr(pos, value) => new Val.Arr(pos, value.map(v => (() => visitExpr(v)): Val.Lazy))
+      case Arr(pos, value) => new Val.Arr(pos, value.map(v => (() => visitExpr(v)): Lazy))
 
       case ObjExtend(superPos, value, ext) => {
         if(strict && isObjLiteral(value))
@@ -215,7 +215,7 @@ class Evaluator(resolver: CachedResolver,
   private def visitApply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String])
                         (implicit scope: ValScope) = {
     val lhs = visitExpr(value)
-    val argsL = new Array[Val.Lazy](args.length)
+    val argsL = new Array[Lazy](args.length)
     var idx = 0
     while (idx < args.length) {
       val a = args(idx)
@@ -468,8 +468,8 @@ class Evaluator(resolver: CachedResolver,
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
     }
 
-  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Val.Lazy] = {
-    val arrF = new Array[(Val.Obj, Val.Obj) => Val.Lazy](bindings.length)
+  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Lazy] = {
+    val arrF = new Array[(Val.Obj, Val.Obj) => Lazy](bindings.length)
     var i = 0
     while(i < bindings.length) {
       val b = bindings(i)
@@ -664,5 +664,5 @@ class Evaluator(resolver: CachedResolver,
 
 object Evaluator {
   val emptyStringArray = new Array[String](0)
-  val emptyLazyArray = new Array[Val.Lazy](0)
+  val emptyLazyArray = new Array[Lazy](0)
 }

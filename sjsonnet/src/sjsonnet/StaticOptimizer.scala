@@ -40,7 +40,7 @@ class StaticOptimizer(rootFileScope: FileScope)(implicit eval: EvalErrorScope)
     case a: Arr =>
       super.transform(a) match {
         case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
-          new Val.Arr(a.pos, a.value.map(e => new Val.Strict(e.asInstanceOf[Val])))
+          new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
         case other => other
       }
 
