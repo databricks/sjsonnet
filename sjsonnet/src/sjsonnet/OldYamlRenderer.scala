@@ -1,86 +1,59 @@
 package sjsonnet
 
 import java.io.{StringWriter, Writer}
-import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
 
-
-class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                   indent: Int = 2) extends BaseCharRenderer(_out, indent){
+class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
+                      indent: Int = 2) extends BaseRenderer(out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
-  private var topLevel = true
+  var topLevel = true
 
-  private val outBuffer = _out.getBuffer()
 
-  override def flushCharBuilder() = {
-    elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
-  }
-
-  private[this] def appendString(s: String) = {
-    val len = s.length
-    var i = 0
-    elemBuilder.ensureLength(len)
-    while(i < len) {
-      elemBuilder.appendUnsafeC(s.charAt(i))
-      i += 1
-    }
-  }
+  val outBuffer = out.getBuffer()
 
   override def visitString(s: CharSequence, index: Int): StringWriter = {
     flushBuffer()
     val len = s.length()
-    if (len == 0) {
-      elemBuilder.ensureLength(2)
-      elemBuilder.append('"')
-      elemBuilder.append('"')
-    } else if (s.charAt(len - 1) == '\n') {
+    if (len == 0) out.append("\"\"")
+    else if (s.charAt(len - 1) == '\n') {
       val splits = YamlRenderer.newlinePattern.split(s)
-      elemBuilder.append('|')
+      out.append('|')
       depth += 1
       splits.foreach { split =>
         newlineBuffered = true
         flushBuffer()
-        appendString(split) // TODO escaping?
+        out.append(split) // TODO escaping?
       }
       depth -= 1
+      out
     } else {
-      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true)
+      BaseRenderer.escape(out, s, unicode = true)
+      out
     }
-    flushCharBuilder()
-    _out
   }
-
   override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
-    appendString(RenderUtils.renderDouble(d))
-    flushCharBuilder()
-    _out
+    out.append(RenderUtils.renderDouble(d))
+    out
   }
-
+  override val colonSnippet = ": "
   override def flushBuffer() = {
     if (newlineBuffered) {
       // drop space between colon and newline
-      elemBuilder.writeOutToIfLongerThan(_out, 0)
       if (outBuffer.length() > 1 && outBuffer.charAt(outBuffer.length() - 1) == ' ') {
         outBuffer.setLength(outBuffer.length() - 1)
       }
-      YamlRenderer.writeIndentation(elemBuilder, indent * depth)
-      flushCharBuilder()
+      OldYamlRenderer.writeIndentation(out, indent * depth)
     }
-    if (dashBuffered) {
-      elemBuilder.append('-')
-      elemBuilder.append(' ')
-      flushCharBuilder()
-    }
+    if (dashBuffered) out.append("- ")
     dashBuffered = false
     newlineBuffered = false
     dashBuffered = false
   }
-
   override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
@@ -96,7 +69,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     if (dedentInObject) depth -= 1
     dashBuffered = true
 
-    def subVisitor = YamlRenderer.this
+    def subVisitor = OldYamlRenderer.this
     def visitValue(v: StringWriter, index: Int): Unit = {
       empty = false
       flushBuffer()
@@ -105,15 +78,10 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     }
     def visitEnd(index: Int) = {
       if (!dedentInObject) depth -= 1
-      if (empty) {
-        elemBuilder.ensureLength(2)
-        elemBuilder.append('[')
-        elemBuilder.append(']')
-      }
+      if (empty) out.append("[]")
       newlineBuffered = false
       dashBuffered = false
-      flushCharBuilder()
-      _out
+      out
     }
   }
   override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
@@ -124,15 +92,12 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
 
     if (afterKey) newlineBuffered = true
 
-    def subVisitor = YamlRenderer.this
-    def visitKey(index: Int) = YamlRenderer.this
+    def subVisitor = OldYamlRenderer.this
+    def visitKey(index: Int) = OldYamlRenderer.this
     def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
-      elemBuilder.ensureLength(2)
-      elemBuilder.append(':')
-      elemBuilder.append(' ')
-      flushCharBuilder()
+      out.append(colonSnippet)
       afterKey = true
       newlineBuffered = false
     }
@@ -141,24 +106,17 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       afterKey = false
     }
     def visitEnd(index: Int) = {
-      if (empty) {
-        elemBuilder.ensureLength(2)
-        elemBuilder.append('{')
-        elemBuilder.append('}')
-      }
+      if (empty) out.append("{}")
       newlineBuffered = false
       depth -= 1
-      flushCharBuilder()
       flushBuffer()
-      _out
+      out
     }
   }
 }
-object YamlRenderer{
-  val newlinePattern = Pattern.compile("\n")
 
-  def writeIndentation(out: upickle.core.CharBuilder, n: Int) = {
-    out.ensureLength(n+1)
+object OldYamlRenderer {
+  def writeIndentation(out: Writer, n: Int) = {
     out.append('\n')
     var i = n
     while(i > 0) {

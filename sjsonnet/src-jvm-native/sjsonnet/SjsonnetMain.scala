@@ -186,7 +186,7 @@ object SjsonnetMain {
       },
       preserveOrder = config.preserveOrder.value,
       strict = config.strict.value,
-      storePos = if (config.yamlDebug.value) currentPos = _ else _ => (),
+      storePos = if (config.yamlDebug.value) currentPos = _ else null,
       parseCache
     )
 

@@ -18,9 +18,9 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   importer: Importer,
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
-                  storePos: Position => Unit = _ => (),
+                  storePos: Position => Unit = null,
                   val parseCache: mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]] = new mutable.HashMap,
-                  staticOpt: Boolean = true) {
+                  staticOpt: Boolean = true) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] = {
@@ -88,7 +88,12 @@ class Interpreter(extVars: Map[String, ujson.Value],
   }
 
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
-    try Right(Materializer.apply0(res, visitor, storePos = storePos)(evaluator))
+    val m =
+      if(storePos == null) Materializer
+      else new Materializer {
+        override def storePos(pos: Position): Unit = self.storePos(pos)
+      }
+    try Right(m.apply0(res, visitor)(evaluator))
     catch{
       case Error.Delegate(msg) => Left(msg)
       case NonFatal(e) =>

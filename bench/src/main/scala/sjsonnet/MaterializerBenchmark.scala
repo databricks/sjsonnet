@@ -1,10 +1,11 @@
 package sjsonnet
 
-import java.io.{OutputStream, PrintStream, StringWriter}
+import java.io.{StringWriter, Writer}
 import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra._
+import ujson.JsVisitor
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -33,13 +34,33 @@ class MaterializerBenchmark {
       importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)
+    assert(renderYaml() == oldRenderYaml())
+    assert(render() == oldRender())
+    assert(renderPython() == oldRenderPython())
   }
 
-  @Benchmark
-  def main(bh: Blackhole): Unit = {
+  @Benchmark def newRenderB(bh: Blackhole): Unit = bh.consume(render())
+  @Benchmark def oldRenderB(bh: Blackhole): Unit = bh.consume(oldRender())
+  @Benchmark def newRenderPythonB(bh: Blackhole): Unit = bh.consume(renderPython())
+  @Benchmark def oldRenderPythonB(bh: Blackhole): Unit = bh.consume(oldRenderPython())
+  @Benchmark def newRenderYamlB(bh: Blackhole): Unit = bh.consume(renderYaml())
+  @Benchmark def oldRenderYamlB(bh: Blackhole): Unit = bh.consume(oldRenderYaml())
+
+  @Benchmark def renderPrettyYamlB(bh: Blackhole): Unit = bh.consume(renderPrettyYaml())
+
+  private def render() = renderWith(new Renderer(_, indent=3))
+  private def renderPython() = renderWith(new PythonRenderer(_, indent=3))
+  private def renderYaml() = renderWith(new YamlRenderer(_, indent=3))
+  private def oldRender() = renderWith(new OldRenderer(_, indent=3))
+  private def oldRenderPython() = renderWith(new OldPythonRenderer(_, indent=3))
+  private def oldRenderYaml() = renderWith(new OldYamlRenderer(_, indent=3))
+
+  private def renderPrettyYaml() = renderWith(new PrettyYamlRenderer(_, indent=3, getCurrentPosition = () => null))
+
+  private def renderWith[T <: Writer](r: StringWriter => JsVisitor[T, T]): String = {
     val writer = new StringWriter
-    val renderer = new Renderer(writer, indent = 3)
-    bh.consume(interp.materialize(value, renderer))
-    bh.consume(writer.toString)
+    val renderer = r(writer)
+    interp.materialize(value, renderer)
+    writer.toString
   }
 }

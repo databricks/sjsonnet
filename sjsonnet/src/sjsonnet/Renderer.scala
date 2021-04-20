@@ -1,4 +1,5 @@
 package sjsonnet
+
 import java.io.Writer
 
 import upickle.core.{ArrVisitor, ObjVisitor}
@@ -12,26 +13,33 @@ import upickle.core.{ArrVisitor, ObjVisitor}
   *
   */
 class Renderer(out: Writer = new java.io.StringWriter(),
-               indent: Int = -1) extends BaseRenderer(out, indent){
+               indent: Int = -1) extends BaseCharRenderer(out, indent){
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int) = {
+    val s = RenderUtils.renderDouble(d)
     flushBuffer()
-    out.append(RenderUtils.renderDouble(d))
+    var i = 0
+    val sLength = s.length
+    elemBuilder.ensureLength(sLength)
+    while(i < sLength){
+      elemBuilder.appendUnsafeC(s.charAt(i))
+      i += 1
+    }
+    flushCharBuilder()
     out
   }
-  override val colonSnippet = ": "
   override def flushBuffer() = {
     if (commaBuffered) {
-      if (indent == -1) out.append(", ")
-      else out.append(',')
+      elemBuilder.append(',')
+      if (indent == -1) elemBuilder.append(' ')
     }
     if (indent == -1) ()
     else if (commaBuffered || newlineBuffered) {
-      out.append('\n')
-
       var i = indent * depth
+      elemBuilder.ensureLength(i+1)
+      elemBuilder.append('\n')
       while(i > 0) {
-        out.append(' ')
+        elemBuilder.append(' ')
         i -= 1
       }
     }
@@ -41,7 +49,7 @@ class Renderer(out: Writer = new java.io.StringWriter(),
   override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
-    out.append('[')
+    elemBuilder.append('[')
     newlineBuffered = true
 
     depth += 1
@@ -56,9 +64,10 @@ class Renderer(out: Writer = new java.io.StringWriter(),
       newlineBuffered = false
       depth -= 1
 
-      if (empty) out.append(' ')
+      if (empty) elemBuilder.append(' ')
       else renderIndent()
-      out.append(']')
+      elemBuilder.append(']')
+      flushCharBuilder()
       out
     }
   }
@@ -66,15 +75,16 @@ class Renderer(out: Writer = new java.io.StringWriter(),
   override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
-    out.append('{')
+    elemBuilder.append('{')
     newlineBuffered = true
     depth += 1
     def subVisitor = Renderer.this
     def visitKey(index: Int) = Renderer.this
     def visitKeyValue(v: Any): Unit = {
       empty = false
-      flushBuffer()
-      out.append(colonSnippet)
+      //flushBuffer()
+      elemBuilder.append(':')
+      elemBuilder.append(' ')
     }
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
@@ -84,9 +94,10 @@ class Renderer(out: Writer = new java.io.StringWriter(),
       newlineBuffered = false
       depth -= 1
 
-      if (empty) out.append(' ')
+      if (empty) elemBuilder.append(' ')
       else renderIndent()
-      out.append('}')
+      elemBuilder.append('}')
+      flushCharBuilder()
       out
     }
   }
@@ -94,31 +105,73 @@ class Renderer(out: Writer = new java.io.StringWriter(),
 
 
 class PythonRenderer(out: Writer = new java.io.StringWriter(),
-                     indent: Int = -1) extends BaseRenderer(out, indent){
+                     indent: Int = -1) extends BaseCharRenderer(out, indent){
 
   override def visitNull(index: Int) = {
     flushBuffer()
-    out.append("None")
+    elemBuilder.ensureLength(4)
+    elemBuilder.appendUnsafe('N')
+    elemBuilder.appendUnsafe('o')
+    elemBuilder.appendUnsafe('n')
+    elemBuilder.appendUnsafe('e')
+    flushCharBuilder()
     out
   }
 
   override def visitFalse(index: Int) = {
     flushBuffer()
-    out.append("False")
+    elemBuilder.ensureLength(5)
+    elemBuilder.appendUnsafe('F')
+    elemBuilder.appendUnsafe('a')
+    elemBuilder.appendUnsafe('l')
+    elemBuilder.appendUnsafe('s')
+    elemBuilder.appendUnsafe('e')
+    flushCharBuilder()
     out
   }
 
   override def visitTrue(index: Int) = {
     flushBuffer()
-    out.append("True")
+    elemBuilder.ensureLength(4)
+    elemBuilder.appendUnsafe('T')
+    elemBuilder.appendUnsafe('r')
+    elemBuilder.appendUnsafe('u')
+    elemBuilder.appendUnsafe('e')
+    flushCharBuilder()
     out
   }
 
-  override val colonSnippet = ": "
+  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+    flushBuffer()
+    elemBuilder.append('{')
+    depth += 1
+    renderIndent()
+    def subVisitor = PythonRenderer.this
+    def visitKey(index: Int) = PythonRenderer.this
+    def visitKeyValue(s: Any): Unit = {
+      elemBuilder.ensureLength(2)
+      elemBuilder.append(':')
+      elemBuilder.append(' ')
+    }
+    def visitValue(v: Writer, index: Int): Unit = {
+      commaBuffered = true
+    }
+    def visitEnd(index: Int) = {
+      commaBuffered = false
+      depth -= 1
+      renderIndent()
+      elemBuilder.append('}')
+      flushCharBuilder()
+      out
+    }
+  }
+
   override def flushBuffer() = {
     if (commaBuffered) {
       commaBuffered = false
-      out.append(", ")
+      elemBuilder.ensureLength(2)
+      elemBuilder.append(',')
+      elemBuilder.append(' ')
       renderIndent()
     }
   }

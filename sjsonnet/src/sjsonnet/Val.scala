@@ -478,7 +478,7 @@ object Val{
   * [[EvalScope]] models the per-evaluator context that is propagated
   * throughout the Jsonnet evaluation.
   */
-trait EvalScope extends EvalErrorScope{
+abstract class EvalScope extends EvalErrorScope{
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val
 

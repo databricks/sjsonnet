@@ -129,7 +129,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
         out.append(bufferedComment)
         bufferedComment = null
       }
-      YamlRenderer.writeIndentation(out, indent * depth)
+      OldYamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) {
       out.append("- ")
@@ -253,7 +253,7 @@ object PrettyYamlRenderer{
     out.append(lineComment)
 
     splits.dropRight(dropRight).foreach { split =>
-      if (split.nonEmpty) YamlRenderer.writeIndentation(out, indent * (depth + 1))
+      if (split.nonEmpty) OldYamlRenderer.writeIndentation(out, indent * (depth + 1))
       else out.write('\n')
       out.append(split)
     }
@@ -328,7 +328,7 @@ object PrettyYamlRenderer{
         writeData(text.slice(start, end) + '\\')
         if (start < end) start = end
         if (column > idealWidth){
-          YamlRenderer.writeIndentation(out, leftIndent)
+          OldYamlRenderer.writeIndentation(out, leftIndent)
           column = leftIndent
         }
 
@@ -377,7 +377,7 @@ object PrettyYamlRenderer{
       // character mark by up to one token, which can be of varying width
       val maxWidth = idealWidth
       if (!firstInLine && currentOffset > maxWidth){
-        YamlRenderer.writeIndentation(out, leftIndent)
+        OldYamlRenderer.writeIndentation(out, leftIndent)
         firstLine = false
         currentOffset = leftIndent
         out.write(token)

@@ -1,25 +1,23 @@
 package sjsonnet
+
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Lazy
 import upickle.core.Visitor
-
-import scala.collection.mutable
 
 /**
   * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
   * which can transform it into [[ujson.Value]]s or directly serialize it
   * to `String`s
   */
-object Materializer {
-  //private val dummyPos: Position = new Position(null, 0)
+abstract class Materializer {
+  def storePos(pos: Position): Unit
 
-  def apply(v: Val, storePos: Position => Unit = _ => ())(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
+  def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
     apply0(v, new sjsonnet.Renderer()).toString
   }
 
-  def apply0[T](v: Val, visitor: Visitor[T, T], storePos: Position => Unit = _ => ())
+  def apply0[T](v: Val, visitor: Visitor[T, T])
                (implicit evaluator: EvalScope): T = try {
     v match {
       case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
@@ -32,7 +30,7 @@ object Materializer {
         val arrVisitor = visitor.visitArray(xs.length, -1)
         for(x <- xs) {
           arrVisitor.visitValue(
-            apply0(x, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
+            apply0(x, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
         }
@@ -61,7 +59,7 @@ object Materializer {
 
 
           objVisitor.visitValue(
-            apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
+            apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
         }
@@ -69,9 +67,8 @@ object Materializer {
 
       case f: Val.Func =>
         apply0(
-          f.apply(emptyLazyArray, null, evaluator.emptyMaterializeFileScopePos),
-          visitor,
-          storePos
+          f.apply(Materializer.emptyLazyArray, null, evaluator.emptyMaterializeFileScopePos),
+          visitor
         )
     }
 
@@ -114,7 +111,11 @@ object Materializer {
       )
   }
 
-  val emptyStringArray = new Array[String](0)
-  val emptyLazyArray = new Array[Lazy](0)
+}
 
+object Materializer extends Materializer {
+  def storePos(pos: Position): Unit = ()
+
+  final val emptyStringArray = new Array[String](0)
+  final val emptyLazyArray = new Array[Lazy](0)
 }
