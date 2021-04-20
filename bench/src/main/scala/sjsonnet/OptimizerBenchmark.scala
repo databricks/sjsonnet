@@ -47,7 +47,7 @@ class OptimizerBenchmark {
 
   class Counter extends ExprTransform {
     var total, vals, exprs, arrVals, staticArrExprs, otherArrExprs, staticObjs, missedStaticObjs,
-      otherObjs, applies, builtin = 0
+      otherObjs, applies, arityApplies, builtin = 0
     def transform(e: Expr) = {
       total += 1
       if(e.isInstanceOf[Val]) vals += 1
@@ -62,6 +62,7 @@ class OptimizerBenchmark {
           if(e.binds == null && e.asserts == null && e.fields.forall(_.isStatic)) missedStaticObjs += 1
           else otherObjs += 1
         case _: Expr.Apply => applies += 1
+        case _: Expr.Apply1 | _: Expr.Apply2 | _: Expr.Apply3 => arityApplies += 1
         case _: Expr.ApplyBuiltin | _: Expr.ApplyBuiltin1 | _: Expr.ApplyBuiltin2 => builtin += 1
         case _ =>
       }
@@ -70,6 +71,6 @@ class OptimizerBenchmark {
     override def toString =
       s"Total: $total, Val: $vals, Expr: $exprs, Val.Arr: $arrVals, static Expr.Arr: $staticArrExprs, "+
         s"other Expr.Arr: $otherArrExprs, Val.Obj: $staticObjs, static MemberList: $missedStaticObjs, "+
-        s"other MemberList: $otherObjs, Apply: $applies, ApplyBuiltin*: $builtin"
+        s"other MemberList: $otherObjs, Apply: $applies, ApplyN: $arityApplies, ApplyBuiltin*: $builtin"
   }
 }

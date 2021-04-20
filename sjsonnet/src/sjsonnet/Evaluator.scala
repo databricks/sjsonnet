@@ -38,6 +38,10 @@ class Evaluator(resolver: CachedResolver,
       case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
       case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
       case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
+
+      case Apply1(pos, value, a1) => visitApply1(pos, value, a1)
+      case Apply2(pos, value, a1, a2) => visitApply2(pos, value, a1, a2)
+      case Apply3(pos, value, a1, a2, a3) => visitApply3(pos, value, a1, a2, a3)
       case Apply(pos, value, args, namedNames) => visitApply(pos, value, args, namedNames)
 
       case lit: Val => lit
@@ -223,6 +227,30 @@ class Evaluator(resolver: CachedResolver,
       idx += 1
     }
     try lhs.cast[Val.Func].apply(argsL, namedNames, pos) catch Error.tryCatchWrap(pos)
+  }
+
+  private def visitApply1(pos: Position, value: Expr, a1: Expr)
+                         (implicit scope: ValScope) = {
+    val lhs = visitExpr(value)
+    val l1: Lazy = () => visitExpr(a1)
+    try lhs.cast[Val.Func].apply1(l1, pos) catch Error.tryCatchWrap(pos)
+  }
+
+  private def visitApply2(pos: Position, value: Expr, a1: Expr, a2: Expr)
+                         (implicit scope: ValScope) = {
+    val lhs = visitExpr(value)
+    val l1: Lazy = () => visitExpr(a1)
+    val l2: Lazy = () => visitExpr(a2)
+    try lhs.cast[Val.Func].apply2(l1, l2, pos) catch Error.tryCatchWrap(pos)
+  }
+
+  private def visitApply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr)
+                         (implicit scope: ValScope) = {
+    val lhs = visitExpr(value)
+    val l1: Lazy = () => visitExpr(a1)
+    val l2: Lazy = () => visitExpr(a2)
+    val l3: Lazy = () => visitExpr(a3)
+    try lhs.cast[Val.Func].apply3(l1, l2, l3, pos) catch Error.tryCatchWrap(pos)
   }
 
   private def visitApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr)

@@ -19,6 +19,27 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y)) expr
         else Apply(pos, x2, y2, namedNames)
 
+      case Apply1(pos, x, y) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        if((x2 eq x) && (y2 eq y)) expr
+        else Apply1(pos, x2, y2)
+
+      case Apply2(pos, x, y, z) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        val z2 = transform(z)
+        if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
+        else Apply2(pos, x2, y2, z2)
+
+      case Apply3(pos, x, y, z, a) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        val z2 = transform(z)
+        val a2 = transform(a)
+        if((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
+        else Apply3(pos, x2, y2, z2, a2)
+
       case ApplyBuiltin(pos, func, x) =>
         val x2 = transformArr(x)
         if(x2 eq x) expr

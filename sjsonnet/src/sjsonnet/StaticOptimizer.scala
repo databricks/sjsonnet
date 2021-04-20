@@ -22,6 +22,15 @@ class StaticOptimizer(rootFileScope: FileScope)(implicit eval: EvalErrorScope)
         case _ => rec(e)
       }
 
+    case Apply(pos, lhs, args, null) if args.length == 1 =>
+      Apply1(pos, transform(lhs), transform(args(0)))
+
+    case Apply(pos, lhs, args, null) if args.length == 2 =>
+      Apply2(pos, transform(lhs), transform(args(0)), transform(args(1)))
+
+    case Apply(pos, lhs, args, null) if args.length == 3 =>
+      Apply3(pos, transform(lhs), transform(args(0)), transform(args(1)), transform(args(2)))
+
     case Select(_, Id(_, "std", _), name) if(scope.get("std") == null) =>
       Std.functions.getOrElse(name, null) match {
         case null => rec(e)

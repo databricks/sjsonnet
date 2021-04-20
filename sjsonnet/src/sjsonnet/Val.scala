@@ -403,6 +403,18 @@ object Val{
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
+
+    def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope match {
+          case null => ValScope.createSimple(Array(argVal1, argVal2, argVal3))
+          case s => s.extendSimple(argVal1, argVal2, argVal3)
+        }
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      }
+    }
   }
 
   abstract class Builtin(paramNames: String*)

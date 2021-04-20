@@ -82,6 +82,14 @@ class ValScope(val dollar0: Val.Obj,
     b(bindings.length+1) = l2
     new ValScope(dollar0, self0, super0, b)
   }
+
+  def extendSimple(l1: Lazy, l2: Lazy, l3: Lazy) = {
+    val b = Arrays.copyOf(bindings, bindings.length+3)
+    b(bindings.length) = l1
+    b(bindings.length+1) = l2
+    b(bindings.length+2) = l3
+    new ValScope(dollar0, self0, super0, b)
+  }
 }
 
 object ValScope{

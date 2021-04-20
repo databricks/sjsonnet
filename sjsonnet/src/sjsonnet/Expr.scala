@@ -107,9 +107,13 @@ object Expr{
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
   case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String]) extends Expr
+  case class Apply1(pos: Position, value: Expr, a1: Expr) extends Expr
+  case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr) extends Expr
+  case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr) extends Expr
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr
   case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr) extends Expr
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
+  case class ApplyBuiltin3(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr, a3: Expr) extends Expr
   case class Select(pos: Position, value: Expr, name: String) extends Expr
   case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
   case class Slice(pos: Position,
