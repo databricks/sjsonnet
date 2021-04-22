@@ -29,7 +29,7 @@ class Evaluator(resolver: CachedResolver,
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val = try {
     expr match {
-      case ValidId(pos, nameIdx) =>
+      case ValidId(pos, _, nameIdx) =>
         val ref = scope.bindings(nameIdx)
         try ref.force catch Error.tryCatchWrap(pos)
 
@@ -39,6 +39,7 @@ class Evaluator(resolver: CachedResolver,
       case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
       case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
 
+      case Apply0(pos, value) => visitApply0(pos, value)
       case Apply1(pos, value, a1) => visitApply1(pos, value, a1)
       case Apply2(pos, value, a1, a2) => visitApply2(pos, value, a1, a2)
       case Apply3(pos, value, a1, a2, a3) => visitApply3(pos, value, a1, a2, a3)
@@ -227,6 +228,12 @@ class Evaluator(resolver: CachedResolver,
       idx += 1
     }
     try lhs.cast[Val.Func].apply(argsL, namedNames, pos) catch Error.tryCatchWrap(pos)
+  }
+
+  private def visitApply0(pos: Position, value: Expr)
+                         (implicit scope: ValScope) = {
+    val lhs = visitExpr(value)
+    try lhs.cast[Val.Func].apply0(pos) catch Error.tryCatchWrap(pos)
   }
 
   private def visitApply1(pos: Position, value: Expr, a1: Expr)

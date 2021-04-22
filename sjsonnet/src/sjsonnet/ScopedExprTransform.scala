@@ -10,7 +10,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
   var scope: Scope = emptyScope
 
   // Marker for Exprs in the scope that should not be used because they need to be evaluated in a different scope
-  val dynamicExpr = new Expr { def pos: Position = ??? }
+  val dynamicExpr = new Expr { def pos: Position = ???; override def toString = "dynamicExpr" }
 
   def transform(e: Expr): Expr = e match {
     case LocalExpr(pos, bindings, returned) =>

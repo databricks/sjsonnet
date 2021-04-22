@@ -7,6 +7,8 @@ import fastparse.Parsed.Success
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra._
 
+import scala.collection.mutable
+
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
 @Threads(1)
@@ -47,7 +49,8 @@ class OptimizerBenchmark {
 
   class Counter extends ExprTransform {
     var total, vals, exprs, arrVals, staticArrExprs, otherArrExprs, staticObjs, missedStaticObjs,
-      otherObjs, applies, arityApplies, builtin = 0
+      otherObjs, namedApplies, applies, arityApplies, builtin = 0
+    val applyArities = new mutable.LongMap[Int]()
     def transform(e: Expr) = {
       total += 1
       if(e.isInstanceOf[Val]) vals += 1
@@ -61,16 +64,25 @@ class OptimizerBenchmark {
         case e: Expr.ObjBody.MemberList =>
           if(e.binds == null && e.asserts == null && e.fields.forall(_.isStatic)) missedStaticObjs += 1
           else otherObjs += 1
-        case _: Expr.Apply => applies += 1
-        case _: Expr.Apply1 | _: Expr.Apply2 | _: Expr.Apply3 => arityApplies += 1
+        case e: Expr.Apply =>
+          if(e.namedNames == null) {
+            applies += 1
+            val a = e.args.length
+            applyArities.put(a.toLong, applyArities.getOrElse(a.toLong, 0) + 1)
+          } else namedApplies += 1
+
+        case _: Expr.Apply0 | _: Expr.Apply1 | _: Expr.Apply2 | _: Expr.Apply3 => arityApplies += 1
         case _: Expr.ApplyBuiltin | _: Expr.ApplyBuiltin1 | _: Expr.ApplyBuiltin2 => builtin += 1
         case _ =>
       }
       rec(e)
     }
-    override def toString =
+    override def toString = {
+      val arities = applyArities.toSeq.sortBy(_._1).map { case (a,b) => s"$a: $b" }.mkString(", ")
       s"Total: $total, Val: $vals, Expr: $exprs, Val.Arr: $arrVals, static Expr.Arr: $staticArrExprs, "+
         s"other Expr.Arr: $otherArrExprs, Val.Obj: $staticObjs, static MemberList: $missedStaticObjs, "+
-        s"other MemberList: $otherObjs, Apply: $applies, ApplyN: $arityApplies, ApplyBuiltin*: $builtin"
+        s"other MemberList: $otherObjs, named Apply: $namedApplies, other Apply: $applies, "+
+        s"ApplyN: $arityApplies, ApplyBuiltin*: $builtin; Apply arities: {$arities}"
+    }
   }
 }

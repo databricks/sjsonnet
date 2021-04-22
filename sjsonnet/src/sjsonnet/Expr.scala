@@ -25,7 +25,7 @@ object Expr{
   case class $(pos: Position) extends Expr
 
   case class Id(pos: Position, name: String, nameIdx: Int) extends Expr
-  case class ValidId(pos: Position, nameIdx: Int) extends Expr
+  case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
     override def toString = s"Arr($pos, ${arrStr(value)})"
   }
@@ -107,6 +107,7 @@ object Expr{
   case class ImportStr(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
   case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String]) extends Expr
+  case class Apply0(pos: Position, value: Expr) extends Expr
   case class Apply1(pos: Position, value: Expr, a1: Expr) extends Expr
   case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr) extends Expr
   case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr) extends Expr

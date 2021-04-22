@@ -380,6 +380,18 @@ object Val{
       }
     }
 
+    def apply0(outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope match {
+          case null => ValScope.empty
+          case s => s
+        }
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      }
+    }
+
     def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
