@@ -658,11 +658,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || {
-    def normalize(x: Val): Val = x match {
-      case f: Val.Func => f.apply(null, null, emptyMaterializeFileScopePos)
-      case x => x
-    }
-    (normalize(x), normalize(y)) match {
+    (x, y) match {
       case (Val.True(_), y) => y.isInstanceOf[Val.True]
       case (Val.False(_), y) => y.isInstanceOf[Val.False]
       case (Val.Null(_), y) => y.isInstanceOf[Val.Null]

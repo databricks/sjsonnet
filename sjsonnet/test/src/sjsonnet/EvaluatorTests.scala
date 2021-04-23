@@ -322,5 +322,9 @@ object EvaluatorTests extends TestSuite{
     test("givenNoDuplicateFieldsInListComprehension2_expectSuccess") {
       eval("""{ ["bar_" + x]: x for x in [5,12]}""") ==> ujson.Obj("bar_5" -> 5, "bar_12" -> 12)
     }
+    test("functionEqualsNull") {
+      eval("""local f(x)=null; f == null""") ==> ujson.False
+      eval("""local f=null; f == null""") ==> ujson.True
+    }
   }
 }
