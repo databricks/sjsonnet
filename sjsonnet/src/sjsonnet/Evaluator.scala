@@ -49,11 +49,12 @@ class Evaluator(resolver: CachedResolver,
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
-      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_in, Super(_)) =>
-        if(scope.super0 == null) Val.False(pos)
+      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
+        val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
+        if(sup == null) Val.False(pos)
         else {
           val key = visitExpr(lhs).cast[Val.Str]
-          Val.bool(pos, scope.super0.containsKey(key.value))
+          Val.bool(pos, sup.containsKey(key.value))
         }
 
       case BinaryOp(pos, lhs, Expr.BinaryOp.OP_&&, rhs) =>
@@ -85,11 +86,6 @@ class Evaluator(resolver: CachedResolver,
       case BinaryOp(pos, lhs, op, rhs) => visitBinaryOp(pos, lhs, op, rhs)
 
       case Lookup(pos, value, index) => visitLookup(pos, value, index)
-
-      case Self(pos) =>
-        val self = scope.self0
-        if(self == null) Error.fail("Cannot use `self` outside an object", pos)
-        self
 
       case Function(pos, params, body) => visitMethod(body, params, pos)
 
@@ -140,17 +136,21 @@ class Evaluator(resolver: CachedResolver,
 
       case Import(pos, value) => visitImport(pos, value)
 
-      case $(pos) =>
-        val dollar = scope.dollar0
-        if(dollar == null) Error.fail("Cannot use `$` outside an object", pos)
-        dollar
-
       case ImportStr(pos, value) => visitImportStr(pos, value)
 
       case Expr.Error(pos, value) => visitError(pos, value)
 
-      case Id(pos, name, _) =>
+      case Id(pos, name) =>
         Error.fail("Unknown variable " + name, pos)
+
+      case Self(pos) =>
+        Error.fail("Cannot use `self` outside an object", pos)
+
+      case $(pos) =>
+        Error.fail("Cannot use `$` outside an object", pos)
+
+      case Super(pos) =>
+        Error.fail("Cannot use `super` outside an object", pos)
     }
   } catch Error.tryCatch(expr.pos)
 
@@ -317,38 +317,40 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitLookup(pos: Position, value: Expr, index: Expr)
-                 (implicit scope: ValScope): Val = {
-    if (value.isInstanceOf[Super]) {
+                 (implicit scope: ValScope): Val = value match {
+    case ValidSuper(_, selfIdx) =>
+      var sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
       val key = visitExpr(index).cast[Val.Str]
-      var s = scope.super0
-      if(s == null) s = scope.self0
-      if(s == null) Error.fail("Cannot use `super` outside an object", pos)
-      else s.value(key.value, pos)
-    } else (visitExpr(value), visitExpr(index)) match {
-      case (v: Val.Arr, i: Val.Num) =>
-        if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
-        val int = i.value.toInt
-        if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
-        try v.force(int)
-        catch Error.tryCatchWrap(pos)
-      case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
-      case (v: Val.Obj, i: Val.Str) =>
-        val ref = v.value(i.value, pos)
-        try ref
-        catch Error.tryCatchWrap(pos)
-      case (lhs, rhs) =>
-        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
-    }
+      if(sup == null) sup = scope.bindings(selfIdx).asInstanceOf[Val.Obj]
+      sup.value(key.value, pos)
+    case _ =>
+      (visitExpr(value), visitExpr(index)) match {
+        case (v: Val.Arr, i: Val.Num) =>
+          if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
+          val int = i.value.toInt
+          if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
+          try v.force(int)
+          catch Error.tryCatchWrap(pos)
+        case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
+        case (v: Val.Obj, i: Val.Str) =>
+          val ref = v.value(i.value, pos)
+          try ref
+          catch Error.tryCatchWrap(pos)
+        case (lhs, rhs) =>
+          Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+      }
   }
 
-  def visitSelect(pos: Position, value: Expr, name: String)(implicit scope: ValScope): Val = {
-    if (value.isInstanceOf[Super]) {
-      if(scope.super0 == null) Error.fail("Cannot use `super` outside an object", pos)
-      else  scope.super0.value(name, pos, scope.self0)
-    } else visitExpr(value) match {
-      case obj: Val.Obj => obj.value(name, pos)
-      case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", pos)
-    }
+  def visitSelect(pos: Position, value: Expr, name: String)(implicit scope: ValScope): Val = value match {
+    case ValidSuper(_, selfIdx) =>
+      val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
+      if(sup == null) Error.fail("Cannot use `super` outside an object", pos)
+      else sup.value(name, pos, scope.bindings(selfIdx).asInstanceOf[Val.Obj])
+    case _ =>
+      visitExpr(value) match {
+        case obj: Val.Obj => obj.value(name, pos)
+        case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", pos)
+      }
   }
 
   def visitImportStr(pos: Position, value: String)(implicit scope: ValScope) =
@@ -542,25 +544,28 @@ class Evaluator(resolver: CachedResolver,
     }
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
-      if(binds == null)
-        scope.extend(null, if(scope.dollar0 != null) scope.dollar0 else self, self, sup)
-      else {
-        val scopeLen = scope.length
-        val newScope = scope.extendBy(binds.length, if(scope.dollar0 != null) scope.dollar0 else self, self, sup)
+      val scopeLen = scope.length
+      val by = if(binds == null) 2 else 2 + binds.length
+      val newScope = scope.extendBy(by)
+      newScope.bindings(scopeLen) = self
+      newScope.bindings(scopeLen+1) = sup
+      if(binds != null) {
         val arrF = newScope.bindings
         var i = 0
+        var j = scopeLen+2
         while(i < binds.length) {
           val b = binds(i)
-          arrF(scopeLen+i) = b.args match {
+          arrF(j) = b.args match {
             case null =>
               () => visitExpr(b.rhs)(makeNewScope(self, sup))
             case argSpec =>
               () => visitMethod(b.rhs, argSpec, b.pos)(makeNewScope(self, sup))
           }
           i += 1
+          j += 1
         }
-        newScope
       }
+      newScope
     }
 
     val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
@@ -593,19 +598,12 @@ class Evaluator(resolver: CachedResolver,
 
   def visitObjComp(objPos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = preLocals ++ postLocals
-    lazy val compScope: ValScope = scope.extend(
-      newSuper = null
-    )
+    val compScope: ValScope = scope //.clearSuper
 
     lazy val newSelf: Val.Obj = {
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(s <- visitComp(first :: rest, Array(compScope))){
-        lazy val newScope: ValScope = s.extend(
-          newBindings,
-          newDollar = if(scope.dollar0 != null) scope.dollar0 else newSelf,
-          newSelf = newSelf,
-          newSuper = null
-        )
+        lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
 
         lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
 
@@ -614,11 +612,7 @@ class Evaluator(resolver: CachedResolver,
             builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
                 visitExpr(value)(
-                  s.extend(
-                    newBindings,
-                    newDollar = if(s.dollar0 != null) s.dollar0 else self,
-                    newSelf = self,
-                  )
+                  s.extend(newBindings, self, null)
                 )
             })
           case Val.Null(_) => // do nothing

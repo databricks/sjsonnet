@@ -25,7 +25,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
   val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] = {
       if(staticOpt)
-        Right(((new StaticOptimizer(fs)(evaluator)).transform(expr), fs))
+        Right(((new StaticOptimizer()(evaluator)).transform(expr), fs))
       else Right((expr, fs))
     }
   }

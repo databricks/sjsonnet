@@ -323,18 +323,13 @@ object Val{
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
       if(simple) {
-        val newScope = defSiteValScope match {
-          case null => ValScope.createSimple(argsL)
-          case s => s.extendSimple(argsL)
-        }
+        val newScope = defSiteValScope.extendSimple(argsL)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       } else {
         val newScopeLen = math.max(params.names.length, argsL.length)
         // Initialize positional args
-        val (base, newScope) = defSiteValScope match {
-          case null => (0, ValScope.createSimple(newScopeLen))
-          case s => (s.length, s.extendBy(newScopeLen))
-        }
+        val base = defSiteValScope.length
+        val newScope = defSiteValScope.extendBy(newScopeLen)
         val argVals = newScope.bindings
         val posArgs = if(namedNames == null) argsL.length else argsL.length - namedNames.length
         System.arraycopy(argsL, 0, argVals, base, posArgs)
@@ -384,11 +379,7 @@ object Val{
       if(params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-        val newScope: ValScope = defSiteValScope match {
-          case null => ValScope.empty
-          case s => s
-        }
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
       }
     }
 
@@ -396,10 +387,7 @@ object Val{
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-        val newScope: ValScope = defSiteValScope match {
-          case null => ValScope.createSimple(argVal)
-          case s => s.extendSimple(argVal)
-        }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
@@ -408,10 +396,7 @@ object Val{
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-        val newScope: ValScope = defSiteValScope match {
-          case null => ValScope.createSimple(Array(argVal1, argVal2))
-          case s => s.extendSimple(argVal1, argVal2)
-        }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
@@ -420,17 +405,14 @@ object Val{
       if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-        val newScope: ValScope = defSiteValScope match {
-          case null => ValScope.createSimple(Array(argVal1, argVal2, argVal3))
-          case s => s.extendSimple(argVal1, argVal2, argVal3)
-        }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
   }
 
   abstract class Builtin(paramNames: String*)
-    extends Func(null, null, Params(paramNames.toArray, new Array[Expr](paramNames.length))) {
+    extends Func(null, ValScope.empty, Params(paramNames.toArray, new Array[Expr](paramNames.length))) {
 
     final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
       val args = new Array[Val](params.names.length)

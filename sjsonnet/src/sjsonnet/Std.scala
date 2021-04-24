@@ -1076,7 +1076,7 @@ object Std {
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}.toArray
     val p = Params(params.map(_._1).toArray, params.map(_._2).toArray)
-    name -> new Val.Func(null, null, p) {
+    name -> new Val.Func(null, ValScope.empty, p) {
       def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
         //println("--- calling builtin: "+name)
         val args = new Array[Val](indexedParamKeys.length)

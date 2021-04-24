@@ -5,7 +5,7 @@ import sjsonnet.Expr._
 
 import scala.collection.immutable.HashMap
 
-class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
+class ScopedExprTransform extends ExprTransform {
   import ScopedExprTransform._
   var scope: Scope = emptyScope
 
@@ -18,7 +18,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
 
     case MemberList(pos, binds, fields, asserts) =>
       val fields2 = transformGenericArr(fields)(transformFieldNameOnly)
-      nestedBindings(binds) {
+      nestedBindings(dynamicExpr, dynamicExpr, binds) {
         val fields3 = transformGenericArr(fields2)(transformFieldNoName)
         val binds2 = transformBinds(binds)
         val asserts2 = transformAsserts(asserts)
@@ -31,7 +31,7 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
 
     case ObjComp(pos, preLocals, key, value, postLocals, first, rest) =>
       val (f2 :: r2, (k2, (pre2, post2, v2))) = compSpecs(first :: rest, { () =>
-        (transform(key), nestedBindings(preLocals ++ postLocals) {
+        (transform(key), nestedBindings(dynamicExpr, dynamicExpr, preLocals ++ postLocals) {
           (transformBinds(preLocals), transformBinds(postLocals), transform(value))
         })
       })
@@ -115,6 +115,25 @@ class ScopedExprTransform(rootFileScope: FileScope) extends ExprTransform {
     }
   }
 
+  protected[this] def nestedBindings[T](self0: Expr, super0: Expr, a: Array[Bind])(f: => T): T = {
+    val self = new ScopedVal(self0, scope, scope.size)
+    val sup = new ScopedVal(super0, scope, scope.size+1)
+    val newm1 = {
+      val m1 = scope.mappings + (("self", self)) + (("super", sup))
+      if(scope.contains("self")) m1 else m1 + (("$", self))
+    }
+    val ns = if(a == null) {
+      new Scope(newm1, scope.size + 2)
+    } else {
+      val newm2 = newm1 ++ a.zipWithIndex.map { case (b, idx) =>
+        //println(s"Binding ${b.name} to ${scope.size + idx}")
+        (b.name, new ScopedVal(if(b.args == null) b.rhs else b, scope, scope.size + idx + 2))
+      }
+      new Scope(newm2, scope.size + a.length + 2)
+    }
+    nestedNew(ns)(f)
+  }
+
   protected[this] def nestedNames[T](a: Array[String])(f: => T): T = {
     if(a == null || a.length == 0) f
     else {
@@ -128,6 +147,7 @@ object ScopedExprTransform {
   final case class ScopedVal(v: AnyRef, sc: Scope, idx: Int)
   final class Scope(val mappings: HashMap[String, ScopedVal], val size: Int) {
     def get(s: String): ScopedVal = mappings.getOrElse(s, null)
+    def contains(s: String): Boolean = mappings.contains(s)
   }
   def emptyScope: Scope = new Scope(HashMap.empty, 0)
 }

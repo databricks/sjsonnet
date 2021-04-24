@@ -282,7 +282,7 @@ class Parser(val currentFile: Path) {
               case "error"     => Pass ~ error(pos)
               case "assert"    => Pass ~ assertExpr(pos)
               case "local"     => Pass ~ local
-              case x           => Pass(Expr.Id(pos, x, ValScope.INVALID_IDX))
+              case x           => Pass(Expr.Id(pos, x))
             }
           }
           case _ => Fail

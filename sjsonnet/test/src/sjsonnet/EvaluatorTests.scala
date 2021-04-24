@@ -117,6 +117,8 @@ object EvaluatorTests extends TestSuite{
 
         eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).c""") ==> ujson.Num(2)
         eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).d""") ==> ujson.Num(1)
+
+        eval("""local x = {a: 1}; local y = {b: super.a}; x + y""") ==> ujson.read("""{"a": 1, "b": 1}""")
       }
     }
     test("hidden") {
