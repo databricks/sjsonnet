@@ -33,22 +33,6 @@ class Evaluator(resolver: CachedResolver,
         val ref = scope.bindings(nameIdx)
         try ref.force catch Error.tryCatchWrap(pos)
 
-      case Select(pos, value, name) => visitSelect(pos, value, name)
-
-      case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
-      case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
-      case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
-
-      case Apply0(pos, value) => visitApply0(pos, value)
-      case Apply1(pos, value, a1) => visitApply1(pos, value, a1)
-      case Apply2(pos, value, a1, a2) => visitApply2(pos, value, a1, a2)
-      case Apply3(pos, value, a1, a2, a3) => visitApply3(pos, value, a1, a2, a3)
-      case Apply(pos, value, args, namedNames) => visitApply(pos, value, args, namedNames)
-
-      case lit: Val => lit
-
-      case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
-
       case BinaryOp(pos, lhs, Expr.BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
         val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
         if(sup == null) Val.False(pos)
@@ -85,6 +69,17 @@ class Evaluator(resolver: CachedResolver,
 
       case BinaryOp(pos, lhs, op, rhs) => visitBinaryOp(pos, lhs, op, rhs)
 
+      case Select(pos, value, name) => visitSelect(pos, value, name)
+
+      case lit: Val => lit
+
+      case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
+      case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
+
+      case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
+
+      case Apply1(pos, value, a1) => visitApply1(pos, value, a1)
+
       case Lookup(pos, value, index) => visitLookup(pos, value, index)
 
       case Function(pos, params, body) => visitMethod(body, params, pos)
@@ -107,12 +102,20 @@ class Evaluator(resolver: CachedResolver,
           }
         visitExpr(returned)(s)
 
+      case Apply(pos, value, args, namedNames) => visitApply(pos, value, args, namedNames)
+
       case IfElse(pos, cond, then0, else0) => visitIfElse(pos, cond, then0, else0)
+
+      case Apply3(pos, value, a1, a2, a3) => visitApply3(pos, value, a1, a2, a3)
 
       case ObjBody.MemberList(pos, binds, fields, asserts) => visitMemberList(pos, pos, binds, fields, asserts, null)
 
+      case Apply2(pos, value, a1, a2) => visitApply2(pos, value, a1, a2)
+
       case AssertExpr(pos, Member.AssertStmt(value, msg), returned) =>
         visitAssert(pos, value, msg, returned)
+
+      case ApplyBuiltin(pos, func, argExprs) => visitApplyBuiltin(pos, func, argExprs)
 
       case Comp(pos, value, first, rest) =>
         new Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Lazy))
@@ -135,6 +138,8 @@ class Evaluator(resolver: CachedResolver,
       case Slice(pos, value, start, end, stride) => visitSlice(pos, value, start, end, stride)
 
       case Import(pos, value) => visitImport(pos, value)
+
+      case Apply0(pos, value) => visitApply0(pos, value)
 
       case ImportStr(pos, value) => visitImportStr(pos, value)
 
