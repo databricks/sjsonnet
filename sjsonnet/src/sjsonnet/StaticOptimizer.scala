@@ -3,7 +3,8 @@ package sjsonnet
 import Expr._
 import ScopedExprTransform._
 
-class StaticOptimizer(implicit eval: EvalErrorScope) extends ScopedExprTransform {
+class StaticOptimizer extends ScopedExprTransform {
+  def optimize(e: Expr): Expr = transform(e)
 
   override def transform(e: Expr): Expr = e match {
     case Apply(pos, Select(_, Id(_, "std"), name), args, null) if(scope.get("std") == null) =>

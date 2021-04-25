@@ -522,7 +522,17 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitMemberList(pos: Position, objPos: Position, binds: Array[Bind], fields: Array[Expr.Member.Field], asserts: Array[Expr.Member.AssertStmt], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
+    var cachedSimpleScope: ValScope = null.asInstanceOf[ValScope]
+    var cachedObj: Val.Obj = null
     var asserting: Boolean = false
+
+    def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
+      if((sup eq null) && (self eq cachedObj)) {
+        if(cachedSimpleScope == null.asInstanceOf[ValScope]) cachedSimpleScope = createNewScope(self, sup)
+        cachedSimpleScope
+      } else createNewScope(self, sup)
+    }
+
     def assertions(self: Val.Obj): Unit = if (!asserting) {
       asserting = true
       val newScope: ValScope = makeNewScope(self, self.getSuper)
@@ -543,7 +553,7 @@ class Evaluator(resolver: CachedResolver,
       }
     }
 
-    def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
+    def createNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       val scopeLen = scope.length
       val by = if(binds == null) 2 else 2 + binds.length
       val newScope = scope.extendBy(by)
@@ -557,9 +567,9 @@ class Evaluator(resolver: CachedResolver,
           val b = binds(i)
           arrF(j) = b.args match {
             case null =>
-              () => visitExpr(b.rhs)(makeNewScope(self, sup))
+              () => visitExpr(b.rhs)(newScope)
             case argSpec =>
-              () => visitMethod(b.rhs, argSpec, b.pos)(makeNewScope(self, sup))
+              () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
           }
           i += 1
           j += 1
@@ -593,7 +603,8 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
     }
-    new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
+    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
+    cachedObj
   }
 
   def visitObjComp(objPos: Position, preLocals: Array[Bind], key: Expr, value: Expr, postLocals: Array[Bind], first: ForSpec, rest: List[CompSpec], sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {

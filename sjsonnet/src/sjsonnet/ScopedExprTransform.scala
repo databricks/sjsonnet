@@ -46,7 +46,7 @@ class ScopedExprTransform extends ExprTransform {
     case e => rec(e)
   }
 
-  override protected[this] def transformBind(b: Bind): Bind = {
+  override def transformBind(b: Bind): Bind = {
     val args = b.args
     val rhs = b.rhs
     nestedNames(if(args == null) null else args.names) {
