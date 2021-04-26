@@ -26,7 +26,6 @@ object Expr{
 
   case class Id(pos: Position, name: String) extends Expr
   case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr
-  case class ValidSuper(pos: Position, selfIdx: Int) extends Expr
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
     override def toString = s"Arr($pos, ${arrStr(value)})"
   }
@@ -72,6 +71,8 @@ object Expr{
     private val names = Map(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
+  case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr
+  case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr
   case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr
   object BinaryOp{
     final val OP_* = 0
@@ -117,7 +118,10 @@ object Expr{
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
   case class ApplyBuiltin3(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr, a3: Expr) extends Expr
   case class Select(pos: Position, value: Expr, name: String) extends Expr
+  case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr
+  case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr
   case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
+  case class LookupSuper(pos: Position, selfIdx: Int, index: Expr) extends Expr
   case class Slice(pos: Position,
                    value: Expr,
                    start: Option[Expr],

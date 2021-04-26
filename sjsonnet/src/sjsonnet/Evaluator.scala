@@ -29,52 +29,25 @@ class Evaluator(resolver: CachedResolver,
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val = try {
     expr match {
-      case ValidId(pos, _, nameIdx) =>
-        val ref = scope.bindings(nameIdx)
-        try ref.force catch Error.tryCatchWrap(pos)
+      case e: ValidId =>
+        val ref = scope.bindings(e.nameIdx)
+        try ref.force catch Error.tryCatchWrap(e.pos)
 
-      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
-        val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
-        if(sup == null) Val.False(pos)
-        else {
-          val key = visitExpr(lhs).cast[Val.Str]
-          Val.bool(pos, sup.containsKey(key.value))
+      case e: BinaryOp => visitBinaryOp(e.pos, e.lhs, e.op, e.rhs)
+
+      case s: Select =>
+        visitExpr(s.value) match {
+          case obj: Val.Obj => obj.value(s.name, s.pos)
+          case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${s.name}", s.pos)
         }
-
-      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_&&, rhs) =>
-        visitExpr(lhs) match {
-          case Val.True(_) =>
-            visitExpr(rhs) match{
-              case b: Val.Bool => b
-              case unknown =>
-                Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
-            }
-          case Val.False(_) => Val.False(pos)
-          case unknown =>
-            Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", pos)
-        }
-
-      case BinaryOp(pos, lhs, Expr.BinaryOp.OP_||, rhs) =>
-        visitExpr(lhs) match {
-          case Val.True(_) => Val.True(pos)
-          case Val.False(_) =>
-            visitExpr(rhs) match{
-              case b: Val.Bool => b
-              case unknown =>
-                Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
-            }
-          case unknown =>
-            Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", pos)
-        }
-
-      case BinaryOp(pos, lhs, op, rhs) => visitBinaryOp(pos, lhs, op, rhs)
-
-      case Select(pos, value, name) => visitSelect(pos, value, name)
 
       case lit: Val => lit
 
       case ApplyBuiltin1(pos, func, a1) => visitApplyBuiltin1(pos, func, a1)
       case ApplyBuiltin2(pos, func, a1, a2) => visitApplyBuiltin2(pos, func, a1, a2)
+
+      case e: And => visitAnd(e)
+      case e: Or => visitOr(e)
 
       case UnaryOp(pos, op, value) => visitUnaryOp(pos, op, value)
 
@@ -121,6 +94,15 @@ class Evaluator(resolver: CachedResolver,
         new Val.Arr(pos, visitComp(first :: rest.toList, Array(scope)).map(s => (() => visitExpr(value)(s)): Lazy))
 
       case Arr(pos, value) => new Val.Arr(pos, value.map(v => (() => visitExpr(v)): Lazy))
+
+      case SelectSuper(pos, selfIdx, name) =>
+        val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
+        if(sup == null) Error.fail("Cannot use `super` outside an object", pos)
+        else sup.value(name, pos, scope.bindings(selfIdx).asInstanceOf[Val.Obj])
+
+      case LookupSuper(pos, selfIdx, index) => visitLookupSuper(pos, selfIdx, index)
+
+      case e: InSuper => visitInSuper(e)
 
       case ObjExtend(superPos, value, ext) => {
         if(strict && isObjLiteral(value))
@@ -322,40 +304,30 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitLookup(pos: Position, value: Expr, index: Expr)
-                 (implicit scope: ValScope): Val = value match {
-    case ValidSuper(_, selfIdx) =>
-      var sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
-      val key = visitExpr(index).cast[Val.Str]
-      if(sup == null) sup = scope.bindings(selfIdx).asInstanceOf[Val.Obj]
-      sup.value(key.value, pos)
-    case _ =>
-      (visitExpr(value), visitExpr(index)) match {
-        case (v: Val.Arr, i: Val.Num) =>
-          if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
-          val int = i.value.toInt
-          if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
-          try v.force(int)
-          catch Error.tryCatchWrap(pos)
-        case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
-        case (v: Val.Obj, i: Val.Str) =>
-          val ref = v.value(i.value, pos)
-          try ref
-          catch Error.tryCatchWrap(pos)
-        case (lhs, rhs) =>
-          Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
-      }
+                 (implicit scope: ValScope): Val = {
+    (visitExpr(value), visitExpr(index)) match {
+      case (v: Val.Arr, i: Val.Num) =>
+        if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
+        val int = i.value.toInt
+        if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
+        try v.force(int)
+        catch Error.tryCatchWrap(pos)
+      case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
+      case (v: Val.Obj, i: Val.Str) =>
+        val ref = v.value(i.value, pos)
+        try ref
+        catch Error.tryCatchWrap(pos)
+      case (lhs, rhs) =>
+        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+    }
   }
 
-  def visitSelect(pos: Position, value: Expr, name: String)(implicit scope: ValScope): Val = value match {
-    case ValidSuper(_, selfIdx) =>
-      val sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
-      if(sup == null) Error.fail("Cannot use `super` outside an object", pos)
-      else sup.value(name, pos, scope.bindings(selfIdx).asInstanceOf[Val.Obj])
-    case _ =>
-      visitExpr(value) match {
-        case obj: Val.Obj => obj.value(name, pos)
-        case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${name}", pos)
-      }
+  def visitLookupSuper(pos: Position, selfIdx: Int, index: Expr)
+                 (implicit scope: ValScope): Val = {
+    var sup = scope.bindings(selfIdx+1).asInstanceOf[Val.Obj]
+    val key = visitExpr(index).cast[Val.Str]
+    if(sup == null) sup = scope.bindings(selfIdx).asInstanceOf[Val.Obj]
+    sup.value(key.value, pos)
   }
 
   def visitImportStr(pos: Position, value: String)(implicit scope: ValScope) =
@@ -371,6 +343,43 @@ class Evaluator(resolver: CachedResolver,
         catch Error.tryCatchWrap(pos)
       }
     )
+  }
+
+  def visitAnd(e: And)(implicit scope: ValScope) = {
+    visitExpr(e.lhs) match {
+      case Val.True(_) =>
+        visitExpr(e.rhs) match{
+          case b: Val.Bool => b
+          case unknown =>
+            Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+        }
+      case Val.False(_) => Val.False(e.pos)
+      case unknown =>
+        Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+    }
+  }
+
+  def visitOr(e: Or)(implicit scope: ValScope) = {
+    visitExpr(e.lhs) match {
+      case Val.True(_) => Val.True(e.pos)
+      case Val.False(_) =>
+        visitExpr(e.rhs) match{
+          case b: Val.Bool => b
+          case unknown =>
+            Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+        }
+      case unknown =>
+        Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+    }
+  }
+
+  def visitInSuper(e: InSuper)(implicit scope: ValScope) = {
+    val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
+    if(sup == null) Val.False(e.pos)
+    else {
+      val key = visitExpr(e.value).cast[Val.Str]
+      Val.bool(e.pos, sup.containsKey(key.value))
+    }
   }
 
   def visitBinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr)(implicit scope: ValScope) = {

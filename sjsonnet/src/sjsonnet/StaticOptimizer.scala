@@ -30,6 +30,27 @@ class StaticOptimizer extends ScopedExprTransform {
         case f => f
       }
 
+    case s: Select =>
+      super.transform(s) match {
+        case Select(pos, ValidSuper(_, selfIdx), name) =>
+          SelectSuper(pos, selfIdx, name)
+        case s2 => s2
+      }
+
+    case l: Lookup =>
+      super.transform(l) match {
+        case Lookup(pos, ValidSuper(_, selfIdx), index) =>
+          LookupSuper(pos, selfIdx, index)
+        case l2 => l2
+      }
+
+    case b : BinaryOp =>
+      super.transform(b) match {
+        case b2 @ BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
+          InSuper(pos, lhs, selfIdx)
+        case b2 => b2
+      }
+
     case Id(pos, name) =>
       val v = scope.get(name)
       v match {
@@ -42,12 +63,6 @@ class StaticOptimizer extends ScopedExprTransform {
     case Self(pos) =>
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
-        case _ => e
-      }
-
-    case Super(pos) =>
-      scope.get("self") match {
-        case ScopedVal(v, _, idx) if v != null => ValidSuper(pos, idx)
         case _ => e
       }
 
@@ -73,6 +88,14 @@ class StaticOptimizer extends ScopedExprTransform {
       }
 
     case e => super.transform(e)
+  }
+
+  object ValidSuper {
+    def unapply(s: Super): Option[(Position, Int)] =
+      scope.get("self") match {
+        case ScopedVal(v, _, idx) if v != null => Some((s.pos, idx))
+        case _ => None
+      }
   }
 
   override protected[this] def transformFieldName(f: FieldName): FieldName = f match {

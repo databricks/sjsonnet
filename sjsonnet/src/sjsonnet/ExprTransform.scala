@@ -72,11 +72,33 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y)) expr
         else BinaryOp(pos, x2, op, y2)
 
+      case And(pos, x, y) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        if((x2 eq x) && (y2 eq y)) expr
+        else And(pos, x2, y2)
+
+      case Or(pos, x, y) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        if((x2 eq x) && (y2 eq y)) expr
+        else Or(pos, x2, y2)
+
+      case InSuper(pos, x, selfIdx) =>
+        val x2 = transform(x)
+        if(x2 eq x) expr
+        else InSuper(pos, x2, selfIdx)
+
       case Lookup(pos, x, y) =>
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Lookup(pos, x2, y2)
+
+      case LookupSuper(pos, selfIdx, x) =>
+        val x2 = transform(x)
+        if(x2 eq x) expr
+        else LookupSuper(pos, selfIdx, x2)
 
       case Function(pos, x, y) =>
         val x2 = transformParams(x)
