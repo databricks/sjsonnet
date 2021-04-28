@@ -434,6 +434,8 @@ object Val{
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos)
+
+    def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
   }
 
   abstract class Builtin1(pn1: String) extends Builtin(pn1) {

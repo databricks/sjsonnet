@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.util
+import java.util.regex.Pattern
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{BinaryOp, Params}
@@ -13,7 +14,6 @@ import sjsonnet.Val.False
 import scala.collection.mutable
 import scala.collection.compat._
 import scala.util.matching.Regex
-
 import ujson.Value
 
 import scala.util.control.Breaks._
@@ -62,11 +62,27 @@ object Std {
   private object ObjectHas extends Val.Builtin2("o", "f") {
     def evalRhs(o: Val, f: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.asObj.containsVisibleKey(f.asString))
+    override def specialize(args: Array[Expr]) = args match {
+      case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+      case _ => null
+    }
+    private class SpecF(f: String) extends Val.Builtin1("o") {
+      def evalRhs(o: Val, ev: EvalScope, pos: Position): Val =
+        Val.bool(pos, o.asObj.containsVisibleKey(f))
+    }
   }
 
   private object ObjectHasAll extends Val.Builtin2("o", "f") {
     def evalRhs(o: Val, f: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.asObj.containsKey(f.asString))
+    override def specialize(args: Array[Expr]) = args match {
+      case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+      case _ => null
+    }
+    class SpecF(f: String) extends Val.Builtin1("o") {
+      def evalRhs(o: Val, ev: EvalScope, pos: Position): Val =
+        Val.bool(pos, o.asObj.containsKey(f))
+    }
   }
 
   private object ObjectFields extends Val.Builtin1("o") {
@@ -262,8 +278,19 @@ object Std {
   }
 
   private object StrReplaceAll extends Val.Builtin3("str", "from", "to") {
-    def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val =
+    def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val = {
+      Pattern.compile(from.asString).matcher(str.asString).replaceAll(to.asString)
       Val.Str(pos, str.asString.replaceAll(from.asString, to.asString))
+    }
+    override def specialize(args: Array[Expr]) = args match {
+      case Array(str, from: Val.Str, to) =>
+        try (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) catch { case _: Exception => null }
+      case _ => null
+    }
+    private class SpecFrom(from: Pattern) extends Val.Builtin2("str", "to") {
+      def evalRhs(str: Val, to: Val, ev: EvalScope, pos: Position): Val =
+        Val.Str(pos, from.matcher(str.asString).replaceAll(to.asString))
+    }
   }
 
   private object Join extends Val.Builtin2("sep", "arr") {
@@ -1187,7 +1214,7 @@ object Std {
       keys.sorted
     }
   }
-  
+
   def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr = {
     new Val.Arr(pos, keys.map { k =>
       (() => v1.value(k, pos.noOffset)(ev)): Lazy

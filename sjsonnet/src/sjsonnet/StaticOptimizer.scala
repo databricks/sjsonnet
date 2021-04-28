@@ -11,12 +11,16 @@ class StaticOptimizer extends ScopedExprTransform {
       //println(s"----- std.$name(#${args.length}) call")
       Std.functions.getOrElse(name, null) match {
         case f: Val.Builtin =>
-          val rargs = transformArr(args)
+          var rargs = transformArr(args)
+          val f2 = f.specialize(rargs) match {
+            case null => f
+            case (f2, a2) => rargs = a2; f2
+          }
           val alen = rargs.length
-          f match {
-            case f: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f, rargs(0))
-            case f: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f, rargs(0), rargs(1))
-            case _ if f.params.names.length == alen => Expr.ApplyBuiltin(pos, f, rargs)
+          f2 match {
+            case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
+            case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
+            case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
             case _ => rec(e)
           }
         case _ => rec(e)
