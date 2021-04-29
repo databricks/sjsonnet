@@ -52,6 +52,9 @@ class StaticOptimizer extends ScopedExprTransform {
       super.transform(b) match {
         case b2 @ BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
           InSuper(pos, lhs, selfIdx)
+        case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
+          try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs)
+          catch { case _: Exception => b2 }
         case b2 => b2
       }
 
