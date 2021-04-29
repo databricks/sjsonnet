@@ -1,7 +1,5 @@
 package sjsonnet
 
-import java.util.BitSet
-
 import fastparse.IndexedParserInput
 
 import scala.util.control.NonFatal
@@ -16,21 +14,19 @@ case class Error(msg: String,
                  underlying: Option[Throwable])
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
-  def addFrame(fileName: Path, wd: Path, offset: Int)(implicit ev: EvalErrorScope) = {
-    val newFrame = ev.importer.read(fileName) match{
+  def addFrame(pos: Position, wd: Path)(implicit ev: EvalErrorScope) = {
+    val newFrame = ev.prettyIndex(pos) match {
       case None =>
         new StackTraceElement(
           "", "",
-          fileName.relativeToString(wd) + " offset:",
-          offset
+          pos.currentFile.relativeToString(wd) + " offset:",
+          pos.offset
         )
-      case Some(resolved) =>
-        val Array(line, col) =
-          new IndexedParserInput(resolved).prettyIndex(offset).split(':')
+      case Some((line, col)) =>
 
         new StackTraceElement(
           "", "",
-          fileName.relativeToString(wd) + ":" + line,
+          pos.currentFile.relativeToString(wd) + ":" + line,
           col.toInt
         )
     }
@@ -45,25 +41,21 @@ object Error {
                  (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e
     case e: Error.Delegate =>
-      throw new Error(e.msg, Nil, None)
-        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
+      throw new Error(e.msg, Nil, None).addFrame(pos, evaluator.wd)
     case NonFatal(e) =>
-      throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
+      throw new Error("Internal Error", Nil, Some(e)).addFrame(pos, evaluator.wd)
   }
   def tryCatchWrap[T](pos: Position)
                      (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(pos.currentFile, evaluator.wd, pos.offset)
+    case e: Error => throw e.addFrame(pos, evaluator.wd)
     case e: Error.Delegate =>
-      throw new Error(e.msg, Nil, None)
-        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
+      throw new Error(e.msg, Nil, None).addFrame(pos, evaluator.wd)
     case NonFatal(e) =>
-      throw new Error("Internal Error", Nil, Some(e))
-        .addFrame(pos.currentFile, evaluator.wd, pos.offset)
+      throw new Error("Internal Error", Nil, Some(e)).addFrame(pos, evaluator.wd)
   }
   def fail(msg: String, pos: Position)
           (implicit evaluator: EvalErrorScope) = {
-    throw Error(msg, Nil, None).addFrame(pos.currentFile, evaluator.wd, pos.offset)
+    throw Error(msg, Nil, None).addFrame(pos, evaluator.wd)
   }
 
   /**
@@ -78,4 +70,12 @@ trait EvalErrorScope {
   def extVars: Map[String, ujson.Value]
   def importer: CachedImporter
   def wd: Path
+
+  def prettyIndex(pos: Position): Option[(Int, Int)] = {
+    importer.read(pos.currentFile).map { s =>
+      val Array(line, col) =
+        new IndexedParserInput(s).prettyIndex(pos.offset).split(':')
+      (line.toInt, col.toInt)
+    }
+  }
 }

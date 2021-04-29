@@ -52,4 +52,5 @@ lazy val bench = (project in file("bench"))
   .dependsOn(main)
   .enablePlugins(JmhPlugin)
   .settings(
+    fork in run := true,
   )

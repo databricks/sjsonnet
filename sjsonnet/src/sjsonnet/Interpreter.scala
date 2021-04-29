@@ -27,13 +27,11 @@ class Interpreter(extVars: Map[String, ujson.Value],
       Right(((new StaticOptimizer).optimize(expr), fs))
   }
 
-  val evaluator: Evaluator = new Evaluator(
-    resolver,
-    extVars,
-    wd,
-    preserveOrder,
-    strict
-  )
+  def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
+                      preserveOrder: Boolean, strict: Boolean): Evaluator =
+    new Evaluator(resolver, extVars, wd, preserveOrder, strict)
+
+  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, preserveOrder, strict)
 
   def interpret(txt: String, path: Path): Either[String, ujson.Value] = {
     interpret0(txt, path, ujson.Value)
