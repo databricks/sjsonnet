@@ -35,7 +35,9 @@ class MaterializerBenchmark {
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)
     assert(renderYaml() == oldRenderYaml())
-    assert(render() == oldRender())
+    val r1 = render()
+    assert(r1 == oldRender())
+    System.err.println("JSON length: "+r1.length)
     assert(renderPython() == oldRenderPython())
   }
 

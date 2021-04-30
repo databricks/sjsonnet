@@ -175,7 +175,28 @@ object Std {
   private object Filter extends Val.Builtin2("func", "arr") {
     def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
-      new Val.Arr(pos, arr.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True]))
+      val p = pos.noOffset
+      val a = arr.asArr.asLazyArray
+      var i = 0
+      while(i < a.length) {
+        if(!func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) {
+          var b = new Array[Lazy](a.length-1)
+          System.arraycopy(a, 0, b, 0, i)
+          var j = i+1
+          while(j < a.length) {
+            if(func.apply1(a(j), p)(ev).isInstanceOf[Val.True]) {
+              b(i) = a(j)
+              i += 1
+            }
+            j += 1
+          }
+          if(i != b.length) b = util.Arrays.copyOf(b, i)
+          return new Val.Arr(pos, b)
+        }
+        i += 1
+      }
+      new Val.Arr(pos, a)
+      //new Val.Arr(pos, arr.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True]))
     }
   }
 
@@ -444,6 +465,67 @@ object Std {
     }
   }
 
+  private object ObjectValues extends Val.Builtin1("o") {
+    def evalRhs(_o: Val, ev: EvalScope, pos: Position): Val = {
+      val o = _o.asObj
+      val keys = getVisibleKeys(ev, o)
+      getObjValuesFromKeys(pos, ev, o, keys)
+    }
+  }
+
+  private object ObjectValuesAll extends Val.Builtin1("o") {
+    def evalRhs(_o: Val, ev: EvalScope, pos: Position): Val = {
+      val o = _o.asObj
+      val keys = getAllKeys(ev, o)
+      getObjValuesFromKeys(pos, ev, o, keys)
+    }
+  }
+
+  private object Lines extends Val.Builtin1("arr") {
+    def evalRhs(v1: Val, ev: EvalScope, pos: Position): Val = {
+    v1.asArr.foreach {
+      case _: Val.Str | _: Val.Null => // donothing
+      case x => throw new Error.Delegate("Cannot call .lines on " + x.prettyName)
+    }
+    Val.Str(pos, Materializer.apply(v1)(ev).asInstanceOf[ujson.Arr]
+      .value
+      .filter(_ != ujson.Null)
+      .map{
+        case ujson.Str(s) => s + "\n"
+        case _ => ??? /* we ensure it's all strings above */
+      }
+      .mkString)
+    }
+  }
+
+  private object Range extends Val.Builtin2("from", "to") {
+    def evalRhs(from: Val, to: Val, ev: EvalScope, pos: Position): Val =
+    new Val.Arr(
+      pos,
+      (from.asInt to to.asInt).map(i => Val.Num(pos, i)).toArray
+    )
+  }
+
+  private object ManifestJson extends Val.Builtin1("v") {
+    def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = {
+      // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+      Val.Str(pos, Materializer
+        .apply0(v, new ujson.StringRenderer(indent = 4))(ev)
+        .toString
+        .replaceAll("\n[ ]+\n", "\n\n"))
+    }
+  }
+
+  private object ManifestJsonEx extends Val.Builtin2("value", "indent") {
+    def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val = {
+      // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
+      Val.Str(pos, Materializer
+        .apply0(v, new ujson.StringRenderer(indent = i.asString.length))(ev)
+        .toString
+        .replaceAll("\n[ ]+\n", "\n\n"))
+    }
+  }
+
   val functions: Map[String, Val.Func] = Map(
     "assertEqual" -> AssertEqual,
     "toString" -> ToString,
@@ -453,38 +535,14 @@ object Std {
     "objectHasAll" -> ObjectHasAll,
     "objectFields" -> ObjectFields,
     "objectFieldsAll" -> ObjectFieldsAll,
-    builtin("objectValues", "o"){ (pos, ev, v1: Val.Obj) =>
-      val keys = getVisibleKeys(ev, v1)
-      getObjValuesFromKeys(pos, ev, v1, keys)
-    },
-    builtin("objectValuesAll", "o"){ (pos, ev, v1: Val.Obj) =>
-      val keys = getAllKeys(ev, v1)
-      getObjValuesFromKeys(pos, ev, v1, keys)
-    },
+    "objectValues" -> ObjectValues,
+    "objectValuesAll" -> ObjectValuesAll,
     "type" -> Type,
-    builtin("lines", "arr"){ (pos, ev, v1: Val.Arr) =>
-      v1.foreach{
-        case _: Val.Str | _: Val.Null => // donothing
-        case x => throw new Error.Delegate("Cannot call .lines on " + x.prettyName)
-      }
-      Materializer.apply(v1)(ev).asInstanceOf[ujson.Arr]
-        .value
-        .filter(_ != ujson.Null)
-        .map{
-          case ujson.Str(s) => s + "\n"
-          case _ => ??? /* we ensure it's all strings above */
-        }
-        .mkString
-    },
+    "lines" -> Lines,
     "format" -> Format_,
     "foldl" -> Foldl,
     "foldr" -> Foldr,
-    builtin("range", "from", "to"){ (pos, ev, from: Int, to: Int) =>
-      new Val.Arr(
-        pos,
-        (from to to).map(i => Val.Num(pos, i)).toArray
-      )
-    },
+    "range" -> Range,
     builtin("mergePatch", "target", "patch"){ (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
       def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
@@ -743,20 +801,8 @@ object Std {
     builtin("manifestPython", "v"){ (pos, ev, v: Val) =>
       Materializer.apply0(v, new PythonRenderer())(ev).toString
     },
-    builtin("manifestJson", "v"){ (pos, ev, v: Val) =>
-      // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-      Materializer
-        .apply0(v, new ujson.StringRenderer(indent = 4))(ev)
-        .toString
-        .replaceAll("\n[ ]+\n", "\n\n")
-    },
-    builtin("manifestJsonEx", "value", "indent"){ (pos, ev, v: Val, i: String) =>
-      // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
-      Materializer
-        .apply0(v, new ujson.StringRenderer(indent = i.length))(ev)
-        .toString
-        .replaceAll("\n[ ]+\n", "\n\n")
-    },
+    "manifestJson" -> ManifestJson,
+    "manifestJsonEx" -> ManifestJsonEx,
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
                         "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>

@@ -3,7 +3,7 @@ package sjsonnet
 import Expr._
 import ScopedExprTransform._
 
-class StaticOptimizer extends ScopedExprTransform {
+class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
   override def transform(e: Expr): Expr = e match {
@@ -12,16 +12,22 @@ class StaticOptimizer extends ScopedExprTransform {
       Std.functions.getOrElse(name, null) match {
         case f: Val.Builtin =>
           var rargs = transformArr(args)
-          val f2 = f.specialize(rargs) match {
-            case null => f
-            case (f2, a2) => rargs = a2; f2
-          }
-          val alen = rargs.length
-          f2 match {
-            case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
-            case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
-            case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
-            case _ => rec(e)
+          tryStaticApply(pos, f, rargs) match {
+            case e: Expr =>
+              //println(s"----- static apply $f(${args.mkString(", ")}) -> $e")
+              e
+            case _ =>
+              val f2 = f.specialize(rargs) match {
+                case null => f
+                case (f2, a2) => rargs = a2; f2
+              }
+              val alen = rargs.length
+              f2 match {
+                case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
+                case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
+                case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
+                case _ => rec(e)
+              }
           }
         case _ => rec(e)
       }
@@ -125,6 +131,13 @@ class StaticOptimizer extends ScopedExprTransform {
       case a => a
     }
     specializeApplyArity(rebound)
+  }
+
+  private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
+    if(args.forall(_.isInstanceOf[Val])) {
+      val vargs = args.map(_.asInstanceOf[Val])
+      try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => return null }
+    } else null
   }
 
   private def specializeApplyArity(a: Apply): Expr = {

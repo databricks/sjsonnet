@@ -20,7 +20,7 @@ class ParserBenchmark {
 
   @Setup
   def setup(): Unit =
-    allFiles = MainBenchmark.findFiles()
+    allFiles = MainBenchmark.findFiles()._1
 
   @Benchmark
   def main(bh: Blackhole): Unit = {

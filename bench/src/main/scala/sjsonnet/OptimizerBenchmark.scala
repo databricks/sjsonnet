@@ -20,17 +20,19 @@ class OptimizerBenchmark {
 
   private var inputs: Iterable[(Expr, FileScope)] = _
   private var allFiles: IndexedSeq[(Path, String)] = _
+  private var ev: EvalScope = _
 
   @Setup
   def setup(): Unit = {
-    val allFiles = MainBenchmark.findFiles()
+    val (allFiles, ev) = MainBenchmark.findFiles()
     this.inputs = allFiles.map { case (p, s) =>
       fastparse.parse(s, new Parser(p).document(_)) match {
         case Success(v, _) => v
       }
     }
+    this.ev = ev
     val static = inputs.map {
-      case (expr, fs) => ((new StaticOptimizer).optimize(expr), fs)
+      case (expr, fs) => ((new StaticOptimizer(ev)).optimize(expr), fs)
     }
     val countBefore, countStatic = new Counter
     inputs.foreach(t => assert(countBefore.transform(t._1) eq t._1))
@@ -43,7 +45,7 @@ class OptimizerBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(inputs.foreach { case (expr, fs) =>
-      bh.consume((new StaticOptimizer).optimize(expr))
+      bh.consume((new StaticOptimizer(ev)).optimize(expr))
     })
   }
 
