@@ -3,20 +3,14 @@ package sjsonnet
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
-import java.util.zip.GZIPOutputStream
 import java.util
 import java.util.regex.Pattern
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{BinaryOp, Params}
-import sjsonnet.Val.False
 
 import scala.collection.mutable
-import scala.collection.compat._
 import scala.util.matching.Regex
-import ujson.Value
-
-import scala.util.control.Breaks._
 
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
@@ -507,23 +501,20 @@ object Std {
   }
 
   private object ManifestJson extends Val.Builtin1("v") {
-    def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = {
-      // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-      Val.Str(pos, Materializer
-        .apply0(v, new ujson.StringRenderer(indent = 4))(ev)
-        .toString
-        .replaceAll("\n[ ]+\n", "\n\n"))
-    }
+    def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer())(ev).toString)
   }
 
   private object ManifestJsonEx extends Val.Builtin2("value", "indent") {
-    def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val = {
-      // account for rendering differences of whitespaces in ujson and jsonnet manifestJsonEx
+    def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer
-        .apply0(v, new ujson.StringRenderer(indent = i.asString.length))(ev)
-        .toString
-        .replaceAll("\n[ ]+\n", "\n\n"))
-    }
+        .apply0(v, new MaterializeJsonRenderer(indent = i.asString.length))(ev)
+        .toString)
+  }
+
+  private object ParseJson extends Val.Builtin1("str") {
+    def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
+      ujson.StringParser.transform(str.asString, new ValVisitor(pos))
   }
 
   val functions: Map[String, Val.Func] = Map(
@@ -1033,29 +1024,7 @@ object Std {
     "parseInt" -> ParseInt,
     "parseOctal" -> ParseOctal,
     "parseHex" -> ParseHex,
-    builtin("parseJson", "str") { (pos, ev, str: String) =>
-      def recursiveTransform(js: ujson.Value): Val = {
-        js match {
-          case ujson.Null => Val.Null(pos)
-          case ujson.True => Val.True(pos)
-          case ujson.False => Val.False(pos)
-          case ujson.Num(value) => Val.Num(pos, value)
-          case ujson.Str(value) => Val.Str(pos, value)
-          case ujson.Arr(values) =>
-            val transformedValue: Array[_ <: Lazy] = values.map(v => (() => recursiveTransform(v)): Lazy).toArray
-            new Val.Arr(pos, transformedValue)
-          case ujson.Obj(valueMap) =>
-            val m = new util.LinkedHashMap[String, Val.Obj.Member]
-            valueMap.foreach { case (k, v) =>
-              m.put(k, new Val.Obj.Member(false, Expr.Member.Visibility.Normal) {
-                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = recursiveTransform(v)
-              })
-            }
-            new Val.Obj(pos, m, false, null, null)
-        }
-      }
-      recursiveTransform(ujson.read(str))
-    },
+    "parseJson" -> ParseJson,
     "md5" -> MD5,
     builtin("prune", "x"){ (pos, ev, s: Val) =>
       def filter(x: Val) = x match{

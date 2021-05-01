@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.Writer
+import java.io.{StringWriter, Writer}
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
@@ -177,6 +177,56 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
   }
 }
 
+case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter())
+  extends BaseCharRenderer(out, indent, escapeUnicode) {
+
+  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+    flushBuffer()
+    elemBuilder.append('[')
+
+    depth += 1
+    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+    if(length == 0) elemBuilder.append('\n') else renderIndent()
+    def subVisitor = MaterializeJsonRenderer.this
+    def visitValue(v: StringWriter, index: Int): Unit = {
+      flushBuffer()
+      commaBuffered = true
+    }
+    def visitEnd(index: Int) = {
+      commaBuffered = false
+      depth -= 1
+      renderIndent()
+      elemBuilder.append(']')
+      flushCharBuilder()
+      out
+    }
+  }
+
+  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+    flushBuffer()
+    elemBuilder.append('{')
+    depth += 1
+    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+    if(length == 0) elemBuilder.append('\n') else renderIndent()
+    def subVisitor = MaterializeJsonRenderer.this
+    def visitKey(index: Int) = MaterializeJsonRenderer.this
+    def visitKeyValue(s: Any): Unit = {
+      elemBuilder.append(':')
+      if (indent != -1) elemBuilder.append(' ')
+    }
+    def visitValue(v: StringWriter, index: Int): Unit = {
+      commaBuffered = true
+    }
+    def visitEnd(index: Int) = {
+      commaBuffered = false
+      depth -= 1
+      renderIndent()
+      elemBuilder.append('}')
+      flushCharBuilder()
+      out
+    }
+  }
+}
 
 object RenderUtils {
   /**
