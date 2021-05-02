@@ -87,6 +87,15 @@ class Interpreter(extVars: Map[String, ujson.Value],
       if(storePos == null) Materializer
       else new Materializer {
         override def storePos(pos: Position): Unit = self.storePos(pos)
+        override def storePos(v: Val): Unit = {
+          storePos(
+            v match {
+              case v: Val.Obj if v.hasKeys => v.pos
+              case v: Val.Arr if v.length > 0 => v.pos
+              case _ => null
+            }
+          )
+        }
       }
     try Right(m.apply0(res, visitor)(evaluator))
     catch{

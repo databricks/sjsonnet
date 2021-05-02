@@ -293,6 +293,14 @@ object Val{
         }
       }
     }
+
+    def foreachElement(sort: Boolean, pos: Position)(f: (String, Val) => Unit)(implicit ev: EvalScope): Unit = {
+      val keys = if (sort) visibleKeyNames.sorted else visibleKeyNames
+      for(k <- keys) {
+        val v = value(k, pos)
+        f(k, v)
+      }
+    }
   }
 
   def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {

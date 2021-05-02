@@ -107,7 +107,12 @@ object Std {
 
   private object Format_ extends Val.Builtin2("str", "vals") {
     def evalRhs(str: Val, vals: Val, ev: EvalScope, pos: Position): Val =
-      new Val.Str(pos, Format.format(str.asString, vals, pos.noOffset)(ev))
+      new Val.Str(pos, Format.format(str.asString, vals, pos)(ev))
+    override def specialize(args: Array[Expr]) = args match {
+      case Array(str, fmt: Val.Str) =>
+        try (new Format.PartialApplyFmt(fmt.value), Array(str)) catch { case _: Exception => null }
+      case _ => null
+    }
   }
 
   private object Foldl extends Val.Builtin3("func", "arr", "init") {
