@@ -173,26 +173,53 @@ object Std {
 
   private object Filter extends Val.Builtin2("func", "arr") {
     def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
-      val func = _func.asFunc
       val p = pos.noOffset
       val a = arr.asArr.asLazyArray
       var i = 0
-      while(i < a.length) {
-        if(!func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) {
-          var b = new Array[Lazy](a.length-1)
-          System.arraycopy(a, 0, b, 0, i)
-          var j = i+1
-          while(j < a.length) {
-            if(func.apply1(a(j), p)(ev).isInstanceOf[Val.True]) {
-              b(i) = a(j)
-              i += 1
+      val func = _func.asFunc
+      if(func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
+        while(i < a.length) {
+          if(!func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) {
+            var b = new Array[Lazy](a.length-1)
+            System.arraycopy(a, 0, b, 0, i)
+            var j = i+1
+            while(j < a.length) {
+              if(func.apply1(a(j), p)(ev).isInstanceOf[Val.True]) {
+                b(i) = a(j)
+                i += 1
+              }
+              j += 1
             }
-            j += 1
+            if(i != b.length) b = util.Arrays.copyOf(b, i)
+            return new Val.Arr(pos, b)
           }
-          if(i != b.length) b = util.Arrays.copyOf(b, i)
-          return new Val.Arr(pos, b)
+          i += 1
         }
-        i += 1
+      } else {
+        // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
+        // the function, there's no risk of the scope leaking (and being invalid at a later point)
+        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case p => p.fileScope }
+        val newScope: ValScope = func.defSiteValScope.extendBy(1)
+        val scopeIdx = newScope.length-1
+        while(i < a.length) {
+          newScope.bindings(scopeIdx) = a(i)
+          if(!func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+            var b = new Array[Lazy](a.length-1)
+            System.arraycopy(a, 0, b, 0, i)
+            var j = i+1
+            while(j < a.length) {
+              newScope.bindings(scopeIdx) = a(j)
+              if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+                b(i) = a(j)
+                i += 1
+              }
+              j += 1
+            }
+            if(i != b.length) b = util.Arrays.copyOf(b, i)
+            return new Val.Arr(pos, b)
+          }
+          i += 1
+        }
       }
       new Val.Arr(pos, a)
       //new Val.Arr(pos, arr.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True]))
