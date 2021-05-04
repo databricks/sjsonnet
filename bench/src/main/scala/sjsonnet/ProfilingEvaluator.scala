@@ -28,6 +28,8 @@ class ProfilingEvaluator(resolver: CachedResolver,
 
   class OpBox(val op: Int, val name: String) extends Box
 
+  class ExprTypeBox(val name: String) extends Box
+
   class BuiltinBox(val name: String) extends Box
 
   private val data = new util.IdentityHashMap[Expr, ExprBox]
@@ -135,6 +137,17 @@ class ProfilingEvaluator(resolver: CachedResolver,
     m.valuesIterator.toSeq
   }
 
+  def exprTypes(): Seq[ExprTypeBox] = {
+    val m = new mutable.HashMap[String, ExprTypeBox]
+    all.foreach { b =>
+      val n = b.expr.getClass.getName
+      val eb = m.getOrElseUpdate(n, new ExprTypeBox(n))
+      eb.time += b.time
+      eb.count += b.count
+    }
+    m.valuesIterator.toSeq
+  }
+
   def builtins(): Seq[BuiltinBox] = {
     val names = new util.IdentityHashMap[Val.Func, String]()
     Std.functions.foreachEntry((n, f) => names.put(f, n))
@@ -149,7 +162,6 @@ class ProfilingEvaluator(resolver: CachedResolver,
       b.expr match {
         case a: Expr.ApplyBuiltin1 => add(b, a.func)
         case a: Expr.ApplyBuiltin2 => add(b, a.func)
-        case a: Expr.ApplyBuiltin3 => add(b, a.func)
         case a: Expr.ApplyBuiltin => add(b, a.func)
         case _ =>
       }

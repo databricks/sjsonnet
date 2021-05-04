@@ -116,7 +116,6 @@ object Expr{
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr
   case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr) extends Expr
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
-  case class ApplyBuiltin3(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr, a3: Expr) extends Expr
   case class Select(pos: Position, value: Expr, name: String) extends Expr
   case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr
   case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr

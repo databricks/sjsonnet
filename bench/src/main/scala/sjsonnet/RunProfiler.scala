@@ -69,4 +69,5 @@ object RunProfiler extends App {
   show(s"\nBinary operators:", profiler.binaryOperators())
   show(s"\nUnary operators:", profiler.unaryOperators())
   show(s"\nBuilt-in functions:", profiler.builtins())
+  show(s"\nExpr types:", profiler.exprTypes())
 }
