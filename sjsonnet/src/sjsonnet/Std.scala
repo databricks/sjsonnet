@@ -46,6 +46,38 @@ object Std {
         case o: Val.Func => o.params.names.length
         case x => throw new Error.Delegate("Cannot get length of " + x.prettyName)
       })
+    override def specialize(args: Array[Expr]) = args match {
+      case Array(Expr.ApplyBuiltin2(_, Filter, f, a)) => (CountF, Array(f, a))
+      case _ => null
+    }
+  }
+
+  private object CountF extends Val.Builtin2("func", "arr") {
+    def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
+      val p = pos.noOffset
+      val a = arr.asArr.asLazyArray
+      var i = 0
+      val func = _func.asFunc
+      var res = 0
+      if(func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
+        while(i < a.length) {
+          if(func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) res += 1
+          i += 1
+        }
+      } else {
+        // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
+        // the function, there's no risk of the scope leaking (and being invalid at a later point)
+        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case p => p.fileScope }
+        val newScope: ValScope = func.defSiteValScope.extendBy(1)
+        val scopeIdx = newScope.length-1
+        while(i < a.length) {
+          newScope.bindings(scopeIdx) = a(i)
+          if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) res += 1
+          i += 1
+        }
+      }
+      new Val.Num(pos, res)
+    }
   }
 
   private object Codepoint extends Val.Builtin1("str") {
