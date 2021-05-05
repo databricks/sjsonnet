@@ -14,7 +14,10 @@ class ScopedExprTransform extends ExprTransform {
 
   def transform(e: Expr): Expr = e match {
     case LocalExpr(pos, bindings, returned) =>
-      nestedBindings(bindings)(rec(e))
+      val b2 = nestedBindings(bindings)(transformBinds(bindings))
+      val r2 = nestedBindings(b2)(transform(returned))
+      if((b2 eq bindings) && (r2 eq returned)) e
+      else LocalExpr(pos, b2, r2)
 
     case MemberList(pos, binds, fields, asserts) =>
       val fields2 = transformGenericArr(fields)(transformFieldNameOnly)

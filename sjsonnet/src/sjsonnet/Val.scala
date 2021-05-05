@@ -419,8 +419,11 @@ object Val{
     }
   }
 
-  abstract class Builtin(paramNames: String*)
-    extends Func(null, ValScope.empty, Params(paramNames.toArray, new Array[Expr](paramNames.length))) {
+  abstract class Builtin(paramNames: Array[String], defaults: Array[Expr] = null)
+    extends Func(null, ValScope.empty, Params(paramNames.toArray,
+      if(defaults == null) new Array[Expr](paramNames.length) else defaults)) {
+
+    override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
 
     final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
       val args = new Array[Val](params.names.length)
@@ -446,7 +449,7 @@ object Val{
     def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
   }
 
-  abstract class Builtin1(pn1: String) extends Builtin(pn1) {
+  abstract class Builtin1(pn1: String) extends Builtin(Array(pn1)) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), ev, pos)
 
@@ -461,7 +464,7 @@ object Val{
       else super.apply(Array(argVal), null, outerPos)
   }
 
-  abstract class Builtin2(pn1: String, pn2: String) extends Builtin(pn1, pn2) {
+  abstract class Builtin2(pn1: String, pn2: String) extends Builtin(Array(pn1, pn2)) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), args(1), ev, pos)
 
@@ -477,7 +480,7 @@ object Val{
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
 
-  abstract class Builtin3(pn1: String, pn2: String, pn3: String) extends Builtin(pn1, pn2, pn3) {
+  abstract class Builtin3(pn1: String, pn2: String, pn3: String) extends Builtin(Array(pn1, pn2, pn3)) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), args(1), args(2), ev, pos)
 

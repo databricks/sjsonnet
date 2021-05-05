@@ -549,6 +549,98 @@ object Std {
       ujson.StringParser.transform(str.asString, new ValVisitor(pos))
   }
 
+  private object Set_ extends Val.Builtin(Array("arr", "keyF"), Array(null, Val.False(dummyPos))) {
+    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val = {
+      uniqArr(pos, ev, sortArr(pos, ev, args(0), args(1)), args(1))
+    }
+  }
+
+  private object SetInter extends Val.Builtin(Array("a", "b", "keyF"), Array(null, null, Val.False(dummyPos))) {
+    def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
+    def isNum(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Num])
+
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
+      case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
+      case Array(a, b: Val.Arr) if isStr(b) => (new Spec1Str(b), Array(a))
+      case args if args.length == 2 => (Spec2, args)
+      case _ => null
+    }
+
+    def asArray(a: Val): Array[Lazy] = a match {
+      case arr: Val.Arr => arr.asLazyArray
+      case str: Val.Str => stringChars(pos, str.value).asLazyArray
+      case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+    }
+
+    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val = {
+      if(args(2).isInstanceOf[Val.False]) Spec2.evalRhs(args(0), args(1), ev, pos)
+      else {
+        val a = asArray(args(0))
+        val b = asArray(args(1))
+        val keyFFunc = args(2).asInstanceOf[Val.Func]
+        val out = new mutable.ArrayBuffer[Lazy]
+        for (v <- a) {
+          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
+          if (b.exists(value => {
+            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
+            ev.equal(appliedValue, appliedX)
+          }) && !out.exists(value => {
+            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
+            ev.equal(mValue, appliedX)
+          })) {
+            out.append(v)
+          }
+        }
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyFFunc)
+      }
+    }
+
+    private object Spec2 extends Val.Builtin2("a", "b") {
+      def evalRhs(_a: Val, _b: Val, ev: EvalScope, pos: Position): Val = {
+        val a = asArray(_a)
+        val b = asArray(_b)
+        val out = new mutable.ArrayBuffer[Lazy](a.length)
+        for (v <- a) {
+          val vf = v.force
+          if (b.exists(value => {
+            ev.equal(value.force, vf)
+          }) && !out.exists(value => {
+            ev.equal(value.force, vf)
+          })) {
+            out.append(v)
+          }
+        }
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), null)
+      }
+    }
+
+    private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("b") {
+      private[this] val a =
+        _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
+
+      def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
+        val b = asArray(_b)
+        val bs = new mutable.HashSet[String]
+        var i = 0
+        while(i < b.length) {
+          b(i).force match {
+            case s: Val.Str => bs.add(s.value)
+            case _ =>
+          }
+          i += 1
+        }
+        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        i = 0
+        while(i < a.length) {
+          val s = a(i).asInstanceOf[Val.Str]
+          if(bs.contains(s.value)) out.addOne(s)
+          i += 1
+        }
+        new Val.Arr(pos, out.result())
+      }
+    }
+  }
+
   val functions: Map[String, Val.Func] = Map(
     "assertEqual" -> AssertEqual,
     "toString" -> ToString,
@@ -927,10 +1019,7 @@ object Std {
     builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       sortArr(pos, ev, args(0), args(1))
     },
-
-    builtinWithDefaults("set", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
-      uniqArr(pos, ev, sortArr(pos, ev, args(0), args(1)), args(1))
-    },
+    "set" -> Set_,
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
@@ -945,49 +1034,7 @@ object Std {
       val concat = new Val.Arr(pos, a ++ b)
       uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
     },
-    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
-      val a = args(0) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
-      }
-      val b = args(1) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
-      }
-
-      val keyF = args(2)
-      val out = new mutable.ArrayBuffer[Lazy]
-
-      for (v <- a) {
-        if (keyF.isInstanceOf[Val.False]) {
-          val vf = v.force
-          if (b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        } else {
-          val keyFFunc = keyF.asInstanceOf[Val.Func]
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
-
-          if (b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
-        }
-      }
-
-      sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
-    },
+    "setInter" -> SetInter,
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
 
       val a = args(0) match {
@@ -1130,7 +1177,7 @@ object Std {
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
                                                                             (eval: (Position, EvalScope, T1, T2, T3) => R): (String, Val.Func) = {
-    (name, new Val.Builtin(p1, p2, p3) {
+    (name, new Val.Builtin(Array(p1, p2, p3)) {
       def evalRhs(args: Array[Val], ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
         val v1: T1 = implicitly[ReadWriter[T1]].apply(args(0))
@@ -1149,19 +1196,9 @@ object Std {
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
     val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}.toArray
-    val p = Params(params.map(_._1).toArray, params.map(_._2).toArray)
-    name -> new Val.Func(null, ValScope.empty, p) {
-      def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
-        //println("--- calling builtin: "+name)
-        val args = new Array[Val](indexedParamKeys.length)
-        var i = 0
-        while(i < args.length) {
-          args(i) = scope.bindings(i).force
-          i += 1
-        }
+    name -> new Val.Builtin(params.map(_._1).toArray, params.map(_._2).toArray) {
+      def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
         implicitly[ReadWriter[R]].write(pos, eval(args, pos, ev))
-      }
-      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
     }
   }
 
@@ -1213,7 +1250,7 @@ object Std {
           }else if (vs.forall(_.isInstanceOf[Val.Num])) {
             vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.value)
           }else if (vs.forall(_.isInstanceOf[Val.Obj])){
-            if (keyF.isInstanceOf[Val.False]) {
+            if (keyF == null || keyF.isInstanceOf[Val.False]) {
               throw new Error.Delegate("Unable to sort array of objects without key function")
             } else {
               val objs = vs.asStrictArray.map(_.cast[Val.Obj])
