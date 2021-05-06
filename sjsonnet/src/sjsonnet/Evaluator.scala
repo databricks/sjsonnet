@@ -651,40 +651,52 @@ class Evaluator(resolver: CachedResolver,
     case Nil => scopes
   }
 
-  def equal(x: Val, y: Val): Boolean = (x eq y) || {
-    (x, y) match {
-      case (Val.True(_), y) => y.isInstanceOf[Val.True]
-      case (Val.False(_), y) => y.isInstanceOf[Val.False]
-      case (Val.Null(_), y) => y.isInstanceOf[Val.Null]
-      case (Val.Num(_, n1), Val.Num(_, n2)) => n1 == n2
-      case (Val.Str(_, s1), Val.Str(_, s2)) => s1 == s2
-      case (xs: Val.Arr, ys: Val.Arr) =>
-        if(xs.length != ys.length) return false
+  def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
+    case _: Val.True => y.isInstanceOf[Val.True]
+    case _: Val.False => y.isInstanceOf[Val.False]
+    case _: Val.Null => y.isInstanceOf[Val.Null]
+    case x: Val.Str => y match {
+      case y: Val.Str => x.value == y.value
+      case _ => false
+    }
+    case x: Val.Num => y match {
+      case y: Val.Num => x.value == y.value
+      case _ => false
+    }
+    case x: Val.Arr => y match {
+      case y: Val.Arr =>
+        val xlen = x.length
+        if(xlen != y.length) return false
         var i = 0
-        while(i < xs.length) {
-          if(!equal(xs.force(i), ys.force(i))) return false
+        while(i < xlen) {
+          if(!equal(x.force(i), y.force(i))) return false
           i += 1
         }
         true
-      case (o1: Val.Obj, o2: Val.Obj) =>
-        val k1 = o1.visibleKeyNames
-        val k2 = o2.visibleKeyNames
-        if(k1.length != k2.length) return false
-        o1.triggerAllAsserts(o1)
-        o2.triggerAllAsserts(o2)
+      case _ => false
+    }
+    case x: Val.Obj => y match {
+      case y: Val.Obj =>
+        val k1 = x.visibleKeyNames
+        val k2 = y.visibleKeyNames
+        val k1len = k1.length
+        if(k1len != k2.length) return false
+        x.triggerAllAsserts(x)
+        y.triggerAllAsserts(y)
         var i = 0
-        while(i < k1.length) {
+        while(i < k1len) {
           val k = k1(i)
-          if(!o2.containsKey(k)) return false
-          val v1 = o1.value(k, emptyMaterializeFileScopePos)
-          val v2 = o2.value(k, emptyMaterializeFileScopePos)
+          if(!y.containsKey(k)) return false
+          val v1 = x.value(k, emptyMaterializeFileScopePos)
+          val v2 = y.value(k, emptyMaterializeFileScopePos)
           if(!equal(v1, v2)) return false
           i += 1
         }
         true
       case _ => false
     }
-  }
+    case _ => false
+  })
 }
 
 object Evaluator {
