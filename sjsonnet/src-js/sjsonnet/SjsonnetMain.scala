@@ -6,26 +6,30 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.HashMap[(Path, String), fastparse.Parsed[(Expr, FileScope)]]()
+  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
                 tlaVars: js.Any,
                 wd0: String,
-                importer: js.Function2[String, String, js.Array[String]],
+                importResolver: js.Function2[String, String, String],
+                importLoader: js.Function1[String, String],
                 preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
-      mutable.HashMap.empty,
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap,
       JsVirtualPath(wd0),
-      importer = (wd, path) => {
-        importer(wd.asInstanceOf[JsVirtualPath].path, path) match{
-          case null => None
-          case arr => Some((JsVirtualPath(arr(0)), arr(1)))
-        }
+      new Importer {
+        def resolve(docBase: Path, importName: String): Option[Path] =
+          importResolver(docBase.asInstanceOf[JsVirtualPath].path, importName) match {
+            case null => None
+            case s => Some(JsVirtualPath(s))
+          }
+        def read(path: Path): Option[String] =
+          Option(importLoader(path.asInstanceOf[JsVirtualPath].path))
       },
-      preserveOrder
+      preserveOrder,
+      parseCache = createParseCache()
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{
       case Left(msg) => throw new js.JavaScriptException(msg)

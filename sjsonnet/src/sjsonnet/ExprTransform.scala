@@ -178,10 +178,10 @@ abstract class ExprTransform {
         if(x2 eq x) expr
         else ForSpec(pos, name, x2)
 
-      case Error(pos, x) =>
+      case Expr.Error(pos, x) =>
         val x2 = transform(x)
         if(x2 eq x) expr
-        else Error(pos, x2)
+        else Expr.Error(pos, x2)
 
       case other => other
     }

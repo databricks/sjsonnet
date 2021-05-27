@@ -7,7 +7,8 @@ import java.util
 import java.util.regex.Pattern
 
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.{BinaryOp, Params}
+import sjsonnet.Expr.BinaryOp
+import sjsonnet.ArrayOps._
 
 import scala.collection.mutable
 import scala.util.matching.Regex
@@ -142,7 +143,7 @@ object Std {
       new Val.Str(pos, Format.format(str.asString, vals, pos)(ev))
     override def specialize(args: Array[Expr]) = args match {
       case Array(str, fmt: Val.Str) =>
-        try (new Format.PartialApplyFmt(fmt.value), Array(str)) catch { case _: Exception => null }
+        try { (new Format.PartialApplyFmt(fmt.value), Array(str)) } catch { case _: Exception => null }
       case _ => null
     }
   }
@@ -363,7 +364,7 @@ object Std {
     }
     override def specialize(args: Array[Expr]) = args match {
       case Array(str, from: Val.Str, to) =>
-        try (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) catch { case _: Exception => null }
+        try { (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) } catch { case _: Exception => null }
       case _ => null
     }
     private class SpecFrom(from: Pattern) extends Val.Builtin2("str", "to") {
@@ -648,7 +649,8 @@ object Std {
 
     private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("b") {
       private[this] val a =
-        _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
+        ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
+        // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
 
       def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
         val b = asArray(_b)
@@ -665,7 +667,7 @@ object Std {
         i = 0
         while(i < a.length) {
           val s = a(i).asInstanceOf[Val.Str]
-          if(bs.contains(s.value)) out.addOne(s)
+          if(bs.contains(s.value)) out.+=(s)
           i += 1
         }
         new Val.Arr(pos, out.result())

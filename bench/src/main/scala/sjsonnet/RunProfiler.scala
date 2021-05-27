@@ -42,7 +42,7 @@ object RunProfiler extends App {
   println(s"\nTop 20 by time:")
   profiler.all.sortBy(-_.time).take(20).foreach { b => show(b.time, b, "- ", false) }
 
-  val cutoff = 0.05
+  val cutoff = 0.02
   println(s"\nTrees with >= $cutoff time:")
   showAll(roots, "")
 
