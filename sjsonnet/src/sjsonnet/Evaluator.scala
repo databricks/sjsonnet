@@ -78,6 +78,11 @@ class Evaluator(resolver: CachedResolver,
       Error.fail("Cannot use `super` outside an object", pos)
   }
 
+  def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
+    case v: Val => v
+    case e => () => visitExpr(e)
+  }
+
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
     try ref.force catch Error.tryCatchWrap(e.pos)
@@ -98,7 +103,7 @@ class Evaluator(resolver: CachedResolver,
         while(i < bindings.length) {
           val b = bindings(i)
           newScope.bindings(base+i) = b.args match {
-            case null => () => visitExpr(b.rhs)(newScope)
+            case null => visitAsLazy(b.rhs)(newScope)
             case argSpec => () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
           }
           i += 1
@@ -109,10 +114,10 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitComp(e: Comp)(implicit scope: ValScope): Val =
-    new Val.Arr(e.pos, visitComp(e.first :: e.rest.toList, Array(scope)).map(s => (() => visitExpr(e.value)(s)): Lazy))
+    new Val.Arr(e.pos, visitComp(e.first :: e.rest.toList, Array(scope)).map(s => visitAsLazy(e.value)(s)))
 
   def visitArr(e: Arr)(implicit scope: ValScope): Val =
-    new Val.Arr(e.pos, e.value.map(v => (() => visitExpr(v)): Lazy))
+    new Val.Arr(e.pos, e.value.map(visitAsLazy))
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
@@ -195,8 +200,7 @@ class Evaluator(resolver: CachedResolver,
     val argsL = new Array[Lazy](args.length)
     var idx = 0
     while (idx < args.length) {
-      val a = args(idx)
-      argsL(idx) = () => visitExpr(a)
+      argsL(idx) = visitAsLazy(args(idx))
       idx += 1
     }
     try lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos) catch Error.tryCatchWrap(e.pos)
@@ -209,22 +213,22 @@ class Evaluator(resolver: CachedResolver,
 
   private def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1: Lazy = () => visitExpr(e.a1)
+    val l1 = visitAsLazy(e.a1)
     try lhs.cast[Val.Func].apply1(l1, e.pos) catch Error.tryCatchWrap(e.pos)
   }
 
   private def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1: Lazy = () => visitExpr(e.a1)
-    val l2: Lazy = () => visitExpr(e.a2)
+    val l1 = visitAsLazy(e.a1)
+    val l2 = visitAsLazy(e.a2)
     try lhs.cast[Val.Func].apply2(l1, l2, e.pos) catch Error.tryCatchWrap(e.pos)
   }
 
   private def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1: Lazy = () => visitExpr(e.a1)
-    val l2: Lazy = () => visitExpr(e.a2)
-    val l3: Lazy = () => visitExpr(e.a3)
+    val l1 = visitAsLazy(e.a1)
+    val l2 = visitAsLazy(e.a2)
+    val l3 = visitAsLazy(e.a3)
     try lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos) catch Error.tryCatchWrap(e.pos)
   }
 
@@ -556,7 +560,7 @@ class Evaluator(resolver: CachedResolver,
           val b = binds(i)
           arrF(j) = b.args match {
             case null =>
-              () => visitExpr(b.rhs)(newScope)
+              visitAsLazy(b.rhs)(newScope)
             case argSpec =>
               () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
           }
