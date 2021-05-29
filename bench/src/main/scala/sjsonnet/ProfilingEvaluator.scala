@@ -140,7 +140,11 @@ class ProfilingEvaluator(resolver: CachedResolver,
   def exprTypes(): Seq[ExprTypeBox] = {
     val m = new mutable.HashMap[String, ExprTypeBox]
     all.foreach { b =>
-      val n = b.expr.getClass.getName
+      val cl = b.expr match {
+        case _: Val => classOf[Val]
+        case e => e.getClass
+      }
+      val n = cl.getName.replaceAll("^sjsonnet\\.", "").replace('$', '.')
       val eb = m.getOrElseUpdate(n, new ExprTypeBox(n))
       eb.time += b.time
       eb.count += b.count

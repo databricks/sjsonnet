@@ -7,31 +7,6 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
   override def transform(e: Expr): Expr = e match {
-    case Apply(pos, Select(_, Id(_, "std"), name), args, null) if(scope.get("std") == null) =>
-      //println(s"----- std.$name(#${args.length}) call")
-      Std.functions.getOrElse(name, null) match {
-        case f: Val.Builtin =>
-          var rargs = transformArr(args)
-          tryStaticApply(pos, f, rargs) match {
-            case e: Expr =>
-              //println(s"----- static apply $f(${args.mkString(", ")}) -> $e")
-              e
-            case _ =>
-              val f2 = f.specialize(rargs) match {
-                case null => f
-                case (f2, a2) => rargs = a2; f2
-              }
-              val alen = rargs.length
-              f2 match {
-                case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
-                case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
-                case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
-                case _ => rec(e)
-              }
-          }
-        case _ => rec(e)
-      }
-
     case a: Apply => transformApply(a)
 
     case Select(_, Id(_, "std"), name) if(scope.get("std") == null) =>
@@ -130,7 +105,10 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
       case null => if((rargs eq a.args) && (rlhs eq a.value)) a else Apply(a.pos, rlhs, rargs, a.namedNames)
       case a => a
     }
-    specializeApplyArity(rebound)
+    rebound match {
+      case a2: Apply => specializeApplyArity(a2)
+      case e => e
+    }
   }
 
   private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
@@ -151,25 +129,48 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
     }
   }
 
-  private def rebindApply(pos: Position, lhs: Expr, args: Array[Expr], names: Array[String]): Apply = lhs match {
-      case ValidId(_, name, nameIdx) =>
-        scope.get(name) match {
-          case ScopedVal(Function(_, params, _), _, _) =>
-            rebind(args, names, params) match {
-              case null => null
-              case newArgs => Apply(pos, lhs, newArgs, null)
-            }
-          case ScopedVal(Bind(_, _, params, _), _, _) =>
-            rebind(args, names, params) match {
-              case null => null
-              case newArgs => Apply(pos, lhs, newArgs, null)
-            }
-          case _ => null
-        }
-      case _ => null
+  private def rebindApply(pos: Position, lhs: Expr, args: Array[Expr], names: Array[String]): Expr = lhs match {
+    case f: Val.Builtin =>
+      rebind(args, names, f.params) match {
+        case null => null
+        case newArgs =>
+          tryStaticApply(pos, f, newArgs) match {
+            case null =>
+              val (f2, rargs) = f.specialize(newArgs) match {
+                case null => (f, newArgs)
+                case (f2, a2) => (f2, a2)
+              }
+              val alen = rargs.length
+              f2 match {
+                case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
+                case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
+                case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
+                case _ => null
+              }
+            case e => e
+          }
+      }
+
+    case ValidId(_, name, nameIdx) =>
+      scope.get(name) match {
+        case ScopedVal(Function(_, params, _), _, _) =>
+          rebind(args, names, params) match {
+            case null => null
+            case newArgs => Apply(pos, lhs, newArgs, null)
+          }
+        case ScopedVal(Bind(_, _, params, _), _, _) =>
+          rebind(args, names, params) match {
+            case null => null
+            case newArgs => Apply(pos, lhs, newArgs, null)
+          }
+        case _ => null
+      }
+
+    case _ => null
   }
 
   private def rebind(args: Array[Expr], argNames: Array[String], params: Params): Array[Expr] = {
+    if(args.length == params.names.length && argNames == null) return args
     if(args.length > params.names.length) return null // too many args
     val positional = if(argNames != null) args.length - argNames.length else args.length
     val target = new Array[Expr](params.names.length)

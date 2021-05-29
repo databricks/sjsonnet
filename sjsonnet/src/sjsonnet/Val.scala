@@ -426,6 +426,8 @@ object Val{
     override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
 
     final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
+//      if(!(new Throwable).getStackTrace.map(_.toString).mkString("\n").contains("StaticOptimizer"))
+//        println(s"----------- generic evalRhs in $this via ${pos} ${ev.prettyIndex(pos)}")
       val args = new Array[Val](params.names.length)
       var i = 0
       var j = scope.length - args.length
@@ -449,7 +451,7 @@ object Val{
     def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
   }
 
-  abstract class Builtin1(pn1: String) extends Builtin(Array(pn1)) {
+  abstract class Builtin1(pn1: String, def1: Expr = null) extends Builtin(Array(pn1), if(def1 == null) null else Array(def1)) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), ev, pos)
 
@@ -464,7 +466,7 @@ object Val{
       else super.apply(Array(argVal), null, outerPos)
   }
 
-  abstract class Builtin2(pn1: String, pn2: String) extends Builtin(Array(pn1, pn2)) {
+  abstract class Builtin2(pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2), defs) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), args(1), ev, pos)
 
@@ -480,7 +482,7 @@ object Val{
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
 
-  abstract class Builtin3(pn1: String, pn2: String, pn3: String) extends Builtin(Array(pn1, pn2, pn3)) {
+  abstract class Builtin3(pn1: String, pn2: String, pn3: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2, pn3), defs) {
     final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0), args(1), args(2), ev, pos)
 

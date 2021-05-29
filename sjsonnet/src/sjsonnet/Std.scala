@@ -582,13 +582,13 @@ object Std {
       ujson.StringParser.transform(str.asString, new ValVisitor(pos))
   }
 
-  private object Set_ extends Val.Builtin(Array("arr", "keyF"), Array(null, Val.False(dummyPos))) {
-    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val = {
-      uniqArr(pos, ev, sortArr(pos, ev, args(0), args(1)), args(1))
+  private object Set_ extends Val.Builtin2("arr", "keyF", Array(null, Val.False(dummyPos))) {
+    def evalRhs(arr: Val, keyF: Val, ev: EvalScope, pos: Position): Val = {
+      uniqArr(pos, ev, sortArr(pos, ev, arr, keyF), keyF)
     }
   }
 
-  private object SetInter extends Val.Builtin(Array("a", "b", "keyF"), Array(null, null, Val.False(dummyPos))) {
+  private object SetInter extends Val.Builtin3("a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
     def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
     def isNum(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Num])
 
@@ -605,12 +605,12 @@ object Std {
       case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
     }
 
-    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val = {
-      if(args(2).isInstanceOf[Val.False]) Spec2.evalRhs(args(0), args(1), ev, pos)
+    def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
+      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
       else {
-        val a = asArray(args(0))
-        val b = asArray(args(1))
-        val keyFFunc = args(2).asInstanceOf[Val.Func]
+        val a = asArray(_a)
+        val b = asArray(_b)
+        val keyFFunc = _keyF.asInstanceOf[Val.Func]
         val out = new mutable.ArrayBuffer[Lazy]
         for (v <- a) {
           val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
@@ -1211,12 +1211,12 @@ object Std {
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
                                                                             (eval: (Position, EvalScope, T1, T2, T3) => R): (String, Val.Func) = {
-    (name, new Val.Builtin(Array(p1, p2, p3)) {
-      def evalRhs(args: Array[Val], ev: EvalScope, outerPos: Position): Val = {
+    (name, new Val.Builtin3(p1, p2, p3) {
+      def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
-        val v1: T1 = implicitly[ReadWriter[T1]].apply(args(0))
-        val v2: T2 = implicitly[ReadWriter[T2]].apply(args(1))
-        val v3: T3 = implicitly[ReadWriter[T3]].apply(args(2))
+        val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1)
+        val v2: T2 = implicitly[ReadWriter[T2]].apply(arg2)
+        val v3: T3 = implicitly[ReadWriter[T3]].apply(arg3)
         implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev, v1, v2, v3))
       }
     })
@@ -1325,17 +1325,11 @@ object Std {
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
     maybeSortKeys(ev, v1.allKeyNames)
   
-  @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] = {
-    if(ev.preserveOrder) {
-      keys
-    } else {
-      keys.sorted
-    }
-  }
+  @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
+    if(ev.preserveOrder) keys else keys.sorted
 
-  def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr = {
+  def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr =
     new Val.Arr(pos, keys.map { k =>
       (() => v1.value(k, pos.noOffset)(ev)): Lazy
     })
-  }
 }
