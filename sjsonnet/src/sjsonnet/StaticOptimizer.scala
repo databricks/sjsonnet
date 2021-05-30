@@ -6,76 +6,52 @@ import ScopedExprTransform._
 class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
-  override def transform(e: Expr): Expr = e match {
+  override def transform(_e: Expr): Expr = super.transform(_e) match {
     case a: Apply => transformApply(a)
 
-    case Select(_, Id(_, "std"), name) if(scope.get("std") == null) =>
-      Std.functions.getOrElse(name, null) match {
-        case null => rec(e)
-        case f => f
-      }
+    case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
+      try obj.value(name, p)(ev).asInstanceOf[Expr] catch { case _: Exception => e }
 
-    case s: Select =>
-      super.transform(s) match {
-        case Select(pos, ValidSuper(_, selfIdx), name) =>
-          SelectSuper(pos, selfIdx, name)
-        case s2 => s2
-      }
+    case Select(pos, ValidSuper(_, selfIdx), name) =>
+      SelectSuper(pos, selfIdx, name)
 
-    case l: Lookup =>
-      super.transform(l) match {
-        case Lookup(pos, ValidSuper(_, selfIdx), index) =>
-          LookupSuper(pos, selfIdx, index)
-        case l2 => l2
-      }
+    case Lookup(pos, ValidSuper(_, selfIdx), index) =>
+      LookupSuper(pos, selfIdx, index)
 
-    case b : BinaryOp =>
-      super.transform(b) match {
-        case b2 @ BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
-          InSuper(pos, lhs, selfIdx)
-        case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
-          try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs)
-          catch { case _: Exception => b2 }
-        case b2 => b2
-      }
+    case b2 @ BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
+      InSuper(pos, lhs, selfIdx)
+    case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
+      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs)
+      catch { case _: Exception => b2 }
 
-    case Id(pos, name) =>
-      val v = scope.get(name)
-      v match {
+    case e @ Id(pos, name) =>
+      scope.get(name) match {
         case ScopedVal(v: Val with Expr, _, _) => v
-        case ScopedVal(e, _, idx) => ValidId(pos, name, idx)
+        case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
         case null if name == "std" => Std.Std
         case _ => e
       }
 
-    case Self(pos) =>
+    case e @ Self(pos) =>
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
         case _ => e
       }
 
-    case $(pos) =>
+    case e @ $(pos) =>
       scope.get("$") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
         case _ => e
       }
 
-    case a: Arr =>
-      super.transform(a) match {
-        case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
-          new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
-        case other => other
-      }
+    case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
+      new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
-    case m: ObjBody.MemberList =>
-      super.transform(m) match {
-        case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-          if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
-          else m
-        case other => other
-      }
+    case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+      else m
 
-    case e => super.transform(e)
+    case e => e
   }
 
   object ValidSuper {
@@ -99,10 +75,8 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   }
 
   private def transformApply(a: Apply): Expr = {
-    val rargs = transformArr(a.args)
-    val rlhs = transform(a.value)
-    val rebound = rebindApply(a.pos, rlhs, rargs, a.namedNames) match {
-      case null => if((rargs eq a.args) && (rlhs eq a.value)) a else Apply(a.pos, rlhs, rargs, a.namedNames)
+    val rebound = rebindApply(a.pos, a.value, a.args, a.namedNames) match {
+      case null => a
       case a => a
     }
     rebound match {
