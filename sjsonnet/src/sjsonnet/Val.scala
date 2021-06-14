@@ -499,7 +499,7 @@ object Val{
   * [[EvalScope]] models the per-evaluator context that is propagated
   * throughout the Jsonnet evaluation.
   */
-abstract class EvalScope extends EvalErrorScope{
+abstract class EvalScope extends EvalErrorScope {
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val
 
@@ -510,5 +510,6 @@ abstract class EvalScope extends EvalErrorScope{
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
-  val preserveOrder: Boolean = false
+  def preserveOrder: Boolean
+  def strict: Boolean
 }

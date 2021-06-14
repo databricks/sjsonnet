@@ -6,7 +6,7 @@ import ScopedExprTransform._
 class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
-  override def transform(_e: Expr): Expr = super.transform(_e) match {
+  override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
 
     case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
@@ -60,6 +60,23 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
         case ScopedVal(v, _, idx) if v != null => Some((s.pos, idx))
         case _ => None
       }
+  }
+
+  private def check(e: Expr): Expr = {
+    e match {
+      case ObjExtend(pos, base, ext) if ev.strict && isObjLiteral(base) =>
+        sjsonnet.Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", e.pos)(ev)
+      case _ =>
+    }
+    e
+  }
+
+  private def isObjLiteral(expr: Expr): Boolean = expr match {
+    case _: ObjBody.MemberList => true
+    case _: ObjBody.ObjComp => true
+    case _: ObjExtend => true
+    case _: Val.Obj => true
+    case _ => false
   }
 
   override protected[this] def transformFieldName(f: FieldName): FieldName = f match {

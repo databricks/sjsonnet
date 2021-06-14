@@ -18,8 +18,8 @@ import scala.collection.mutable
 class Evaluator(resolver: CachedResolver,
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
-                override val preserveOrder: Boolean = false,
-                strict: Boolean) extends EvalScope{
+                val preserveOrder: Boolean = false,
+                val strict: Boolean = false) extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
 
@@ -126,22 +126,12 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {
-    if(strict && isObjLiteral(e.base))
-      Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", e.pos)
     val original = visitExpr(e.base).cast[Val.Obj]
     e.ext match {
       case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
       case ext: ObjBody.ObjComp => visitObjComp(ext, original)
       case o: Val.Obj => o.addSuper(e.pos, original)
     }
-  }
-
-  private def isObjLiteral(expr: Expr): Boolean = expr match {
-    case _: ObjBody.MemberList => true
-    case _: ObjBody.ObjComp => true
-    case _: ObjExtend => true
-    case _: Val.Obj => true
-    case _ => false
   }
 
   def visitIfElse(e: IfElse)(implicit scope: ValScope): Val = {

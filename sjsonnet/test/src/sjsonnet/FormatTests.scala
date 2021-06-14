@@ -17,6 +17,8 @@ object FormatTests extends TestSuite{
         def materialize(v: Val): Value = ???
         def equal(x: Val, y: Val): Boolean = ???
         def importer: sjsonnet.CachedImporter = ???
+        def preserveOrder = false
+        def strict = false
       }
     )
     assert(formatted == expected)
