@@ -103,7 +103,7 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   }
 
   private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
-    if(args.forall(_.isInstanceOf[Val])) {
+    if(f.staticSafe && args.forall(_.isInstanceOf[Val])) {
       val vargs = args.map(_.asInstanceOf[Val])
       try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => return null }
     } else null

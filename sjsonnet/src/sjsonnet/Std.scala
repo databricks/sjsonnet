@@ -522,6 +522,7 @@ object Std {
         ev.extVars.getOrElse(x, throw new Error.Delegate("Unknown extVar: " + x))
       )
     }
+    override def staticSafe = false
   }
 
   private object ObjectValues extends Val.Builtin1("o") {

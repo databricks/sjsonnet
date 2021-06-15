@@ -449,6 +449,9 @@ object Val{
       else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos)
 
     def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
+
+    /** Is this builtin safe to use in static evaluation */
+    def staticSafe: Boolean = true
   }
 
   abstract class Builtin1(pn1: String, def1: Expr = null) extends Builtin(Array(pn1), if(def1 == null) null else Array(def1)) {
