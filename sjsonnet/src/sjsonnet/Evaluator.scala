@@ -121,7 +121,7 @@ class Evaluator(resolver: CachedResolver,
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
-    if(sup == null) Error.fail("Cannot use `super` outside an object", e.pos)
+    if(sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
     else sup.value(e.name, e.pos, scope.bindings(e.selfIdx).asInstanceOf[Val.Obj])
   }
 

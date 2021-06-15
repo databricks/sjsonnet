@@ -119,6 +119,12 @@ object EvaluatorTests extends TestSuite{
         eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).d""") ==> ujson.Num(1)
 
         eval("""local x = {a: 1}; local y = {b: super.a}; x + y""") ==> ujson.read("""{"a": 1, "b": 1}""")
+
+        eval("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }""") ==>
+          ujson.Obj("a" -> ujson.Num(10))
+        evalErr("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }.b""") ==>
+        """sjsonnet.Error: Attempt to use `super` when there is no super class
+          |at .(:1:68)""".stripMargin
       }
     }
     test("hidden") {
