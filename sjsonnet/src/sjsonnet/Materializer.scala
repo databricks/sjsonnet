@@ -39,9 +39,9 @@ abstract class Materializer {
       case xs: Val.Arr =>
         storePos(xs.pos);
         val arrVisitor = visitor.visitArray(xs.length, -1)
-        val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
         var i = 0
         while(i < xs.length) {
+          val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
           arrVisitor.visitValue(apply0(xs.force(i), sub), -1)
           i += 1
         }
