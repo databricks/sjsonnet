@@ -129,7 +129,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
         out.append(bufferedComment)
         bufferedComment = null
       }
-      OldYamlRenderer.writeIndentation(out, indent * depth)
+      PrettyYamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) {
       out.append("- ")
@@ -253,7 +253,7 @@ object PrettyYamlRenderer{
     out.append(lineComment)
 
     splits.dropRight(dropRight).foreach { split =>
-      if (split.nonEmpty) OldYamlRenderer.writeIndentation(out, indent * (depth + 1))
+      if (split.nonEmpty) PrettyYamlRenderer.writeIndentation(out, indent * (depth + 1))
       else out.write('\n')
       out.append(split)
     }
@@ -328,7 +328,7 @@ object PrettyYamlRenderer{
         writeData(text.slice(start, end) + '\\')
         if (start < end) start = end
         if (column > idealWidth){
-          OldYamlRenderer.writeIndentation(out, leftIndent)
+          PrettyYamlRenderer.writeIndentation(out, leftIndent)
           column = leftIndent
         }
 
@@ -377,7 +377,7 @@ object PrettyYamlRenderer{
       // character mark by up to one token, which can be of varying width
       val maxWidth = idealWidth
       if (!firstInLine && currentOffset > maxWidth){
-        OldYamlRenderer.writeIndentation(out, leftIndent)
+        PrettyYamlRenderer.writeIndentation(out, leftIndent)
         firstLine = false
         currentOffset = leftIndent
         out.write(token)
@@ -480,6 +480,13 @@ object PrettyYamlRenderer{
     str.charAt(str.length - 1) == ' ' // trailing space needs quotes
   }
 
-
+  def writeIndentation(out: Writer, n: Int) = {
+    out.append('\n')
+    var i = n
+    while(i > 0) {
+      out.append(' ')
+      i -= 1
+    }
+  }
 
 }

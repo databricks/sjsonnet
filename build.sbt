@@ -49,7 +49,7 @@ lazy val main = (project in file("sjsonnet"))
   )
 
 lazy val bench = (project in file("bench"))
-  .dependsOn(main)
+  .dependsOn(main % "compile->test")
   .enablePlugins(JmhPlugin)
   .settings(
     fork in run := true,

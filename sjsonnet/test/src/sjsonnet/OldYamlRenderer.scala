@@ -47,7 +47,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       if (outBuffer.length() > 1 && outBuffer.charAt(outBuffer.length() - 1) == ' ') {
         outBuffer.setLength(outBuffer.length() - 1)
       }
-      OldYamlRenderer.writeIndentation(out, indent * depth)
+      PrettyYamlRenderer.writeIndentation(out, indent * depth)
     }
     if (dashBuffered) out.append("- ")
     dashBuffered = false
@@ -111,17 +111,6 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       depth -= 1
       flushBuffer()
       out
-    }
-  }
-}
-
-object OldYamlRenderer {
-  def writeIndentation(out: Writer, n: Int) = {
-    out.append('\n')
-    var i = n
-    while(i > 0) {
-      out.append(' ')
-      i -= 1
     }
   }
 }
