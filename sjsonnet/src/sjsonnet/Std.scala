@@ -358,10 +358,8 @@ object Std {
   }
 
   private object StrReplaceAll extends Val.Builtin3("str", "from", "to") {
-    def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val = {
-      Pattern.compile(from.asString).matcher(str.asString).replaceAll(to.asString)
+    def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.replaceAll(from.asString, to.asString))
-    }
     override def specialize(args: Array[Expr]) = args match {
       case Array(str, from: Val.Str, to) =>
         try { (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) } catch { case _: Exception => null }
