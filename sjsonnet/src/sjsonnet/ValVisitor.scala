@@ -7,6 +7,7 @@ import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 
 import scala.collection.mutable
 
+/** Parse JSON directly into a literal `Val` */
 class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   def visitArray(length: Int, index: Int): ArrVisitor[Val, Val] = new ArrVisitor[Val, Val] {
     val a = new mutable.ArrayBuilder.ofRef[Lazy]

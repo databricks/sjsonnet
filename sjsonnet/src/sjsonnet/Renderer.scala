@@ -177,6 +177,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
   }
 }
 
+/** Renderer used by std.manifestJson and std.manifestJsonEx */
 case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter())
   extends BaseCharRenderer(out, indent, escapeUnicode) {
 

@@ -2,6 +2,7 @@ package sjsonnet
 
 import Expr._
 
+/** Simple tree transformer for the AST. */
 abstract class ExprTransform {
 
   def transform(expr: Expr): Expr

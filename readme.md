@@ -114,17 +114,22 @@ The only stack size limit is the one of the JVM.
 
 ## Architecture
 
-Sjsonnet is implementated as a straightforward AST interpreter. There are
-roughly 3 phases:
+Sjsonnet is implementated as an optimizing interpreter. There are roughly 4
+phases:
 
 - `sjsonnet.Parser`: parses an input `String` into a `sjsonnet.Expr`, which is a
   [Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree) representing
   the Jsonnet document syntax, using the
   [Fastparse](https://github.com/lihaoyi/fastparse) parsing library
 
-- `sjsonnet.Evaluator`: recurses over the `sjsonnet.Expr` and converts it into a
-  `sjsonnet.Val`, a data structure representing the Jsonnet runtime values
-  (basically lazy JSON which can contain function values).
+- `sjsonnet.StaticOptimizer` is a single AST transform that performs static
+  checking, essential rewriting (e.g. assigning indices in the symbol table for
+  variables) and optimizations. The result is another `jsonnet.Expr` per input
+  file that can be stored in the parse cache and reused.
+
+- `sjsonnet.Evaluator`: recurses over the `sjsonnet.Expr` produced by the
+  optimizer and converts it into a `sjsonnet.Val`, a data structure representing
+  the Jsonnet runtime values (basically lazy JSON which can contain function values).
 
 - `sjsonnet.Materializer`: recurses over the `sjsonnet.Val` and converts it into
   an output `ujson.Expr`: a non-lazy JSON structure without any remaining
@@ -143,10 +148,14 @@ Some notes on the values used in parts of the pipeline:
 - `sjsonnet.Val`: essentially the JSON structure (objects, arrays, primitives)
   but with two modifications. The first is that functions like
   `function(a){...}` can still be present in the structure: in Jsonnet you can
-  pass around functions as values and call then later on. The second is that and
+  pass around functions as values and call then later on. The second is that
   object values & array entries are *lazy*: e.g. `[error 123, 456][1]` does not
   raise an error because the first (erroneous) entry of the array is un-used and
   thus not evaluated.
+
+- Classes representing literals extend `sjsonnet.Val.Literal` which in turn extends
+  *both*, `Expr` and `Val`. This allows the evaluator to skip over them instead of
+  having to convert them from one representation to the other.
 
 ## Performance
 
@@ -174,15 +183,38 @@ f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
 benchmark in  
 [SjsonnetTestMain.scala](https://github.com/databricks/sjsonnet/blob/master/sjsonnet/test/src-jvm/sjsonnet/SjsonnetTestMain.scala)
 
+Sjsonnet 0.4.0 and 0.5.0 further improve the performance significantly on our
+internal benchmarks. A set of new JMH benchmarks provide detailed
+performance data of an entire run (`MainBenchmark`) and the
+non-evaluation-related parts (`MaterializerBenchmark`, `OptimizerBenchmark`,
+`ParserBenchmark`). They can be run from the (JVM / Scala 2.13 only) sbt build.
+The Sjsonnet profiler is located in the same sbt project:
+
+The Sjsonnet command line which is run by all of these is defined in
+`MainBenchmark.mainArgs`. You need to change it to point to a suitable input
+before running a benchmark or the profiler. (For Databricks employees who
+want to reproduce our benchmarks, the pre-configured command line is expected
+to be run against databricks/universe @ 7cbd8d7cb071983077d41fcc34f0766d0d2a247d).
+
+Benchmark example:
+```
+sbt bench/jmh:run -jvmArgs "-XX:+UseStringDeduplication" sjsonnet.MainBenchmark
+```
+
+Profiler:
+```
+sbt bench/run
+```
+
 ## Laziness
 
 The Jsonnet language is *lazy*: expressions don't get evaluated unless
 their value is needed, and thus even erroneous expressions do not cause
 a failure if un-used. This is represented in the Sjsonnet codebase by
-`sjsonnet.Val.Lazy`: a wrapper type that encapsulates an arbitrary
+`sjsonnet.Lazy`: a wrapper type that encapsulates an arbitrary
 computation that returns a `sjsonnet.Val`.
 
-`sjsonnet.Val.Lazy` is used in several places, representing where
+`sjsonnet.Lazy` is used in several places, representing where
 laziness is present in the language:
 
 - Inside `sjsonnet.Scope`, representing local variable name bindings
@@ -190,6 +222,9 @@ laziness is present in the language:
 - Inside `sjsonnet.Val.Arr`, representing the contents of array cells
 
 - Inside `sjsonnet.Val.Obj`, representing the contents of object values
+
+`Val` extends `Lazy` so that an already computed value can be treated as
+lazy without having to wrap it.
 
 Unlike [google/jsonnet](https://github.com/google/jsonnet), Sjsonnet caches the
 results of lazy computations the first time they are evaluated, avoiding

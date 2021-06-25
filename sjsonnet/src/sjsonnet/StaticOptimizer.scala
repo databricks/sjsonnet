@@ -3,6 +3,8 @@ package sjsonnet
 import Expr._
 import ScopedExprTransform._
 
+/** StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope
+ * indices) plus additional optimizations (post-order) and static checking (pre-order). */
 class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 

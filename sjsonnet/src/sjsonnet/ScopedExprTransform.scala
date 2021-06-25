@@ -5,6 +5,7 @@ import sjsonnet.Expr._
 
 import scala.collection.immutable.HashMap
 
+/** Tree transformer that keeps track of the bindings in the static scope. */
 class ScopedExprTransform extends ExprTransform {
   import ScopedExprTransform._
   var scope: Scope = emptyScope

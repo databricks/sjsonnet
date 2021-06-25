@@ -31,7 +31,7 @@ abstract class Lazy {
   * the tree can contain functions.
   */
 sealed abstract class Val extends Lazy {
-  cached = this
+  cached = this // avoid a megamorphic call to compute() when forcing
   final def compute() = this
 
   def pos: Position
@@ -419,15 +419,14 @@ object Val{
     }
   }
 
+  /** Superclass for standard library functions */
   abstract class Builtin(paramNames: Array[String], defaults: Array[Expr] = null)
-    extends Func(null, ValScope.empty, Params(paramNames.toArray,
+    extends Func(null, ValScope.empty, Params(paramNames,
       if(defaults == null) new Array[Expr](paramNames.length) else defaults)) {
 
     override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
 
     final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
-//      if(!(new Throwable).getStackTrace.map(_.toString).mkString("\n").contains("StaticOptimizer"))
-//        println(s"----------- generic evalRhs in $this via ${pos} ${ev.prettyIndex(pos)}")
       val args = new Array[Val](params.names.length)
       var i = 0
       var j = scope.length - args.length
@@ -448,6 +447,11 @@ object Val{
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos)
 
+    /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
+     * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
+     * to it (usually a subset of the supplied arguments).
+     * @param args the positional arguments for this function call. Named arguments and defaults have
+     *             already been resolved. */
     def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
 
     /** Is this builtin safe to use in static evaluation */
