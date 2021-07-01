@@ -75,16 +75,25 @@ object Format{
     else if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
     else " " * missingWidth + lhs2 + mhs + rhs
   }
+
   def format(s: String,
+             values0: Val,
+             pos: Position)
+            (implicit evaluator: EvalScope): String = {
+    val (leading, chunks) = fastparse.parse(s, format(_)).get.value
+    format(leading, chunks, values0, pos)
+  }
+
+  def format(leading: String,
+             chunks: scala.Seq[(FormatSpec, String)],
              values0: Val,
              pos: Position)
             (implicit evaluator: EvalScope): String = {
     val values = values0 match{
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x => Val.Arr(pos, Array[Val.Lazy](() => x))
+      case x => new Val.Arr(pos, Array[Lazy](x))
     }
-    val (leading, chunks) = fastparse.parse(s, format(_)).get.value
     val output = new StringBuilder
     output.append(leading)
     var i = 0
@@ -94,10 +103,10 @@ object Format{
         case _ =>
 
           val value = formatted.label match{
-            case None => Materializer(values.cast[Val.Arr].value(i).force)
+            case None => Materializer(values.cast[Val.Arr].force(i))
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.value(i).force)
+                case v: Val.Arr => Materializer(v.force(i))
                 case v: Val.Obj => Materializer(v.value(key, pos))
               }
           }
@@ -240,5 +249,11 @@ object Format{
 
   def maybeDecimalPoint(formatted: FormatSpec, fracLengths: (Int, Int)) = {
     if (formatted.precision.contains(0) && !formatted.alternate) None else Some(fracLengths)
+  }
+
+  class PartialApplyFmt(fmt: String) extends Val.Builtin1("values") {
+    val (leading, chunks) = fastparse.parse(fmt, format(_)).get.value
+    def evalRhs(values0: Val, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, format(leading, chunks, values0, pos)(ev))
   }
 }

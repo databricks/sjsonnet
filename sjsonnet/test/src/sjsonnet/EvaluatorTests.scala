@@ -31,6 +31,9 @@ object EvaluatorTests extends TestSuite{
       eval("function() 1") ==> ujson.Num(1)
       eval("function(a=1) a") ==> ujson.Num(1)
       eval("(function(x, y = x + 1) y)(x = 10)") ==> ujson.Num(11)
+      eval("local f(x) = function() true; f(42)") ==> ujson.True
+      eval("local f(x) = function() true; f(42) == true") ==> ujson.False
+      eval("local f(x) = function() true; f(42)() == true") ==> ujson.True
     }
     test("members") {
       eval("{local x = 1, x: x}['x']") ==> ujson.Num(1)
@@ -117,6 +120,14 @@ object EvaluatorTests extends TestSuite{
 
         eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).c""") ==> ujson.Num(2)
         eval("""(({a: 1}{b: 2}) + ({c: super.b}{d: super.a})).d""") ==> ujson.Num(1)
+
+        eval("""local x = {a: 1}; local y = {b: super.a}; x + y""") ==> ujson.read("""{"a": 1, "b": 1}""")
+
+        eval("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }""") ==>
+          ujson.Obj("a" -> ujson.Num(10))
+        evalErr("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }.b""") ==>
+        """sjsonnet.Error: Attempt to use `super` when there is no super class
+          |at .(:1:68)""".stripMargin
       }
     }
     test("hidden") {
@@ -301,13 +312,11 @@ object EvaluatorTests extends TestSuite{
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", true) ==>
-        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-          |at .(:1:11)""".stripMargin
+        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
       eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       eval("local x = { c: 3 }; (x { a: 1 }).a", true) ==> ujson.Num(1)
       evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", true) ==>
-        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-          |at .(:1:31)""".stripMargin
+        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
     }
     test("objectDeclaration") {
       eval("{ ['foo']: x for x in  []}", false) ==> ujson.Obj()
@@ -321,6 +330,10 @@ object EvaluatorTests extends TestSuite{
     }
     test("givenNoDuplicateFieldsInListComprehension2_expectSuccess") {
       eval("""{ ["bar_" + x]: x for x in [5,12]}""") ==> ujson.Obj("bar_5" -> 5, "bar_12" -> 12)
+    }
+    test("functionEqualsNull") {
+      eval("""local f(x)=null; f == null""") ==> ujson.False
+      eval("""local f=null; f == null""") ==> ujson.True
     }
   }
 }

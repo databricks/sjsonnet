@@ -6,7 +6,7 @@ cancelable in Global := true
 
 lazy val main = (project in file("sjsonnet"))
   .settings(
-    scalacOptions in Compile ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**"),
+    scalacOptions in Compile ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**"),
     fork in Test := true,
     baseDirectory in Test := (baseDirectory in ThisBuild).value,
     libraryDependencies ++= Seq(
@@ -49,7 +49,8 @@ lazy val main = (project in file("sjsonnet"))
   )
 
 lazy val bench = (project in file("bench"))
-  .dependsOn(main)
+  .dependsOn(main % "compile->test")
   .enablePlugins(JmhPlugin)
   .settings(
+    fork in run := true,
   )

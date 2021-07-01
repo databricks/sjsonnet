@@ -7,12 +7,11 @@ object PrettyYamlRendererTests extends TestSuite{
   def eval(path: os.Path, comments: Boolean) = {
     var currentPos: Position = null
     val interp = new Interpreter(
-      sjsonnet.SjsonnetMain.createParseCache(),
       Map(),
       Map(),
       OsPath(testSuiteRoot),
       importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot))),
-      storePos = if (comments) currentPos = _ else _ => ()
+      storePos = if (comments) currentPos = _ else null
     )
     val res = interp.interpret0(
       os.read(path),

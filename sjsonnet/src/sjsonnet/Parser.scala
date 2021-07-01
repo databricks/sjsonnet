@@ -41,15 +41,13 @@ object Parser {
 
   def idStartChar(c: Char) = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
-  private val emptyExprArray = new Array[Expr](0)
+  private val emptyLazyArray = new Array[Lazy](0)
 }
 
 class Parser(val currentFile: Path) {
   import Parser._
 
-  private val nameIndices = new mutable.HashMap[String, Int]
-  nameIndices("std") = 0
-  private val fileScope = new FileScope(currentFile, nameIndices)
+  private val fileScope = new FileScope(currentFile)
 
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
@@ -130,14 +128,24 @@ class Parser(val currentFile: Path) {
   )
 
 
-  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(Expr.Arr(_, emptyExprArray)) | arrBody )
+  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody )
   def compSuffix[_: P] = P( forspec ~ compspec ).map(Left(_))
   def arrBody[_: P]: P[Expr] = P(
     Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
+    case (offset, first: Val, None) => new Val.Arr(offset, Array(first))
     case (offset, first, None) => Expr.Arr(offset, Array(first))
     case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
+    case (offset, first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
+      val a = new Array[Lazy](rest.length + 1)
+      a(0) = first
+      var i = 1
+      rest.foreach { v =>
+        a(i) = v.asInstanceOf[Val]
+        i += 1
+      }
+      new Val.Arr(offset, a)
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 
@@ -168,27 +176,31 @@ class Parser(val currentFile: Path) {
                 remaining = remaining.tail
                 val rhs = climb(prec + 1, next)
                 val op1 = op match{
-                  case "*" => Expr.BinaryOp.`*`
-                  case "/" => Expr.BinaryOp.`/`
-                  case "%" => Expr.BinaryOp.`%`
-                  case "+" => Expr.BinaryOp.`+`
-                  case "-" => Expr.BinaryOp.`-`
-                  case "<<" => Expr.BinaryOp.`<<`
-                  case ">>" => Expr.BinaryOp.`>>`
-                  case "<" => Expr.BinaryOp.`<`
-                  case ">" => Expr.BinaryOp.`>`
-                  case "<=" => Expr.BinaryOp.`<=`
-                  case ">=" => Expr.BinaryOp.`>=`
-                  case "in" => Expr.BinaryOp.`in`
-                  case "==" => Expr.BinaryOp.`==`
-                  case "!=" => Expr.BinaryOp.`!=`
-                  case "&" => Expr.BinaryOp.`&`
-                  case "^" => Expr.BinaryOp.`^`
-                  case "|" => Expr.BinaryOp.`|`
-                  case "&&" => Expr.BinaryOp.`&&`
-                  case "||" => Expr.BinaryOp.`||`
+                  case "*" => Expr.BinaryOp.OP_*
+                  case "/" => Expr.BinaryOp.OP_/
+                  case "%" => Expr.BinaryOp.OP_%
+                  case "+" => Expr.BinaryOp.OP_+
+                  case "-" => Expr.BinaryOp.OP_-
+                  case "<<" => Expr.BinaryOp.OP_<<
+                  case ">>" => Expr.BinaryOp.OP_>>
+                  case "<" => Expr.BinaryOp.OP_<
+                  case ">" => Expr.BinaryOp.OP_>
+                  case "<=" => Expr.BinaryOp.OP_<=
+                  case ">=" => Expr.BinaryOp.OP_>=
+                  case "in" => Expr.BinaryOp.OP_in
+                  case "==" => Expr.BinaryOp.OP_==
+                  case "!=" => Expr.BinaryOp.OP_!=
+                  case "&" => Expr.BinaryOp.OP_&
+                  case "^" => Expr.BinaryOp.OP_^
+                  case "|" => Expr.BinaryOp.OP_|
+                  case "&&" => Expr.BinaryOp.OP_&&
+                  case "||" => Expr.BinaryOp.OP_||
                 }
-                result = Expr.BinaryOp(offset, result, op1, rhs)
+                result = op1 match {
+                  case Expr.BinaryOp.OP_&& => Expr.And(offset, result, rhs)
+                  case Expr.BinaryOp.OP_|| => Expr.Or(offset, result, rhs)
+                  case _ => Expr.BinaryOp(offset, result, op1, rhs)
+                }
                 true
               }
           }
@@ -212,11 +224,8 @@ class Parser(val currentFile: Path) {
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case '(' => Pass ~ (args ~ ")").map { x =>
-            val argNames =
-              if(x.names.exists(_ != null)) x.names
-              else null
-            Expr.Apply(i, _: Expr, argNames, x.exprs)
+          case '(' => Pass ~ (args ~ ")").map { case (args, namedNames) =>
+            Expr.Apply(i, _: Expr, args, if(namedNames.length == 0) null else namedNames)
           }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
@@ -233,10 +242,10 @@ class Parser(val currentFile: Path) {
   def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>
       def k2 = op match{
-        case '+' => Expr.UnaryOp.`+`
-        case '-' => Expr.UnaryOp.`-`
-        case '~' => Expr.UnaryOp.`~`
-        case '!' => Expr.UnaryOp.`!`
+        case '+' => Expr.UnaryOp.OP_+
+        case '-' => Expr.UnaryOp.OP_-
+        case '~' => Expr.UnaryOp.OP_~
+        case '!' => Expr.UnaryOp.OP_!
       }
       Expr.UnaryOp(pos, k2, e)
     }
@@ -277,7 +286,7 @@ class Parser(val currentFile: Path) {
               case "error"     => Pass ~ error(pos)
               case "assert"    => Pass ~ assertExpr(pos)
               case "local"     => Pass ~ local
-              case x           => Pass(Expr.Id(pos, indexFor(x)))
+              case x           => Pass(Expr.Id(pos, x))
             }
           }
           case _ => Fail
@@ -330,6 +339,8 @@ class Parser(val currentFile: Path) {
       (lhs, comps) match {
         case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>
           Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+        case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
+          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
         case _ => // do nothing
       }
       Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)
@@ -350,7 +361,7 @@ class Parser(val currentFile: Path) {
   def objlocal[_: P] = P( "local" ~~ break ~/ bind )
   def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
   def forspec[_: P] =
-    P( Pos ~~ "for" ~~ break ~/ id.map(indexFor(_)) ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
+    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
   def ifspec[_: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
   def fieldname[_: P] = P(
     id.map(Expr.FieldName.Fixed) |
@@ -361,12 +372,16 @@ class Parser(val currentFile: Path) {
     P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
 
   def bind[_: P] =
-    P( Pos ~~ id.map(indexFor(_)) ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
   def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
-    } else Pass(Expr.Args(x.map(_._1.getOrElse(null)).toArray, x.map(_._2).toArray))
+    } else {
+      val args = x.iterator.map(_._2).toArray
+      val namedNames = x.iterator.dropWhile(_._1.isEmpty).map(_._1.get).toArray
+      Pass((args, namedNames))
+    }
   }
 
   def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
@@ -379,8 +394,7 @@ class Parser(val currentFile: Path) {
     if (overlap == null) {
       val names = x.map(_._1).toArray[String]
       val exprs = x.map(_._2.getOrElse(null)).toArray[Expr]
-      val idxs = names.map(indexFor)
-      Pass(Expr.Params(names, exprs, idxs))
+      Pass(Expr.Params(names, exprs))
     }
     else Fail.opaque("no duplicate parameter: " + overlap)
 
@@ -395,38 +409,19 @@ class Parser(val currentFile: Path) {
   ).!
 
   def document[_: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
-
-  /**
-    * We assign local identifier names to integer offsets into a local variable
-    * array at parse time, to avoid having to make a separate pass over the AST
-    * to replace them. This is sub-optimal, since we do not keep track of the
-    * fact that identifiers in unrelated scopes could share slots in the array,
-    * but it's good enough for now since the number of local variables in a
-    * particular file tends to be pretty small.
-    *
-    * We do not bother releasing a slot when backtracking after a parse fails,
-    * because this parser uses cuts to aggressively prevent backtracking.
-    *
-    * The Jsonnet standard library `std` always lives at slot 0.
-    */
-  def indexFor[_: P](name: String): Int = {
-    nameIndices.get(name) match{
-      case None =>
-        val index = nameIndices.size
-        nameIndices(name) = index
-        index
-      case Some(index) => index
-    }
-  }
 }
 
-class Position(val fileScope: FileScope, val offset: Int) {
+final class Position(val fileScope: FileScope, val offset: Int) {
   def currentFile = fileScope.currentFile
+  def noOffset = fileScope.noOffsetPos
   override def equals(o: Any) = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _ => false
   }
-  override def toString = s"Position($fileScope, $offset)"
+  override def toString = {
+    val name = if(fileScope == null) "null" else fileScope.currentFileLastPathElement
+    s"Position($name, $offset)"
+  }
 }
 
 /**
@@ -435,13 +430,7 @@ class Position(val fileScope: FileScope, val offset: Int) {
   * well as the mapping of local variable names to local variable array indices
   * which is shared throughout each file.
   */
-class FileScope(val currentFile: Path,
-                val nameIndices: scala.collection.Map[String, Int]){
-  // Only used for error messages, so in the common case
-  // where nothing blows up this does not need to be allocated
-  lazy val indexNames = nameIndices.map(_.swap)
-
-  lazy val currentFileLastPathElement = currentFile.last
-
+class FileScope(val currentFile: Path) {
+  lazy val currentFileLastPathElement = if(currentFile == null) null else currentFile.last
   val noOffsetPos: Position = new Position(this, -1)
 }

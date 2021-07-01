@@ -1,77 +1,58 @@
 package sjsonnet
+
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Val.Lazy
 import upickle.core.Visitor
-
-import scala.collection.mutable
 
 /**
   * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
   * which can transform it into [[ujson.Value]]s or directly serialize it
   * to `String`s
   */
-object Materializer {
-  //private val dummyPos: Position = new Position(null, 0)
+abstract class Materializer {
+  def storePos(pos: Position): Unit
+  def storePos(v: Val): Unit
 
-  def apply(v: Val, storePos: Position => Unit = _ => ())(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
+  def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
     apply0(v, new sjsonnet.Renderer()).toString
   }
 
-  def apply0[T](v: Val, visitor: Visitor[T, T], storePos: Position => Unit = _ => ())
+  def apply0[T](v: Val, visitor: Visitor[T, T])
                (implicit evaluator: EvalScope): T = try {
     v match {
-      case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
-      case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
-      case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
-      case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
-      case Val.Arr(pos, xs) =>
-        storePos(pos);
-        val arrVisitor = visitor.visitArray(xs.length, -1)
-        for(x <- xs) {
-          arrVisitor.visitValue(
-            apply0(x.force, arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
-            -1
-          )
-        }
-        arrVisitor.visitEnd(-1)
-
       case obj: Val.Obj =>
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
-
-        val keysUnsorted = obj.visibleKeyNames
-        val keys = if (!evaluator.preserveOrder) keysUnsorted.sorted else keysUnsorted
-        val objVisitor = visitor.visitObject(keys.length , -1)
-
-        for(k <- keys) {
-          val value = obj.value(k, evaluator.emptyMaterializeFileScopePos)
-
-          storePos(
-            value match{
-              case v: Val.Obj if v.hasKeys => value.pos
-              case v: Val.Arr if v.value.nonEmpty => value.pos
-              case _ => null
-            }
-          )
+        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , -1)
+        obj.foreachElement(!evaluator.preserveOrder, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
+          storePos(v)
           objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
-
-
-
           objVisitor.visitValue(
-            apply0(value, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]], storePos),
+            apply0(v, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
         }
         objVisitor.visitEnd(-1)
-
+      case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
+      case xs: Val.Arr =>
+        storePos(xs.pos);
+        val arrVisitor = visitor.visitArray(xs.length, -1)
+        var i = 0
+        while(i < xs.length) {
+          val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
+          arrVisitor.visitValue(apply0(xs.force(i), sub), -1)
+          i += 1
+        }
+        arrVisitor.visitEnd(-1)
+      case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
+      case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
+      case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
       case f: Val.Func =>
         apply0(
-          f.apply(emptyStringArray, emptyLazyArray, evaluator.emptyMaterializeFileScopePos),
-          visitor,
-          storePos
+          f.apply(Materializer.emptyLazyArray, null, evaluator.emptyMaterializeFileScopePos),
+          visitor
         )
     }
 
@@ -85,13 +66,13 @@ object Materializer {
     case ujson.Null => Val.Null(pos)
     case ujson.Num(n) => Val.Num(pos, n)
     case ujson.Str(s) => Val.Str(pos, s)
-    case ujson.Arr(xs) => Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Val.Lazy).toArray[Val.Lazy])
+    case ujson.Arr(xs) => new Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Lazy).toArray[Lazy])
     case ujson.Obj(xs) =>
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(x <- xs) {
-        val v = Val.Obj.Member(false, Visibility.Normal,
-          (_: Val.Obj, _: Val.Obj, _, _) => reverse(pos, x._2)
-        )
+        val v = new Val.Obj.Member(false, Visibility.Normal) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = reverse(pos, x._2)
+        }
         builder.put(x._1, v)
       }
       new Val.Obj(pos, builder, false, null, null)
@@ -114,7 +95,12 @@ object Materializer {
       )
   }
 
-  val emptyStringArray = new Array[String](0)
-  val emptyLazyArray = new Array[Lazy](0)
+}
 
+object Materializer extends Materializer {
+  def storePos(pos: Position): Unit = ()
+  def storePos(v: Val): Unit = ()
+
+  final val emptyStringArray = new Array[String](0)
+  final val emptyLazyArray = new Array[Lazy](0)
 }

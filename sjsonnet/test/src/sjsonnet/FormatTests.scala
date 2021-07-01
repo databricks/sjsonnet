@@ -4,7 +4,7 @@ import ujson.Value
 import utest._
 
 object FormatTests extends TestSuite{
-  val dummyPos = new Position(new FileScope(DummyPath("(unknown)"), Map.empty), -1)
+  val dummyPos = new Position(new FileScope(DummyPath("(unknown)")), -1)
 
   def check(fmt: String, jsonStr: String, expected: String) = {
     val json = ujson.read(jsonStr)
@@ -16,6 +16,9 @@ object FormatTests extends TestSuite{
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
         def equal(x: Val, y: Val): Boolean = ???
+        def importer: sjsonnet.CachedImporter = ???
+        def preserveOrder = false
+        def strict = false
       }
     )
     assert(formatted == expected)

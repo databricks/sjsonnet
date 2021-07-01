@@ -7,7 +7,22 @@ import sjsonnet.Expr.Params
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+
+/**
+ * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily
+ * evaluated dictionary values, array contents, or function parameters
+ * are all wrapped in [[Lazy]] and only truly evaluated on-demand
+ */
+abstract class Lazy {
+  protected[this] var cached: Val = null
+  def compute(): Val
+  final def force: Val = {
+    if(cached == null)  cached = compute()
+    cached
+  }
+}
 
 /**
   * [[Val]]s represented Jsonnet values that are the result of evaluating
@@ -15,15 +30,31 @@ import scala.reflect.ClassTag
   * except evaluation of object attributes and array contents are lazy, and
   * the tree can contain functions.
   */
-sealed abstract class Val {
+sealed abstract class Val extends Lazy {
+  cached = this // avoid a megamorphic call to compute() when forcing
+  final def compute() = this
+
+  def pos: Position
   def prettyName: String
+
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
     else throw new Error.Delegate(
       "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
     )
-  def pos: Position
+
+  private[this] def failAs(err: String): Nothing =
+    throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + prettyName)
+
+  def asString: String = failAs("String")
+  def asBoolean: Boolean = failAs("Boolean")
+  def asInt: Int = failAs("Int")
+  def asDouble: Double = failAs("Number")
+  def asObj: Val.Obj = failAs("Object")
+  def asArr: Val.Arr = failAs("Array")
+  def asFunc: Val.Func = failAs("Function")
 }
+
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
   implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
@@ -34,22 +65,10 @@ object PrettyNamed{
 }
 object Val{
 
-  /**
-    * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily
-    * evaluated dictionary values, array contents, or function parameters
-    * are all wrapped in [[Lazy]] and only truly evaluated on-demand
-    */
-  abstract class Lazy {
-    private[this] var cached: Val = null
-    def compute(): Val
-    final def force: Val = {
-      if(cached == null) cached = compute()
-      cached
-    }
-  }
-
   abstract class Literal extends Val with Expr
-  abstract class Bool extends Literal
+  abstract class Bool extends Literal {
+    override def asBoolean: Boolean = this.isInstanceOf[True]
+  }
 
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
 
@@ -64,21 +83,60 @@ object Val{
   }
   case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
+    override def asString: String = value
   }
   case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
+    override def asInt: Int = value.toInt
+    override def asDouble: Double = value
   }
 
-  case class Arr(pos: Position, value: Array[Lazy]) extends Val{
+  class Arr(val pos: Position, private val value: Array[_ <: Lazy]) extends Literal {
     def prettyName = "array"
+    override def asArr: Arr = this
+    def length: Int = value.length
+    def force(i: Int) = value(i).force
+
+    def asLazy(i: Int) = value(i)
+    def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
+    def asStrictArray: Array[Val] = value.map(_.force)
+
+    def concat(newPos: Position, rhs: Arr): Arr =
+      new Arr(newPos, value ++ rhs.value)
+
+    def slice(start: Int, end: Int, stride: Int): Arr = {
+      val range = start until end by stride
+      new Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < value.length).map(value).toArray)
+    }
+
+    def iterator: Iterator[Val] = value.iterator.map(_.force)
+    def foreach[U](f: Val => U) = {
+      var i = 0
+      while(i < value.length) {
+        f(value(i).force)
+        i += 1
+      }
+    }
+    def forall(f: Val => Boolean): Boolean = {
+      var i = 0
+      while(i < value.length) {
+        if(!f(value(i).force)) return false
+        i += 1
+      }
+      true
+    }
   }
 
   object Obj{
 
-    case class Member(add: Boolean,
-                      visibility: Visibility,
-                      invoke: (Obj, Obj, FileScope, EvalScope) => Val,
-                      cached: Boolean = true)
+    abstract class Member(val add: Boolean, val visibility: Visibility, val cached: Boolean = true) {
+      def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
+    }
+
+    class ConstMember(add: Boolean, visibility: Visibility, v: Val, cached: Boolean = true)
+      extends Member(add, visibility, cached) {
+      def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val = v
+    }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
       val m = new util.LinkedHashMap[String, Obj.Member]()
@@ -101,9 +159,7 @@ object Val{
       if(value0 == null) {
         value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
-          val v = valueCache(k)
-          val m = Val.Obj.Member(false, Visibility.Normal, (self: Val.Obj, sup: Val.Obj, _, _) => v)
-          value0.put(k, m)
+          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
       }
       value0
@@ -122,14 +178,18 @@ object Val{
     }
 
     def prettyName = "object"
+    override def asObj: Val.Obj = this
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
-      if(`super` != null) `super`.gatherKeys(mapping)
-      getValue0.forEach { (k, m) =>
-        val vis = m.visibility
-        if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
-        else if(vis == Visibility.Hidden) mapping.put(k, true)
-        else if(vis == Visibility.Unhide) mapping.put(k, false)
+      if(static) mapping.putAll(allKeys)
+      else {
+        if(`super` != null) `super`.gatherKeys(mapping)
+        getValue0.forEach { (k, m) =>
+          val vis = m.visibility
+          if(!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+          else if(vis == Visibility.Hidden) mapping.put(k, true)
+          else if(vis == Visibility.Unhide) mapping.put(k, false)
+        }
       }
     }
 
@@ -159,15 +219,20 @@ object Val{
               pos: Position,
               self: Obj = this)
              (implicit evaluator: EvalScope): Val = {
-
-      val cacheKey = if(self eq this) k else (k, self)
-
-      valueCache.getOrElse(cacheKey, {
-        valueRaw(k, self, pos, valueCache, cacheKey) match {
+      if(static) {
+        valueCache.getOrElse(k, null) match {
           case null => Error.fail("Field does not exist: " + k, pos)
           case x => x
         }
-      })
+      } else {
+        val cacheKey = if(self eq this) k else (k, self)
+        valueCache.getOrElse(cacheKey, {
+          valueRaw(k, self, pos, valueCache, cacheKey) match {
+            case null => Error.fail("Field does not exist: " + k, pos)
+            case x => x
+          }
+        })
+      }
     }
 
     private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
@@ -190,9 +255,9 @@ object Val{
         val rr = r.asInstanceOf[Val.Num].value
         Val.Num(pos, ll + rr)
       } else if(l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
-        val ll = l.asInstanceOf[Val.Arr].value
-        val rr = r.asInstanceOf[Val.Arr].value
-        Val.Arr(pos, ll ++ rr)
+        val ll = l.asInstanceOf[Val.Arr].asLazyArray
+        val rr = r.asInstanceOf[Val.Arr].asLazyArray
+        new Val.Arr(pos, ll ++ rr)
       } else if(l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
         val ll = l.asInstanceOf[Val.Obj]
         val rr = r.asInstanceOf[Val.Obj]
@@ -206,20 +271,34 @@ object Val{
                  addTo: mutable.HashMap[Any, Val] = null,
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
-      val s = this.`super`
-      getValue0.get(k) match{
-        case null =>
-          if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
-        case m =>
-          val vv = m.invoke(self, s, pos.fileScope, evaluator)
-          val v = if(s != null && m.add) {
-            s.valueRaw(k, self, pos, null, null) match {
-              case null => vv
-              case supValue => mergeMember(supValue, vv, pos)
-            }
-          } else vv
-          if(addTo != null && m.cached) addTo(addKey) = v
-          v
+      if(static) {
+        val v = valueCache.getOrElse(k, null)
+        if(addTo != null && v != null) addTo(addKey) = v
+        v
+      } else {
+        val s = this.`super`
+        getValue0.get(k) match{
+          case null =>
+            if(s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+          case m =>
+            val vv = m.invoke(self, s, pos.fileScope, evaluator)
+            val v = if(s != null && m.add) {
+              s.valueRaw(k, self, pos, null, null) match {
+                case null => vv
+                case supValue => mergeMember(supValue, vv, pos)
+              }
+            } else vv
+            if(addTo != null && m.cached) addTo(addKey) = v
+            v
+        }
+      }
+    }
+
+    def foreachElement(sort: Boolean, pos: Position)(f: (String, Val) => Unit)(implicit ev: EvalScope): Unit = {
+      val keys = if (sort) visibleKeyNames.sorted else visibleKeyNames
+      for(k <- keys) {
+        val v = value(k, pos)
+        f(k, v)
       }
     }
   }
@@ -235,124 +314,191 @@ object Val{
     new Val.Obj(pos, null, true, null, null, cache, allKeys)
   }
 
-  case class Func(pos: Position,
-                  defSiteValScope: ValScope,
-                  params: Params,
-                  evalRhs: (ValScope, EvalScope, FileScope, Position) => Val,
-                  evalDefault: (Expr, ValScope, EvalScope) => Val = null) extends Val {
+  abstract class Func(val pos: Position,
+                      val defSiteValScope: ValScope,
+                      val params: Params) extends Val with Expr {
+
+    def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val
+
+    def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = null
 
     def prettyName = "function"
 
-    def apply(argNames: Array[String], argVals: Array[Lazy],
-              outerPos: Position)
-             (implicit evaluator: EvalScope) = {
+    override def asFunc: Func = this
 
-      val argsSize = argVals.length
-      val simple = argNames == null && params.indices.length == argsSize
-      val passedArgsBindingsI = if(argNames != null) {
-        val arrI: Array[Int] = new Array(argsSize)
-        var i = 0
-        try {
-          while (i < argsSize) {
-            val aname = argNames(i)
-            arrI(i) = if(aname != null) params.argIndices.getOrElse(
-              aname,
-              Error.fail(s"Function has no parameter $aname", outerPos)
-            ) else params.indices(i)
-            i += 1
-          }
-        } catch { case e: IndexOutOfBoundsException =>
-          Error.fail("Too many args, function has " + params.names.length + " parameter(s)", outerPos)
-        }
-        arrI
-      } else if(params.indices.length < argsSize) {
-        Error.fail(
-          "Too many args, function has " + params.names.length + " parameter(s)",
-          outerPos
-        )
-      } else params.indices // Don't cut down to size to avoid copying. The correct size is argVals.length!
-
+    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
+      val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
-
-      val newScope: ValScope = {
-        if(simple) {
-          defSiteValScope match {
-            case null => ValScope.createSimple(passedArgsBindingsI, argVals)
-            case s => s.extendSimple(passedArgsBindingsI, argVals)
+      //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
+      if(simple) {
+        val newScope = defSiteValScope.extendSimple(argsL)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      } else {
+        val newScopeLen = math.max(params.names.length, argsL.length)
+        // Initialize positional args
+        val base = defSiteValScope.length
+        val newScope = defSiteValScope.extendBy(newScopeLen)
+        val argVals = newScope.bindings
+        val posArgs = if(namedNames == null) argsL.length else argsL.length - namedNames.length
+        System.arraycopy(argsL, 0, argVals, base, posArgs)
+        if(namedNames != null) { // Add named args
+          var i = 0
+          var j = posArgs
+          while(i < namedNames.length) {
+            val idx = params.paramMap.getOrElse(namedNames(i),
+              Error.fail(s"Function has no parameter ${namedNames(i)}", outerPos))
+            if(argVals(base+idx) != null)
+              Error.fail(s"binding parameter a second time: ${namedNames(i)}", outerPos)
+            argVals(base+idx) = argsL(j)
+            i += 1
+            j += 1
           }
-        } else {
-          val defaultArgsBindingIndices = params.defaultsOnlyIndices
-          lazy val newScope: ValScope = {
-            val defaultArgsBindings = new Array[Lazy](params.defaultsOnly.length)
-            var idx = 0
-            while (idx < params.defaultsOnly.length) {
-              val default = params.defaultsOnly(idx)
-              defaultArgsBindings(idx) = () => evalDefault(default, newScope, evaluator)
-              idx += 1
-            }
-            defSiteValScope match {
-              case null => ValScope.createSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
-              case s => s.extendSimple(defaultArgsBindingIndices, defaultArgsBindings, passedArgsBindingsI, argVals)
-            }
-          }
-          validateFunctionCall(passedArgsBindingsI, params, outerPos, funDefFileScope, argsSize)
-          newScope
         }
+        if(argsL.length > params.names.length)
+          Error.fail("Too many args, function has " + params.names.length + " parameter(s)", outerPos)
+        if(params.names.length != argsL.length) { // Args missing -> add defaults
+          var missing: ArrayBuffer[String] = null
+          var i = posArgs
+          var j = base + posArgs
+          while(j < argVals.length) {
+            if(argVals(j) == null) {
+              val default = params.defaultExprs(i)
+              if(default != null) {
+                argVals(j) = () => evalDefault(default, newScope, ev)
+              } else {
+                if(missing == null) missing = new ArrayBuffer
+                missing.+=(params.names(i))
+              }
+            }
+            i += 1
+            j += 1
+          }
+          if(missing != null) {
+            val plural = if(missing.size > 1) "s" else ""
+            Error.fail(s"Function parameter$plural ${missing.mkString(", ")} not bound in call", outerPos)
+          }
+          //println(argVals.mkString(s"params: ${params.names.length}, argsL: ${argsL.length}, argVals: [", ", ", "]"))
+        }
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
-
-      evalRhs(newScope, evaluator, funDefFileScope, outerPos)
     }
 
-    def validateFunctionCall(passedArgsBindingsI: Array[Int],
-                             params: Params,
-                             outerPos: Position,
-                             defSiteFileScope: FileScope,
-                             argListSize: Int)
-                            (implicit eval: EvalScope): Unit = {
-
-      val seen = new util.BitSet(argListSize)
-      var idx = 0
-      while (idx < argListSize) {
-        val i = passedArgsBindingsI(idx)
-        seen.set(i)
-        idx += 1
-      }
-
-      if(argListSize != params.names.length || argListSize != seen.cardinality()) {
-        seen.clear()
-        val repeats = new util.BitSet(argListSize)
-
-        idx = 0
-        while (idx < argListSize) {
-          val i = passedArgsBindingsI(idx)
-          if (!seen.get(i)) seen.set(i)
-          else repeats.set(i)
-          idx += 1
-        }
-
-        Error.failIfNonEmpty(
-          repeats,
-          outerPos,
-          (plural, names) => s"binding parameter a second time: $names",
-          defSiteFileScope
-        )
-        val b = params.noDefaultIndices.clone().asInstanceOf[util.BitSet]
-        b.andNot(seen)
-        Error.failIfNonEmpty(
-          b,
-          outerPos,
-          (plural, names) => s"Function parameter$plural $names not bound in call",
-          defSiteFileScope // pass the definition site for the correct error message/names to be resolved
-        )
-        seen.andNot(params.allIndices)
-        Error.failIfNonEmpty(
-          seen,
-          outerPos,
-          (plural, names) => s"Function has no parameter$plural $names",
-          outerPos.fileScope
-        )
+    def apply0(outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
       }
     }
+
+    def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 1) apply(Array(argVal), null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      }
+    }
+
+    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      }
+    }
+
+    def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+      if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      else {
+        val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
+      }
+    }
+  }
+
+  /** Superclass for standard library functions */
+  abstract class Builtin(paramNames: Array[String], defaults: Array[Expr] = null)
+    extends Func(null, ValScope.empty, Params(paramNames,
+      if(defaults == null) new Array[Expr](paramNames.length) else defaults)) {
+
+    override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
+
+    final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
+      val args = new Array[Val](params.names.length)
+      var i = 0
+      var j = scope.length - args.length
+      while(i < args.length) {
+        args(i) = scope.bindings(i).force
+        i += 1
+      }
+      evalRhs(args, ev, pos)
+    }
+
+    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val
+
+    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+      if(params.names.length != 1) apply(Array(argVal), null, outerPos)
+      else evalRhs(Array(argVal.force), ev, outerPos)
+
+    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+      if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
+      else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos)
+
+    /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
+     * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
+     * to it (usually a subset of the supplied arguments).
+     * @param args the positional arguments for this function call. Named arguments and defaults have
+     *             already been resolved. */
+    def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
+
+    /** Is this builtin safe to use in static evaluation */
+    def staticSafe: Boolean = true
+  }
+
+  abstract class Builtin1(pn1: String, def1: Expr = null) extends Builtin(Array(pn1), if(def1 == null) null else Array(def1)) {
+    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0), ev, pos)
+
+    def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
+
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+      if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
+      else super.apply(argVals, namedNames, outerPos)
+
+    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+      if(params.names.length == 1) evalRhs(argVal.force, ev, outerPos)
+      else super.apply(Array(argVal), null, outerPos)
+  }
+
+  abstract class Builtin2(pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2), defs) {
+    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0), args(1), ev, pos)
+
+    def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
+
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+      if(namedNames == null && argVals.length == 2)
+        evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
+      else super.apply(argVals, namedNames, outerPos)
+
+    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+      if(params.names.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos)
+      else super.apply(Array(argVal1, argVal2), null, outerPos)
+  }
+
+  abstract class Builtin3(pn1: String, pn2: String, pn3: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2, pn3), defs) {
+    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0), args(1), args(2), ev, pos)
+
+    def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
+
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+      if(namedNames == null && argVals.length == 3)
+        evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
+      else super.apply(argVals, namedNames, outerPos)
   }
 }
 
@@ -360,7 +506,7 @@ object Val{
   * [[EvalScope]] models the per-evaluator context that is propagated
   * throughout the Jsonnet evaluation.
   */
-trait EvalScope extends EvalErrorScope{
+abstract class EvalScope extends EvalErrorScope {
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val
 
@@ -368,128 +514,9 @@ trait EvalScope extends EvalErrorScope{
 
   def equal(x: Val, y: Val): Boolean
 
-  val emptyMaterializeFileScope = new FileScope(wd / "(materialize)", Map())
+  val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
-  val preserveOrder: Boolean = false
-}
-
-object ValScope{
-  def empty(size: Int) = new ValScope(null, null, null, new Array(size))
-
-  def createSimple(newBindingsI: Array[Int],
-                   newBindingsV: Array[Val.Lazy]) = {
-    val arr = new Array[Val.Lazy](newBindingsI.length)
-    var i = 0
-    while(i < newBindingsI.length) {
-      arr(newBindingsI(i)) = newBindingsV(i)
-      i += 1
-    }
-    new ValScope(null, null, null, arr)
-  }
-
-  def createSimple(newBindingsI1: Array[Int],
-                   newBindingsV1: Array[Val.Lazy],
-                   newBindingsI2: Array[Int],
-                   newBindingsV2: Array[Val.Lazy]) = {
-    val arr = new Array[Val.Lazy](newBindingsV1.length + newBindingsV2.length)
-    var i = 0
-    while(i < newBindingsV1.length) {
-      arr(newBindingsI1(i)) = newBindingsV1(i)
-      i += 1
-    }
-    i = 0
-    while(i < newBindingsV2.length) {
-      arr(newBindingsI2(i)) = newBindingsV2(i)
-      i += 1
-    }
-    new ValScope(null, null, null, arr)
-  }
-}
-
-/**
-  * [[ValScope]]s which model the lexical scopes within
-  * a Jsonnet file that bind variable names to [[Val]]s, as well as other
-  * contextual information like `self` `this` or `super`.
-  *
-  * Note that scopes are standalone, and nested scopes are done by copying
-  * and updating the array of bindings rather than using a linked list. This
-  * is because the bindings array is typically pretty small and the constant
-  * factor overhead from a cleverer data structure dominates any algorithmic
-  * improvements
-  *
-  * The bindings array is private and only copy-on-write, so for nested scopes
-  * which do not change it (e.g. those just updating `dollar0` or `self0`) the
-  * bindings array can be shared cheaply.
-  */
-class ValScope(val dollar0: Val.Obj,
-               val self0: Val.Obj,
-               val super0: Val.Obj,
-               bindings0: Array[Val.Lazy]) {
-
-  def bindings(k: Int): Val.Lazy = bindings0(k)
-
-  def extend(newBindingsI: Array[Expr.Bind] = null,
-             newBindingsF: Array[(Val.Obj, Val.Obj) => Val.Lazy] = null,
-             newDollar: Val.Obj = null,
-             newSelf: Val.Obj = null,
-             newSuper: Val.Obj = null) = {
-    val dollar = if (newDollar != null) newDollar else dollar0
-    val self = if (newSelf != null) newSelf else self0
-    val sup = if (newSuper != null) newSuper else super0
-    new ValScope(
-      dollar,
-      self,
-      sup,
-      if (newBindingsI == null || newBindingsI.length == 0) bindings0
-      else{
-        val b = bindings0.clone()
-        var i = 0
-        while(i < newBindingsI.length) {
-          b(newBindingsI(i).name) = newBindingsF(i).apply(self, sup)
-          i += 1
-        }
-        b
-      }
-    )
-  }
-
-  def extendSimple(newBindingsI: Array[Int],
-                   newBindingsV: Array[Val.Lazy]) = {
-    if(newBindingsI == null || newBindingsI.length == 0) this
-    else {
-      val b = bindings0.clone()
-      var i = 0
-      while(i < newBindingsI.length) {
-        b(newBindingsI(i)) = newBindingsV(i)
-        i += 1
-      }
-      new ValScope(dollar0, self0, super0, b)
-    }
-  }
-
-  def extendSimple(newBindingsI1: Array[Int],
-                   newBindingsV1: Array[Val.Lazy],
-                   newBindingsI2: Array[Int],
-                   newBindingsV2: Array[Val.Lazy]) = {
-    val b = bindings0.clone()
-    var i = 0
-    while(i < newBindingsV1.length) {
-      b(newBindingsI1(i)) = newBindingsV1(i)
-      i += 1
-    }
-    i = 0
-    while(i < newBindingsV2.length) {
-      b(newBindingsI2(i)) = newBindingsV2(i)
-      i += 1
-    }
-    new ValScope(dollar0, self0, super0, b)
-  }
-
-  def extendSimple(newBindingI: Int,
-                   newBindingV: Val.Lazy) = {
-    val b = bindings0.clone()
-    b(newBindingI) = newBindingV
-    new ValScope(dollar0, self0, super0, b)
-  }
+  def preserveOrder: Boolean
+  def strict: Boolean
 }
