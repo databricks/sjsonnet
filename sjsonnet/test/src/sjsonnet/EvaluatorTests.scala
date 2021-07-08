@@ -127,9 +127,9 @@ object EvaluatorTests extends TestSuite{
           ujson.Obj("a" -> ujson.Num(10))
         evalErr("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }.b""") ==>
         """sjsonnet.Error: Attempt to use `super` when there is no super class
-          |at .(:1:68)
-          |at .(:1:70)
-          |at .(:1:73)""".stripMargin
+          |at [SelectSuper b].(:1:68)
+          |at [Select c].(:1:70)
+          |at [BinaryOp *].(:1:73)""".stripMargin
       }
     }
     test("hidden") {

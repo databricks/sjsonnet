@@ -240,12 +240,9 @@ class Evaluator(resolver: CachedResolver,
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
     if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
       e.asserted.msg match {
-        case null => Error.fail("Assertion failed", e.pos)
+        case null => Error.fail("Assertion failed", e)
         case msg =>
-          Error.fail(
-            "Assertion failed: " + visitExpr(msg).cast[Val.Str].value,
-            e.pos
-          )
+          Error.fail("Assertion failed: " + visitExpr(msg).cast[Val.Str].value, e)
       }
     }
     visitExpr(e.returned)
@@ -509,11 +506,11 @@ class Evaluator(resolver: CachedResolver,
         val a = asserts(i)
         if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
           a.msg match {
-            case null => Error.fail("Assertion failed", a.value.pos)
+            case null => Error.fail("Assertion failed", a.value.pos, "Assert")
             case msg =>
               Error.fail(
                 "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
-                a.value.pos
+                a.value.pos, "Assert"
               )
           }
         }
@@ -605,7 +602,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
-    case ForSpec(_, name, expr) :: rest =>
+    case (spec @ ForSpec(_, name, expr)) :: rest =>
       visitComp(
         rest,
         for{
@@ -614,18 +611,18 @@ class Evaluator(resolver: CachedResolver,
             case a: Val.Arr => a.asLazyArray
             case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
-              expr.pos
+              spec
             )
           }
         } yield s.extendSimple(e)
       )
-    case IfSpec(offset, expr) :: rest =>
+    case (spec @ IfSpec(offset, expr)) :: rest =>
       visitComp(rest, scopes.filter(visitExpr(expr)(_) match {
         case Val.True(_) => true
         case Val.False(_) => false
         case other => Error.fail(
           "Condition must be boolean, got " + other.prettyName,
-          expr.pos
+          spec
         )
       }))
     case Nil => scopes

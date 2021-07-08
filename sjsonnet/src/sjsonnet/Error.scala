@@ -16,33 +16,21 @@ class Error(val msg: String, stack: List[StackTraceElement] = Nil, underlying: O
 
   override def fillInStackTrace: Throwable = this
 
-  def addFrame(pos: Position, wd: Path, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
+  def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
     if(stack.isEmpty || alwaysAddPos(expr)) {
-      val cl = ""
-  //    val cl = expr match {
-  //      case null => ""
-  //      case expr => expr.getClass.getName.replaceFirst("^sjsonnet.Expr\\$(.*)", "[$1]")
-  //    }
-      val newFrame = ev.prettyIndex(pos) match {
-        case None =>
-          new StackTraceElement(
-            cl, "",
-            pos.currentFile.relativeToString(wd) + " offset:",
-            pos.offset
-          )
-        case Some((line, col)) =>
-          new StackTraceElement(
-            cl, "",
-            pos.currentFile.relativeToString(wd) + ":" + line,
-            col.toInt
-          )
-      }
+      val exprErrorString = if(expr == null) null else expr.exprErrorString
+      val newFrame = Error.mkFrame(pos, exprErrorString)
       stack match {
-        case h :: _ if h == newFrame => this
+        case s :: ss if eq(s, newFrame) =>
+          if(s.getClassName == "" && newFrame.getClassName != null) new Error(msg, newFrame :: ss, underlying)
+          else this
         case _ => new Error(msg, newFrame :: stack, underlying)
       }
     } else this
   }
+
+  private[this] def eq(s1: StackTraceElement, s2: StackTraceElement): Boolean =
+    s1.getFileName == s2.getFileName && s1.getLineNumber == s2.getLineNumber
 
   private[this] def alwaysAddPos(expr: Expr): Boolean = expr match {
     case _: Expr.LocalExpr | _: Expr.Arr | _: Expr.ObjExtend | _: Expr.ObjBody | _: Expr.IfElse => false
@@ -53,16 +41,28 @@ class Error(val msg: String, stack: List[StackTraceElement] = Nil, underlying: O
 object Error {
   def withStackFrame[T](expr: Expr)
                        (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(expr.pos, evaluator.wd, expr)
+    case e: Error => throw e.addFrame(expr.pos, expr)
     case NonFatal(e) =>
-      throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, evaluator.wd, expr)
+      throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, expr)
   }
 
-  def fail(msg: String, pos: Position)
-          (implicit evaluator: EvalErrorScope): Nothing =
-    throw new Error(msg, Nil, None).addFrame(pos, evaluator.wd)
+  def fail(msg: String, expr: Expr)(implicit evaluator: EvalErrorScope): Nothing =
+    throw new Error(msg, Nil, None).addFrame(expr.pos, expr)
 
-  def fail(msg: String): Nothing = throw new Error(msg)
+  def fail(msg: String, pos: Position, cl: String = null)(implicit evaluator: EvalErrorScope): Nothing =
+    throw new Error(msg, mkFrame(pos, cl) :: Nil, None)
+
+  def fail(msg: String): Nothing =
+    throw new Error(msg)
+
+  private def mkFrame(pos: Position, exprErrorString: String)(implicit ev: EvalErrorScope): StackTraceElement = {
+    val cl = if(exprErrorString == null) "" else s"[${exprErrorString}]"
+    val (frameFile, frameLine) = ev.prettyIndex(pos) match {
+      case None => (pos.currentFile.relativeToString(ev.wd) + " offset:", pos.offset)
+      case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col.toInt)
+    }
+    new StackTraceElement(cl, "", frameFile, frameLine)
+  }
 }
 
 trait EvalErrorScope {
