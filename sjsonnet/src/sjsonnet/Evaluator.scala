@@ -60,23 +60,8 @@ class Evaluator(resolver: CachedResolver,
       case e: Apply0 => visitApply0(e)
       case e: ImportStr => visitImportStr(e)
       case e: Expr.Error => visitError(e)
-      case e => visitInvalid(e)
     }
   } catch Error.withStackFrame(e)
-
-  def visitInvalid(e: Expr): Nothing = e match {
-    case Id(pos, name) =>
-      Error.fail("Unknown variable " + name, pos)
-
-    case Self(pos) =>
-      Error.fail("Cannot use `self` outside an object", pos)
-
-    case $(pos) =>
-      Error.fail("Cannot use `$` outside an object", pos)
-
-    case Super(pos) =>
-      Error.fail("Cannot use `super` outside an object", pos)
-  }
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
     case v: Val => v

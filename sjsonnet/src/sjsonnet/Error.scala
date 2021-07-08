@@ -82,6 +82,19 @@ class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option
     new ParseError(msg, stack, underlying)
 }
 
+class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
+  extends Error(msg, stack, underlying) {
+
+  override protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+                                    underlying: Option[Throwable] = underlying) =
+    new StaticError(msg, stack, underlying)
+}
+
+object StaticError {
+  def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing =
+    throw new StaticError(msg, new Error.Frame(expr.pos, expr.exprErrorString) :: Nil, None)
+}
+
 trait EvalErrorScope {
   def extVars: Map[String, ujson.Value]
   def importer: CachedImporter

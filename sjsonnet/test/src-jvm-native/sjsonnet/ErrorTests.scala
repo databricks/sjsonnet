@@ -115,7 +115,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("computed_field_scope") - check(
-      """sjsonnet.Error: Unknown variable x
+      """sjsonnet.StaticError: Unknown variable: x
         |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
         |""".stripMargin
     )
@@ -171,7 +171,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "import_static-check-failure" - check(
-      """sjsonnet.Error: Unknown variable x
+      """sjsonnet.StaticError: Unknown variable: x
         |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
         |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
         |""".stripMargin

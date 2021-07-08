@@ -31,20 +31,23 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
         case ScopedVal(v: Val with Expr, _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
         case null if name == "std" => Std.Std
-        case _ => e
+        case _ => StaticError.fail("Unknown variable: "+name, e)(ev)
       }
 
     case e @ Self(pos) =>
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
-        case _ => e
+        case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
       }
 
     case e @ $(pos) =>
       scope.get("$") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
-        case _ => e
+        case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
       }
+
+    case e @ Super(_) if !scope.contains("super") =>
+      StaticError.fail("Can't use super outside of an object", e)(ev)
 
     case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
       new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
@@ -67,7 +70,7 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   private def check(e: Expr): Expr = {
     e match {
       case ObjExtend(pos, base, ext) if ev.strict && isObjLiteral(base) =>
-        sjsonnet.Error.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", e.pos)(ev)
+        StaticError.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", e)(ev)
       case _ =>
     }
     e
