@@ -43,6 +43,7 @@ object ErrorTests extends TestSuite{
     test("03") - check(
       """sjsonnet.Error: foo
         |    at .(sjsonnet/test/resources/test_suite/error.03.jsonnet:17:21)
+        |    at .(sjsonnet/test/resources/test_suite/error.03.jsonnet:18:7)
         |""".stripMargin
     )
     test("04") - check(
@@ -60,6 +61,7 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.06.jsonnet:17:15)
         |    at .(sjsonnet/test/resources/test_suite/error.06.jsonnet:18:22)
         |    at .(sjsonnet/test/resources/test_suite/error.06.jsonnet:19:2)
+        |    at .(sjsonnet/test/resources/test_suite/error.06.jsonnet:19:5)
         |""".stripMargin
     )
     test("07") - check(
@@ -68,6 +70,7 @@ object ErrorTests extends TestSuite{
         |    at .(sjsonnet/test/resources/test_suite/error.07.jsonnet:17:32)
         |    at .(sjsonnet/test/resources/test_suite/error.07.jsonnet:18:20)
         |    at .(sjsonnet/test/resources/test_suite/error.07.jsonnet:19:1)
+        |    at .(sjsonnet/test/resources/test_suite/error.07.jsonnet:19:7)
         |""".stripMargin
     )
     test("08") - check(
@@ -103,6 +106,7 @@ object ErrorTests extends TestSuite{
     test("comprehension_spec_object") - check(
       """sjsonnet.Error: In comprehension, can only iterate over array, not object
         |    at .(sjsonnet/test/resources/test_suite/error.comprehension_spec_object.jsonnet:17:15)
+        |    at .(sjsonnet/test/resources/test_suite/error.comprehension_spec_object.jsonnet:17:2)
         |""".stripMargin
     )
     test("comprehension_spec_object2") - check(
@@ -137,7 +141,6 @@ object ErrorTests extends TestSuite{
     test("function_duplicate_arg") - check(
       """sjsonnet.Error: binding parameter a second time: x
         |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
-        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
         |""".stripMargin
     )
     test("function_duplicate_param") - check(
@@ -145,7 +148,6 @@ object ErrorTests extends TestSuite{
     )
     test("function_too_many_args") - check(
       """sjsonnet.Error: Too many args, function has 2 parameter(s)
-        |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)
         |    at .(sjsonnet/test/resources/test_suite/error.function_too_many_args.jsonnet:19:4)
         |""".stripMargin
     )
@@ -235,6 +237,7 @@ object ErrorTests extends TestSuite{
     test("native_not_found") - check(
       """sjsonnet.Error: Field does not exist: native
         |    at .(sjsonnet/test/resources/test_suite/error.native_not_found.jsonnet:17:4)
+        |    at .(sjsonnet/test/resources/test_suite/error.native_not_found.jsonnet:17:11)
         |""".stripMargin
     )
     test("obj_assert") - {
@@ -242,12 +245,14 @@ object ErrorTests extends TestSuite{
         """sjsonnet.Error: Assertion failed
           |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:25)
           |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:38)
+          |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:50)
         |""".stripMargin
       )
       test("fail2") - check(
         """sjsonnet.Error: Assertion failed: foo was not equal to bar
           |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:25)
           |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:74)
+          |    at .(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:86)
         |""".stripMargin
       )
     }
@@ -255,13 +260,11 @@ object ErrorTests extends TestSuite{
     test("import_wrong_nr_args") - checkImports(
       """|sjsonnet.Error: Function parameter y not bound in call
          |    at .(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
-         |    at .(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
          |""".stripMargin
     )
 
     test("wrong_named_arg") - checkImports(
       """|sjsonnet.Error: Function has no parameter z
-         |    at .(sjsonnet/test/resources/imports/error.wrong_named_arg.jsonnet:3:6)
          |    at .(sjsonnet/test/resources/imports/error.wrong_named_arg.jsonnet:3:6)
          |""".stripMargin
     )
@@ -269,13 +272,11 @@ object ErrorTests extends TestSuite{
     test("too_many_arg") - checkImports(
       """|sjsonnet.Error: Too many args, function has 2 parameter(s)
          |    at .(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
-         |    at .(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
          |""".stripMargin
     )
 
     test("too_many_arg_with_named_arg") - checkImports(
       """|sjsonnet.Error: binding parameter a second time: x
-         |    at .(sjsonnet/test/resources/imports/error.too_many_arg_with_named_arg.jsonnet:2:2)
          |    at .(sjsonnet/test/resources/imports/error.too_many_arg_with_named_arg.jsonnet:2:2)
          |""".stripMargin
     )

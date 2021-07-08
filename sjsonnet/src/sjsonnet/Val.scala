@@ -233,10 +233,8 @@ object Val{
       }
     }
 
-    private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
-      try evaluator.materialize(v).transform(new Renderer()).toString
-      catch Error.tryCatchWrap(pos)
-    }
+    private def renderString(v: Val)(implicit evaluator: EvalScope): String =
+      evaluator.materialize(v).transform(new Renderer()).toString
 
     def mergeMember(l: Val,
                     r: Val,
