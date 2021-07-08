@@ -9,11 +9,14 @@ import scala.util.control.NonFatal
   * propagating upwards. This helps provide good error messages with line
   * numbers pointing towards user code.
   */
-case class Error(msg: String,
-                 stack: List[StackTraceElement],
-                 underlying: Option[Throwable])
+class Error(val msg: String,
+            val stack: List[StackTraceElement] = Nil,
+            val underlying: Option[Throwable] = None)
   extends Exception(msg, underlying.orNull){
   setStackTrace(stack.toArray.reverse)
+
+  override def fillInStackTrace: Throwable = this
+
   def addFrame(pos: Position, wd: Path)(implicit ev: EvalErrorScope) = {
     val newFrame = ev.prettyIndex(pos) match {
       case None =>
@@ -31,7 +34,7 @@ case class Error(msg: String,
         )
     }
 
-    this.copy(stack = newFrame :: this.stack)
+    new Error(msg, newFrame :: stack, underlying)
   }
 }
 
@@ -39,31 +42,22 @@ case class Error(msg: String,
 object Error {
   def tryCatch[T](pos: Position)
                  (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
+    case e: Error if e.stack.isEmpty => throw e.addFrame(pos, evaluator.wd)
     case e: Error => throw e
-    case e: Error.Delegate =>
-      throw new Error(e.msg, Nil, None).addFrame(pos, evaluator.wd)
     case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e)).addFrame(pos, evaluator.wd)
   }
   def tryCatchWrap[T](pos: Position)
                      (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(pos, evaluator.wd)
-    case e: Error.Delegate =>
-      throw new Error(e.msg, Nil, None).addFrame(pos, evaluator.wd)
     case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e)).addFrame(pos, evaluator.wd)
   }
   def fail(msg: String, pos: Position)
-          (implicit evaluator: EvalErrorScope) = {
-    throw Error(msg, Nil, None).addFrame(pos, evaluator.wd)
-  }
+          (implicit evaluator: EvalErrorScope): Nothing =
+    throw new Error(msg, Nil, None).addFrame(pos, evaluator.wd)
 
-  /**
-    * An exception containing a message, which is expected to get caught by
-    * the nearest enclosing try-catch and converted into an [[Error]]
-    */
-  case class Delegate(msg: String) extends Exception(msg)
-
+  def fail(msg: String): Nothing = throw new Error(msg)
 }
 
 trait EvalErrorScope {

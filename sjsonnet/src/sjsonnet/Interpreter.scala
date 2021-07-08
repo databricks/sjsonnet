@@ -99,7 +99,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
       }
     try Right(m.apply0(res, visitor)(evaluator))
     catch{
-      case Error.Delegate(msg) => Left(msg)
+//      case Error.Delegate(msg) => Left(msg)
       case NonFatal(e) =>
         val s = new StringWriter()
         val p = new PrintWriter(s)
