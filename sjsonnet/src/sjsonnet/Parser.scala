@@ -25,7 +25,8 @@ object Parser {
     Seq("^"),
     Seq("|"),
     Seq("&&"),
-    Seq("||")
+    Seq("||"),
+    Seq("??")
   )
 
   val precedence = precedenceTable
@@ -198,10 +199,12 @@ class Parser(val currentFile: Path,
                   case "|" => Expr.BinaryOp.OP_|
                   case "&&" => Expr.BinaryOp.OP_&&
                   case "||" => Expr.BinaryOp.OP_||
+                  case "??" => Expr.BinaryOp.OP_??
                 }
                 result = op1 match {
                   case Expr.BinaryOp.OP_&& => Expr.And(offset, result, rhs)
                   case Expr.BinaryOp.OP_|| => Expr.Or(offset, result, rhs)
+                  case Expr.BinaryOp.OP_?? => Expr.NullCoal(offset, result, rhs)
                   case _ => Expr.BinaryOp(offset, result, op1, rhs)
                 }
                 true
@@ -419,7 +422,7 @@ class Parser(val currentFile: Path,
   def binaryop[_: P] = P(
     StringIn(
       "<<", ">>", "<=", ">=", "in", "==", "!=", "&&", "||",
-      "*", "/", "%", "+", "-", "<", ">", "&", "^", "|"
+      "*", "/", "%", "+", "-", "<", ">", "&", "^", "|", "??"
     )
 
   ).!

@@ -84,6 +84,7 @@ object Expr{
   }
   case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr
   case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr
+  case class NullCoal(pos: Position, lhs: Expr, rhs: Expr) extends Expr
   case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr {
     override def exprErrorString: String = s"${super.exprErrorString} ${BinaryOp.name(op)}"
   }
@@ -107,9 +108,10 @@ object Expr{
     final val OP_| = 16
     final val OP_&& = 17
     final val OP_|| = 18
+    final val OP_?? = 19
     private val names = Map(OP_* -> "*", OP_/ -> "/", OP_% -> "%", OP_+ -> "+", OP_- -> "-", OP_<< -> "<<",
       OP_>> -> ">>", OP_< -> "<", OP_> -> ">", OP_<= -> "<=", OP_>= -> ">=", OP_in -> "in", OP_== -> "==",
-      OP_!= -> "!=", OP_& -> "&", OP_^ -> "^", OP_| -> "|", OP_&& -> "&&", OP_|| -> "||" )
+      OP_!= -> "!=", OP_& -> "&", OP_^ -> "^", OP_| -> "|", OP_&& -> "&&", OP_|| -> "||" , OP_?? -> "??" )
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr

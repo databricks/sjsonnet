@@ -38,6 +38,7 @@ class Evaluator(resolver: CachedResolver,
       case e: ApplyBuiltin2 => visitApplyBuiltin2(e)
       case e: And => visitAnd(e)
       case e: Or => visitOr(e)
+      case e: NullCoal => visitNullCoalesce(e)
       case e: UnaryOp => visitUnaryOp(e)
       case e: Apply1 => visitApply1(e)
       case e: Lookup => visitLookup(e)
@@ -341,6 +342,13 @@ class Evaluator(resolver: CachedResolver,
         }
       case unknown =>
         Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+    }
+  }
+
+  def visitNullCoalesce(e: NullCoal)(implicit scope: ValScope) = {
+    visitExpr(e.lhs) match {
+      case _: Val.Null => visitExpr(e.rhs)
+      case any => any
     }
   }
 
