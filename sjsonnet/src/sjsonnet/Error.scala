@@ -9,28 +9,32 @@ import scala.util.control.NonFatal
   * propagating upwards. This helps provide good error messages with line
   * numbers pointing towards user code.
   */
-class Error(val msg: String, stack: List[StackTraceElement] = Nil, underlying: Option[Throwable] = None)
+class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
     extends Exception(msg, underlying.orNull) {
 
-  setStackTrace(stack.toArray.reverse)
+  setStackTrace(stack.reverseIterator.map(_.ste).toArray)
 
   override def fillInStackTrace: Throwable = this
 
   def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
     if(stack.isEmpty || alwaysAddPos(expr)) {
       val exprErrorString = if(expr == null) null else expr.exprErrorString
-      val newFrame = Error.mkFrame(pos, exprErrorString)
+      val newFrame = new Error.Frame(pos, exprErrorString)
       stack match {
-        case s :: ss if eq(s, newFrame) =>
-          if(s.getClassName == "" && newFrame.getClassName != null) new Error(msg, newFrame :: ss, underlying)
+        case s :: ss if s.pos == pos =>
+          if(s.exprErrorString == null && exprErrorString != null) copy(stack = newFrame :: ss)
           else this
-        case _ => new Error(msg, newFrame :: stack, underlying)
+        case _ => copy(stack = newFrame :: stack)
       }
     } else this
   }
 
-  private[this] def eq(s1: StackTraceElement, s2: StackTraceElement): Boolean =
-    s1.getFileName == s2.getFileName && s1.getLineNumber == s2.getLineNumber
+  def asSeenFrom(ev: EvalErrorScope): Error =
+    copy(stack = stack.map(_.asSeenFrom(ev)))
+
+  protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+                           underlying: Option[Throwable] = underlying) =
+    new Error(msg, stack, underlying)
 
   private[this] def alwaysAddPos(expr: Expr): Boolean = expr match {
     case _: Expr.LocalExpr | _: Expr.Arr | _: Expr.ObjExtend | _: Expr.ObjBody | _: Expr.IfElse => false
@@ -39,6 +43,20 @@ class Error(val msg: String, stack: List[StackTraceElement] = Nil, underlying: O
 }
 
 object Error {
+  final class Frame(val pos: Position, val exprErrorString: String)(implicit ev: EvalErrorScope) {
+    val ste: StackTraceElement = {
+      val cl = if(exprErrorString == null) "" else s"[${exprErrorString}]"
+      val (frameFile, frameLine) = ev.prettyIndex(pos) match {
+        case None => (pos.currentFile.relativeToString(ev.wd) + " offset:", pos.offset)
+        case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col.toInt)
+      }
+      new StackTraceElement(cl, "", frameFile, frameLine)
+    }
+
+    def asSeenFrom(ev: EvalErrorScope): Frame =
+      if(ev eq this.ev) this else new Frame(pos, exprErrorString)(ev)
+  }
+
   def withStackFrame[T](expr: Expr)
                        (implicit evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
     case e: Error => throw e.addFrame(expr.pos, expr)
@@ -46,23 +64,22 @@ object Error {
       throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, expr)
   }
 
-  def fail(msg: String, expr: Expr)(implicit evaluator: EvalErrorScope): Nothing =
-    throw new Error(msg, Nil, None).addFrame(expr.pos, expr)
+  def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing =
+    fail(msg, expr.pos, expr.exprErrorString)
 
-  def fail(msg: String, pos: Position, cl: String = null)(implicit evaluator: EvalErrorScope): Nothing =
-    throw new Error(msg, mkFrame(pos, cl) :: Nil, None)
+  def fail(msg: String, pos: Position, cl: String = null)(implicit ev: EvalErrorScope): Nothing =
+    throw new Error(msg, new Frame(pos, cl) :: Nil, None)
 
   def fail(msg: String): Nothing =
     throw new Error(msg)
+}
 
-  private def mkFrame(pos: Position, exprErrorString: String)(implicit ev: EvalErrorScope): StackTraceElement = {
-    val cl = if(exprErrorString == null) "" else s"[${exprErrorString}]"
-    val (frameFile, frameLine) = ev.prettyIndex(pos) match {
-      case None => (pos.currentFile.relativeToString(ev.wd) + " offset:", pos.offset)
-      case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col.toInt)
-    }
-    new StackTraceElement(cl, "", frameFile, frameLine)
-  }
+class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
+  extends Error(msg, stack, underlying) {
+
+  override protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+                                    underlying: Option[Throwable] = underlying) =
+    new ParseError(msg, stack, underlying)
 }
 
 trait EvalErrorScope {

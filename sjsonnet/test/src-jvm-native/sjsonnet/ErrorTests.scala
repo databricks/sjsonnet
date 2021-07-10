@@ -135,7 +135,9 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("function_arg_positional_after_named") - check(
-      """Parse error: Expected no positional params after named params:19:11, found ")\n"""".stripMargin
+      """sjsonnet.ParseError: Expected no positional params after named params:19:11, found ")\n"
+        |    at .(sjsonnet/test/resources/test_suite/error.function_arg_positional_after_named.jsonnet:19:11)
+        |""".stripMargin
     )
 
     test("function_duplicate_arg") - check(
@@ -144,7 +146,9 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("function_duplicate_param") - check(
-      """Parse error: Expected no duplicate parameter: x:17:14, found ") x\n"""".stripMargin
+      """sjsonnet.ParseError: Expected no duplicate parameter: x:17:14, found ") x\n"
+        |    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_param.jsonnet:17:14)
+        |""".stripMargin
     )
     test("function_too_many_args") - check(
       """sjsonnet.Error: Too many args, function has 2 parameter(s)
@@ -173,7 +177,8 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     "import_syntax-error" - check(
-      """sjsonnet.Error: Imported file "lib/syntax_error.jsonnet" had Parse error. Expected "\"":2:1, found ""
+      """sjsonnet.ParseError: Expected "\"":2:1, found ""
+        |    at .(sjsonnet/test/resources/test_suite/lib/syntax_error.jsonnet:2:1)
         |    at [Import].(sjsonnet/test/resources/test_suite/error.import_syntax-error.jsonnet:1:1)
         |""".stripMargin
     )

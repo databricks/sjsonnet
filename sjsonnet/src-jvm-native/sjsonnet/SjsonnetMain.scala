@@ -4,13 +4,11 @@ import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStre
 import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
 
-
-import scala.collection.mutable
 import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
+  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
 
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
@@ -46,7 +44,7 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-            parseCache: collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]],
+            parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -129,7 +127,7 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-                     parseCache: collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]],
+                     parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {

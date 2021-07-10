@@ -2,7 +2,6 @@ package sjsonnet
 
 import java.io.{PrintWriter, StringWriter}
 
-import fastparse.Parsed
 import sjsonnet.Expr.Params
 
 import scala.collection.mutable
@@ -19,12 +18,12 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
                   storePos: Position => Unit = null,
-                  val parseCache: mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]] = new mutable.HashMap,
+                  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
                   ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
-    override def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] =
-      Right(((new StaticOptimizer(evaluator)).optimize(expr), fs))
+    override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
+      handleException((new StaticOptimizer(evaluator)).optimize(expr), fs)
   }
 
   def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
@@ -39,29 +38,34 @@ class Interpreter(extVars: Map[String, ujson.Value],
   def interpret0[T](txt: String,
                     path: Path,
                     visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
-    for{
+    (for{
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
-    } yield r
+    } yield r) match {
+      case Right(v) => Right(v)
+      case Left(e) =>
+        val s = new StringWriter()
+        val p = new PrintWriter(s)
+        e.printStackTrace(p)
+        p.close()
+        Left(s.toString.replace("\t", "    "))
+    }
   }
 
-  def evaluate[T](txt: String, path: Path): Either[String, Val] = {
+  private def handleException[T](f: => T): Either[Error, T] = {
+    try Right(f) catch {
+      case e: Error => Left(e)
+      case NonFatal(e) =>
+        Left(new Error("Internal error: "+e.toString, Nil, Some(e)))
+    }
+  }
+
+  def evaluate[T](txt: String, path: Path): Either[Error, Val] = {
     resolver.cache(path) = txt
     for{
-      res <- resolver.parse(path, txt) match {
-        case Left(msg) => Left("Parse error: " + msg)
-        case r => r
-      }
-      (parsed, fs) = res
-      res0 <-
-        try Right(evaluator.visitExpr(parsed)(ValScope.empty))
-        catch{case NonFatal(e) =>
-          val s = new StringWriter()
-          val p = new PrintWriter(s)
-          e.printStackTrace(p)
-          p.close()
-          Left(s.toString.replace("\t", "    "))
-        }
+      res <- resolver.parse(path, txt)(evaluator)
+      (parsed, _) = res
+      res0 <- handleException(evaluator.visitExpr(parsed)(ValScope.empty))
       res = res0 match{
         case f: Val.Func =>
           val defaults2 = f.params.defaultExprs.clone()
@@ -82,7 +86,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
     } yield res
   }
 
-  def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+  def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
     val m =
       if(storePos == null) Materializer
       else new Materializer {
@@ -97,15 +101,6 @@ class Interpreter(extVars: Map[String, ujson.Value],
           )
         }
       }
-    try Right(m.apply0(res, visitor)(evaluator))
-    catch{
-//      case Error.Delegate(msg) => Left(msg)
-      case NonFatal(e) =>
-        val s = new StringWriter()
-        val p = new PrintWriter(s)
-        e.printStackTrace(p)
-        p.close()
-        Left(s.toString.replace("\t", "    "))
-    }
+    handleException(m.apply0(res, visitor)(evaluator))
   }
 }

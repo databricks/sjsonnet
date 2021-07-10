@@ -295,7 +295,10 @@ class Evaluator(resolver: CachedResolver,
     cachedImports.getOrElseUpdate(
       p,
       {
-        val (doc, _) = resolver.parseOrFail(e.pos, e.value, p, str)
+        val doc = resolver.parse(p, str) match {
+          case Right((expr, _)) => expr
+          case Left(err) => throw err.asSeenFrom(this)
+        }
         visitExpr(doc)(ValScope.empty)
       }
     )

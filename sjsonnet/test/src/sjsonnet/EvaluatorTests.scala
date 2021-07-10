@@ -314,11 +314,13 @@ object EvaluatorTests extends TestSuite{
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", true) ==>
-        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
+        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at .(:1:11)""".stripMargin
       eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       eval("local x = { c: 3 }; (x { a: 1 }).a", true) ==> ujson.Num(1)
       evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", true) ==>
-        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
+        """sjsonnet.Error: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at .(:1:31)""".stripMargin
     }
     test("objectDeclaration") {
       eval("{ ['foo']: x for x in  []}", false) ==> ujson.Obj()

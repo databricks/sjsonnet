@@ -43,26 +43,21 @@ class CachedImporter(parent: Importer) extends Importer {
 
 class CachedResolver(
   parentImporter: Importer,
-  val parseCache: mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]] = new mutable.HashMap
+  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap
 ) extends CachedImporter(parentImporter) {
 
-  def parse(path: Path, txt: String): Either[String, (Expr, FileScope)] = {
+  def parse(path: Path, txt: String)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, txt), {
       val parsed = fastparse.parse(txt, new Parser(path).document(_)) match {
-        case f @ Parsed.Failure(l, i, e) => Left(f.trace().msg)
-        case Parsed.Success(r, index) => Right(r)
+        case f @ Parsed.Failure(_, _, _) =>
+          val traced = f.trace()
+          val pos = new Position(new FileScope(path), traced.index)
+          Left(new ParseError(traced.msg).addFrame(pos))
+        case Parsed.Success(r, _) => Right(r)
       }
       parsed.flatMap { case (e, fs) => process(e, fs) }
-
     })
   }
 
-  def parseOrFail(pos: Position, pathStr: String, path: Path, txt: String)(implicit ev: EvalErrorScope): (Expr, FileScope) =
-    parse(path, txt) match {
-      case Right(x) => x
-      case Left(msg) =>
-        Error.fail("Imported file " + pprint.Util.literalize(pathStr) + " had Parse error. " + msg, pos)
-    }
-
-  def process(expr: Expr, fs: FileScope): Either[String, (Expr, FileScope)] = Right((expr, fs))
+  def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))
 }
