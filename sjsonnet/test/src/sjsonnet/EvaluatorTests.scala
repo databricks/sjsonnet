@@ -21,6 +21,8 @@ object EvaluatorTests extends TestSuite{
     }
     test("objects") {
       eval("{x: 1}.x") ==> ujson.Num(1)
+      eval("{x: 1}?.y") ==> ujson.Null
+      eval("{x: 1}?.y?.z") ==> ujson.Null
     }
     test("arrays") {
       eval("[1, [2, 3], 4][1][0]") ==> ujson.Num(2)

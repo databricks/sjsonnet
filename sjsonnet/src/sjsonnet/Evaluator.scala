@@ -89,7 +89,8 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
-    case obj: Val.Obj => obj.value(e.name, e.pos)
+    case obj: Val.Obj => obj.value(e.name, e.pos, safe = e.safe)
+    case _: Val.Null if e.safe => Val.Null(e.pos)
     case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${e.name}", e.pos)
   }
 
@@ -122,7 +123,7 @@ class Evaluator(resolver: CachedResolver,
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
     if(sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
-    else sup.value(e.name, e.pos, scope.bindings(e.selfIdx).asInstanceOf[Val.Obj])
+    else sup.value(e.name, e.pos, scope.bindings(e.selfIdx).asInstanceOf[Val.Obj], safe = e.safe)
   }
 
   def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {

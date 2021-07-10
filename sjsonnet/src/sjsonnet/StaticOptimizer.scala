@@ -19,11 +19,11 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
 
-    case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
+    case e @ Select(p, obj: Val.Obj, name, safe) if obj.containsKey(name) =>
       try obj.value(name, p)(ev).asInstanceOf[Expr] catch { case _: Exception => e }
 
-    case Select(pos, ValidSuper(_, selfIdx), name) =>
-      SelectSuper(pos, selfIdx, name)
+    case Select(pos, ValidSuper(_, selfIdx), name, safe) =>
+      SelectSuper(pos, selfIdx, name, safe)
 
     case Lookup(pos, ValidSuper(_, selfIdx), index) =>
       LookupSuper(pos, selfIdx, index)
