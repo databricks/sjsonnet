@@ -27,7 +27,7 @@ object Std {
       val x1 = Materializer(v1)(ev)
       val x2 = Materializer(v2)(ev)
       if (x1 == x2) Val.True(pos)
-      else throw new Error.Delegate("assertEqual failed: " + x1 + " != " + x2)
+      else Error.fail("assertEqual failed: " + x1 + " != " + x2)
     }
   }
 
@@ -45,7 +45,7 @@ object Std {
         case a: Val.Arr => a.length
         case o: Val.Obj => o.visibleKeyNames.length
         case o: Val.Func => o.params.names.length
-        case x => throw new Error.Delegate("Cannot get length of " + x.prettyName)
+        case x => Error.fail("Cannot get length of " + x.prettyName)
       })
     override def specialize(args: Array[Expr]) = args match {
       case Array(Expr.ApplyBuiltin2(_, Filter, f, a)) => (CountF, Array(f, a))
@@ -386,7 +386,7 @@ object Std {
                 if(added) b.append(s)
                 added = true
                 b.append(x)
-              case x => throw new Error.Delegate("Cannot join " + x.prettyName)
+              case x => Error.fail("Cannot join " + x.prettyName)
             }
             i += 1
           }
@@ -401,11 +401,11 @@ object Std {
                 if (added) out.appendAll(sep.asLazyArray)
                 added = true
                 out.appendAll(v.asLazyArray)
-              case x => throw new Error.Delegate("Cannot join " + x.prettyName)
+              case x => Error.fail("Cannot join " + x.prettyName)
             }
           }
           new Val.Arr(pos, out.toArray)
-        case x => throw new Error.Delegate("Cannot join " + x.prettyName)
+        case x => Error.fail("Cannot join " + x.prettyName)
       }
     }
   }
@@ -416,14 +416,14 @@ object Std {
         case str: Val.Str =>
           val secondArg = x match {
             case Val.Str(_, value) => value
-            case n => throw new Error.Delegate("std.member second argument must be a string, got " + x.prettyName)
+            case n => Error.fail("std.member second argument must be a string, got " + x.prettyName)
           }
           str.value.contains(secondArg)
         case a: Val.Arr =>
           var c = 0
           a.foreach(v => if(ev.equal(v, x)) c += 1)
           c > 0
-        case x => throw new Error.Delegate("std.member first argument must be an array or a string, got " + arr.prettyName)
+        case x => Error.fail("std.member first argument must be an array or a string, got " + arr.prettyName)
       })
     }
   }
@@ -435,7 +435,7 @@ object Std {
         x match{
           case Val.Null(_) => // do nothing
           case v: Val.Arr => out.appendAll(v.asLazyArray)
-          case x => throw new Error.Delegate("Cannot call flattenArrays on " + x)
+          case x => Error.fail("Cannot call flattenArrays on " + x)
         }
       }
       new Val.Arr(pos, out.toArray)
@@ -446,7 +446,7 @@ object Std {
     def evalRhs(_str: Val, _c: Val, ev: EvalScope, pos: Position): Val = {
       val str = _str.asString
       val cStr = _c.asString
-      if(cStr.length != 1) throw new Error.Delegate("std.split second parameter should have length 1, got "+cStr.length)
+      if(cStr.length != 1) Error.fail("std.split second parameter should have length 1, got "+cStr.length)
       val c = cStr.charAt(0)
       val b = new mutable.ArrayBuilder.ofRef[Lazy]
       var i = 0
@@ -517,7 +517,7 @@ object Std {
       val Val.Str(_, x) = _x
       Materializer.reverse(
         pos,
-        ev.extVars.getOrElse(x, throw new Error.Delegate("Unknown extVar: " + x))
+        ev.extVars.getOrElse(x, Error.fail("Unknown extVar: " + x))
       )
     }
     override def staticSafe = false
@@ -543,7 +543,7 @@ object Std {
     def evalRhs(v1: Val, ev: EvalScope, pos: Position): Val = {
     v1.asArr.foreach {
       case _: Val.Str | _: Val.Null => // donothing
-      case x => throw new Error.Delegate("Cannot call .lines on " + x.prettyName)
+      case x => Error.fail("Cannot call .lines on " + x.prettyName)
     }
     Val.Str(pos, Materializer.apply(v1)(ev).asInstanceOf[ujson.Arr]
       .value
@@ -601,7 +601,7 @@ object Std {
     def asArray(a: Val): Array[Lazy] = a match {
       case arr: Val.Arr => arr.asLazyArray
       case str: Val.Str => stringChars(pos, str.value).asLazyArray
-      case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+      case _ => Error.fail("Arguments must be either arrays or strings")
     }
 
     def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
@@ -828,7 +828,7 @@ object Std {
               val fres = func.apply1(v, pos.noOffset)(ev)
               fres match {
                 case va: Val.Arr => va.asLazyArray
-                case unknown => throw new Error.Delegate("flatMap func must return an array, not " + unknown)
+                case unknown => Error.fail("flatMap func must return an array, not " + unknown)
               }
             }
           }
@@ -842,7 +842,7 @@ object Std {
               fres match {
                 case fstr: Val.Str => fstr.value
                 case _: Val.Null => ""
-                case x => throw Error.Delegate("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
+                case x => Error.fail("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
               }
             )
           }
@@ -907,7 +907,7 @@ object Std {
             out.appendAll(a.asLazyArray)
           }
           new Val.Arr(pos, out.toArray)
-        case x => throw new Error.Delegate("std.repeat first argument must be an array or a string")
+        case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
     },
@@ -958,7 +958,7 @@ object Std {
       val indentArrayInObject = args(1)  match {
           case Val.False(_) => false
           case Val.True(_) => true
-          case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
+          case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
         }
       Materializer.apply0(
         v,
@@ -972,7 +972,7 @@ object Std {
       val indentArrayInObject = args(1)  match {
         case Val.False(_) => false
         case Val.True(_) => true
-        case _ => throw Error.Delegate("indent_array_in_object has to be a boolean, got" + v.getClass)
+        case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
       }
       v match {
         case arr: Val.Arr => arr.asLazyArray
@@ -983,7 +983,7 @@ object Std {
             )(ev).toString()
           }
           .mkString("---\n", "\n---\n", "\n...\n")
-        case _ => throw new Error.Delegate("manifestYamlStream only takes arrays, got " + v.getClass)
+        case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
     builtin("manifestPythonVars", "v"){ (pos, ev, v: Val.Obj) =>
@@ -1000,14 +1000,14 @@ object Std {
             tag(t)(
               attrs.value.map {
                 case (k, ujson.Str(v)) => attr(k) := v
-                case (k, v) => throw new Error.Delegate("Cannot call manifestXmlJsonml on " + v.getClass)
+                case (k, v) => Error.fail("Cannot call manifestXmlJsonml on " + v.getClass)
               }.toSeq,
               children.map(rec)
             )
           case ujson.Arr(mutable.Seq(ujson.Str(t), children@_*)) =>
             tag(t)(children.map(rec).toSeq)
           case x =>
-            throw new Error.Delegate("Cannot call manifestXmlJsonml on " + x.getClass)
+            Error.fail("Cannot call manifestXmlJsonml on " + x.getClass)
         }
       }
       rec(Materializer(value)(ev)).render
@@ -1016,7 +1016,7 @@ object Std {
       v match{
         case Val.Str(_, value) => Base64.getEncoder().encodeToString(value.getBytes)
         case arr: Val.Arr => Base64.getEncoder().encodeToString(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
-        case x => throw new Error.Delegate("Cannot base64 encode " + x.prettyName)
+        case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
     },
 
@@ -1031,7 +1031,7 @@ object Std {
       v match{
         case Val.Str(_, value) => Platform.gzipString(value)
         case arr: Val.Arr => Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
-        case x => throw new Error.Delegate("Cannot gzip encode " + x.prettyName)
+        case x => Error.fail("Cannot gzip encode " + x.prettyName)
       }
     },
 
@@ -1039,7 +1039,7 @@ object Std {
       v match{
         case Val.Str(_, value) => Platform.xzString(value)
         case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
-        case x => throw new Error.Delegate("Cannot xz encode " + x.prettyName)
+        case x => Error.fail("Cannot xz encode " + x.prettyName)
       }
     },
 
@@ -1057,12 +1057,12 @@ object Std {
       val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+        case _ => Error.fail("Arguments must be either arrays or strings")
       }
       val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+        case _ => Error.fail("Arguments must be either arrays or strings")
       }
       val concat = new Val.Arr(pos, a ++ b)
       uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
@@ -1073,12 +1073,12 @@ object Std {
       val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+        case _ => Error.fail("Arguments must be either arrays or strings")
       }
       val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
         case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => throw new Error.Delegate("Arguments must be either arrays or strings")
+        case _ => Error.fail("Arguments must be either arrays or strings")
       }
 
       val keyF = args(2)
@@ -1239,7 +1239,7 @@ object Std {
     val arrValue = arr match {
       case arr: Val.Arr => arr.asLazyArray
       case str: Val.Str => stringChars(pos, str.value).asLazyArray
-      case _ => throw new Error.Delegate("Argument must be either array or string")
+      case _ => Error.fail("Argument must be either array or string")
     }
 
     val out = new mutable.ArrayBuffer[Lazy]
@@ -1284,7 +1284,7 @@ object Std {
             vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.value)
           }else if (vs.forall(_.isInstanceOf[Val.Obj])){
             if (keyF == null || keyF.isInstanceOf[Val.False]) {
-              throw new Error.Delegate("Unable to sort array of objects without key function")
+              Error.fail("Unable to sort array of objects without key function")
             } else {
               val objs = vs.asStrictArray.map(_.cast[Val.Obj])
 
@@ -1296,7 +1296,7 @@ object Std {
               } else if (keys.forall(_.isInstanceOf[Val.Num])) {
                 objs.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Num].value)
               } else {
-                throw new Error.Delegate("Cannot sort with key values that are " + keys(0).prettyName + "s")
+                Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
               }
             }
           }else {
@@ -1304,7 +1304,7 @@ object Std {
           }
         )
       case Val.Str(pos, s) => new Val.Arr(pos, s.sorted.map(c => Val.Str(pos, c.toString)).toArray)
-      case x => throw new Error.Delegate("Cannot sort " + x.prettyName)
+      case x => Error.fail("Cannot sort " + x.prettyName)
     }
   }
 

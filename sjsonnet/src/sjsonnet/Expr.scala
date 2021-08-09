@@ -14,6 +14,12 @@ import scala.collection.mutable
   */
 trait Expr{
   def pos: Position
+
+  /** The name of this expression type to be shown in error messages */
+  def exprErrorString: String = {
+    val n = getClass.getName
+    if(n.startsWith("sjsonnet.Expr$")) n.substring(14) else n
+  }
 }
 object Expr{
   private final def arrStr(a: Array[_]): String = {
@@ -24,8 +30,12 @@ object Expr{
   case class Super(pos: Position) extends Expr
   case class $(pos: Position) extends Expr
 
-  case class Id(pos: Position, name: String) extends Expr
-  case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr
+  case class Id(pos: Position, name: String) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} $name"
+  }
+  case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} $name"
+  }
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
     override def toString = s"Arr($pos, ${arrStr(value)})"
   }
@@ -62,7 +72,9 @@ object Expr{
     override def toString = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
 
-  case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr
+  case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} ${UnaryOp.name(op)}"
+  }
   object UnaryOp{
     final val OP_! = 0
     final val OP_- = 1
@@ -73,7 +85,9 @@ object Expr{
   }
   case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr
   case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr
-  case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr
+  case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} ${BinaryOp.name(op)}"
+  }
   object BinaryOp{
     final val OP_* = 0
     final val OP_/ = 1
@@ -116,8 +130,12 @@ object Expr{
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr
   case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr) extends Expr
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr) extends Expr
-  case class Select(pos: Position, value: Expr, name: String) extends Expr
-  case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr
+  case class Select(pos: Position, value: Expr, name: String) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} $name"
+  }
+  case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr {
+    override def exprErrorString: String = s"${super.exprErrorString} $name"
+  }
   case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr
   case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
   case class LookupSuper(pos: Position, selfIdx: Int, index: Expr) extends Expr

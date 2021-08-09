@@ -127,7 +127,9 @@ object EvaluatorTests extends TestSuite{
           ujson.Obj("a" -> ujson.Num(10))
         evalErr("""local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }.b""") ==>
         """sjsonnet.Error: Attempt to use `super` when there is no super class
-          |at .(:1:68)""".stripMargin
+          |at [SelectSuper b].(:1:68)
+          |at [Select c].(:1:70)
+          |at [BinaryOp *].(:1:73)""".stripMargin
       }
     }
     test("hidden") {
@@ -233,19 +235,19 @@ object EvaluatorTests extends TestSuite{
       assert(ex.getMessage.contains("Function has no parameter hello"))
     }
 
-    test("nakedSelf") {
-      val ex = intercept[Exception]{eval("self.x")}
-      assert(ex.getMessage.contains("Cannot use `self` outside an object"))
-    }
-
-    test("nakedDollar") {
-      val ex = intercept[Exception]{eval("$.x")}
-      assert(ex.getMessage.contains("Cannot use `$` outside an object"))
-    }
-
-    test("nakedSuper") {
-      val ex = intercept[Exception]{eval("super.x")}
-      assert(ex.getMessage.contains("Cannot use `super` outside an object"))
+    test("unknownVariable") {
+      evalErr("x") ==>
+        """sjsonnet.StaticError: Unknown variable: x
+          |at [Id x].(:1:1)""".stripMargin
+      evalErr("self.x") ==>
+        """sjsonnet.StaticError: Can't use self outside of an object
+          |at [Self].(:1:1)""".stripMargin
+      evalErr("$.x") ==>
+        """sjsonnet.StaticError: Can't use $ outside of an object
+          |at [$].(:1:1)""".stripMargin
+      evalErr("super.x") ==>
+        """sjsonnet.StaticError: Can't use super outside of an object
+          |at [Super].(:1:1)""".stripMargin
     }
 
     test("validParam") {
@@ -312,11 +314,13 @@ object EvaluatorTests extends TestSuite{
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", true) ==>
-        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
+        """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at [ObjExtend].(:1:11)""".stripMargin
       eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
       eval("local x = { c: 3 }; (x { a: 1 }).a", true) ==> ujson.Num(1)
       evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", true) ==>
-        """Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects"""
+        """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+          |at [ObjExtend].(:1:31)""".stripMargin
     }
     test("objectDeclaration") {
       eval("{ ['foo']: x for x in  []}", false) ==> ujson.Obj()

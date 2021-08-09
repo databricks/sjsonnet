@@ -60,23 +60,8 @@ class Evaluator(resolver: CachedResolver,
       case e: Apply0 => visitApply0(e)
       case e: ImportStr => visitImportStr(e)
       case e: Expr.Error => visitError(e)
-      case e => visitInvalid(e)
     }
-  } catch Error.tryCatch(e.pos)
-
-  def visitInvalid(e: Expr): Nothing = e match {
-    case Id(pos, name) =>
-      Error.fail("Unknown variable " + name, pos)
-
-    case Self(pos) =>
-      Error.fail("Cannot use `self` outside an object", pos)
-
-    case $(pos) =>
-      Error.fail("Cannot use `$` outside an object", pos)
-
-    case Super(pos) =>
-      Error.fail("Cannot use `super` outside an object", pos)
-  }
+  } catch Error.withStackFrame(e)
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
     case v: Val => v
@@ -85,7 +70,7 @@ class Evaluator(resolver: CachedResolver,
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
-    try ref.force catch Error.tryCatchWrap(e.pos)
+    ref.force
   }
 
   def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
@@ -150,9 +135,7 @@ class Evaluator(resolver: CachedResolver,
     Error.fail(
       visitExpr(e.value) match {
         case Val.Str(_, s) => s
-        case r =>
-          try Materializer.stringify(r)
-          catch Error.tryCatchWrap(e.pos)
+        case r => Materializer.stringify(r)
       },
       e.pos
     )
@@ -193,25 +176,25 @@ class Evaluator(resolver: CachedResolver,
       argsL(idx) = visitAsLazy(args(idx))
       idx += 1
     }
-    try lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos) catch Error.tryCatchWrap(e.pos)
+    lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos)
   }
 
   private def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    try lhs.cast[Val.Func].apply0(e.pos) catch Error.tryCatchWrap(e.pos)
+    lhs.cast[Val.Func].apply0(e.pos)
   }
 
   private def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     val l1 = visitAsLazy(e.a1)
-    try lhs.cast[Val.Func].apply1(l1, e.pos) catch Error.tryCatchWrap(e.pos)
+    lhs.cast[Val.Func].apply1(l1, e.pos)
   }
 
   private def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     val l1 = visitAsLazy(e.a1)
     val l2 = visitAsLazy(e.a2)
-    try lhs.cast[Val.Func].apply2(l1, l2, e.pos) catch Error.tryCatchWrap(e.pos)
+    lhs.cast[Val.Func].apply2(l1, l2, e.pos)
   }
 
   private def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
@@ -219,14 +202,14 @@ class Evaluator(resolver: CachedResolver,
     val l1 = visitAsLazy(e.a1)
     val l2 = visitAsLazy(e.a2)
     val l3 = visitAsLazy(e.a3)
-    try lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos) catch Error.tryCatchWrap(e.pos)
+    lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
   }
 
   private def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) =
-    try e.func.evalRhs(visitExpr(e.a1), this, e.pos) catch Error.tryCatchWrap(e.pos)
+    e.func.evalRhs(visitExpr(e.a1), this, e.pos)
 
   private def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) =
-    try e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos) catch Error.tryCatchWrap(e.pos)
+    e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
 
   private def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
     val arr = new Array[Val](e.argExprs.length)
@@ -236,18 +219,15 @@ class Evaluator(resolver: CachedResolver,
       arr(idx) = visitExpr(e.argExprs(boundIdx))
       idx += 1
     }
-    try e.func.evalRhs(arr, this, e.pos) catch Error.tryCatchWrap(e.pos)
+    e.func.evalRhs(arr, this, e.pos)
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
     if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
       e.asserted.msg match {
-        case null => Error.fail("Assertion failed", e.pos)
+        case null => Error.fail("Assertion failed", e)
         case msg =>
-          Error.fail(
-            "Assertion failed: " + visitExpr(msg).cast[Val.Str].value,
-            e.pos
-          )
+          Error.fail("Assertion failed: " + visitExpr(msg).cast[Val.Str].value, e)
       }
     }
     visitExpr(e.returned)
@@ -276,13 +256,10 @@ class Evaluator(resolver: CachedResolver,
         if (i.value > v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
         val int = i.value.toInt
         if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
-        try v.force(int)
-        catch Error.tryCatchWrap(pos)
+        v.force(int)
       case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
-        val ref = v.value(i.value, pos)
-        try ref
-        catch Error.tryCatchWrap(pos)
+        v.value(i.value, pos)
       case (lhs, rhs) =>
         Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
     }
@@ -303,9 +280,11 @@ class Evaluator(resolver: CachedResolver,
     cachedImports.getOrElseUpdate(
       p,
       {
-        val (doc, newFileScope) = resolver.parseOrFail(e.pos, e.value, p, str)
-        try visitExpr(doc)(ValScope.empty)
-        catch Error.tryCatchWrap(e.pos)
+        val doc = resolver.parse(p, str) match {
+          case Right((expr, _)) => expr
+          case Left(err) => throw err.asSeenFrom(this)
+        }
+        visitExpr(doc)(ValScope.empty)
       }
     )
   }
@@ -358,25 +337,19 @@ class Evaluator(resolver: CachedResolver,
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
-        try Val.bool(pos, equal(l, r))
-        catch Error.tryCatchWrap(pos)
+        Val.bool(pos, equal(l, r))
 
       case Expr.BinaryOp.OP_!= =>
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
           Error.fail("cannot test equality of functions", pos)
         }
-        try Val.bool(pos, !equal(l, r))
-        catch Error.tryCatchWrap(pos)
+        Val.bool(pos, !equal(l, r))
 
       case Expr.BinaryOp.OP_+ => (l, r) match {
         case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
         case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
-        case (Val.Str(_, l), r) =>
-          try Val.Str(pos, l + Materializer.stringify(r))
-          catch Error.tryCatchWrap(pos)
-        case (l, Val.Str(_, r)) =>
-          try Val.Str(pos, Materializer.stringify(l) + r)
-          catch Error.tryCatchWrap(pos)
+        case (Val.Str(_, l), r) => Val.Str(pos, l + Materializer.stringify(r))
+        case (l, Val.Str(_, r)) => Val.Str(pos, Materializer.stringify(l) + r)
         case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
         case (l: Val.Arr, r: Val.Arr) => l.concat(pos, r)
         case _ => fail()
@@ -401,9 +374,7 @@ class Evaluator(resolver: CachedResolver,
 
       case Expr.BinaryOp.OP_% => (l, r) match {
         case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
-        case (Val.Str(_, l), r) =>
-          try Val.Str(pos, Format.format(l, r, pos))
-          catch Error.tryCatchWrap(pos)
+        case (Val.Str(_, l), r) => Val.Str(pos, Format.format(l, r, pos))
         case _ => fail()
       }
 
@@ -523,11 +494,11 @@ class Evaluator(resolver: CachedResolver,
         val a = asserts(i)
         if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
           a.msg match {
-            case null => Error.fail("Assertion failed", a.value.pos)
+            case null => Error.fail("Assertion failed", a.value.pos, "Assert")
             case msg =>
               Error.fail(
                 "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
-                a.value.pos
+                a.value.pos, "Assert"
               )
           }
         }
@@ -619,7 +590,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
-    case ForSpec(_, name, expr) :: rest =>
+    case (spec @ ForSpec(_, name, expr)) :: rest =>
       visitComp(
         rest,
         for{
@@ -628,18 +599,18 @@ class Evaluator(resolver: CachedResolver,
             case a: Val.Arr => a.asLazyArray
             case r => Error.fail(
               "In comprehension, can only iterate over array, not " + r.prettyName,
-              expr.pos
+              spec
             )
           }
         } yield s.extendSimple(e)
       )
-    case IfSpec(offset, expr) :: rest =>
+    case (spec @ IfSpec(offset, expr)) :: rest =>
       visitComp(rest, scopes.filter(visitExpr(expr)(_) match {
         case Val.True(_) => true
         case Val.False(_) => false
         case other => Error.fail(
           "Condition must be boolean, got " + other.prettyName,
-          expr.pos
+          spec
         )
       }))
     case Nil => scopes

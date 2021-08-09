@@ -39,12 +39,10 @@ sealed abstract class Val extends Lazy {
 
   def cast[T: ClassTag: PrettyNamed] =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
-    else throw new Error.Delegate(
-      "Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName
-    )
+    else Error.fail("Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName)
 
   private[this] def failAs(err: String): Nothing =
-    throw new Error.Delegate("Wrong parameter type: expected " + err + ", got " + prettyName)
+    Error.fail("Wrong parameter type: expected " + err + ", got " + prettyName)
 
   def asString: String = failAs("String")
   def asBoolean: Boolean = failAs("Boolean")
@@ -235,10 +233,8 @@ object Val{
       }
     }
 
-    private def renderString(v: Val)(implicit evaluator: EvalScope): String = {
-      try evaluator.materialize(v).transform(new Renderer()).toString
-      catch Error.tryCatchWrap(pos)
-    }
+    private def renderString(v: Val)(implicit evaluator: EvalScope): String =
+      evaluator.materialize(v).transform(new Renderer()).toString
 
     def mergeMember(l: Val,
                     r: Val,
