@@ -4,9 +4,58 @@ import scala.collection.mutable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
+// [DISCUSS]
+// -- Not used in Universe or Sjsonnet however internally in /build.sbt:
+//        libraryDependencies ++=
+//        Seq(
+//           "com.github.ben-manes.caffeine" % "caffeine"
+//        )
+//    which is used in universe: jars=[“:com.github.ben-manes.caffeine__caffeine__2.3.4.jar”])
+// -- Needs to be cloned in databricks repository | original: https://github.com/blemale/scaffeine
+import com.github.blemale.scaffeine.{ Cache, Scaffeine }
+import scala.concurrent.duration._
+
+// [DISCUSS]
+// -- Single instance shared, hence declared object (and not class)
+// -- Regarding thread safe, it internally uses caffeine which is thread safe so this would address our concern of cache
+//    begin shared among multiple threads
+// -- No other implementation should be required on the universe side in SjsonnetWorker
+object ParseCacheCaffeine {
+
+  val maxNumberOfEntries = 10000
+
+  val cache: Cache[(Path, String), Either[String, (Expr, FileScope)]] =
+    Scaffeine()
+      .recordStats()
+      .maximumSize(maxNumberOfEntries)        // Size based eviction using "Window TinyLfu" (high hit rate and low memory footprint)
+      .build[(Path, String), Either[String, (Expr, FileScope)]]()
+
+  // [This functionality is needed]
+  // From docs: If key k is defined in map ms, return its associated value.
+  // Otherwise, update ms with the mapping k -> d and return d.
+  def getOrElseUpdate(path: Path, txt: String) = {
+
+    // From docs: Returns the value associated with `key` in this cache, obtaining that value from
+    // `mappingFunction` if necessary. This method provides a simple substitute for the
+    // conventional "if cached, return; otherwise create, cache and return" pattern.
+    // def get(key: K, mappingFunction: K => V): V = underlying.get(key, mappingFunction.asJava)
+    cache.get((path, txt))
+  }
+
+  // Some other methods for benchmarking and profiling
+  // -- Why need other methods for benchmarking if only getOrElseUpdate is being used?
+  //    Shouldn't memory usage, response time etc.. be mesaured for both cache and compared?
+}
+
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
   def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
+
+  // [DISCUSS] - other places can do .getOrElseUpdate() like before
+  def createParseCacheSizeLimit() = {
+    ParseCacheCaffeine
+  }
+
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
