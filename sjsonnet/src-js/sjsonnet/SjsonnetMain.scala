@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 // [DISCUSS]
 // -- Single instance shared, hence declared object (and not class)
 // -- Regarding thread safe, it internally uses caffeine which is thread safe so this would address our concern of cache
-//    begin shared among multiple threads
+//    being shared among multiple threads
 // -- No other implementation should be required on the universe side in SjsonnetWorker
 object ParseCacheCaffeine {
 
