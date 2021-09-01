@@ -35,22 +35,13 @@ object ParseCacheCaffeine {
   // [This functionality is needed]
   // From docs: If key k is defined in map ms, return its associated value.
   // Otherwise, update ms with the mapping k -> d and return d.
-  def getOrElseUpdate(path: Path, txt: String) = {
+  def getOrElseUpdate((path: Path, txt: String), calculateAST: (path: Path, txt: String) => Either[String, (Expr, FileScope)]) = {
 
     // From docs: Returns the value associated with `key` in this cache, obtaining that value from
     // `mappingFunction` if necessary. This method provides a simple substitute for the
     // conventional "if cached, return; otherwise create, cache and return" pattern.
     // def get(key: K, mappingFunction: K => V): V = underlying.get(key, mappingFunction.asJava)
-    cache.get((path, txt), {
-      val parsed = fastparse.parse(txt, new Parser(path).document(_)) match {
-        case f @ Parsed.Failure(_, _, _) =>
-          val traced = f.trace()
-          val pos = new Position(new FileScope(path), traced.index)
-          Left(new ParseError(traced.msg).addFrame(pos))
-        case Parsed.Success(r, _) => Right(r)
-      }
-      parsed.flatMap { case (e, fs) => process(e, fs) }
-    })
+    cache.get((path, txt), calculateAST)
   }
 
   // Some other methods for benchmarking and profiling
