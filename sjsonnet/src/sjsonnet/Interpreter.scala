@@ -18,8 +18,9 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
                   storePos: Position => Unit = null,
-                  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
-                  ) { self =>
+//                  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
+                  val parseCache: ParseCacheInterface,
+                 ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
