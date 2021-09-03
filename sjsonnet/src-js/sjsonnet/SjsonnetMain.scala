@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.Parsed
-
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
@@ -9,10 +7,6 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
   def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
-
-  // [DISCUSS] - other places can do .getOrElseUpdate() like before
-  def createParseCacheSizeLimit() = HashMapSizeLimit
-
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
