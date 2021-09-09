@@ -7,24 +7,23 @@ import java.nio.file.NoSuchFileException
 import scala.util.Try
 import scala.util.control.NonFatal
 
-// JsonnetWorker (in universe) extends this trait in the universe so that it can pass the cache based on Caffeine to main0 here
-trait ParseCacheInterface {
+// Trait extended by JsonnetWorker (in universe) so that it can pass the cache based on Caffeine to main0 here
+trait ParseCache {
   def getOrElseUpdate(key: (Path, String), defaultValue:  => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)]
 }
 
-// As JsonnetWorker (in universe) passes an object to main0 which extends the trait: ParseCacheInterface, class based on HashMap
-// which extends this trait is needed to use the default HashMap
-case class HashMapDefault () extends ParseCacheInterface {
+// A default implementation based on a mutable HashMap. This implementation is not thread-safe.
+class DefaultParseCache extends ParseCache {
   val cache = new collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
 
   override def getOrElseUpdate(key: (Path, String), defaultValue:  => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)] = {
-    cache.getOrElseUpdate((key._1, key._2), defaultValue)
+    cache.getOrElseUpdate(key, defaultValue)
   }
 }
 
 object SjsonnetMain {
 //  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
-  def createParseCache() = new HashMapDefault
+  def createParseCache() = new DefaultParseCache
 
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
@@ -50,7 +49,7 @@ object SjsonnetMain {
         case _ => args
       },
 //      collection.mutable.HashMap.empty,
-      new HashMapDefault,
+      new DefaultParseCache,
       System.in,
       System.out,
       System.err,
@@ -62,7 +61,7 @@ object SjsonnetMain {
 
   def main0(args: Array[String],
 //            parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
-            parseCache: ParseCacheInterface,
+            parseCache: ParseCache,
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -146,7 +145,7 @@ object SjsonnetMain {
   def mainConfigured(file: String,
                      config: Config,
 //                     parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
-                     parseCache: ParseCacheInterface,
+                     parseCache: ParseCache,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {

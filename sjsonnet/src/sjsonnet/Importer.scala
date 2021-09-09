@@ -44,7 +44,7 @@ class CachedImporter(parent: Importer) extends Importer {
 class CachedResolver(
   parentImporter: Importer,
 //  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap
-  val parseCache: ParseCacheInterface,
+  val parseCache: ParseCache,
                     ) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, txt: String)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {

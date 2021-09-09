@@ -19,7 +19,7 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   strict: Boolean = false,
                   storePos: Position => Unit = null,
 //                  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
-                  val parseCache: ParseCacheInterface,
+                  val parseCache: ParseCache = new DefaultParseCache
                  ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
