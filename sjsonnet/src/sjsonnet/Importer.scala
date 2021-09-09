@@ -43,7 +43,6 @@ class CachedImporter(parent: Importer) extends Importer {
 
 class CachedResolver(
   parentImporter: Importer,
-//  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap
   val parseCache: ParseCache,
                     ) extends CachedImporter(parentImporter) {
 

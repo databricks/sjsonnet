@@ -22,7 +22,6 @@ class DefaultParseCache extends ParseCache {
 }
 
 object SjsonnetMain {
-//  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
   def createParseCache() = new DefaultParseCache
 
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
@@ -48,7 +47,6 @@ object SjsonnetMain {
         case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
         case _ => args
       },
-//      collection.mutable.HashMap.empty,
       new DefaultParseCache,
       System.in,
       System.out,
@@ -60,7 +58,6 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-//            parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
             parseCache: ParseCache,
             stdin: InputStream,
             stdout: PrintStream,
@@ -144,7 +141,6 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-//                     parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
                      parseCache: ParseCache,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,

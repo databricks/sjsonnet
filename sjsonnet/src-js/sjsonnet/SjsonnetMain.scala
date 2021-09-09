@@ -6,7 +6,6 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
-//  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
   def createParseCache() = new DefaultParseCache
   @JSExport
   def interpret(text: String,

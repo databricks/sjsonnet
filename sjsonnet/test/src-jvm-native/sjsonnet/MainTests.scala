@@ -16,10 +16,8 @@ object MainTests extends TestSuite {
       val outF = File.createTempFile("sjsonnet", ".json")
       val out = new ByteArrayOutputStream()
       val pout = new PrintStream(out)
-//      SjsonnetMain.main0(Array(source), collection.mutable.HashMap.empty, System.in, pout, System.err, os.pwd, None)
       SjsonnetMain.main0(Array(source), new DefaultParseCache, System.in, pout, System.err, os.pwd, None)
       pout.flush()
-//      SjsonnetMain.main0(Array("-o", outF.getAbsolutePath, source), collection.mutable.HashMap.empty, System.in, System.out, System.err, os.pwd, None)
       SjsonnetMain.main0(Array("-o", outF.getAbsolutePath, source), new DefaultParseCache, System.in, System.out, System.err, os.pwd, None)
       val stdoutBytes = out.toByteArray
       val fileBytes = os.read(os.Path(outF)).getBytes
