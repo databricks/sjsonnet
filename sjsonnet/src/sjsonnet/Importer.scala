@@ -43,8 +43,7 @@ class CachedImporter(parent: Importer) extends Importer {
 
 class CachedResolver(
   parentImporter: Importer,
-  val parseCache: ParseCache,
-                    ) extends CachedImporter(parentImporter) {
+  val parseCache: ParseCache) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, txt: String)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, txt), {
