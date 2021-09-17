@@ -15,10 +15,10 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
+                  val parseCache: ParseCache,
                   preserveOrder: Boolean = false,
                   strict: Boolean = false,
-                  storePos: Position => Unit = null,
-                  val parseCache: ParseCache = new DefaultParseCache
+                  storePos: Position => Unit = null
                  ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {

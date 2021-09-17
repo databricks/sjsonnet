@@ -28,8 +28,8 @@ object SjsonnetMain {
         def read(path: Path): Option[String] =
           Option(importLoader(path.asInstanceOf[JsVirtualPath].path))
       },
-      preserveOrder,
-      parseCache = createParseCache()
+      parseCache = createParseCache(),
+      preserveOrder
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{
       case Left(msg) => throw new js.JavaScriptException(msg)

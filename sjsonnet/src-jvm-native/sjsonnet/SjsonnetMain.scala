@@ -196,10 +196,10 @@ object SjsonnetMain {
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
+      parseCache,
       preserveOrder = config.preserveOrder.value,
       strict = config.strict.value,
-      storePos = if (config.yamlDebug.value) currentPos = _ else null,
-      parseCache
+      storePos = if (config.yamlDebug.value) currentPos = _ else null
     )
 
     (config.multi, config.yamlStream.value) match {

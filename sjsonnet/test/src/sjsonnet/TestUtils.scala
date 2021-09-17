@@ -7,6 +7,7 @@ object TestUtils {
       Map(),
       DummyPath(),
       Importer.empty,
+      parseCache = new DefaultParseCache,
       preserveOrder = preserveOrder,
       strict = strict
     ).interpret(s, DummyPath("(memory)")) match {
