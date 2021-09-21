@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.0</version>
+    <version>0.4.1</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.0" // SBT
-ivy"com.databricks::sjsonnet:0.4.0" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.1" // SBT
+ivy"com.databricks::sjsonnet:0.4.1" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/lihaoyi/sjsonnet/releases/download/0.4.0/sjsonnet.jar>
+- <https://github.com/lihaoyi/sjsonnet/releases/download/0.4.1/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.4.0/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.4.1/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.0/sjsonnet.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.1/sjsonnet.js > sjsonnet.js
 
 $ node
 
@@ -274,6 +274,11 @@ To publish, run the following commands:
 ```
 
 ## Changelog
+
+### 0.4.1
+
+- Additional significant performance improvements [#119](https://github.com/databricks/sjsonnet/pull/119)
+- Error handling fixes and improvements [#125](https://github.com/databricks/sjsonnet/pull/125)
 
 ### 0.4.0
 
