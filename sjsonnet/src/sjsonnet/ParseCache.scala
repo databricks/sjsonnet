@@ -1,7 +1,5 @@
 package sjsonnet
 
-import sjsonnet.{Error, Expr, FileScope, Path}
-
 // Trait extended by JsonnetWorker (in universe) so that it can pass the cache based on Caffeine to main0 here
 trait ParseCache {
   def getOrElseUpdate(key: (Path, String), defaultValue:  => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)]
