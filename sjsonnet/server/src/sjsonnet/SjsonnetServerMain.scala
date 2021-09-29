@@ -23,8 +23,8 @@ trait SjsonnetServerMain[T]{
             setIdle: Boolean => Unit,
             wd: os.Path): (Boolean, Option[T])
 }
-
-object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]]{
+// collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]
+object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
@@ -45,7 +45,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[
     ).run()
   }
   def main0(args: Array[String],
-            stateCache: Option[collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]],
+            stateCache: Option[DefaultParseCache],
             mainInteractive: Boolean,
             stdin: InputStream,
             stdout: PrintStream,
@@ -55,7 +55,8 @@ object SjsonnetServerMain extends SjsonnetServerMain[collection.mutable.HashMap[
             wd: os.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
-      val p = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
+//      val p = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
+      val p = new DefaultParseCache
       this.stateCache = Some(p)
       p
     }
