@@ -55,7 +55,6 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
             wd: os.Path) = {
 
     val stateCache2 = stateCache.getOrElse{
-//      val p = collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]()
       val p = new DefaultParseCache
       this.stateCache = Some(p)
       p
