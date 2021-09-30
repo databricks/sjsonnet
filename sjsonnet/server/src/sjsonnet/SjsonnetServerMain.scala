@@ -23,7 +23,11 @@ trait SjsonnetServerMain[T]{
             setIdle: Boolean => Unit,
             wd: os.Path): (Boolean, Option[T])
 }
-// collection.mutable.HashMap[(Path, String), Either[String, (Expr, FileScope)]]
+
+//  [Ask] SjsonnetServerMain has a valid main method (args0: Array[String]): Unit,
+//  [warn]   but sjsonnet.SjsonnetServerMain will not have an entry point on the JVM.
+//  [warn]   Reason: companion is a trait, which means no static forwarder can be generated.
+//  [warn] object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
 object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
