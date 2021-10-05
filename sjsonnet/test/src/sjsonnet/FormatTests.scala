@@ -11,15 +11,12 @@ object FormatTests extends TestSuite{
     val formatted = Format.format(fmt, Materializer.reverse(null, json), dummyPos)(
       new EvalScope{
         def extVars: Map[String, Value] = Map()
-        def loadCachedSource(p: Path): Option[String] = None
         def wd: Path = DummyPath()
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
         def equal(x: Val, y: Val): Boolean = ???
         def importer: sjsonnet.CachedImporter = ???
-        def preserveOrder = false
-        def strict = false
-        def noStaticErrors = false
+        def settings = Settings.default
         def warn(e: Error) = ()
       }
     )

@@ -28,7 +28,7 @@ object SjsonnetMain {
         def read(path: Path): Option[String] =
           Option(importLoader(path.asInstanceOf[JsVirtualPath].path))
       },
-      preserveOrder,
+      new Settings(preserveOrder = preserveOrder),
       parseCache = createParseCache()
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{

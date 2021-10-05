@@ -15,12 +15,10 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
-                  preserveOrder: Boolean = false,
-                  strict: Boolean = false,
+                  settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
                   warnLogger: (String => Unit) = null,
-                  noStaticErrors: Boolean = false,
                   ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
@@ -31,11 +29,10 @@ class Interpreter(extVars: Map[String, ujson.Value],
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
   def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
-                      preserveOrder: Boolean, strict: Boolean, noStaticErrors: Boolean,
-                      warn: Error => Unit): Evaluator =
-    new Evaluator(resolver, extVars, wd, preserveOrder, strict, noStaticErrors, warn)
+                      settings: Settings, warn: Error => Unit): Evaluator =
+    new Evaluator(resolver, extVars, wd, settings, warn)
 
-  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, preserveOrder, strict, noStaticErrors, warn)
+  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, settings, warn)
 
   def formatError(e: Error): String = {
     val s = new StringWriter()

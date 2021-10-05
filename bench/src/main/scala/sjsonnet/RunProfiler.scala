@@ -15,9 +15,8 @@ object RunProfiler extends App {
     importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
   ) {
     override def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
-                                 preserveOrder: Boolean, strict: Boolean, noStaticErrors: Boolean,
-                                 warn: Error => Unit): Evaluator =
-      new ProfilingEvaluator(resolver, extVars, wd, preserveOrder, strict, noStaticErrors, warn)
+                                 settings: Settings, warn: Error => Unit): Evaluator =
+      new ProfilingEvaluator(resolver, extVars, wd, settings, warn)
   }
   val profiler = interp.evaluator.asInstanceOf[ProfilingEvaluator]
 

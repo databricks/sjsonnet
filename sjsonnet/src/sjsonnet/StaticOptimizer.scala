@@ -10,7 +10,7 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
 
   def failOrWarn(msg: String, expr: Expr): Expr = {
     val e = new StaticError(msg, new sjsonnet.Error.Frame(expr.pos, expr.exprErrorString)(ev) :: Nil, None)
-    if(ev.noStaticErrors) {
+    if(ev.settings.noStaticErrors) {
       ev.warn(e)
       expr
     } else throw e
@@ -77,7 +77,7 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
 
   private def check(e: Expr): Expr = {
     e match {
-      case ObjExtend(pos, base, ext) if ev.strict && isObjLiteral(base) =>
+      case ObjExtend(pos, base, ext) if ev.settings.strict && isObjLiteral(base) =>
         StaticError.fail("Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects", e)(ev)
       case _ =>
     }

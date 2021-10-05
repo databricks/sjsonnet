@@ -513,8 +513,6 @@ abstract class EvalScope extends EvalErrorScope {
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
-  def preserveOrder: Boolean
-  def strict: Boolean
-  def noStaticErrors: Boolean
+  def settings: Settings
   def warn(e: Error): Unit
 }

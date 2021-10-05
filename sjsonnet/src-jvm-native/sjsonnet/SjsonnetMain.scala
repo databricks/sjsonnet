@@ -187,12 +187,14 @@ object SjsonnetMain {
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
-      preserveOrder = config.preserveOrder.value,
-      strict = config.strict.value,
+      settings = new Settings(
+        preserveOrder = config.preserveOrder.value,
+        strict = config.strict.value,
+        noStaticErrors = config.noStaticErrors.value,
+      ),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       parseCache,
-      warnLogger,
-      config.noStaticErrors.value
+      warnLogger
     )
 
     (config.multi, config.yamlStream.value) match {

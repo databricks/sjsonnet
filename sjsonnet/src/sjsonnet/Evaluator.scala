@@ -18,9 +18,7 @@ import scala.collection.mutable
 class Evaluator(resolver: CachedResolver,
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
-                val preserveOrder: Boolean = false,
-                val strict: Boolean = false,
-                val noStaticErrors: Boolean = false,
+                val settings: Settings,
                 warnLogger: Error => Unit = null) extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver

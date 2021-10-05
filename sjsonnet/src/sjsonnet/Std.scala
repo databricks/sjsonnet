@@ -1325,7 +1325,7 @@ object Std {
     maybeSortKeys(ev, v1.allKeyNames)
   
   @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
-    if(ev.preserveOrder) keys else keys.sorted
+    if(ev.settings.preserveOrder) keys else keys.sorted
 
   def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr =
     new Val.Arr(pos, keys.map { k =>
