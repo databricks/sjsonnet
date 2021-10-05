@@ -19,9 +19,13 @@ class Evaluator(resolver: CachedResolver,
                 val extVars: Map[String, ujson.Value],
                 val wd: Path,
                 val preserveOrder: Boolean = false,
-                val strict: Boolean = false) extends EvalScope {
+                val strict: Boolean = false,
+                val noStaticErrors: Boolean = false,
+                warnLogger: Error => Unit = null) extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
+
+  def warn(e: Error): Unit = if(warnLogger != null) warnLogger(e)
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.HashMap.empty[Path, Val]
@@ -60,8 +64,21 @@ class Evaluator(resolver: CachedResolver,
       case e: Apply0 => visitApply0(e)
       case e: ImportStr => visitImportStr(e)
       case e: Expr.Error => visitError(e)
+      case e => visitInvalid(e)
     }
   } catch Error.withStackFrame(e)
+
+  // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
+  def visitInvalid(e: Expr): Nothing = e match {
+    case Id(pos, name) =>
+      Error.fail("Unknown variable: " + name, pos)
+    case Self(pos) =>
+      Error.fail("Can't use self outside of an object", pos)
+    case $(pos) =>
+      Error.fail("Can't use $ outside of an object", pos)
+    case Super(pos) =>
+      Error.fail("Can't use super outside of an object", pos)
+  }
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
     case v: Val => v

@@ -515,4 +515,6 @@ abstract class EvalScope extends EvalErrorScope {
 
   def preserveOrder: Boolean
   def strict: Boolean
+  def noStaticErrors: Boolean
+  def warn(e: Error): Unit
 }

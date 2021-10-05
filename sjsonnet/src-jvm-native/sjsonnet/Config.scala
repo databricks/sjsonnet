@@ -107,5 +107,10 @@ case class Config(
     name = "yaml-debug",
     doc = "Generate source line comments in the output YAML doc to make it easier to figure out where values come from."
   )
-  yamlDebug: Flag = Flag()
+  yamlDebug: Flag = Flag(),
+  @arg(
+    name = "no-static-errors",
+    doc = "Turn static errors into warnings"
+  )
+  noStaticErrors: Flag = Flag(),
 )

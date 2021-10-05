@@ -8,6 +8,14 @@ import ScopedExprTransform._
 class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
+  def failOrWarn(msg: String, expr: Expr): Expr = {
+    val e = new StaticError(msg, new sjsonnet.Error.Frame(expr.pos, expr.exprErrorString)(ev) :: Nil, None)
+    if(ev.noStaticErrors) {
+      ev.warn(e)
+      expr
+    } else throw e
+  }
+
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
 
@@ -31,23 +39,23 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
         case ScopedVal(v: Val with Expr, _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
         case null if name == "std" => Std.Std
-        case _ => StaticError.fail("Unknown variable: "+name, e)(ev)
+        case _ => failOrWarn("Unknown variable: "+name, e)
       }
 
     case e @ Self(pos) =>
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
-        case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
+        case _ => failOrWarn("Can't use self outside of an object", e)
       }
 
     case e @ $(pos) =>
       scope.get("$") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
-        case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
+        case _ => failOrWarn("Can't use $ outside of an object", e)
       }
 
     case e @ Super(_) if !scope.contains("super") =>
-      StaticError.fail("Can't use super outside of an object", e)(ev)
+      failOrWarn("Can't use super outside of an object", e)
 
     case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
       new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
