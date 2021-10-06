@@ -43,10 +43,6 @@ object SjsonnetMain {
     System.exit(exitCode)
   }
 
-  private def warn(out: PrintStream, msg: String): Unit = {
-    out.println("[warning] "+msg)
-  }
-
   def main0(args: Array[String],
             parseCache: ParseCache,
             stdin: InputStream,
@@ -55,6 +51,12 @@ object SjsonnetMain {
             wd: os.Path,
             allowedInputs: Option[Set[os.Path]] = None,
             importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
+
+    var hasWarnings = false
+    def warn(msg: String): Unit = {
+      hasWarnings = true
+      stderr.println("[warning] "+msg)
+    }
 
     val parser = mainargs.ParserForClass[Config]
     val name = s"Sjsonnet ${sjsonnet.Version.version}"
@@ -70,8 +72,12 @@ object SjsonnetMain {
           Left("error: -i/--interactive must be passed in as the first argument")
         }else Right(config.file)
       }
-      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn(stderr, _))
-    } yield outputStr
+      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn)
+      res <- {
+        if(hasWarnings && config.fatalWarnings.value) Left("")
+        else Right(outputStr)
+      }
+    } yield res
 
     result match{
       case Left(err) =>
