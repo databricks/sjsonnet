@@ -16,8 +16,6 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
                   val parseCache: ParseCache,
-                  storePos: Position => Unit = null
-                 ) { self =>
                   settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   warnLogger: (String => Unit) = null,
