@@ -8,9 +8,9 @@ import scala.jdk.CollectionConverters._
 class ProfilingEvaluator(resolver: CachedResolver,
                          extVars: Map[String, ujson.Value],
                          wd: Path,
-                         preserveOrder: Boolean = false,
-                         strict: Boolean)
-  extends Evaluator(resolver, extVars, wd, preserveOrder, strict) {
+                         settings: Settings,
+                         warn: Error => Unit)
+  extends Evaluator(resolver, extVars, wd, settings, warn) {
 
   trait Box {
     def name: String

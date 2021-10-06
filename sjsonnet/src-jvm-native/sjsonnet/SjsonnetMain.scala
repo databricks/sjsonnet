@@ -43,6 +43,10 @@ object SjsonnetMain {
     System.exit(exitCode)
   }
 
+  private def warn(out: PrintStream, msg: String): Unit = {
+    out.println("[warning] "+msg)
+  }
+
   def main0(args: Array[String],
             parseCache: ParseCache,
             stdin: InputStream,
@@ -66,7 +70,7 @@ object SjsonnetMain {
           Left("error: -i/--interactive must be passed in as the first argument")
         }else Right(config.file)
       }
-      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer)
+      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn(stderr, _))
     } yield outputStr
 
     result match{
@@ -130,7 +134,8 @@ object SjsonnetMain {
                      parseCache: ParseCache,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
-                     importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
+                     importer: Option[(Path, String) => Option[os.Path]] = None,
+                     warnLogger: String => Unit = null): Either[String, String] = {
     val path = os.Path(file, wd)
     var varBinding = Map.empty[String, ujson.Value]
     config.extStr.map(_.split('=')).foreach{
@@ -183,9 +188,15 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
       parseCache,
-      preserveOrder = config.preserveOrder.value,
-      strict = config.strict.value,
       storePos = if (config.yamlDebug.value) currentPos = _ else null
+      settings = new Settings(
+        preserveOrder = config.preserveOrder.value,
+        strict = config.strict.value,
+        noStaticErrors = config.noStaticErrors.value,
+      ),
+      storePos = if (config.yamlDebug.value) currentPos = _ else null,
+      parseCache,
+      warnLogger
     )
 
     (config.multi, config.yamlStream.value) match {
