@@ -4,23 +4,26 @@ import utest._
 
 object ErrorTests extends TestSuite{
   val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path) = {
+  def eval(p: os.Path, noStaticErrors: Boolean) = {
+    val out = new StringBuffer()
     val interp = new Interpreter(
       Map(),
       Map(),
       OsPath(os.pwd),
       importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
+      warnLogger = (msg: String) => out.append(msg).append('\n'),
+      settings = new Settings(noStaticErrors = noStaticErrors),
     )
-    interp.interpret(os.read(p), OsPath(p))
+    interp.interpret(os.read(p), OsPath(p)).left.map(s => out.toString + s)
   }
-  def check(expected: String)(implicit tp: utest.framework.TestPath) = {
-    val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet")
+  def check(expected: String, noStaticErrors: Boolean = false)(implicit tp: utest.framework.TestPath) = {
+    val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet", noStaticErrors)
 
     assert(res == Left(expected))
   }
 
   def checkImports(expected: String)(implicit tp: utest.framework.TestPath) = {
-    val res = eval(os.pwd / "sjsonnet" / "test" / "resources" / "imports" / s"error.${tp.value.mkString(".")}.jsonnet")
+    val res = eval(os.pwd / "sjsonnet" / "test" / "resources" / "imports" / s"error.${tp.value.mkString(".")}.jsonnet", false)
 
     assert(res == Left(expected))
   }
@@ -114,11 +117,22 @@ object ErrorTests extends TestSuite{
         |    at [ForSpec].(sjsonnet/test/resources/test_suite/error.comprehension_spec_object2.jsonnet:17:13)
         |""".stripMargin
     )
-    test("computed_field_scope") - check(
-      """sjsonnet.StaticError: Unknown variable: x
-        |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
-        |""".stripMargin
-    )
+    test("computed_field_scope") - {
+      check(
+        """sjsonnet.StaticError: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
+          |""".stripMargin
+      )
+      check(
+        """[warning] sjsonnet.StaticError: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
+          |
+          |sjsonnet.Error: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
+          |""".stripMargin,
+        noStaticErrors = true
+      )
+    }
     test("divide_zero") - check(
       """sjsonnet.Error: division by zero
         |    at [BinaryOp /].(sjsonnet/test/resources/test_suite/error.divide_zero.jsonnet:17:5)
@@ -170,12 +184,24 @@ object ErrorTests extends TestSuite{
         |    at [Import].(sjsonnet/test/resources/test_suite/error.import_folder_slash.jsonnet:17:1)
         |""".stripMargin
     )
-    "import_static-check-failure" - check(
-      """sjsonnet.StaticError: Unknown variable: x
-        |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
-        |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
-        |""".stripMargin
-    )
+    "import_static-check-failure" - {
+      check(
+        """sjsonnet.StaticError: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
+          |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
+          |""".stripMargin
+      )
+      check(
+        """[warning] sjsonnet.StaticError: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
+          |
+          |sjsonnet.Error: Unknown variable: x
+          |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
+          |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
+          |""".stripMargin,
+        noStaticErrors = true
+      )
+    }
     "import_syntax-error" - check(
       """sjsonnet.ParseError: Expected "\"":2:1, found ""
         |    at .(sjsonnet/test/resources/test_suite/lib/syntax_error.jsonnet:2:1)

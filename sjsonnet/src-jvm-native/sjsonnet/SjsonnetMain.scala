@@ -52,6 +52,12 @@ object SjsonnetMain {
             allowedInputs: Option[Set[os.Path]] = None,
             importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
 
+    var hasWarnings = false
+    def warn(msg: String): Unit = {
+      hasWarnings = true
+      stderr.println("[warning] "+msg)
+    }
+
     val parser = mainargs.ParserForClass[Config]
     val name = s"Sjsonnet ${sjsonnet.Version.version}"
     val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
@@ -66,8 +72,12 @@ object SjsonnetMain {
           Left("error: -i/--interactive must be passed in as the first argument")
         }else Right(config.file)
       }
-      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer)
-    } yield outputStr
+      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn)
+      res <- {
+        if(hasWarnings && config.fatalWarnings.value) Left("")
+        else Right(outputStr)
+      }
+    } yield res
 
     result match{
       case Left(err) =>
@@ -130,7 +140,8 @@ object SjsonnetMain {
                      parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
-                     importer: Option[(Path, String) => Option[os.Path]] = None): Either[String, String] = {
+                     importer: Option[(Path, String) => Option[os.Path]] = None,
+                     warnLogger: String => Unit = null): Either[String, String] = {
     val path = os.Path(file, wd)
     var varBinding = Map.empty[String, ujson.Value]
     config.extStr.map(_.split('=')).foreach{
@@ -182,10 +193,14 @@ object SjsonnetMain {
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
-      preserveOrder = config.preserveOrder.value,
-      strict = config.strict.value,
+      settings = new Settings(
+        preserveOrder = config.preserveOrder.value,
+        strict = config.strict.value,
+        noStaticErrors = config.noStaticErrors.value,
+      ),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
-      parseCache
+      parseCache,
+      warnLogger
     )
 
     (config.multi, config.yamlStream.value) match {

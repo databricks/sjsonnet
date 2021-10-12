@@ -7,8 +7,7 @@ object TestUtils {
       Map(),
       DummyPath(),
       Importer.empty,
-      preserveOrder = preserveOrder,
-      strict = strict
+      new Settings(preserveOrder = preserveOrder, strict = strict)
     ).interpret(s, DummyPath("(memory)")) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)

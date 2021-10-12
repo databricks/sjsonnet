@@ -15,42 +15,43 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
-                  preserveOrder: Boolean = false,
-                  strict: Boolean = false,
+                  settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
+                  warnLogger: (String => Unit) = null,
                   ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
-      handleException((new StaticOptimizer(evaluator)).optimize(expr), fs)
+      handleException(new StaticOptimizer(evaluator).optimize(expr), fs)
   }
+
+  private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
   def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
-                      preserveOrder: Boolean, strict: Boolean): Evaluator =
-    new Evaluator(resolver, extVars, wd, preserveOrder, strict)
+                      settings: Settings, warn: Error => Unit): Evaluator =
+    new Evaluator(resolver, extVars, wd, settings, warn)
 
-  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, preserveOrder, strict)
+  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, settings, warn)
 
-  def interpret(txt: String, path: Path): Either[String, ujson.Value] = {
-    interpret0(txt, path, ujson.Value)
+  def formatError(e: Error): String = {
+    val s = new StringWriter()
+    val p = new PrintWriter(s)
+    e.printStackTrace(p)
+    p.close()
+    s.toString.replace("\t", "    ")
   }
+
+  def interpret(txt: String, path: Path): Either[String, ujson.Value] =
+    interpret0(txt, path, ujson.Value)
+
   def interpret0[T](txt: String,
                     path: Path,
-                    visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
+                    visitor: upickle.core.Visitor[T, T]): Either[String, T] =
     (for{
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
-    } yield r) match {
-      case Right(v) => Right(v)
-      case Left(e) =>
-        val s = new StringWriter()
-        val p = new PrintWriter(s)
-        e.printStackTrace(p)
-        p.close()
-        Left(s.toString.replace("\t", "    "))
-    }
-  }
+    } yield r).left.map(formatError)
 
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f) catch {
