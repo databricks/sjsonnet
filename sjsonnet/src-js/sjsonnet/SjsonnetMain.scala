@@ -6,7 +6,6 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 @JSExportTopLevel("SjsonnetMain")
 object SjsonnetMain {
-  def createParseCache() = new DefaultParseCache
   @JSExport
   def interpret(text: String,
                 extVars: js.Any,
@@ -28,7 +27,7 @@ object SjsonnetMain {
         def read(path: Path): Option[String] =
           Option(importLoader(path.asInstanceOf[JsVirtualPath].path))
       },
-      parseCache = createParseCache(),
+      parseCache = new DefaultParseCache,
       new Settings(preserveOrder = preserveOrder),
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match{

@@ -8,8 +8,6 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def createParseCache() = new DefaultParseCache
-
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
       (docBase +: searchRoots0)
