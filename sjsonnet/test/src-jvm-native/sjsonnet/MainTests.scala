@@ -45,7 +45,7 @@ object MainTests extends TestSuite {
     val perr = new PrintStream(err, true, "UTF-8")
     val out = new ByteArrayOutputStream()
     val pout = new PrintStream(out, true, "UTF-8")
-    val res = SjsonnetMain.main0(args.toArray, collection.mutable.HashMap.empty, System.in, pout, perr, os.pwd, None)
+    val res = SjsonnetMain.main0(args.toArray, new DefaultParseCache, System.in, pout, perr, os.pwd, None)
     (res, new String(out.toByteArray, "UTF-8"), new String(err.toByteArray, "UTF-8"))
   }
 }
