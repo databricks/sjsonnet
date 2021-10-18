@@ -62,11 +62,11 @@ object SjsonnetTestMain {
         val path = testSuiteRoot / s"$name.jsonnet"
         var currentPos: Position = null
         val interp = new Interpreter(
-          parseCache,
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2), "isKubecfg" -> true),
           Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
           OsPath(os.pwd),
           SjsonnetMain.resolveImport(Seq(), None),
+          parseCache,
           storePos = currentPos = _
         )
         val writer = new java.io.StringWriter
