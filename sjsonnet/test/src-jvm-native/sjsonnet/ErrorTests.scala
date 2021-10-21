@@ -93,7 +93,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("array_large_index") - check(
-      """sjsonnet.Error: array bounds error: 1.8446744073709552E19 not within [0, 3)
+      """sjsonnet.Error: array index was not integer: 1.8446744073709552E19
         |    at [Lookup].(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
         |""".stripMargin
     )
