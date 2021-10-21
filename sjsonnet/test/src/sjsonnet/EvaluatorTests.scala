@@ -26,7 +26,7 @@ object EvaluatorTests extends TestSuite{
       eval("[1, [2, 3], 4][1][0]") ==> ujson.Num(2)
       eval("([1, 2, 3] + [4, 5, 6])[3]") ==> ujson.Num(4)
       evalErr("[][0]") ==>
-      """sjsonnet.Error: array bounds error: 0.0 not within [0, 0)
+      """sjsonnet.Error: array bounds error: 0 not within [0, 0)
         |at [Lookup].(:1:3)""".stripMargin
     }
     test("functions") {

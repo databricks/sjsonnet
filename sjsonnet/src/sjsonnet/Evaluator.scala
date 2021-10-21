@@ -268,9 +268,9 @@ class Evaluator(resolver: CachedResolver,
     val pos = e.pos
     (visitExpr(e.value), visitExpr(e.index)) match {
       case (v: Val.Arr, i: Val.Num) =>
-        if (i.value >= v.length) Error.fail(s"array bounds error: ${i.value} not within [0, ${v.length})", pos)
         val int = i.value.toInt
         if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
+        if (int >= v.length) Error.fail(s"array bounds error: ${int} not within [0, ${v.length})", pos)
         v.force(int)
       case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
