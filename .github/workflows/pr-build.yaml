@@ -1,0 +1,28 @@
+name: Pull Request Validation
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+      - name: Run mill tests
+        run: ./mill __.test
+      - name: Compile with sbt
+        run: sbt compile bench/compile bench/jmh:compile
+      - name: Run sbt tests
+        run: sbt test
