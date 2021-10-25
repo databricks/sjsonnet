@@ -32,6 +32,7 @@ class MaterializerBenchmark {
       Map.empty[String, ujson.Value],
       OsPath(wd),
       importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
+      parseCache = new DefaultParseCache
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)
     assert(renderYaml() == oldRenderYaml())

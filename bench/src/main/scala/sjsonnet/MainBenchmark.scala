@@ -23,7 +23,8 @@ object MainBenchmark {
       Map.empty[String, ujson.Value],
       Map.empty[String, ujson.Value],
       OsPath(wd),
-      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None)
+      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
+      parseCache = new DefaultParseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
     interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
@@ -50,7 +51,7 @@ class MainBenchmark {
   def main(bh: Blackhole): Unit = {
     bh.consume(SjsonnetMain.main0(
       MainBenchmark.mainArgs,
-      collection.mutable.HashMap.empty,
+      new DefaultParseCache,
       System.in,
       dummyOut,
       System.err,

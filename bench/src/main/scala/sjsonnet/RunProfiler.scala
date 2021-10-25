@@ -13,6 +13,7 @@ object RunProfiler extends App {
     Map.empty[String, ujson.Value],
     OsPath(wd),
     importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
+    parseCache = new DefaultParseCache
   ) {
     override def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
                                  settings: Settings, warn: Error => Unit): Evaluator =
