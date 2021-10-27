@@ -8,12 +8,13 @@ object RunProfiler extends App {
   val file = config.file
   val wd = os.pwd
   val path = OsPath(os.Path(file, wd))
+  val parseCache = new DefaultParseCache
   val interp = new Interpreter(
     Map.empty[String, ujson.Value],
     Map.empty[String, ujson.Value],
     OsPath(wd),
     importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
-    parseCache = new DefaultParseCache
+    parseCache = parseCache
   ) {
     override def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
                                  settings: Settings, warn: Error => Unit): Evaluator =
@@ -37,7 +38,7 @@ object RunProfiler extends App {
   profiler.clear()
   val total = (for(i <- 1 to 5) yield run()).sum
 
-  val roots = interp.parseCache.valuesIterator.map(_.getOrElse(???)).map(_._1).toSeq
+  val roots = parseCache.valuesIterator.map(_.getOrElse(???)).map(_._1).toSeq
   roots.foreach(profiler.accumulate)
 
   println(s"\nTop 20 by time:")

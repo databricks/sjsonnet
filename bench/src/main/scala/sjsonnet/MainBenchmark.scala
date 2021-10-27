@@ -19,16 +19,17 @@ object MainBenchmark {
     val file = config.file
     val wd = os.pwd
     val path = OsPath(os.Path(file, wd))
+    val parseCache = new DefaultParseCache
     val interp = new Interpreter(
       Map.empty[String, ujson.Value],
       Map.empty[String, ujson.Value],
       OsPath(wd),
       importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
-      parseCache = new DefaultParseCache
+      parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
     interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
-    (interp.parseCache.keySet.toIndexedSeq, interp.evaluator)
+    (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 }
 
