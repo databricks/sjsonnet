@@ -8,8 +8,6 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def createParseCache() = collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
-
   def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
       (docBase +: searchRoots0)
@@ -33,7 +31,7 @@ object SjsonnetMain {
         case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
         case _ => args
       },
-      collection.mutable.HashMap.empty,
+      new DefaultParseCache,
       System.in,
       System.out,
       System.err,
@@ -44,7 +42,7 @@ object SjsonnetMain {
   }
 
   def main0(args: Array[String],
-            parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
+            parseCache: ParseCache,
             stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
@@ -137,7 +135,7 @@ object SjsonnetMain {
 
   def mainConfigured(file: String,
                      config: Config,
-                     parseCache: collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]],
+                     parseCache: ParseCache,
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None,
@@ -193,13 +191,13 @@ object SjsonnetMain {
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
+      parseCache,
       settings = new Settings(
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
         noStaticErrors = config.noStaticErrors.value,
       ),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
-      parseCache,
       warnLogger
     )
 

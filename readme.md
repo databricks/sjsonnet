@@ -18,7 +18,7 @@ Sjsonnet can be used from Java:
 ```java
 sjsonnet.SjsonnetMain.main0(
     new String[]{"foo.jsonnet"},
-    sjsonnet.SjsonnetMain.createParseCache(),
+    new DefaultParseCache,
     System.in,
     System.out,
     System.err,
@@ -37,7 +37,7 @@ ivy"com.databricks::sjsonnet:0.4.1" // Mill
 ```scala
 sjsonnet.SjsonnetMain.main0(
     Array("foo.jsonnet"),
-    sjsonnet.SjsonnetMain.createParseCache(),
+    new DefaultParseCache,
     System.in,
     System.out,
     System.err,

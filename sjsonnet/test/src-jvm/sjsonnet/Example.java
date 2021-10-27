@@ -4,7 +4,7 @@ public class Example {
     public void example(){
         sjsonnet.SjsonnetMain.main0(
             new String[]{"foo.jsonnet"},
-            sjsonnet.SjsonnetMain.createParseCache(),
+            new DefaultParseCache(),
             System.in,
             System.out,
             System.err,

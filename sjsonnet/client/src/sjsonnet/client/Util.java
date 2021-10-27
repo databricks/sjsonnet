@@ -70,11 +70,11 @@ public class Util {
                 total += res;
             }
         }
-        return new String(arr);
+        return new String(arr, "UTF-8");
     }
 
     public static void writeString(OutputStream outputStream, String string) throws IOException {
-        byte[] bytes = string.getBytes();
+        byte[] bytes = string.getBytes("UTF-8");
         writeInt(outputStream, bytes.length);
         outputStream.write(bytes);
     }

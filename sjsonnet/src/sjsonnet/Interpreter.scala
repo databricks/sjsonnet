@@ -15,9 +15,9 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
+                  val parseCache: ParseCache,
                   settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
-                  val parseCache: mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]] = new mutable.HashMap,
                   warnLogger: (String => Unit) = null,
                   ) { self =>
 
