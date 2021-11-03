@@ -31,6 +31,12 @@ object MainBenchmark {
     interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
+
+  def createDummyOut = new PrintStream(new OutputStream {
+    def write(b: Int): Unit = ()
+    override def write(b: Array[Byte]): Unit = ()
+    override def write(b: Array[Byte], off: Int, len: Int): Unit = ()
+  })
 }
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -42,11 +48,7 @@ object MainBenchmark {
 @State(Scope.Benchmark)
 class MainBenchmark {
 
-  val dummyOut = new PrintStream(new OutputStream {
-    def write(b: Int): Unit = ()
-    override def write(b: Array[Byte]): Unit = ()
-    override def write(b: Array[Byte], off: Int, len: Int): Unit = ()
-  })
+  val dummyOut = MainBenchmark.createDummyOut
 
   @Benchmark
   def main(bh: Blackhole): Unit = {
