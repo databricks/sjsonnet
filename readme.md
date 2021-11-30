@@ -87,8 +87,11 @@ $ node
     "", // initial working directory
 
     // import callback: receives a base directory and the imported path string,
-    // returns a 2-element array of the resolved file path and file contents
-    (wd, imported) => [wd + "/" + imported, "local bar = 123; bar + bar"])
+    // returns a tuple of the resolved file path and file contents or file contents resolve method
+    (wd, imported) => [wd + "/" + imported, "local bar = 123; bar + bar"],
+    // loader callback: receives the tuple from the import callback and returns the file contents
+    ([path, content]) => content
+    )
 '246bar'
 ```
 
@@ -149,12 +152,12 @@ Some notes on the values used in parts of the pipeline:
   but with two modifications. The first is that functions like
   `function(a){...}` can still be present in the structure: in Jsonnet you can
   pass around functions as values and call then later on. The second is that
-  object values & array entries are *lazy*: e.g. `[error 123, 456][1]` does not
+  object values & array entries are _lazy_: e.g. `[error 123, 456][1]` does not
   raise an error because the first (erroneous) entry of the array is un-used and
   thus not evaluated.
 
 - Classes representing literals extend `sjsonnet.Val.Literal` which in turn extends
-  *both*, `Expr` and `Val`. This allows the evaluator to skip over them instead of
+  _both_, `Expr` and `Val`. This allows the evaluator to skip over them instead of
   having to convert them from one representation to the other.
 
 ## Performance
@@ -169,13 +172,13 @@ google/jsonnet and google/go-jsonnet, measuring the time taken to
 evaluate the `test_suite/` folder (smaller is better):
 
 |              | Sjsonnet 0.1.5 | Sjsonnet 0.1.6 |
-|:-------------|---------------:|---------------:|
+| :----------- | -------------: | -------------: |
 | Scala 2.13.0 | 14.26ms ± 0.22 |  6.59ms ± 0.27 |
 | Scala 2.12.8 | 18.07ms ± 0.30 |  9.29ms ± 0.26 |
 
 | google/jsonnet | google/go-jsonnet |
-|---------------:|------------------:|
-|         ~1277ms|             ~274ms|
+| -------------: | ----------------: |
+|        ~1277ms |            ~274ms |
 
 google/jsonnet was built from source on commit
 f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
@@ -197,18 +200,20 @@ want to reproduce our benchmarks, the pre-configured command line is expected
 to be run against databricks/universe @ 7cbd8d7cb071983077d41fcc34f0766d0d2a247d).
 
 Benchmark example:
+
 ```
 sbt bench/jmh:run -jvmArgs "-XX:+UseStringDeduplication" sjsonnet.MainBenchmark
 ```
 
 Profiler:
+
 ```
 sbt bench/run
 ```
 
 ## Laziness
 
-The Jsonnet language is *lazy*: expressions don't get evaluated unless
+The Jsonnet language is _lazy_: expressions don't get evaluated unless
 their value is needed, and thus even erroneous expressions do not cause
 a failure if un-used. This is represented in the Sjsonnet codebase by
 `sjsonnet.Lazy`: a wrapper type that encapsulates an arbitrary
@@ -299,7 +304,7 @@ To publish, run the following commands:
 ### 0.3.0
 
 - Add `--yaml-debug` flag to add source-line comments showing where each line of YAML came from [#105]()https://github.com/databricks/sjsonnet/pull/105
-- Add `objectValues` and `objectVlauesAll` to stdlib [#104](https://github.com/databricks/sjsonnet/pull/104) 
+- Add `objectValues` and `objectVlauesAll` to stdlib [#104](https://github.com/databricks/sjsonnet/pull/104)
 
 ### 0.2.8
 
@@ -307,7 +312,7 @@ To publish, run the following commands:
 - Do not allow duplicate field in object when evaluating list list comprehension [#100](https://github.com/databricks/sjsonnet/pull/100)
 - Fix compiler crash when '+' signal is true in a field declaration inside a list comprehension [#98](https://github.com/databricks/sjsonnet/pull/98)
 - Fix error message for too many arguments with at least one named arg [#97](https://github.com/databricks/sjsonnet/pull/97)
- 
+
 ### 0.2.7
 
 - Streaming JSON output to disk for lower memory usage [#85](https://github.com/databricks/sjsonnet/pull/85)
