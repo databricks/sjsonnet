@@ -49,6 +49,8 @@ class Parser(val currentFile: Path) {
 
   private val fileScope = new FileScope(currentFile)
 
+  private val strings = new mutable.HashMap[String, String]
+
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
   def id[_: P] = P(
@@ -251,7 +253,12 @@ class Parser(val currentFile: Path) {
     }
   )
 
-  def constructString(pos: Position, lines: Seq[String]) = Val.Str(pos, lines.mkString)
+  def constructString(pos: Position, lines: Seq[String]) = {
+    val s = lines.mkString
+    val unique = strings.getOrElseUpdate(s, s)
+    Val.Str(pos, unique)
+  }
+
   // Any `expr` that isn't naively left-recursive
   def expr2[_: P]: P[Expr] = P(
     Pos.flatMapX{ pos =>
