@@ -155,10 +155,12 @@ object Val{
 
     private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if(value0 == null) {
-        value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
+        // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
+        this.value0 = value0
       }
       value0
     }
