@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.1</version>
+    <version>0.4.2</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.1" // SBT
-ivy"com.databricks::sjsonnet:0.4.1" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.2" // SBT
+ivy"com.databricks::sjsonnet:0.4.2" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/lihaoyi/sjsonnet/releases/download/0.4.1/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.2/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/lihaoyi/sjsonnet/releases/download/0.4.1/sjsonnet.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.2/sjsonnet.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.1/sjsonnet.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.2/sjsonnet.js > sjsonnet.js
 
 $ node
 
@@ -127,7 +127,7 @@ phases:
 
 - `sjsonnet.StaticOptimizer` is a single AST transform that performs static
   checking, essential rewriting (e.g. assigning indices in the symbol table for
-  variables) and optimizations. The result is another `jsonnet.Expr` per input
+  variables) and optimizations. The result is another `sjsonnet.Expr` per input
   file that can be stored in the parse cache and reused.
 
 - `sjsonnet.Evaluator`: recurses over the `sjsonnet.Expr` produced by the
@@ -186,7 +186,7 @@ f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
 benchmark in  
 [SjsonnetTestMain.scala](https://github.com/databricks/sjsonnet/blob/master/sjsonnet/test/src-jvm/sjsonnet/SjsonnetTestMain.scala)
 
-Sjsonnet 0.4.0 and 0.5.0 further improve the performance significantly on our
+Sjsonnet 0.4.0 and 0.4.1 further improve the performance significantly on our
 internal benchmarks. A set of new JMH benchmarks provide detailed
 performance data of an entire run (`MainBenchmark`) and the
 non-evaluation-related parts (`MaterializerBenchmark`, `OptimizerBenchmark`,
@@ -269,16 +269,22 @@ programmatically via `new Interpreter(...).interpret(...)`.
 
 ## Publishing
 
-To publish, run the following commands:
+To publish, make sure the version number in `build.sc` is correct, then run the following commands:
 
 ```bash
-./mill -i mill.scalalib.PublishModule/publishAll lihaoyi:$SONATYPE_PASSWORD $GPG_PASSWORD --publishArtifacts __.publishArtifacts --release true
+./mill -i mill.scalalib.PublishModule/publishAll --sonatypeCreds lihaoyi:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true
 
 ./mill -i show sjsonnet[2.13.4].js.fullOpt
 ./mill -i show sjsonnet[2.13.4].jvm.assembly
 ```
 
 ## Changelog
+
+### 0.4.2
+
+- Make lazy initialization of static Val.Obj thread-safe [#136](https://github.com/databricks/sjsonnet/pull/136)
+- Deduplicate strings in the parser [#137](https://github.com/databricks/sjsonnet/pull/137)
+- Update the JS example [#141](https://github.com/databricks/sjsonnet/pull/141)
 
 ### 0.4.1
 
