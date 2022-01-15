@@ -12,6 +12,9 @@ object Platform {
   def xzString(s: String): String = {
     throw new Exception("XZ not implemented in Scala Native")
   }
+  def yamlToJson(s: String): String = {
+    throw new Exception("parseYaml() not implemented in Scala Native")
+  }
   def md5(s: String): String = {
     throw new Exception("MD5 not implemented in Scala Native")
   }

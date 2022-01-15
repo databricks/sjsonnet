@@ -5,10 +5,8 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import java.util
 import java.util.regex.Pattern
-
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.BinaryOp
-import sjsonnet.ArrayOps._
 
 import scala.collection.mutable
 import scala.util.matching.Regex
@@ -581,6 +579,16 @@ object Std {
       ujson.StringParser.transform(str.asString, new ValVisitor(pos))
   }
 
+  private object ParseYaml extends Val.Builtin1("str") {
+    def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
+      try {
+        ujson.StringParser.transform(Platform.yamlToJson(str.asString), new ValVisitor(pos))
+      } catch {
+        case _: Exception => null
+      }
+    }
+  }
+
   private object Set_ extends Val.Builtin2("arr", "keyF", Array(null, Val.False(dummyPos))) {
     def evalRhs(arr: Val, keyF: Val, ev: EvalScope, pos: Position): Val = {
       uniqArr(pos, ev, sortArr(pos, ev, arr, keyF), keyF)
@@ -1137,6 +1145,7 @@ object Std {
     "parseOctal" -> ParseOctal,
     "parseHex" -> ParseHex,
     "parseJson" -> ParseJson,
+    "parseYaml" -> ParseYaml,
     "md5" -> MD5,
     builtin("prune", "x"){ (pos, ev, s: Val) =>
       def filter(x: Val) = x match{
