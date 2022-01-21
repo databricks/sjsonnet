@@ -8,7 +8,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 
 
 class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                   indent: Int = 2) extends BaseCharRenderer(_out, indent){
+                   quoteKeys: Boolean = true, indent: Int = 2) extends BaseCharRenderer(_out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
@@ -27,6 +27,15 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     while(i < len) {
       elemBuilder.appendUnsafeC(s.charAt(i))
       i += 1
+    }
+  }
+
+  private[this] def removeQuoteKey(): Unit = {
+    // refer to quote_keys parameter in https://jsonnet.org/ref/stdlib.html, only unquote keys
+    if (!quoteKeys && !afterKey) {
+      val key = elemBuilder.makeString()
+      elemBuilder.reset()
+      elemBuilder.appendAll(key.toCharArray, 1, key.length - 2);
     }
   }
 
@@ -49,6 +58,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       depth -= 1
     } else {
       upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true)
+      removeQuoteKey()
     }
     flushCharBuilder()
     _out
