@@ -3,7 +3,7 @@ package sjsonnet
 import utest._
 
 object ErrorTests extends TestSuite{
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources"
   def eval(p: os.Path, noStaticErrors: Boolean) = {
     val out = new StringBuffer()
     val interp = new Interpreter(
@@ -17,18 +17,11 @@ object ErrorTests extends TestSuite{
     )
     interp.interpret(os.read(p), OsPath(p)).left.map(s => out.toString + s)
   }
-  def check(expected: String, noStaticErrors: Boolean = false)(implicit tp: utest.framework.TestPath) = {
-    val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet", noStaticErrors)
+  def check(expected: String, noStaticErrors: Boolean = false, suite: String = "test_suite")(implicit tp: utest.framework.TestPath) = {
+    val res = eval(testSuiteRoot / suite / s"error.${tp.value.mkString(".")}.jsonnet", noStaticErrors)
 
     assert(res == Left(expected))
   }
-
-  def checkImports(expected: String)(implicit tp: utest.framework.TestPath) = {
-    val res = eval(os.pwd / "sjsonnet" / "test" / "resources" / "imports" / s"error.${tp.value.mkString(".")}.jsonnet", false)
-
-    assert(res == Left(expected))
-  }
-
 
   val tests = Tests{
     test("01") - check(
@@ -289,28 +282,40 @@ object ErrorTests extends TestSuite{
       )
     }
 
-    test("import_wrong_nr_args") - checkImports(
+    test("import_wrong_nr_args") - check(
       """|sjsonnet.Error: Function parameter y not bound in call
          |    at [Apply1].(sjsonnet/test/resources/imports/error.import_wrong_nr_args.jsonnet:3:6)
-         |""".stripMargin
+         |""".stripMargin,
+      suite = "imports"
     )
 
-    test("wrong_named_arg") - checkImports(
+    test("wrong_named_arg") - check(
       """|sjsonnet.Error: Function has no parameter z
          |    at [Apply].(sjsonnet/test/resources/imports/error.wrong_named_arg.jsonnet:3:6)
-         |""".stripMargin
+         |""".stripMargin,
+      suite = "imports"
     )
 
-    test("too_many_arg") - checkImports(
+    test("too_many_arg") - check(
       """|sjsonnet.Error: Too many args, function has 2 parameter(s)
          |    at [Apply].(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
-         |""".stripMargin
+         |""".stripMargin,
+      suite = "imports"
     )
 
-    test("too_many_arg_with_named_arg") - checkImports(
+    test("too_many_arg_with_named_arg") - check(
       """|sjsonnet.Error: binding parameter a second time: x
          |    at [Apply].(sjsonnet/test/resources/imports/error.too_many_arg_with_named_arg.jsonnet:2:2)
-         |""".stripMargin
+         |""".stripMargin,
+      suite = "imports"
+    )
+
+    test("format_func") - check(
+      """|sjsonnet.Error: Cannot format function value
+         |    at [Function].(sjsonnet/test/resources/db/error.format_func.jsonnet:1:9)
+         |    at [ApplyBuiltin1].(sjsonnet/test/resources/db/error.format_func.jsonnet:1:7)
+         |""".stripMargin,
+      suite = "db"
     )
   }
 }
