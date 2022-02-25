@@ -102,13 +102,17 @@ object Format{
         case '%' => widenRaw(formatted, "%")
         case _ =>
 
-          val value = formatted.label match{
-            case None => Materializer(values.cast[Val.Arr].force(i))
+          val raw = formatted.label match{
+            case None => values.cast[Val.Arr].force(i)
             case Some(key) =>
               values match{
-                case v: Val.Arr => Materializer(v.force(i))
-                case v: Val.Obj => Materializer(v.value(key, pos))
+                case v: Val.Arr => v.force(i)
+                case v: Val.Obj => v.value(key, pos)
               }
+          }
+          val value = raw match {
+            case f: Val.Func => Error.fail("Cannot format function value", f)
+            case raw => Materializer(raw)
           }
           i += 1
           value match{

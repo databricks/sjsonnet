@@ -1,0 +1,1 @@
+"%1s" % function() "foo"

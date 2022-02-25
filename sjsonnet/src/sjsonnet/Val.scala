@@ -322,6 +322,8 @@ object Val{
 
     def prettyName = "function"
 
+    override def exprErrorString: String = "Function"
+
     override def asFunc: Func = this
 
     def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
