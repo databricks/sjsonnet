@@ -99,7 +99,7 @@ class OptimizerBenchmark {
       case _ => 0
     }
     def countSelectOnId(e: Expr): Int = e match {
-      case Expr.Select(_, x, _) =>
+      case Expr.Select(_, x, _, false) =>
        val c = countSelectOnId(x)
         if(c == -1) -1 else c + 1
       case _: Expr.ValidId => 0

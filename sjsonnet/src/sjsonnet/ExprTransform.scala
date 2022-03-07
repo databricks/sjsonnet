@@ -9,10 +9,10 @@ abstract class ExprTransform {
 
   def rec(expr: Expr): Expr = {
     expr match {
-      case Select(pos, x, name) =>
+      case Select(pos, x, name, safe) =>
         val x2 = transform(x)
         if(x2 eq x) expr
-        else Select(pos, x2, name)
+        else Select(pos, x2, name, safe)
 
       case Apply(pos, x, y, namedNames) =>
         val x2 = transform(x)
