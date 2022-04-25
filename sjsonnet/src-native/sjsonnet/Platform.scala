@@ -12,6 +12,9 @@ object Platform {
   def xzString(s: String): String = {
     throw new Exception("XZ not implemented in Scala Native")
   }
+  def uuid(length: Int): String = {
+    throw new Exception("UUID not implemented in Scala Native")
+  }
   def md5(s: String): String = {
     throw new Exception("MD5 not implemented in Scala Native")
   }

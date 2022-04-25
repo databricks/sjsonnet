@@ -1043,6 +1043,13 @@ object Std {
       }
     },
 
+    builtin("uuid", "v"){ (pos, ev, v: Val) =>
+      v match{
+        case Val.Num(_, value) => Platform.uuid(value.toInt)
+        case x => Error.fail("Cannot generate UUID string. Invalid length: " + x.prettyName)
+      }
+    },
+
     "encodeUTF8" -> EncodeUTF8,
     "decodeUTF8" -> DecodeUTF8,
 

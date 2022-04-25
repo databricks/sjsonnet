@@ -31,6 +31,9 @@ object Platform {
   def xzString(s: String): String = {
     xzBytes(s.getBytes())
   }
+  def uuid(length: Int): String = {
+    java.util.UUID.randomUUID.toString.take(length)
+  }
   def md5(s: String): String = {
     java.security.MessageDigest.getInstance("MD5")
       .digest(s.getBytes("UTF-8"))
