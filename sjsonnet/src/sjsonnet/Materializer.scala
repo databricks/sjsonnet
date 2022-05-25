@@ -26,13 +26,20 @@ abstract class Materializer {
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
         val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , -1)
-        obj.foreachElement(!evaluator.settings.preserveOrder, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
+        val sort = !evaluator.settings.preserveOrder
+        var prevKey: String = null
+        obj.foreachElement(sort, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
           storePos(v)
           objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
           objVisitor.visitValue(
             apply0(v, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
+          if(sort) {
+            if(prevKey != null && k.compareTo(prevKey) <= 0)
+              Error.fail(s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""")
+            prevKey = k
+          }
         }
         objVisitor.visitEnd(-1)
       case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
