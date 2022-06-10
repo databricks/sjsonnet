@@ -38,7 +38,8 @@ object SjsonnetTestMain {
       "unicode",
       "unix_line_endings",
       "unparse",
-      "verbatim_strings"
+      "verbatim_strings",
+      "issue_127"
       // disabled because it spams the console a lot
 //      "stdlib"
     )

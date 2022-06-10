@@ -381,7 +381,7 @@ class Parser(val currentFile: Path) {
   def bind[_: P] =
     P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
-  def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def args[_: P] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
     } else {
