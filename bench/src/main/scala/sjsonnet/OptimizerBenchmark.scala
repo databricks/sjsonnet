@@ -1,5 +1,10 @@
 package sjsonnet
 
+/*-
+ * Changed:
+ * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ */
+
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
 
@@ -99,7 +104,7 @@ class OptimizerBenchmark {
       case _ => 0
     }
     def countSelectOnId(e: Expr): Int = e match {
-      case Expr.Select(_, x, _, false) =>
+      case Expr.Select(_, x, _, _) =>
        val c = countSelectOnId(x)
         if(c == -1) -1 else c + 1
       case _: Expr.ValidId => 0

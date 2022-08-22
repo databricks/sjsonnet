@@ -1,5 +1,10 @@
 package sjsonnet
 
+/*-
+ * Changed:
+ * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ */
+
 import Expr._
 import ScopedExprTransform._
 

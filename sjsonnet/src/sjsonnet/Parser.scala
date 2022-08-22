@@ -1,5 +1,12 @@
 package sjsonnet
 
+/*-
+ * Changed:
+ * - 7187ded408ff8ea68822297079549c1c323bcdee: implement support for ?? binary op
+ * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ * - b78178f48a289622e65d5d0d2416898b7dadddbc: avoid string comparison for null safe select
+ */
+
 import fastparse.JsonnetWhitespace._
 import fastparse._
 import Expr.Member.Visibility

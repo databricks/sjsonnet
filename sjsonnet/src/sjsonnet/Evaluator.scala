@@ -1,5 +1,11 @@
 package sjsonnet
 
+/*-
+ * Changed:
+ * - 7187ded408ff8ea68822297079549c1c323bcdee: implement support for ?? binary op
+ * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ */
+
 import Expr.{Error => _, _}
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
