@@ -222,19 +222,19 @@ class Parser(val currentFile: Path,
   }
 
   def exprSuffix2[_: P]: P[Expr => Expr] = P(
-    Pos.flatMapX{i =>
-      (CharIn(".[({") | StringIn("?."))./.!.flatMapX{ c =>
-        (c: @switch) match{
-          case "." => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
-          case "?." => Pass ~ id.map(x => Expr.Select(i, _: Expr, x, safe = true))
-          case "[" => Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map{
+    Pos.flatMapX { i =>
+      (CharIn(".[({") | StringIn("?."))./.!.map(_ (0)).flatMapX { c =>
+        (c: @switch) match {
+          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
+          case '?' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x, true))
+          case '[' => Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map {
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case "(" => Pass ~ (args ~ ")").map { case (args, namedNames) =>
-            Expr.Apply(i, _: Expr, args, if(namedNames.length == 0) null else namedNames)
+          case '(' => Pass ~ (args ~ ")").map { case (args, namedNames) =>
+            Expr.Apply(i, _: Expr, args, if (namedNames.length == 0) null else namedNames)
           }
-          case "{" => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
+          case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
           case _ => Fail
         }
       }
