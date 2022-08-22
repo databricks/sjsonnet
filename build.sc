@@ -37,14 +37,17 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
     def pomSettings = PomSettings(
       description = artifactName(),
-      organization = "com.databricks",
-      url = "https://github.com/lihaoyi/sjsonnet",
-      licenses = Seq(License.MIT),
-      versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
+      organization = "io.github.jam01",
+      url = "https://github.com/jam01/sjsonnet",
+      licenses = Seq(License.`Apache-2.0`),
+      versionControl = VersionControl.github("jam01", "sjsonnet"),
       developers = Seq(
-        Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
+        Developer("jam01", "Jose Montoya","https://github.com/jam01")
       )
     )
+    def sonatypeUri: String = "https://s01.oss.sonatype.org/service/local"
+    def sonatypeSnapshotUri: String = "https://s01.oss.sonatype.org/content/repositories/snapshots"
+
     trait CrossTests extends ScalaModule with TestModule {
       def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.7")
       def testFrameworks = Seq("utest.runner.Framework")
