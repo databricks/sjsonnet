@@ -5,6 +5,7 @@ package sjsonnet
  * - 7187ded408ff8ea68822297079549c1c323bcdee: implement support for ?? binary op
  * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
  * - b78178f48a289622e65d5d0d2416898b7dadddbc: avoid string comparison for null safe select
+ * - enable indexing objects with a string
  */
 
 import fastparse.JsonnetWhitespace._
@@ -65,7 +66,7 @@ class Parser(val currentFile: Path,
   def id[_: P] = P(
     CharIn("_a-zA-Z") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
-  ).!.filter(s => !keywords.contains(s))
+  ).!.filter(s => !keywords.contains(s)).opaque("identifier")
 
   def break[_: P] = P(!CharIn("_a-zA-Z0-9"))
   def number[_: P]: P[Val.Num] = P(
@@ -232,8 +233,8 @@ class Parser(val currentFile: Path,
     Pos.flatMapX { i =>
       (CharIn(".[({") | StringIn("?."))./.!.map(_ (0)).flatMapX { c =>
         (c: @switch) match {
-          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
-          case '?' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x, true))
+          case '.' => Pass ~ (id.map(x => Expr.Select(i, _: Expr, x)) | string.map(x => Expr.Select(i, _: Expr, x)))
+          case '?' => Pass ~ (id.map(x => Expr.Select(i, _: Expr, x, safe = true)) | string.map(x => Expr.Select(i, _: Expr, x, safe = true)))
           case '[' => Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map {
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
