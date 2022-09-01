@@ -237,9 +237,14 @@ class Parser(val currentFile: Path) {
   )
 
   def local[_: P] = P( localExpr )
-  def importStr[_: P](pos: Position) = P( string.map(Expr.ImportStr(pos, _)) )
-  def `import`[_: P](pos: Position) = P( string.map(Expr.Import(pos, _)) )
+  def importStr[_: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
+  def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
   def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
+
+  def importExpr[_: P]: P[String] = P(expr.flatMap {
+    case Val.Str(_, s) => Pass(s)
+    case _ => Fail.opaque("string literal (computed imports are not allowed)")
+  })
 
   def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>

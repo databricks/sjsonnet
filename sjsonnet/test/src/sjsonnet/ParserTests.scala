@@ -27,5 +27,13 @@ object ParserTests extends TestSuite{
     test("givenDuplicateFieldsInListComprehension_expectError") {
       parseErr("""{ ["bar"]: x for x in [1, 2]}""") ==> """Expected no duplicate field: "bar" :1:29, found "}""""
     }
+    test("computedImports") {
+      parse("""local foo = import "foo"; 0""") ==>
+        LocalExpr(pos(6), Array(Bind(pos(6), "foo", null, Import(pos(12), "foo"))), Num(pos(26),0.0))
+      parse("""local foo = (import "foo") + bar; 0""") ==>
+        LocalExpr(pos(6), Array(Bind(pos(6), "foo", null, BinaryOp(pos(27), Import(pos(13), "foo"), 3, Id(pos(29), "bar")))), Num(pos(34),0.0))
+      parseErr("""local foo = import ("foo" + bar); 0""") ==> """Expected string literal (computed imports are not allowed):1:33, found "; 0""""
+      parseErr("""local foo = import "foo" + bar; 0""") ==> """Expected string literal (computed imports are not allowed):1:31, found "; 0""""
+    }
   }
 }
