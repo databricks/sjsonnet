@@ -589,7 +589,7 @@ class Evaluator(resolver: CachedResolver,
 
         visitExpr(e.key)(s) match {
           case Val.Str(_, k) =>
-            builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
+            builder.put(k, new Val.Obj.Member(e.plus, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
                 visitExpr(e.value)(
                   s.extend(newBindings, self, null)

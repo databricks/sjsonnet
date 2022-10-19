@@ -151,7 +151,7 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y)) expr
         else ObjExtend(superPos, x2, y2.asInstanceOf[ObjBody])
 
-      case ObjBody.ObjComp(pos, p, k, v, o, f, r) =>
+      case ObjBody.ObjComp(pos, p, k, v, pl, o, f, r) =>
         val p2 = transformBinds(p)
         val k2 = transform(k)
         val v2 = transform(v)
@@ -159,7 +159,7 @@ abstract class ExprTransform {
         val f2 = transform(f).asInstanceOf[ForSpec]
         val r2 = transformList(r).asInstanceOf[List[CompSpec]]
         if((p2 eq p) && (k2 eq k) && (v2 eq v) && (o2 eq o) && (f2 eq f) && (r2 eq r)) expr
-        else ObjBody.ObjComp(pos, p2, k2, v2, o2, f2, r2)
+        else ObjBody.ObjComp(pos, p2, k2, v2, pl, o2, f2, r2)
 
       case Slice(pos, v, x, y, z) =>
         val v2 = transform(v)

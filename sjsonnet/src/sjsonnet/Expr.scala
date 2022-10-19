@@ -161,6 +161,7 @@ object Expr{
                        preLocals: Array[Bind],
                        key: Expr,
                        value: Expr,
+                       plus: Boolean,
                        postLocals: Array[Bind],
                        first: ForSpec,
                        rest: List[CompSpec]) extends ObjBody {
