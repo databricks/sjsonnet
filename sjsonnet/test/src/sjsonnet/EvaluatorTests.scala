@@ -296,6 +296,8 @@ object EvaluatorTests extends TestSuite{
 
       eval("'foo' ?? null") ==> ujson.Str("foo")
       eval("null ?? 'bar'") ==> ujson.Str("bar")
+      eval("local obj = { keyA: {} }; obj?.keyA?.first ?? 'defaultA'") ==>
+        ujson.Str("defaultA")
     }
     test("stdToString"){
       eval("""std.toString({k: "v"})""") ==> ujson.Str("""{"k": "v"}""")

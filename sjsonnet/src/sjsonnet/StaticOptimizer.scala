@@ -3,6 +3,7 @@ package sjsonnet
 /*-
  * Changed:
  * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ * - transform null coalescing binary op
  */
 
 import Expr._
@@ -24,8 +25,12 @@ class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
 
-    case e @ Select(p, obj: Val.Obj, name, safe) if obj.containsKey(name) =>
-      try obj.value(name, p)(ev).asInstanceOf[Expr] catch { case _: Exception => e }
+    case e @ Select(p, obj: Val.Obj, name, safe) =>
+      if (obj.containsKey(name))
+        try obj.value(name, p)(ev).asInstanceOf[Expr] catch { case _: Exception => e }
+      else if (safe)
+        Val.Null(p)
+      else e
 
     case Select(pos, ValidSuper(_, selfIdx), name, safe) =>
       SelectSuper(pos, selfIdx, name, safe)

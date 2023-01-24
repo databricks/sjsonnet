@@ -3,6 +3,7 @@ package sjsonnet
 /*-
  * Changed:
  * - 80f58d4e2d5e4d4ea94ef828962ef5d8cba1a625: implements support for safe select operator ?.
+ * - transform null coalescing binary op
  */
 
 import Expr._
@@ -89,6 +90,12 @@ abstract class ExprTransform {
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Or(pos, x2, y2)
+
+      case NullCoal(pos, x, y) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        if((x2 eq x) && (y2 eq y)) expr
+        else NullCoal(pos, x2, y2)
 
       case InSuper(pos, x, selfIdx) =>
         val x2 = transform(x)
