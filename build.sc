@@ -189,7 +189,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       }
     )
     object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+      def testFramework: T[String] = T("com.novocode.junit.JUnitFramework")
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
     }
   }
