@@ -1,7 +1,7 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
 val sjsonnetVersion = "0.4.5"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.16", "2.13.6")
+object sjsonnet extends Cross[SjsonnetModule]("2.12.17", "2.13.10")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
   def millSourcePath = super.millSourcePath / os.up
   trait SjsonnetJvmNative extends SjsonnetCrossModule {
@@ -20,7 +20,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"com.lihaoyi::pprint::0.6.1",
       ivy"com.lihaoyi::ujson::1.3.7",
       ivy"com.lihaoyi::scalatags::0.9.3",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.5.0"
+      ivy"org.scala-lang.modules::scala-collection-compat::2.9.0"
     )
     def publishVersion = sjsonnetVersion
 
@@ -49,12 +49,12 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def sonatypeSnapshotUri: String = "https://s01.oss.sonatype.org/content/repositories/snapshots"
 
     trait CrossTests extends ScalaModule with TestModule {
-      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.7")
-      def testFrameworks = Seq("utest.runner.Framework")
+      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.1")
+      def testFramework: T[String] = T("utest.runner.Framework")
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.10.1"
+    def scalaJSVersion = "1.12.0"
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-js",
@@ -69,7 +69,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
   }
   object native extends SjsonnetCrossModule with SjsonnetJvmNative with ScalaNativeModule{
-    def scalaNativeVersion = "0.4.0"
+    def scalaNativeVersion = "0.4.10"
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-native",
@@ -144,7 +144,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       )
     )
     object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+      def testFramework: T[String] = T("com.novocode.junit.JUnitFramework")
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
     }
   }
