@@ -1,7 +1,7 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
 val sjsonnetVersion = "0.4.5"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.16", "2.13.10")
+object sjsonnet extends Cross[SjsonnetModule]("2.12.16", "2.13.6")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
   def millSourcePath = super.millSourcePath / os.up
   trait SjsonnetJvmNative extends SjsonnetCrossModule {
@@ -20,7 +20,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       ivy"com.lihaoyi::pprint::0.6.1",
       ivy"com.lihaoyi::ujson::1.3.7",
       ivy"com.lihaoyi::scalatags::0.9.3",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.9.0"
+      ivy"org.scala-lang.modules::scala-collection-compat::2.5.0"
     )
     def publishVersion = sjsonnetVersion
 
