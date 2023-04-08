@@ -54,7 +54,7 @@ class Parser(val currentFile: Path) {
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
   def id[_: P] = P(
-    CharIn("_a-zA-Z0-9") ~~
+    CharIn("_a-zA-Z") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
   ).!.filter(s => !keywords.contains(s))
 
