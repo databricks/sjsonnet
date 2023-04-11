@@ -51,7 +51,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.4.0"
+    def scalaJSVersion = "1.8.0"
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-js",
