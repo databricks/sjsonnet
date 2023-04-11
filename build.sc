@@ -1,4 +1,4 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, mill.scalajslib.api._
 val sjsonnetVersion = "0.4.3-SNAPSHOT"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
@@ -64,6 +64,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         millSourcePath / "src-jvm-js"
       )
     }
+    def jsEnvConfig = T(JsEnvConfig.JsDom(args = List("--dns-result-order=ipv4first")))
   }
   object native extends SjsonnetCrossModule with SjsonnetJvmNative with ScalaNativeModule{
     def scalaNativeVersion = "0.4.0"
