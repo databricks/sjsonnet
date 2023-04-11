@@ -280,6 +280,11 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 
 ## Changelog
 
+### 0.4.4
+
+- Update Mill to 0.10.12
+- Fix parsing of k/v cli arguments with an "=" in the value
+
 ### 0.4.2
 
 - Make lazy initialization of static Val.Obj thread-safe [#136](https://github.com/databricks/sjsonnet/pull/136)
