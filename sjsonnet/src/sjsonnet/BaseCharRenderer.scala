@@ -18,8 +18,10 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   protected[this] var depth: Int = 0
 
+  protected[this] var visitingKey = false
 
   protected[this] var commaBuffered = false
+  protected[this] var quoteBuffered = false
 
   def flushBuffer() = {
     if (commaBuffered) {
@@ -27,7 +29,12 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       elemBuilder.append(',')
       renderIndent()
     }
+    if (quoteBuffered) {
+      quoteBuffered = false
+      elemBuilder.append('"')
+    }
   }
+
   def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('[')
@@ -49,14 +56,20 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
     def subVisitor = BaseCharRenderer.this
-    def visitKey(index: Int) = BaseCharRenderer.this
+    def visitKey(index: Int) = {
+      quoteBuffered = true
+      visitingKey = true
+      BaseCharRenderer.this
+    }
     def visitKeyValue(s: Any): Unit = {
+      elemBuilder.append('"')
+      visitingKey = false
       elemBuilder.append(':')
       if (indent != -1) elemBuilder.append(' ')
     }
@@ -120,6 +133,21 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
+  override def visitFloat32(d: Float, index: Int) = {
+    d match{
+      case Float.PositiveInfinity => visitNonNullString("Infinity", -1)
+      case Float.NegativeInfinity => visitNonNullString("-Infinity", -1)
+      case d if java.lang.Float.isNaN(d) => visitNonNullString("NaN", -1)
+      case d =>
+        val i = d.toInt
+        if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
+        else super.visitFloat32(d, index)
+        flushBuffer()
+    }
+    flushCharBuilder()
+    out
+  }
+
   override def visitFloat64(d: Double, index: Int) = {
     d match{
       case Double.PositiveInfinity => visitNonNullString("Infinity", -1)
@@ -135,7 +163,6 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-
   def visitString(s: CharSequence, index: Int) = {
 
     if (s eq null) visitNull(index)
@@ -144,7 +171,11 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode)
+
+    upickle.core.RenderUtils.escapeChar(
+      unicodeCharBuilder, elemBuilder, s, escapeUnicode, !visitingKey
+    )
+
     flushCharBuilder()
     out
   }
@@ -161,4 +192,32 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       }
     }
   }
+}
+
+object BaseCharRenderer {
+  final def escape(sb: java.io.Writer, s: CharSequence, unicode: Boolean): Unit = {
+    sb.append('"')
+    var i = 0
+    val len = s.length
+    while (i < len) {
+      (s.charAt(i): @switch) match {
+        case '"' => sb.append("\\\"")
+        case '\\' => sb.append("\\\\")
+        case '\b' => sb.append("\\b")
+        case '\f' => sb.append("\\f")
+        case '\n' => sb.append("\\n")
+        case '\r' => sb.append("\\r")
+        case '\t' => sb.append("\\t")
+        case c =>
+          if (c < ' ' || (c > '~' && unicode)) {
+            sb.append("\\u").append(toHex((c >> 12) & 15)).append(toHex((c >> 8) & 15))
+              .append(toHex((c >> 4) & 15)).append(toHex(c & 15))
+          } else sb.append(c)
+      }
+      i += 1
+    }
+    sb.append('"')
+  }
+
+  private def toHex(nibble: Int): Char = (nibble + (if (nibble >= 10) 87 else 48)).toChar
 }

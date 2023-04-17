@@ -48,7 +48,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       }
       depth -= 1
     } else {
-      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true)
+      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true, true)
     }
     flushCharBuilder()
     _out
@@ -116,7 +116,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       _out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1

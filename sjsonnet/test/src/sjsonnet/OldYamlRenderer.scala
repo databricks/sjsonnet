@@ -6,7 +6,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 
 
 class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                      indent: Int = 2) extends BaseRenderer(out, indent){
+                      indent: Int = 2) extends BaseCharRenderer(out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
@@ -31,7 +31,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       depth -= 1
       out
     } else {
-      BaseRenderer.escape(out, s, unicode = true)
+      BaseCharRenderer.escape(out, s, unicode = true)
       out
     }
   }
@@ -40,7 +40,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     out.append(RenderUtils.renderDouble(d))
     out
   }
-  override val colonSnippet = ": "
+  val colonSnippet = ": "
   override def flushBuffer() = {
     if (newlineBuffered) {
       // drop space between colon and newline
@@ -84,7 +84,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
