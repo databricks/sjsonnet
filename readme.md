@@ -176,7 +176,8 @@ evaluate an arbitrary config file in the Databricks codebase:
 | staging/runbot-app.jsonnet | ~0.10s |  ~6.5s | ~67s |
 
 Sjsonnet was run as a long-lived daemon to keep the JVM warm,
-while go-jsonnet and google/jsonnet were run as subprocesses. The Sjsonnet command
+while go-jsonnet and google/jsonnet were run as subprocesses, following typical
+usage patterns. The Sjsonnet command
 line which is run by all of these is defined in
 `MainBenchmark.mainArgs`. You need to change it to point to a suitable input
 before running a benchmark or the profiler.
