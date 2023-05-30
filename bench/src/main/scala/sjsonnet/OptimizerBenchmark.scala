@@ -32,7 +32,7 @@ class OptimizerBenchmark {
     }
     this.ev = ev
     val static = inputs.map {
-      case (expr, fs) => ((new StaticOptimizer(ev)).optimize(expr), fs)
+      case (expr, fs) => ((new StaticOptimizer(ev, new Std().Std)).optimize(expr), fs)
     }
     val countBefore, countStatic = new Counter
     inputs.foreach(t => assert(countBefore.transform(t._1) eq t._1))
@@ -45,7 +45,7 @@ class OptimizerBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(inputs.foreach { case (expr, fs) =>
-      bh.consume((new StaticOptimizer(ev)).optimize(expr))
+      bh.consume((new StaticOptimizer(ev, new Std().Std)).optimize(expr))
     })
   }
 
