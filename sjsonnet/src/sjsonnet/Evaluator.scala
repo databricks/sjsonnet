@@ -589,12 +589,16 @@ class Evaluator(resolver: CachedResolver,
 
         visitExpr(e.key)(s) match {
           case Val.Str(_, k) =>
+            val prev_length = builder.size()
             builder.put(k, new Val.Obj.Member(e.plus, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
                 visitExpr(e.value)(
                   s.extend(newBindings, self, null)
                 )
             })
+            if (prev_length == builder.size()) {
+              Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
+            }
           case Val.Null(_) => // do nothing
         }
       }

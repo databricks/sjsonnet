@@ -19,11 +19,12 @@ class Interpreter(extVars: Map[String, ujson.Value],
                   settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   warnLogger: (String => Unit) = null,
+                  std: Val.Obj = new Std().Std
                   ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
-      handleException(new StaticOptimizer(evaluator).optimize(expr), fs)
+      handleException(new StaticOptimizer(evaluator, std).optimize(expr), fs)
   }
 
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))

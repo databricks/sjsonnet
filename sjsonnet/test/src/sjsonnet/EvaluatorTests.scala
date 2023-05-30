@@ -339,6 +339,19 @@ object EvaluatorTests extends TestSuite{
     test("givenNoDuplicateFieldsInListComprehension2_expectSuccess") {
       eval("""{ ["bar_" + x]: x for x in [5,12]}""") ==> ujson.Obj("bar_5" -> 5, "bar_12" -> 12)
     }
+    test("givenDuplicateFieldsInListComprehension_expectFailure") {
+      evalErr("""{ [x]: x for x in ["A", "A"]}""") ==>
+        """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+          |at .(:1:3)""".stripMargin
+    }
+    test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
+      evalErr(
+        """local y = { a: "A" };
+          |local z = { a: "A" };
+          |{ [x.a]: x for x in [y, z]}""".stripMargin) ==>
+        """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+          |at .(:3:3)""".stripMargin
+    }
     test("functionEqualsNull") {
       eval("""local f(x)=null; f == null""") ==> ujson.False
       eval("""local f=null; f == null""") ==> ujson.True

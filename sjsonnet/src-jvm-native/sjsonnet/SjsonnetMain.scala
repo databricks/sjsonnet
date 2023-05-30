@@ -142,38 +142,38 @@ object SjsonnetMain {
                      warnLogger: String => Unit = null): Either[String, String] = {
     val path = os.Path(file, wd)
     var varBinding = Map.empty[String, ujson.Value]
-    config.extStr.map(_.split('=')).foreach{
+    config.extStr.map(_.split("=", 2)).foreach{
       case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
       case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.Str(v))
     }
-    config.extStrFile.map(_.split('=')).foreach {
+    config.extStrFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
         varBinding = varBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
     }
-    config.extCode.map(_.split('=')).foreach {
+    config.extCode.map(_.split("=", 2)).foreach {
       case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.read(System.getenv(x)))
       case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.read(v))
     }
-    config.extCodeFile.map(_.split('=')).foreach {
+    config.extCodeFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
         varBinding = varBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
     }
 
     var tlaBinding = Map.empty[String, ujson.Value]
 
-    config.tlaStr.map(_.split('=')).foreach{
+    config.tlaStr.map(_.split("=", 2)).foreach{
       case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
       case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(v))
     }
-    config.tlaStrFile.map(_.split('=')).foreach {
+    config.tlaStrFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
         tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
     }
-    config.tlaCode.map(_.split('=')).foreach {
+    config.tlaCode.map(_.split("=", 2)).foreach {
       case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(System.getenv(x)))
       case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(v))
     }
-    config.tlaCodeFile.map(_.split('=')).foreach {
+    config.tlaCodeFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
         tlaBinding = tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
     }
