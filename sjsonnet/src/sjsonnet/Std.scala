@@ -18,7 +18,7 @@ import scala.util.matching.Regex
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
   * logic automatically
   */
-object Std {
+class Std {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
 
