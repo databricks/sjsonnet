@@ -355,5 +355,11 @@ object EvaluatorTests extends TestSuite{
       eval("""local f(x)=null; f == null""") ==> ujson.False
       eval("""local f=null; f == null""") ==> ujson.True
     }
+    test("identifierStartsWithKeyword") {
+      for(keyword <- Parser.keywords){
+        eval(s"""local ${keyword}Foo = 123; ${keyword}Foo""") ==> ujson.Num(123)
+        eval(s"""{${keyword}Foo: 123}""") ==> ujson.Obj(s"${keyword}Foo" -> ujson.Num(123))
+      }
+    }
   }
 }
