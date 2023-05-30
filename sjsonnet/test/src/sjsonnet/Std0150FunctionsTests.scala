@@ -41,5 +41,16 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.join(' ', ['', 'foo'])") ==> ujson.Str(" foo")
       eval("std.join(' ', [null, 'foo'])") ==> ujson.Str("foo")
     }
+
+    test("slice"){
+      eval("std.slice([1, 2, 3, 4, 5, 6], 0, 4, 1)") ==> ujson.read("[ 1, 2, 3, 4 ]")
+      eval("std.slice([1, 2, 3, 4, 5, 6], 1, 6, 2)") ==> ujson.read("[ 2, 4, 6 ]")
+      eval("""std.slice("jsonnet", 0, 4, 1)""") ==> ujson.Str("json")
+    }
+
+    test("manifestJsonMinified"){
+      eval("""std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring"], y: { a: 1, b: 2, c: [1, 2] }, })""") ==>
+        ujson.Str("{\"x\":[1,2,3,true,false,null,\"string\\nstring\"],\"y\":{\"a\":1,\"b\":2,\"c\":[1,2]}}")
+    }
   }
 }
