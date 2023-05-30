@@ -64,6 +64,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         millSourcePath / "src-jvm-js"
       )
     }
+
     def jsEnvConfig = T(JsEnvConfig.JsDom(args = List("--dns-result-order=ipv4first")))
   }
   object native extends SjsonnetCrossModule with SjsonnetJvmNative with ScalaNativeModule{
