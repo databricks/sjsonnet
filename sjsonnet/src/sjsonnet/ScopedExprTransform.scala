@@ -34,14 +34,14 @@ class ScopedExprTransform extends ExprTransform {
     case Function(pos, params, body) =>
       nestedNames(params.names)(rec(e))
 
-    case ObjComp(pos, preLocals, key, value, postLocals, first, rest) =>
+    case ObjComp(pos, preLocals, key, value, plus, postLocals, first, rest) =>
       val (f2 :: r2, (k2, (pre2, post2, v2))) = compSpecs(first :: rest, { () =>
         (transform(key), nestedBindings(dynamicExpr, dynamicExpr, preLocals ++ postLocals) {
           (transformBinds(preLocals), transformBinds(postLocals), transform(value))
         })
       })
       if((f2 eq first) && (k2 eq key) && (v2 eq value) && (pre2 eq preLocals) && (post2 eq postLocals) && (r2, rest).zipped.forall(_ eq _)) e
-      else ObjComp(pos, pre2, k2, v2, post2, f2.asInstanceOf[ForSpec], r2)
+      else ObjComp(pos, pre2, k2, v2, plus, post2, f2.asInstanceOf[ForSpec], r2)
 
     case Comp(pos, value, first, rest) =>
       val (f2 :: r2, v2) = compSpecs(first :: rest.toList, () => transform(value))

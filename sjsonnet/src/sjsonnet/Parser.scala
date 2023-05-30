@@ -332,7 +332,7 @@ class Parser(val currentFile: Path) {
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, null, Visibility.Normal, rhs) =
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), plus, null, Visibility.Normal, rhs) =
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
@@ -350,7 +350,7 @@ class Parser(val currentFile: Path) {
           Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
         case _ => // do nothing
       }
-      Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)
+      Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, plus, postLocals.toArray, comps._1, comps._2.toList)
   }
 
   def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ assertStmt | field )
