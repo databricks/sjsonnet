@@ -355,5 +355,11 @@ object EvaluatorTests extends TestSuite{
       eval("""local f(x)=null; f == null""") ==> ujson.False
       eval("""local f=null; f == null""") ==> ujson.True
     }
+
+
+    test("errorNonString") {
+      assert(evalErr("""error {a: "b"}""").contains("""{"a": "b"}"""))
+      assert(evalErr("""assert 1 == 2 : { a: "b"}; 1""").contains("""{"a": "b"}"""))
+    }
   }
 }
