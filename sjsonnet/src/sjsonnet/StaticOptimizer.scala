@@ -5,7 +5,7 @@ import ScopedExprTransform._
 
 /** StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope
  * indices) plus additional optimizations (post-order) and static checking (pre-order). */
-class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
+class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
   def failOrWarn(msg: String, expr: Expr): Expr = {
@@ -38,7 +38,7 @@ class StaticOptimizer(ev: EvalScope) extends ScopedExprTransform {
       scope.get(name) match {
         case ScopedVal(v: Val with Expr, _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
-        case null if name == "std" => Std.Std
+        case null if name == "std" => std
         case _ => failOrWarn("Unknown variable: "+name, e)
       }
 
