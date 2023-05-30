@@ -16,7 +16,7 @@ import scala.collection.mutable
   * `parseCache`.
   */
 class Evaluator(resolver: CachedResolver,
-                val extVars: Map[String, ujson.Value],
+                val extVars: String => Option[Expr],
                 val wd: Path,
                 val settings: Settings,
                 warnLogger: Error => Unit = null) extends EvalScope {

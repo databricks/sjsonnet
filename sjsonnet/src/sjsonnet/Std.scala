@@ -515,10 +515,7 @@ class Std {
   private object ExtVar extends Val.Builtin1("x") {
     def evalRhs(_x: Val, ev: EvalScope, pos: Position): Val = {
       val Val.Str(_, x) = _x
-      Materializer.reverse(
-        pos,
-        ev.extVars.getOrElse(x, Error.fail("Unknown extVar: " + x))
-      )
+      ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
     }
     override def staticSafe = false
   }
@@ -1015,6 +1012,12 @@ class Std {
             tag(t)(
               attrs.value.map {
                 case (k, ujson.Str(v)) => attr(k) := v
+
+                // use ujson.write to make sure output number format is same as
+                // google/jsonnet, e.g. whole numbers are printed without the
+                // decimal point and trailing zero
+                case (k, ujson.Num(v)) => attr(k) := ujson.write(v)
+
                 case (k, v) => Error.fail("Cannot call manifestXmlJsonml on " + v.getClass)
               }.toSeq,
               children.map(rec)
