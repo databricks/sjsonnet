@@ -27,5 +27,8 @@ object ParserTests extends TestSuite{
     test("givenDuplicateFieldsInListComprehension_expectError") {
       parseErr("""{ ["bar"]: x for x in [1, 2]}""") ==> """Expected no duplicate field: "bar" :1:29, found "}""""
     }
+    test("id starts with number") {
+      parseErr("""{1_n: "foo",}""") ==> """Expected "}":1:2, found "1_n: \"foo\"""""
+    }
   }
 }
