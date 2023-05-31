@@ -68,6 +68,7 @@ object FileTests extends TestSuite{
     test("unix_line_endings") - checkGolden()
     test("unparse") - checkGolden()
     test("verbatim_strings") - check()
+    test("issue_127") - check()
   }
 }
 

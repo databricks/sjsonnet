@@ -167,37 +167,20 @@ this blog post for more details:
 
 - [Writing a Faster Jsonnet Compiler](https://databricks.com/blog/2018/10/12/writing-a-faster-jsonnet-compiler.html)
 
-Here's the latest set of benchmarks I've run comparing Sjsonnet against
-google/jsonnet and google/go-jsonnet, measuring the time taken to  
-evaluate the `test_suite/` folder (smaller is better):
+Here's the latest set of benchmarks I've run (as  of 18 May 2023) comparing Sjsonnet against
+google/go-jsonnet and google/jsonnet, measuring the time taken to
+evaluate an arbitrary config file in the Databricks codebase:
 
-|              | Sjsonnet 0.1.5 | Sjsonnet 0.1.6 |
-| :----------- | -------------: | -------------: |
-| Scala 2.13.0 | 14.26ms ± 0.22 |  6.59ms ± 0.27 |
-| Scala 2.12.8 | 18.07ms ± 0.30 |  9.29ms ± 0.26 |
+|              | Sjsonnet 0.4.3 | google/go-jsonnet 0.20.0 | google/jsonnet 0.20.0 |
+| :----------- | -------------: | -------------: | -------------: |
+| staging/runbot-app.jsonnet (~6.6mb output JSON) | ~0.10s |  ~6.5s | ~67s |
 
-| google/jsonnet | google/go-jsonnet |
-| -------------: | ----------------: |
-|        ~1277ms |            ~274ms |
-
-google/jsonnet was built from source on commit
-f59758d1904bccda99598990f582dd2e1e9ad263, while google/go-jsonnet was
-`go get`ed at version `v0.13.0`. You can see the source code of the
-benchmark in  
-[SjsonnetTestMain.scala](https://github.com/databricks/sjsonnet/blob/master/sjsonnet/test/src-jvm/sjsonnet/SjsonnetTestMain.scala)
-
-Sjsonnet 0.4.0 and 0.4.1 further improve the performance significantly on our
-internal benchmarks. A set of new JMH benchmarks provide detailed
-performance data of an entire run (`MainBenchmark`) and the
-non-evaluation-related parts (`MaterializerBenchmark`, `OptimizerBenchmark`,
-`ParserBenchmark`). They can be run from the (JVM / Scala 2.13 only) sbt build.
-The Sjsonnet profiler is located in the same sbt project:
-
-The Sjsonnet command line which is run by all of these is defined in
+Sjsonnet was run as a long-lived daemon to keep the JVM warm,
+while go-jsonnet and google/jsonnet were run as subprocesses, following typical
+usage patterns. The Sjsonnet command
+line which is run by all of these is defined in
 `MainBenchmark.mainArgs`. You need to change it to point to a suitable input
-before running a benchmark or the profiler. (For Databricks employees who
-want to reproduce our benchmarks, the pre-configured command line is expected
-to be run against databricks/universe @ 7cbd8d7cb071983077d41fcc34f0766d0d2a247d).
+before running a benchmark or the profiler.
 
 Benchmark example:
 
@@ -279,6 +262,11 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 ```
 
 ## Changelog
+
+### 0.4.4
+
+- Update Mill to 0.10.12
+- Fix parsing of k/v cli arguments with an "=" in the value
 
 ### 0.4.2
 

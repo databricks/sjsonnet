@@ -3,7 +3,7 @@ val sjsonnetVersion = "0.4.3-SNAPSHOT"
 
 object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
-  def millSourcePath = super.millSourcePath / ammonite.ops.up
+  def millSourcePath = super.millSourcePath / os.up
   trait SjsonnetJvmNative extends SjsonnetCrossModule {
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"com.lihaoyi::os-lib::0.7.2",
