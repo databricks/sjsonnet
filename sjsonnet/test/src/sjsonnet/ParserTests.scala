@@ -35,6 +35,7 @@ object ParserTests extends TestSuite{
         LocalExpr(pos(6), Array(Bind(pos(6), "foo", null, BinaryOp(pos(27), Import(pos(13), "foo"), 3, Id(pos(29), "bar")))), Num(pos(34),0.0))
       parseErr("""local foo = import ("foo" + bar); 0""") ==> """Expected string literal (computed imports are not allowed):1:33, found "; 0""""
       parseErr("""local foo = import "foo" + bar; 0""") ==> """Expected string literal (computed imports are not allowed):1:31, found "; 0""""
+    }
 
     test("id starts with number") {
       parseErr("""{1_n: "foo",}""") ==> """Expected "}":1:2, found "1_n: \"foo\"""""
