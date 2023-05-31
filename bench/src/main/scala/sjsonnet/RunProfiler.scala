@@ -16,7 +16,7 @@ object RunProfiler extends App {
     importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
     parseCache = parseCache
   ) {
-    override def createEvaluator(resolver: CachedResolver, extVars: String => Option[String], wd: Path,
+    override def createEvaluator(resolver: CachedResolver, extVars: String => Option[Expr], wd: Path,
                                  settings: Settings, warn: Error => Unit): Evaluator =
       new ProfilingEvaluator(resolver, extVars, wd, settings, warn)
   }
