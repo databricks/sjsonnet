@@ -147,13 +147,12 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitError(e: Expr.Error)(implicit scope: ValScope): Nothing = {
-    Error.fail(
-      visitExpr(e.value) match {
-        case Val.Str(_, s) => s
-        case r => Materializer.stringify(r)
-      },
-      e.pos
-    )
+    Error.fail(materializeError(visitExpr(e.value)), e.pos)
+  }
+
+  private def materializeError(value: Val) = value match {
+    case Val.Str(_, s) => s
+    case r => Materializer.stringify(r)
   }
 
   def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
@@ -242,7 +241,7 @@ class Evaluator(resolver: CachedResolver,
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
         case msg =>
-          Error.fail("Assertion failed: " + visitExpr(msg).cast[Val.Str].value, e)
+          Error.fail("Assertion failed: " + materializeError(visitExpr(msg)), e)
       }
     }
     visitExpr(e.returned)
