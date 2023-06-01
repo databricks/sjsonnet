@@ -251,15 +251,28 @@ class Evaluator(resolver: CachedResolver,
   private def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
     visitExpr(e.value) match {
       case a: Val.Arr =>
-        a.slice(e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
-          e.end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt),
-          e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt))
-      case Val.Str(_, s) =>
-        val range =
-          e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt) until
-            e.end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt) by
+        new Val.Arr(
+          e.pos,
+          Util.sliceArr(
+            a.asLazyArray,
+            e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
+            e.end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt),
             e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-        Val.Str(e.pos, range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).mkString)
+          )
+        )
+
+
+      case Val.Str(_, s) =>
+        Val.Str(
+          e.pos,
+          Util.sliceStr(
+            s,
+            e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
+            e.end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt),
+            e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
+          )
+        )
+
       case x => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
     }
   }

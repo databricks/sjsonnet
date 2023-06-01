@@ -745,10 +745,9 @@ class Std {
       math.max(minVal, math.min(x, maxVal))
     },
     builtin("slice", "indexable", "index", "end", "step"){ (pos, ev, indexable: Val, index: Int, end: Int, step: Int) =>
-      val range = collection.immutable.Range(index, end, step)
-      val res = indexable match{
-        case Val.Str(pos0, s) => Val.Str(pos, new String(range.map(s.charAt).toArray))
-        case arr: Val.Arr => new Val.Arr(pos, range.map(arr.asArr.asLazy(_)).toArray)
+      val res = indexable match {
+        case Val.Str(pos0, s) => Val.Str(pos, Util.sliceStr(s, index, end, step))
+        case arr: Val.Arr => new Val.Arr(pos, Util.sliceArr(arr.asLazyArray, index, end, step))
         case _ => Error.fail("std.slice first argument must be indexable")
       }
       res: Val
