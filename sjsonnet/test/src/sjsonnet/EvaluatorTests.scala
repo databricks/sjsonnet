@@ -331,6 +331,7 @@ object EvaluatorTests extends TestSuite{
 
       eval("{ ['foo']+: x for x in  []}", false) ==> ujson.Obj()
       eval("{ ['foo']+: x for x in  [1]}", false) ==> ujson.Obj("foo" -> 1)
+      eval("{ ['foo']+: [x] for x in [1]} + { ['foo']+: [x] for x in [2]}", false) ==> ujson.Obj("foo" -> ujson.Arr(1,2))
     }
     test("givenNoDuplicateFieldsInListComprehension1_expectSuccess") {
       eval("""{ ["bar"]: x for x in [-876.89]}""") ==> ujson.Obj("bar" -> -876.89)
@@ -355,11 +356,17 @@ object EvaluatorTests extends TestSuite{
       eval("""local f(x)=null; f == null""") ==> ujson.False
       eval("""local f=null; f == null""") ==> ujson.True
     }
+
     test("identifierStartsWithKeyword") {
       for(keyword <- Parser.keywords){
         eval(s"""local ${keyword}Foo = 123; ${keyword}Foo""") ==> ujson.Num(123)
         eval(s"""{${keyword}Foo: 123}""") ==> ujson.Obj(s"${keyword}Foo" -> ujson.Num(123))
       }
+    }
+
+    test("errorNonString") {
+      assert(evalErr("""error {a: "b"}""").contains("""{"a": "b"}"""))
+      assert(evalErr("""assert 1 == 2 : { a: "b"}; 1""").contains("""{"a": "b"}"""))
     }
   }
 }

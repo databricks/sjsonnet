@@ -54,7 +54,7 @@ class Parser(val currentFile: Path) {
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
   def id[_: P] = P(
-    CharIn("_a-zA-Z0-9") ~~
+    CharIn("_a-zA-Z") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
   ).!.filter(s => !keywords.contains(s))
 
@@ -237,9 +237,14 @@ class Parser(val currentFile: Path) {
   )
 
   def local[_: P] = P( localExpr )
-  def importStr[_: P](pos: Position) = P( string.map(Expr.ImportStr(pos, _)) )
-  def `import`[_: P](pos: Position) = P( string.map(Expr.Import(pos, _)) )
+  def importStr[_: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
+  def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
   def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
+
+  def importExpr[_: P]: P[String] = P(expr.flatMap {
+    case Val.Str(_, s) => Pass(s)
+    case _ => Fail.opaque("string literal (computed imports are not allowed)")
+  })
 
   def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>
@@ -332,7 +337,7 @@ class Parser(val currentFile: Path) {
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), _, null, Visibility.Normal, rhs) =
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), plus, null, Visibility.Normal, rhs) =
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
@@ -350,7 +355,7 @@ class Parser(val currentFile: Path) {
           Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
         case _ => // do nothing
       }
-      Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, postLocals.toArray, comps._1, comps._2.toList)
+      Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, plus, postLocals.toArray, comps._1, comps._2.toList)
   }
 
   def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
@@ -381,7 +386,7 @@ class Parser(val currentFile: Path) {
   def bind[_: P] =
     P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
 
-  def args[_: P] = P( ((id ~ "=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def args[_: P] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
     } else {
