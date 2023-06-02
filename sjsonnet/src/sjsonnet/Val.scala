@@ -141,7 +141,7 @@ object Val{
   final class Obj(val pos: Position,
                   private[this] var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
-                  val triggerAsserts: Val.Obj => Unit,
+                  triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
                   private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
