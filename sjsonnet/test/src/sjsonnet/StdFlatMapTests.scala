@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object StdFlatMapTests extends TestSuite {
 
   def tests = Tests {
@@ -14,13 +14,11 @@ object StdFlatMapTests extends TestSuite {
 
       eval("std.flatMap(function (x) if x == \" \" then null else x, \"a b c d e\")") ==> ujson.Str("abcde")
 
-      try {
-        eval("std.flatMap(function(x) 123, 'Hello')")
-        assert(false)
-      } catch {
-        case e: Exception =>
-          assert(e.getMessage().startsWith("""sjsonnet.Error: flatMap func must return string, got number"""))
-      }
+      assert(
+        evalErr("std.flatMap(function(x) 123, 'Hello')")
+          .startsWith("sjsonnet.Error: flatMap func must return string, got number")
+      )
+
     }
   }
 }

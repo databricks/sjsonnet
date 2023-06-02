@@ -141,7 +141,7 @@ object Val{
   final class Obj(val pos: Position,
                   private[this] var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
-                  triggerAsserts: Val.Obj => Unit,
+                  val triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
                   private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
@@ -167,8 +167,8 @@ object Val{
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case null => new Val.Obj(pos, getValue0, false, null, lhs)
-        case x => new Val.Obj(pos, getValue0, false, null, x.addSuper(pos, lhs))
+        case null => new Val.Obj(pos, getValue0, false, triggerAsserts, lhs)
+        case x => new Val.Obj(pos, getValue0, false, triggerAsserts, x.addSuper(pos, lhs))
       }
     }
 

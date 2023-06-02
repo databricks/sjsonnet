@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object PreserveOrderTests extends TestSuite {
 
   def tests = Tests {
@@ -289,19 +289,17 @@ object PreserveOrderTests extends TestSuite {
     }
 
     test("preserveOrderError") {
-      try {
-        eval(
+      assert(
+        evalErr(
           """local x = { b: 1, a: 2, c: self.a + self.b };
-           error x""", true)
-        assert(false)
-      } catch {
-        case e: Exception =>
-          assert(e.getMessage().startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}"""))
-      }
+           error x""", preserveOrder = true
+        )
+          .startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}""")
+      )
     }
 
     test("preserveOrderPreservesEquality") {
-      eval("""{a: 1, b: 2} == {b: 2, a: 1}""", true).toString ==> "true"
+      eval("""{a: 1, b: 2} == {b: 2, a: 1}""", preserveOrder = true).toString ==> "true"
     }
 
     test("preserveOrderSet") {
