@@ -6,7 +6,7 @@ object FileTests extends TestSuite{
   val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path) = {
     val interp = new Interpreter(
-      Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
+      Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "test", "var2" -> ujson.Obj("x" -> 1, "y" -> 2)),
       OsPath(testSuiteRoot),
       importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot))),

@@ -6,7 +6,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 class ProfilingEvaluator(resolver: CachedResolver,
-                         extVars: Map[String, ujson.Value],
+                         extVars: String => Option[Expr],
                          wd: Path,
                          settings: Settings,
                          warn: Error => Unit)

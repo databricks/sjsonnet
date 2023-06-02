@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(extVars: Map[String, ujson.Value],
+class Interpreter(extVars: Map[String, String],
                   tlaVars: Map[String, ujson.Value],
                   wd: Path,
                   importer: Importer,
@@ -29,11 +29,22 @@ class Interpreter(extVars: Map[String, ujson.Value],
 
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
-  def createEvaluator(resolver: CachedResolver, extVars: Map[String, ujson.Value], wd: Path,
+  def createEvaluator(resolver: CachedResolver, extVars: String => Option[Expr], wd: Path,
                       settings: Settings, warn: Error => Unit): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, warn)
 
-  val evaluator: Evaluator = createEvaluator(resolver, extVars, wd, settings, warn)
+  lazy val evaluator: Evaluator = createEvaluator(
+    resolver,
+    // parse extVars lazily, because they can refer to each other and be recursive
+    extVars
+      .mapValues{ v => resolver.parse(wd / s"<ext-var $v>", v)(evaluator).fold(throw _, _._1) }
+      .lift,
+    wd,
+    settings,
+    warn
+  )
+
+  evaluator // force the lazy val
 
   def formatError(e: Error): String = {
     val s = new StringWriter()

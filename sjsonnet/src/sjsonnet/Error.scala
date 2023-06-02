@@ -96,7 +96,7 @@ object StaticError {
 }
 
 trait EvalErrorScope {
-  def extVars: Map[String, ujson.Value]
+  def extVars: String => Option[Expr]
   def importer: CachedImporter
   def wd: Path
 

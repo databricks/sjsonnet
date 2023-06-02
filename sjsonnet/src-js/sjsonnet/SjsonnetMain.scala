@@ -15,7 +15,7 @@ object SjsonnetMain {
                 importLoader: js.Function1[String, String],
                 preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
-      ujson.WebJson.transform(extVars, ujson.Value).obj.toMap,
+      ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map{case (k, ujson.Str(v)) => (k, v)},
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap,
       JsVirtualPath(wd0),
       new Importer {

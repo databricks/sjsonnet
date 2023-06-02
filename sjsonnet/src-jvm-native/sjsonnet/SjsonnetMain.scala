@@ -141,22 +141,22 @@ object SjsonnetMain {
                      importer: Option[(Path, String) => Option[os.Path]] = None,
                      warnLogger: String => Unit = null): Either[String, String] = {
     val path = os.Path(file, wd)
-    var varBinding = Map.empty[String, ujson.Value]
+    var varBinding = Map.empty[String, String]
     config.extStr.map(_.split("=", 2)).foreach{
-      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
-      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.Str(v))
+      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.write(System.getenv(x)))
+      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.write(v))
     }
     config.extStrFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
-        varBinding = varBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
+        varBinding = varBinding ++ Seq(x -> ujson.write(os.read(os.Path(v, wd))))
     }
     config.extCode.map(_.split("=", 2)).foreach {
-      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.read(System.getenv(x)))
-      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.read(v))
+      case Array(x) => varBinding = varBinding ++ Seq(x -> System.getenv(x))
+      case Array(x, v) => varBinding = varBinding ++ Seq(x -> v)
     }
     config.extCodeFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
-        varBinding = varBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
+        varBinding = varBinding ++ Seq(x -> os.read(os.Path(v, wd)))
     }
 
     var tlaBinding = Map.empty[String, ujson.Value]

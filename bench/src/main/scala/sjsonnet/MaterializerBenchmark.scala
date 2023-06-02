@@ -28,7 +28,7 @@ class MaterializerBenchmark {
     val path = os.Path(file, wd)
     var currentPos: Position = null
     this.interp = new Interpreter(
-      Map.empty[String, ujson.Value],
+      Map.empty[String, String],
       Map.empty[String, ujson.Value],
       OsPath(wd),
       importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),

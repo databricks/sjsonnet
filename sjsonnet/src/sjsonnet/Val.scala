@@ -102,11 +102,6 @@ object Val{
     def concat(newPos: Position, rhs: Arr): Arr =
       new Arr(newPos, value ++ rhs.value)
 
-    def slice(start: Int, end: Int, stride: Int): Arr = {
-      val range = start until end by stride
-      new Arr(pos, range.dropWhile(_ < 0).takeWhile(_ < value.length).map(value).toArray)
-    }
-
     def iterator: Iterator[Val] = value.iterator.map(_.force)
     def foreach[U](f: Val => U) = {
       var i = 0
@@ -498,6 +493,18 @@ object Val{
     override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
+      else super.apply(argVals, namedNames, outerPos)
+  }
+
+  abstract class Builtin4(pn1: String, pn2: String, pn3: String, pn4: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2, pn3, pn4), defs) {
+    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0), args(1), args(2), args(3), ev, pos)
+
+    def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, pos: Position): Val
+
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+      if(namedNames == null && argVals.length == 4)
+        evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, argVals(3).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 }
