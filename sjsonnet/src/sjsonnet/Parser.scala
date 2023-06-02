@@ -358,7 +358,7 @@ class Parser(val currentFile: Path) {
       Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, plus, postLocals.toArray, comps._1, comps._2.toList)
   }
 
-  def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ assertStmt | field )
+  def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
   def field[_: P] = P(
     (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
       case (pos, name, plus, p, h2, e) =>
