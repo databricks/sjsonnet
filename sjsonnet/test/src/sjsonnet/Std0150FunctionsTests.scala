@@ -103,5 +103,12 @@ object Std0150FunctionsTests extends TestSuite {
       check("""std.extVar("stdExtVarRecursive")""", 115)
     }
 
+    test("fold"){
+      eval("""std.foldr(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
+        ujson.Str("t e n n o s j this is")
+
+      eval("""std.foldl(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
+        ujson.Str("this is j s o n n e t")
+    }
   }
 }
