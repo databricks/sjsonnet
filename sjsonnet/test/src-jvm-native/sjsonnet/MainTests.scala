@@ -61,9 +61,25 @@ object MainTests extends TestSuite {
     }
 
     test("exec") {
-      val source = "local x = 1; local y = 2; x + y"
+      val source = "local x = [1]; local y = [2]; x + y"
       val (res, out, err) = runMain(source, "--exec")
-      assert((res, out, err) == (0, "3\n", ""))
+      val expectedJson =
+        """[
+          |   1,
+          |   2
+          |]
+          |""".stripMargin
+      assert((res, out, err) == (0, expectedJson, ""))
+    }
+    test("execYaml") {
+      val source = "local x = [1]; local y = [2]; x + y"
+      val (res, out, err) = runMain(source, "--exec", "--yaml-out")
+      val expectedYaml =
+        """- 1
+          |- 2
+          |
+          |""".stripMargin
+      assert((res, out, err) == (0, expectedYaml, ""))
     }
 
     test("yamlStreamOutputFile") {
