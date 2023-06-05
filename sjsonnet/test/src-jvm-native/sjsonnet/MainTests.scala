@@ -88,24 +88,24 @@ object MainTests extends TestSuite {
       val worldDestStr = os.read(multiDest / "world")
       assert(worldDestStr == expectedWorldDestStr)
     }
-//
-//    test("multiOutputFile") {
-//      val source = testSuiteRoot / "db" / "multi.jsonnet"
-//      val dest = os.temp()
-//      val multiDest = os.temp.dir()
-//      val (res, out, err) = runMain(source, "--multi", multiDest, "--output-file", dest)
-//      val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
-//      assert((res, out, err) == (0, "", ""))
-//
-//      val destStr = os.read(dest)
-//      assert(destStr == expectedOut)
-//
-//      val helloDestStr = os.read(multiDest / "hello")
-//      assert(helloDestStr == "1")
-//
-//      val worldDestStr = os.read(multiDest / "world")
-//      assert(worldDestStr == expectedWorldDestStr)
-//    }
+
+    test("multiOutputFile") {
+      val source = testSuiteRoot / "db" / "multi.jsonnet"
+      val dest = os.temp()
+      val multiDest = os.temp.dir()
+      val (res, out, err) = runMain(source, "--multi", multiDest, "--output-file", dest)
+      val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
+      assert((res, out, err) == (0, "", ""))
+
+      val destStr = os.read(dest)
+      assert(destStr == expectedOut)
+
+      val helloDestStr = os.read(multiDest / "hello")
+      assert(helloDestStr == "1")
+
+      val worldDestStr = os.read(multiDest / "world")
+      assert(worldDestStr == expectedWorldDestStr)
+    }
 
     test("multiYamlOut") {
       val source = testSuiteRoot / "db" / "multi.jsonnet"
