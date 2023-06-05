@@ -1,9 +1,9 @@
 package sjsonnet
 
+import utest._
+
 import java.io.{ByteArrayOutputStream, File, PrintStream}
 import java.util.Arrays
-
-import utest._
 
 object MainTests extends TestSuite {
 
