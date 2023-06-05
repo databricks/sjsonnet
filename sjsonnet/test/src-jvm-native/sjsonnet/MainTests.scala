@@ -94,7 +94,7 @@ object MainTests extends TestSuite {
       val dest = os.temp()
       val multiDest = os.temp.dir()
       val (res, out, err) = runMain(source, "--multi", multiDest, "--output-file", dest)
-      val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
+      val expectedOut = s"$multiDest/hello\n$multiDest/world"
       assert((res, out, err) == (0, "", ""))
 
       val destStr = os.read(dest)

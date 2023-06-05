@@ -77,14 +77,20 @@ object SjsonnetMain {
         if(hasWarnings && config.fatalWarnings.value) Left("")
         else Right(outputStr)
       }
-    } yield res
+    } yield (config, res)
 
     result match{
       case Left(err) =>
         if (!err.isEmpty) stderr.println(err)
         1
-      case Right(str) =>
-        if (!str.isEmpty) stdout.println(str)
+      case Right((config, str)) =>
+        if (!str.isEmpty) {
+          config.outputFile match {
+            case None => stdout.println(str)
+            case Some(f) => os.write.over(os.Path(f, wd), str)
+          }
+        }
+
         0
     }
   }
@@ -137,6 +143,10 @@ object SjsonnetMain {
 
   def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
+  /**
+   * @return Right(str) if there's some string that needs to be printed to stdout or
+   *         --output-file, Left(err) if there is an error to be reported
+   */
   def mainConfigured(file: String,
                      config: Config,
                      parseCache: ParseCache,
@@ -234,6 +244,7 @@ object SjsonnetMain {
                   _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
                 } yield relPath
               }
+
             renderedFiles.collect{case Left(err) => err} match{
               case Nil =>
                 Right[String, String](renderedFiles.collect{case Right(path) => path}.mkString("\n"))

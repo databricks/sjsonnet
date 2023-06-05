@@ -1,7 +1,7 @@
 package sjsonnet
 
-
 import mainargs.{main, arg, Leftover, Flag}
+
 @main
 case class Config(
   @arg(
