@@ -95,9 +95,7 @@ class Interpreter(extVars: Map[String, String],
             i += 1
           }
           new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
-            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = {
-              f.evalRhs(vs, es, fs, pos)
-            }
+            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = f.evalRhs(vs, es, fs, pos)
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = {
               evaluator.visitExpr(expr)(ValScope.empty)
             }
