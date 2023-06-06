@@ -143,6 +143,27 @@ object SjsonnetMain {
 
   def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
+  def parseBindings(strs: Seq[String],
+                    strFiles: Seq[String],
+                    codes: Seq[String],
+                    codeFiles: Seq[String],
+                    wd: os.Path) = {
+
+    def split(s: String) = s.split("=", 2) match{
+      case Array(x) => (x, System.getenv(x))
+      case Array(x, v) => (x, v)
+    }
+
+    def splitMap(s: Seq[String], f: String => String) = s.map(split).map{case (x, v) => (x, f(v))}
+    def readPath(v: String) = os.read(os.Path(v, wd))
+
+    Map() ++
+    splitMap(strs, v => ujson.write(v)) ++
+    splitMap(strFiles, v => ujson.write(readPath(v))) ++
+    splitMap(codes, identity) ++
+    splitMap(codeFiles, readPath)
+  }
+
   /**
    * @return Right(str) if there's some string that needs to be printed to stdout or
    *         --output-file, Left(err) if there is an error to be reported
@@ -159,45 +180,21 @@ object SjsonnetMain {
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / "<exec>") else (os.read(os.Path(file)), os.Path(file))
 
-    var varBinding = Map.empty[String, String]
-    config.extStr.map(_.split("=", 2)).foreach{
-      case Array(x) => varBinding = varBinding ++ Seq(x -> ujson.write(System.getenv(x)))
-      case Array(x, v) => varBinding = varBinding ++ Seq(x -> ujson.write(v))
-    }
-    config.extStrFile.map(_.split("=", 2)).foreach {
-      case Array(x, v) =>
-        varBinding = varBinding ++ Seq(x -> ujson.write(os.read(os.Path(v, wd))))
-    }
-    config.extCode.map(_.split("=", 2)).foreach {
-      case Array(x) => varBinding = varBinding ++ Seq(x -> System.getenv(x))
-      case Array(x, v) => varBinding = varBinding ++ Seq(x -> v)
-    }
-    config.extCodeFile.map(_.split("=", 2)).foreach {
-      case Array(x, v) =>
-        varBinding = varBinding ++ Seq(x -> os.read(os.Path(v, wd)))
-    }
+    val extBinding = parseBindings(
+      config.extStr, config.extStrFile,
+      config.extCode, config.extCodeFile,
+      wd
+    )
 
-    var tlaBinding = Map.empty[String, ujson.Value]
+    val tlaBinding = parseBindings(
+      config.tlaStr, config.tlaStrFile,
+      config.tlaCode, config.tlaCodeFile,
+      wd
+    )
 
-    config.tlaStr.map(_.split("=", 2)).foreach{
-      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
-      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(v))
-    }
-    config.tlaStrFile.map(_.split("=", 2)).foreach {
-      case Array(x, v) =>
-        tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
-    }
-    config.tlaCode.map(_.split("=", 2)).foreach {
-      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(System.getenv(x)))
-      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(v))
-    }
-    config.tlaCodeFile.map(_.split("=", 2)).foreach {
-      case Array(x, v) =>
-        tlaBinding = tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
-    }
     var currentPos: Position = null
     val interp = new Interpreter(
-      varBinding,
+      extBinding,
       tlaBinding,
       OsPath(wd),
       importer = importer match{

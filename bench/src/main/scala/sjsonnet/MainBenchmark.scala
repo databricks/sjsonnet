@@ -22,7 +22,7 @@ object MainBenchmark {
     val parseCache = new DefaultParseCache
     val interp = new Interpreter(
       Map.empty[String, String],
-      Map.empty[String, ujson.Value],
+      Map.empty[String, String],
       OsPath(wd),
       importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
       parseCache = parseCache
