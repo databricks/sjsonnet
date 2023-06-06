@@ -10,7 +10,8 @@ public class Example {
             System.err,
             os.package$.MODULE$.pwd(),
             scala.None$.empty(),
-            scala.None$.empty()
+            scala.None$.empty(),
+            new sjsonnet.Std().Std()
         );
     }
 }

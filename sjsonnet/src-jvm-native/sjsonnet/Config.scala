@@ -1,7 +1,7 @@
 package sjsonnet
 
-
 import mainargs.{main, arg, Leftover, Flag}
+
 @main
 case class Config(
   @arg(
@@ -118,4 +118,9 @@ case class Config(
     doc = "Fail if any warnings were emitted"
   )
   fatalWarnings: Flag = Flag(),
+  @arg(
+    short = 'e',
+    doc = "Evaluate the given string as Jsonnet rather than treating it as a file name"
+  )
+  exec: Flag = Flag(),
 )
