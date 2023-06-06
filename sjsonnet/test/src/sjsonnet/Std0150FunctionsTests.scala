@@ -103,5 +103,34 @@ object Std0150FunctionsTests extends TestSuite {
       check("""std.extVar("stdExtVarRecursive")""", 115)
     }
 
+    test("tlaVars"){
+      val interpreter = new Interpreter(
+        Map(),
+        Map(
+          "num" -> "1",
+          "str" -> "\"hello\"",
+          "bool" -> "true",
+          "jsonArrNums" -> """[1, 2, 3]""",
+          "jsonObjBools" -> """{"hello": false}""",
+          "code" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)""",
+          "std" -> """std.length("hello")""",
+        ),
+        DummyPath(),
+        Importer.empty,
+        parseCache = new DefaultParseCache,
+      )
+
+      def check(s: String, expected: ujson.Value) =
+        interpreter.interpret(s, DummyPath("(memory)")) ==> Right(expected)
+
+      check("""function(num) num""", 1)
+      check("""function(str) str""", "hello")
+      check("""function(bool) bool""", ujson.True)
+      check("""function(jsonArrNums) jsonArrNums""", ujson.Arr(1, 2, 3))
+      check("""function(jsonObjBools) jsonObjBools""", ujson.Obj("hello" -> false))
+      check("""function(code) code""", ujson.Obj("x" -> 1, "y" -> 2))
+      check("""function(std) std""", 5)
+    }
+
   }
 }

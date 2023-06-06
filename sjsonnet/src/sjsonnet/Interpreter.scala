@@ -12,7 +12,7 @@ import scala.util.control.NonFatal
   * evaluation to materialization, into a convenient wrapper class.
   */
 class Interpreter(extVars: Map[String, String],
-                  tlaVars: Map[String, ujson.Value],
+                  tlaVars: Map[String, String],
                   wd: Path,
                   importer: Importer,
                   val parseCache: ParseCache,
@@ -33,12 +33,15 @@ class Interpreter(extVars: Map[String, String],
                       settings: Settings, warn: Error => Unit): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, warn)
 
+
+  def parseVar(k: String, v: String) = {
+    resolver.parse(wd / s"<$k>", v)(evaluator).fold(throw _, _._1)
+  }
+
   lazy val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
-    extVars
-      .mapValues{ v => resolver.parse(wd / s"<ext-var $v>", v)(evaluator).fold(throw _, _._1) }
-      .lift,
+    k => extVars.get(k).map(v => parseVar(s"ext-var $k", v)),
     wd,
     settings,
     warn
@@ -73,7 +76,7 @@ class Interpreter(extVars: Map[String, String],
     }
   }
 
-  def evaluate[T](txt: String, path: Path): Either[Error, Val] = {
+  def evaluate(txt: String, path: Path): Either[Error, Val] = {
     resolver.cache(path) = txt
     for{
       res <- resolver.parse(path, txt)(evaluator)
@@ -84,15 +87,20 @@ class Interpreter(extVars: Map[String, String],
           val defaults2 = f.params.defaultExprs.clone()
           var i = 0
           while(i < defaults2.length) {
-            tlaVars.get(f.params.names(i)) match {
-              case Some(v) => defaults2(i) = Materializer.toExpr(v)(evaluator)
+            val k = f.params.names(i)
+            tlaVars.get(k) match {
+              case Some(v) => defaults2(i) = parseVar(s"tla-var $k", v)
               case None =>
             }
             i += 1
           }
           new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
-            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = f.evalRhs(vs, es, fs, pos)
-            override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = f.evalDefault(expr, vs, es)
+            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = {
+              f.evalRhs(vs, es, fs, pos)
+            }
+            override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = {
+              evaluator.visitExpr(expr)(ValScope.empty)
+            }
           }
         case x => x
       }

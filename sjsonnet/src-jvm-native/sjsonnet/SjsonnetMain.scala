@@ -159,23 +159,23 @@ object SjsonnetMain {
         varBinding = varBinding ++ Seq(x -> os.read(os.Path(v, wd)))
     }
 
-    var tlaBinding = Map.empty[String, ujson.Value]
+    var tlaBinding = Map.empty[String, String]
 
     config.tlaStr.map(_.split("=", 2)).foreach{
-      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(System.getenv(x)))
-      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(v))
+      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.write(System.getenv(x)))
+      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.write(v))
     }
     config.tlaStrFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
-        tlaBinding = tlaBinding ++ Seq(x -> ujson.Str(os.read(os.Path(v, wd))))
+        tlaBinding = tlaBinding ++ Seq(x -> ujson.write(os.read(os.Path(v, wd))))
     }
     config.tlaCode.map(_.split("=", 2)).foreach {
-      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(System.getenv(x)))
-      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> ujson.read(v))
+      case Array(x) => tlaBinding = tlaBinding ++ Seq(x -> System.getenv(x))
+      case Array(x, v) => tlaBinding = tlaBinding ++ Seq(x -> v)
     }
     config.tlaCodeFile.map(_.split("=", 2)).foreach {
       case Array(x, v) =>
-        tlaBinding = tlaBinding ++ Seq(x -> ujson.read(os.read(os.Path(v, wd))))
+        tlaBinding = tlaBinding ++ Seq(x -> os.read(os.Path(v, wd)))
     }
     var currentPos: Position = null
     val interp = new Interpreter(
