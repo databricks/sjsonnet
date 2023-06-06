@@ -1,10 +1,7 @@
 package sjsonnet
 
 import java.io.{StringWriter, Writer}
-import java.util.regex.Pattern
-
 import upickle.core.{ArrVisitor, ObjVisitor}
-import fastparse.IndexedParserInput
 
 import scala.collection.mutable
 /**
@@ -16,7 +13,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indentArrayInObject: Boolean = false,
                          indent: Int,
                          idealWidth: Int = 80,
-                         getCurrentPosition: () => Position) extends BaseRenderer[Writer](out, indent){
+                         getCurrentPosition: () => Position) extends BaseCharRenderer[Writer](out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterColon = false
@@ -68,7 +65,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     // or have leading/trailing spaces, are rendered single-quoted
     else if (PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
       val strWriter = new StringWriter
-      BaseRenderer.escape(strWriter, s, unicode = true)
+      BaseCharRenderer.escape(strWriter, s, unicode = true)
       val quotedStr = "'" + str.replace("'", "''") + "'"
       PrettyYamlRenderer.writeWrappedString(quotedStr, leftHandPrefixOffset, out, indent * (depth + 1), idealWidth)
       leftHandPrefixOffset = quotedStr.length + 2
@@ -182,7 +179,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitObject(length: Int, jsonKeys: Boolean, index: Int) = new ObjVisitor[Writer, Writer] {
     firstElementInArray = false
     var empty = true
     flushBuffer()

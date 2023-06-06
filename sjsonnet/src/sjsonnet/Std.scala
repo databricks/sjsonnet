@@ -970,7 +970,7 @@ class Std {
     },
     builtin("escapeStringJson", "str"){ (pos, ev, str: String) =>
       val out = new StringWriter()
-      BaseRenderer.escape(out, str, unicode = true)
+      BaseCharRenderer.escape(out, str, unicode = true)
       out.toString
     },
     builtin("escapeStringBash", "str"){ (pos, ev, str: String) =>

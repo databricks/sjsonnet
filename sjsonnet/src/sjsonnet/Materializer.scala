@@ -25,7 +25,7 @@ abstract class Materializer {
       case obj: Val.Obj =>
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
-        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , -1)
+        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , true, -1)
         val sort = !evaluator.settings.preserveOrder
         var prevKey: String = null
         obj.foreachElement(sort, evaluator.emptyMaterializeFileScopePos) { (k, v) =>

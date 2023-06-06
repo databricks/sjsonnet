@@ -12,14 +12,14 @@ import upickle.core.{ArrVisitor, ObjVisitor}
   *
   */
 class OldRenderer(out: Writer = new java.io.StringWriter(),
-                  indent: Int = -1) extends BaseRenderer(out, indent){
+                  indent: Int = -1) extends BaseCharRenderer(out, indent){
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int) = {
     flushBuffer()
     out.append(RenderUtils.renderDouble(d))
     out
   }
-  override val colonSnippet = ": "
+  val colonSnippet = ": "
   override def flushBuffer() = {
     if (commaBuffered) {
       if (indent == -1) out.append(", ")
@@ -63,7 +63,7 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')
@@ -94,7 +94,7 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
 
 
 class OldPythonRenderer(out: Writer = new java.io.StringWriter(),
-                        indent: Int = -1) extends BaseRenderer(out, indent){
+                        indent: Int = -1) extends BaseCharRenderer(out, indent){
 
   override def visitNull(index: Int) = {
     flushBuffer()
@@ -114,7 +114,7 @@ class OldPythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override val colonSnippet = ": "
+  val colonSnippet = ": "
   override def flushBuffer() = {
     if (commaBuffered) {
       commaBuffered = false

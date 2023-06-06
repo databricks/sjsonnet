@@ -39,8 +39,27 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): Val =
     Val.Num(pos,
       if (decIndex != -1 || expIndex != -1) s.toString.toDouble
-      else upickle.core.Util.parseIntegralNum(s, decIndex, expIndex, index)
+      else upickle.core.ParseUtils.parseIntegralNum(s, decIndex, expIndex, index)
     )
 
   def visitString(s: CharSequence, index: Int): Val = Val.Str(pos, s.toString)
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {
+    val cache = mutable.HashMap.empty[Any, Val]
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    var key: String = null
+
+    def subVisitor: Visitor[_, _] = self
+
+    def visitKey(index: Int) = upickle.core.StringVisitor
+
+    def visitKeyValue(s: Any): Unit = key = s.toString
+
+    def visitValue(v: Val, index: Int): Unit = {
+      cache.put(key, v)
+      allKeys.put(key, false)
+    }
+
+    def visitEnd(index: Int): Val = new Val.Obj(pos, null, true, null, null, cache, allKeys)
+  }
 }
