@@ -103,6 +103,7 @@ object Std0150FunctionsTests extends TestSuite {
       check("""std.extVar("stdExtVarRecursive")""", 115)
     }
 
+
     test("tlaVars"){
       val interpreter = new Interpreter(
         Map(),
@@ -132,5 +133,12 @@ object Std0150FunctionsTests extends TestSuite {
       check("""function(std) std""", 5)
     }
 
+    test("fold"){
+      eval("""std.foldr(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
+        ujson.Str("t e n n o s j this is")
+
+      eval("""std.foldl(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
+        ujson.Str("this is j s o n n e t")
+    }
   }
 }
