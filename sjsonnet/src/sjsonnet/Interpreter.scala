@@ -4,7 +4,6 @@ import java.io.{PrintWriter, StringWriter}
 
 import sjsonnet.Expr.Params
 
-import scala.collection.mutable
 import scala.util.control.NonFatal
 
 /**
