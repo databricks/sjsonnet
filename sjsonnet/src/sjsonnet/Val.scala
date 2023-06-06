@@ -167,8 +167,8 @@ object Val{
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
       `super` match{
-        case null => new Val.Obj(pos, getValue0, false, null, lhs)
-        case x => new Val.Obj(pos, getValue0, false, null, x.addSuper(pos, lhs))
+        case null => new Val.Obj(pos, getValue0, false, triggerAsserts, lhs)
+        case x => new Val.Obj(pos, getValue0, false, triggerAsserts, x.addSuper(pos, lhs))
       }
     }
 

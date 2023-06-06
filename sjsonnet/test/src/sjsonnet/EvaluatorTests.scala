@@ -1,17 +1,10 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object EvaluatorTests extends TestSuite{
 
-  def evalErr(s: String, strict: Boolean = false) = {
-    try {
-      val x = eval(s, strict = strict)
-      throw new Exception (s"Expected exception, got result: $x")
-    }catch{case e: Exception =>
-      e.getMessage.split('\n').map(_.trim).mkString("\n") // normalize inconsistent indenation on JVM vs JS
-    }
-  }
+
   def tests = Tests{
     test("arithmetic") {
       eval("1 + 2 + 3") ==> ujson.Num(6)
@@ -315,13 +308,13 @@ object EvaluatorTests extends TestSuite{
       eval("'%#-0- + 5.5f' % -123.456") ==> ujson.Str("-123.45600")
     }
     test("strict") {
-      eval("({ a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
-      evalErr("({ a: 1 } { b: 2 }).a", true) ==>
+      eval("({ a: 1 } { b: 2 }).a", strict = false) ==> ujson.Num(1)
+      evalErr("({ a: 1 } { b: 2 }).a", strict = true) ==>
         """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
           |at [ObjExtend].(:1:11)""".stripMargin
-      eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", false) ==> ujson.Num(1)
-      eval("local x = { c: 3 }; (x { a: 1 }).a", true) ==> ujson.Num(1)
-      evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", true) ==>
+      eval("local x = { c: 3 }; (x { a: 1 } { b: 2 }).a", strict = false) ==> ujson.Num(1)
+      eval("local x = { c: 3 }; (x { a: 1 }).a", strict = true) ==> ujson.Num(1)
+      evalErr("local x = { c: 3 }; ({ a: 1 } { b: 2 }).a", strict = true) ==>
         """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
           |at [ObjExtend].(:1:31)""".stripMargin
     }
@@ -367,6 +360,14 @@ object EvaluatorTests extends TestSuite{
     test("errorNonString") {
       assert(evalErr("""error {a: "b"}""").contains("""{"a": "b"}"""))
       assert(evalErr("""assert 1 == 2 : { a: "b"}; 1""").contains("""{"a": "b"}"""))
+    }
+
+    test("assertInheritance"){
+      test - assert(evalErr("""{ } + {assert false}""").contains("sjsonnet.Error: Assertion failed"))
+      test - assert(evalErr("""{assert false} + {}""").contains("sjsonnet.Error: Assertion failed"))
+      test - assert(evalErr("""{assert false} + {} + {}""").contains("sjsonnet.Error: Assertion failed"))
+      test - assert(evalErr("""{} + {assert false} + {}""").contains("sjsonnet.Error: Assertion failed"))
+      test - assert(evalErr("""{} + {} + {assert false}""").contains("sjsonnet.Error: Assertion failed"))
     }
   }
 }
