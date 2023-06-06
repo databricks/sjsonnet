@@ -151,24 +151,47 @@ class Std {
   private object Foldl extends Val.Builtin3("func", "arr", "init") {
     def evalRhs(_func: Val, arr: Val, init: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
-      var current = init
-      for(item <- arr.asArr.asLazyArray){
-        val c = current
-        current = func.apply2(c, item, pos.noOffset)(ev)
+      arr match{
+        case arr: Val.Arr =>
+          var current = init
+          for (item <- arr.asLazyArray) {
+            val c = current
+            current = func.apply2(c, item, pos.noOffset)(ev)
+          }
+          current
+
+        case s: Val.Str =>
+          var current = init
+          for (char <- s.value) {
+            val c = current
+            current = func.apply2(c, Val.Str(pos, new String(Array(char))), pos.noOffset)(ev)
+          }
+          current
       }
-      current
+
+
     }
   }
 
   private object Foldr extends Val.Builtin3("func", "arr", "init") {
     def evalRhs(_func: Val, arr: Val, init: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
-      var current = init
-      for(item <- arr.asArr.asLazyArray.reverse){
-        val c = current
-        current = func.apply2(item, c, pos.noOffset)(ev)
+      arr match {
+        case arr: Val.Arr =>
+          var current = init
+          for (item <- arr.asLazyArray.reverse) {
+            val c = current
+            current = func.apply2(item, c, pos.noOffset)(ev)
+          }
+          current
+        case s: Val.Str =>
+          var current = init
+          for (char <- s.value) {
+            val c = current
+            current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(ev)
+          }
+          current
       }
-      current
     }
   }
 
