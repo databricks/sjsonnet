@@ -84,19 +84,21 @@ class Interpreter(extVars: Map[String, String],
       res = res0 match{
         case f: Val.Func =>
           val defaults2 = f.params.defaultExprs.clone()
+          val tlaExpressions = collection.mutable.Set.empty[Expr]
           var i = 0
           while(i < defaults2.length) {
             val k = f.params.names(i)
-            tlaVars.get(k) match {
-              case Some(v) => defaults2(i) = parseVar(s"tla-var $k", v)
-              case None =>
+            for(v <- tlaVars.get(k)){
+              val parsed = parseVar(s"tla-var $k", v)
+              defaults2(i) = parsed
+              tlaExpressions.add(parsed)
             }
             i += 1
           }
           new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
             def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) = f.evalRhs(vs, es, fs, pos)
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = {
-              evaluator.visitExpr(expr)(ValScope.empty)
+              evaluator.visitExpr(expr)(if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs)
             }
           }
         case x => x

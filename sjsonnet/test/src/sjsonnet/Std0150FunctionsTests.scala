@@ -117,7 +117,14 @@ object Std0150FunctionsTests extends TestSuite {
           "std" -> """std.length("hello")""",
         ),
         DummyPath(),
-        Importer.empty,
+        new Importer {
+          override def resolve(docBase: Path, importName: String): Option[Path] = importName match{
+            case "bar.json" => Some(DummyPath("bar"))
+          }
+          override def read(path: Path): Option[String] = path match{
+            case DummyPath("bar") => Some("""{"x": "y"}""")
+          }
+        },
         parseCache = new DefaultParseCache,
       )
 
@@ -131,6 +138,12 @@ object Std0150FunctionsTests extends TestSuite {
       check("""function(jsonObjBools) jsonObjBools""", ujson.Obj("hello" -> false))
       check("""function(code) code""", ujson.Obj("x" -> 1, "y" -> 2))
       check("""function(std) std""", 5)
+      // Make sure top-level-vars which use their in-code defined default
+      // values work
+      //
+      // For some reason, this needs to go through the import codepath to
+      // trigger the failure if it's not properly implemented. Not sure why
+      check("""local foo = import "bar.json"; function(qux = foo) qux""", ujson.Obj("x" -> "y"))
     }
 
     test("fold"){
