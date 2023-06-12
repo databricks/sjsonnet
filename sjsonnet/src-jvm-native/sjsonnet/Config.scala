@@ -123,4 +123,9 @@ case class Config(
     doc = "Evaluate the given string as Jsonnet rather than treating it as a file name"
   )
   exec: Flag = Flag(),
+  @arg(
+    name = "no-duplicate-keys-in-comprehension",
+    doc = "Raise an error if an object comprehension contains duplicate keys"
+  )
+  noDuplicateKeysInComprehension: Flag = Flag(),
 )

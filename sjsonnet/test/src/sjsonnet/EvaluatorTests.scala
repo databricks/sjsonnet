@@ -333,17 +333,32 @@ object EvaluatorTests extends TestSuite{
       eval("""{ ["bar_" + x]: x for x in [5,12]}""") ==> ujson.Obj("bar_5" -> 5, "bar_12" -> 12)
     }
     test("givenDuplicateFieldsInListComprehension_expectFailure") {
-      evalErr("""{ [x]: x for x in ["A", "A"]}""") ==>
+      evalErr("""{ [x]: x for x in ["A", "A"]}""", noDuplicateKeysInComprehension = true) ==>
         """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
           |at .(:1:3)""".stripMargin
+    }
+    test("givenDuplicateFieldsInListComprehension_noflag_expectSuccess") {
+      eval("""{ [x]: x for x in ["A", "A"]}""", noDuplicateKeysInComprehension = false) ==>
+        ujson.Obj("A" -> "A")
     }
     test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
       evalErr(
         """local y = { a: "A" };
           |local z = { a: "A" };
-          |{ [x.a]: x for x in [y, z]}""".stripMargin) ==>
+          |{ [x.a]: x for x in [y, z]}""".stripMargin,
+         noDuplicateKeysInComprehension = true
+      ) ==>
         """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
           |at .(:3:3)""".stripMargin
+    }
+    test("givenDuplicateFieldsInIndirectListComprehension_noflag_expectSuccess") {
+      eval(
+        """local y = { a: "A" };
+          |local z = { a: "A", "b": "B" };
+          |{ [x.a]: x for x in [y, z]}""".stripMargin,
+         noDuplicateKeysInComprehension = false
+      ) ==>
+        ujson.Obj("A" -> ujson.Obj("a" -> "A", "b" -> "B"))
     }
     test("functionEqualsNull") {
       eval("""local f(x)=null; f == null""") ==> ujson.False

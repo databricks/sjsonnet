@@ -6,6 +6,7 @@ class Settings(
   val preserveOrder: Boolean = false,
   val strict: Boolean = false,
   val noStaticErrors: Boolean = false,
+  val noDuplicateKeysInComprehension: Boolean = false,
 )
 
 object Settings {

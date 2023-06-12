@@ -215,6 +215,7 @@ object SjsonnetMain {
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
         noStaticErrors = config.noStaticErrors.value,
+        noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
       ),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       warnLogger = warnLogger,
