@@ -178,7 +178,11 @@ object SjsonnetMain {
                      std: Val.Obj = new Std().Std): Either[String, String] = {
 
     val (jsonnetCode, path) =
-      if (config.exec.value) (file, wd / "<exec>") else (os.read(os.Path(file)), os.Path(file))
+      if (config.exec.value) (file, wd / "<exec>")
+      else {
+        val p = os.Path(file, wd)
+        (os.read(p), p)
+      }
 
     val extBinding = parseBindings(
       config.extStr, config.extStrFile,
