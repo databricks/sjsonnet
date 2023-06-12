@@ -153,5 +153,10 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.foldl(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
         ujson.Str("this is j s o n n e t")
     }
+    test("reverse"){
+      eval("""std.reverse([])""") ==> ujson.Arr()
+      eval("""std.reverse([1])""") ==> ujson.Arr(1)
+      eval("""std.reverse(["1", true, null])""") ==> ujson.Arr(ujson.Null, true, "1")
+    }
   }
 }

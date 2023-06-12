@@ -464,6 +464,11 @@ class Std {
       new Val.Arr(pos, out.toArray)
     }
   }
+  private object Reverse extends Val.Builtin1("arrs") {
+    def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
+      new Val.Arr(pos, arrs.asArr.asLazyArray.reverse)
+    }
+  }
 
   private object Split extends Val.Builtin2("str", "c") {
     def evalRhs(_str: Val, _c: Val, ev: EvalScope, pos: Position): Val = {
@@ -946,6 +951,7 @@ class Std {
     },
 
     "flattenArrays" -> FlattenArrays,
+    "reverse" -> Reverse,
 
     builtin("manifestIni", "v"){ (pos, ev, v: Val) =>
       val materialized = Materializer(v)(ev)
