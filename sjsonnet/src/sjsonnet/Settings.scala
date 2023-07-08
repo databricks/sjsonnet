@@ -7,6 +7,7 @@ class Settings(
   val strict: Boolean = false,
   val noStaticErrors: Boolean = false,
   val noDuplicateKeysInComprehension: Boolean = false,
+  val strictImportSyntax: Boolean = false,
 )
 
 object Settings {

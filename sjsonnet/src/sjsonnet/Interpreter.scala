@@ -21,7 +21,7 @@ class Interpreter(extVars: Map[String, String],
                   std: Val.Obj = new Std().Std
                   ) { self =>
 
-  val resolver = new CachedResolver(importer, parseCache) {
+  val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
       handleException(new StaticOptimizer(evaluator, std).optimize(expr), fs)
   }

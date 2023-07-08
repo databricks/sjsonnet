@@ -128,4 +128,9 @@ case class Config(
     doc = "Raise an error if an object comprehension contains duplicate keys"
   )
   noDuplicateKeysInComprehension: Flag = Flag(),
+  @arg(
+    name = "strict-import-syntax",
+    doc = """Raise an error if import expressions are used without proper parentheses, e.g. import "foo".bar rather than (import "foo").bar"""
+  )
+  strictImportSyntax: Flag = Flag(),
 )

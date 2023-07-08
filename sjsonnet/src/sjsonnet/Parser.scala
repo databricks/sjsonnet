@@ -44,7 +44,8 @@ object Parser {
   private val emptyLazyArray = new Array[Lazy](0)
 }
 
-class Parser(val currentFile: Path) {
+class Parser(val currentFile: Path,
+             strictImportSyntax: Boolean) {
   import Parser._
 
   private val fileScope = new FileScope(currentFile)
@@ -241,10 +242,13 @@ class Parser(val currentFile: Path) {
   def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
   def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
 
-  def importExpr[_: P]: P[String] = P(expr.flatMap {
-    case Val.Str(_, s) => Pass(s)
-    case _ => Fail.opaque("string literal (computed imports are not allowed)")
-  })
+  def importExpr[_: P]: P[String] = P(
+    if (!strictImportSyntax) string
+    else expr.flatMap {
+      case Val.Str(_, s) => Pass(s)
+      case _ => Fail.opaque("string literal (computed imports are not allowed)")
+    }
+  )
 
   def unaryOpExpr[_: P](pos: Position, op: Char) = P(
     expr1.map{ e =>

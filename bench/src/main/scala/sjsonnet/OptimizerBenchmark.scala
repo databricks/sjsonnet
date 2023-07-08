@@ -26,7 +26,7 @@ class OptimizerBenchmark {
   def setup(): Unit = {
     val (allFiles, ev) = MainBenchmark.findFiles()
     this.inputs = allFiles.map { case (p, s) =>
-      fastparse.parse(s, new Parser(p).document(_)) match {
+      fastparse.parse(s, new Parser(p, true).document(_)) match {
         case Success(v, _) => v
       }
     }
