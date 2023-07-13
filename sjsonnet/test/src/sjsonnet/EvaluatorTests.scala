@@ -383,6 +383,23 @@ object EvaluatorTests extends TestSuite{
       test - assert(evalErr("""{assert false} + {} + {}""").contains("sjsonnet.Error: Assertion failed"))
       test - assert(evalErr("""{} + {assert false} + {}""").contains("sjsonnet.Error: Assertion failed"))
       test - assert(evalErr("""{} + {} + {assert false}""").contains("sjsonnet.Error: Assertion failed"))
+      test - {
+        val problematicStrictInheritedAssertionsSnippet =
+          """local template = { assert self.flag };
+            |{ a: template { flag: true, }, b: template { flag: false, } }
+            |""".stripMargin
+        assert(
+          evalErr(
+            problematicStrictInheritedAssertionsSnippet,
+            strictInheritedAssertions = true
+          ).contains("sjsonnet.Error: Assertion failed")
+        )
+
+        assert(
+          eval(problematicStrictInheritedAssertionsSnippet, strictInheritedAssertions = false) ==
+          ujson.Obj("a" -> ujson.Obj("flag" -> true), "b" -> ujson.Obj("flag" -> false))
+        )
+      }
     }
   }
 }

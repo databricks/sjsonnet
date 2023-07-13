@@ -145,6 +145,7 @@ object Val{
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
                   private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+    var asserting: Boolean = false
 
     def getSuper = `super`
 

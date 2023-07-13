@@ -513,8 +513,22 @@ class Evaluator(resolver: CachedResolver,
       } else createNewScope(self, sup)
     }
 
-    def assertions(self: Val.Obj): Unit = if (!asserting) {
-      asserting = true
+    def assertions(self: Val.Obj): Unit = if (
+      // We need to avoid asserting the same object more than once to prevent
+      // infinite recursion, but the previous implementation had the `asserting`
+      // flag kept under the object's *instantiation* rather than under the
+      // object itself. That means that objects that are instantiated once then
+      // extended multiple times would only trigger the assertions once, rather
+      // than once per extension.
+      //
+      // Due to backwards compatibility concerns, this fix has to go in under
+      // the flag `strictInheritedAssertions`, to be removed after an appropriate
+      // time period has passed.
+      (settings.strictInheritedAssertions && !self.asserting) ||
+      (!settings.strictInheritedAssertions && !asserting)
+    ) {
+      if (settings.strictInheritedAssertions) self.asserting = true
+      else asserting = true
       val newScope: ValScope = makeNewScope(self, self.getSuper)
       var i = 0
       while(i < asserts.length) {
