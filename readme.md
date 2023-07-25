@@ -287,7 +287,7 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
   when it should be `(import "foo").bar`, following upstream google/jsonnet.
   This is optional for migration purposes but will likely become the default in future
   [#153](https://github.com/databricks/sjsonnet/pull/153)
-- [ccbe6e](https://github.com/databricks/sjsonnet/commit/ccbe6e3a3f8cfb661ab6fa733aff690a61e47022)
+  [ccbe6e](https://github.com/databricks/sjsonnet/commit/ccbe6e3a3f8cfb661ab6fa733aff690a61e47022)
 
 - Allow assertions to take non-string error messages [#170](https://github.com/databricks/sjsonnet/pull/170)
 
