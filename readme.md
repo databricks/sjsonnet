@@ -234,13 +234,13 @@ mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
 ```bash
-./mill show sjsonnet[2.13.0].assembly
+./mill -i show sjsonnet[2.13.4].jvm.assembly
 ```
 
 To create the executable. For the client-server executable, you can use
 
 ```bash
-./mill show sjsonnet[2.13.0].server.assembly
+./mill -i show sjsonnet[2.13.4].server.assembly
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
@@ -262,6 +262,55 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 ```
 
 ## Changelog
+
+### 0.4.5
+
+- Make Jsonnet standard library configurable and non-global
+  [#166](https://github.com/databricks/sjsonnet/pull/166), fixing a race condition
+  on library initialization in multithreaded environments and allowing custom `std.*`
+  functions to be passed in by the user
+
+- Added a flag `--no-duplicate-keys-in-comprehension` to follow upstream google/jsonnet
+  behavior of failing if a dictionary comprehension
+  [#156](https://github.com/databricks/sjsonnet/pull/156)
+  [ea8720f](https://github.com/databricks/sjsonnet/commit/ea8720f218a4765b64e6313ac9f4a84d99c6e315).
+  This is optional for migration purposes but will likely become the default in future
+
+- Disallow Jsonnet identifiers that start with numbers [#161](https://github.com/databricks/sjsonnet/pull/161)
+
+- Fix parsing of `+:` in dictionary comprehensions [#155](https://github.com/databricks/sjsonnet/pull/155)
+
+- Fix parse failure when passing `id == ...` to a function arguments
+  [#151](https://github.com/databricks/sjsonnet/pull/151)
+
+- Add a flag `--strict-import-syntax` to disallow the syntax `import "foo".bar`,
+  when it should be `(import "foo").bar`, following upstream google/jsonnet.
+  This is optional for migration purposes but will likely become the default in future
+  [#153](https://github.com/databricks/sjsonnet/pull/153)
+- [ccbe6e](https://github.com/databricks/sjsonnet/commit/ccbe6e3a3f8cfb661ab6fa733aff690a61e47022)
+
+- Allow assertions to take non-string error messages [#170](https://github.com/databricks/sjsonnet/pull/170)
+
+- Fix parsing of object keys starting with the prefix `assert`
+  [#169](https://github.com/databricks/sjsonnet/pull/169)
+
+- Properly propagate assertions during inheritance [#172](https://github.com/databricks/sjsonnet/pull/172),
+  and add the flag `--strict-inherited-assertions` to fix a bug where assertions
+  inherited from a shared object were only triggering once, rather than
+  once-per-inheritor [95342](https://github.com/databricks/sjsonnet/commit/9534260fff4a50d29db379e307bce9a484790fa7).
+  This is optional for migration purposes but will likely become the default in future
+
+- Add `std.slice`, `std.manifestJsonMinified`, fix handling of numbers in
+  `manifestXmlJsonml`, handling of code in `extCode`
+  [#171](https://github.com/databricks/sjsonnet/pull/171)
+
+- Add the ability to include code in `--tla-code` and `--tla-code-file`
+  [#175](https://github.com/databricks/sjsonnet/pull/175)
+
+- Add `std.reverse` [a425342](https://github.com/databricks/sjsonnet/commit/a42534244c6966d049f38167473339be899d11af)
+
+- Fixes to main method handling of various combinations of `--exec`, `--yaml-out`,
+  `-yaml-stream`, `--multi`, and `--output-file` [#174](https://github.com/databricks/sjsonnet/pull/174)
 
 ### 0.4.4
 
