@@ -1,10 +1,14 @@
 package sjsonnet
 
+import org.json.JSONObject
+
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
+import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.Constructor
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -30,6 +34,10 @@ object Platform {
   }
   def xzString(s: String): String = {
     xzBytes(s.getBytes())
+  }
+  def yamlToJson(yamlString: String): String = {
+    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new Constructor(classOf[java.util.LinkedHashMap[String, Object]])).load(yamlString)
+    new JSONObject(yaml).toString()
   }
   def md5(s: String): String = {
     java.security.MessageDigest.getInstance("MD5")

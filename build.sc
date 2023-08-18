@@ -105,7 +105,9 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       millSourcePath / "src-jvm-js"
     )
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"org.tukaani:xz::1.8"
+      ivy"org.json:json:20211205",
+      ivy"org.tukaani:xz::1.8",
+      ivy"org.yaml:snakeyaml::1.30"
     )
     def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**")
     //def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
