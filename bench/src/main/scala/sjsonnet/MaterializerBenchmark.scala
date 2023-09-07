@@ -58,7 +58,14 @@ class MaterializerBenchmark {
   private def oldRenderPython() = renderWith(new OldPythonRenderer(_, indent=3))
   private def oldRenderYaml() = renderWith(new OldYamlRenderer(_, indent=3))
 
-  private def renderPrettyYaml() = renderWith(new PrettyYamlRenderer(_, indent=3, getCurrentPosition = () => null))
+  private def renderPrettyYaml() = renderWith(
+    new PrettyYamlRenderer(
+      _,
+      indent=3,
+      getCurrentPosition = () => null,
+      noUnquotedStringLiterals = false
+    )
+  )
 
   private def renderWith[T <: Writer](r: StringWriter => JsVisitor[T, T]): String = {
     val writer = new StringWriter
