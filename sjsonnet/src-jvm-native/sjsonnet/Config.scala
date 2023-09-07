@@ -139,8 +139,8 @@ case class Config(
   )
   strictInheritedAssertions: Flag = Flag(),
   @arg(
-    name = "no-unquoted-string-literals",
+    name = "yaml-no-unquoted-string-literals",
     doc = """Forces all YAML string literals to be quoted, to avoid issues with non-compliant YAML parsers interpreting them in different ways"""
   )
-  noUnquotedStringLiterals: Flag = Flag(),
+  yamlNoUnquotedStringLiterals: Flag = Flag(),
 )

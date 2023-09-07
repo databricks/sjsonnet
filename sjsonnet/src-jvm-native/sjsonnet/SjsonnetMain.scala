@@ -100,7 +100,7 @@ object SjsonnetMain {
       wr,
       indent = config.indent,
       getCurrentPosition = getCurrentPosition,
-      noUnquotedStringLiterals = config.noUnquotedStringLiterals.value
+      noUnquotedStringLiterals = config.yamlNoUnquotedStringLiterals.value
     )
     else new Renderer(wr, indent = config.indent)
 
