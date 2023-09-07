@@ -67,7 +67,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     }
     // Strings which look like booleans/nulls/numbers/dates/etc.,
     // or have leading/trailing spaces, are rendered single-quoted
-    else if (!noUnquotedStringLiterals || PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
+    else if (noUnquotedStringLiterals || PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
       val strWriter = new StringWriter
       BaseRenderer.escape(strWriter, s, unicode = true)
       val quotedStr = "'" + str.replace("'", "''") + "'"
