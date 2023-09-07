@@ -99,7 +99,8 @@ object SjsonnetMain {
     if (config.yamlOut.value) new PrettyYamlRenderer(
       wr,
       indent = config.indent,
-      getCurrentPosition = getCurrentPosition
+      getCurrentPosition = getCurrentPosition,
+      noUnquotedStringLiterals = config.noUnquotedStringLiterals.value
     )
     else new Renderer(wr, indent = config.indent)
 

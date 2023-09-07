@@ -138,4 +138,9 @@ case class Config(
     doc = """Properly handle assertions defined in a Jsonnet dictionary that is extended more than once"""
   )
   strictInheritedAssertions: Flag = Flag(),
+  @arg(
+    name = "no-unquoted-string-literals",
+    doc = """Forces all YAML string literals to be quoted, to avoid issues with non-compliant YAML parsers interpreting them in different ways"""
+  )
+  noUnquotedStringLiterals: Flag = Flag(),
 )
