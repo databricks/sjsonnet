@@ -4,7 +4,7 @@ import utest._
 
 object PrettyYamlRendererTests extends TestSuite{
   val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(path: os.Path, comments: Boolean, noUnquotedStringLiterals: Boolean = false) = {
+  def eval(path: os.Path, comments: Boolean) = {
     var currentPos: Position = null
     val interp = new Interpreter(
       Map(),
@@ -19,8 +19,7 @@ object PrettyYamlRendererTests extends TestSuite{
       OsPath(path),
       new PrettyYamlRenderer(
         indent = 2,
-        getCurrentPosition = () => currentPos,
-        noUnquotedStringLiterals = noUnquotedStringLiterals
+        getCurrentPosition = () => currentPos
       )
     )
     res.right.get.toString
@@ -36,8 +35,8 @@ object PrettyYamlRendererTests extends TestSuite{
         os.read(nontrivial / "mixins.golden.comments.yaml")
     }
     test("nounquoted"){
-      eval(nontrivial / "mixins.jsonnet", comments = false, noUnquotedStringLiterals = true) ==>
-        os.read(nontrivial / "mixins.golden.nounquoted.yaml")
+      eval(nontrivial / "quotingNumberLikeStrings.jsonnet", comments = false) ==>
+        os.read(nontrivial / "quotingNumberLikeStrings.yaml")
     }
   }
 }

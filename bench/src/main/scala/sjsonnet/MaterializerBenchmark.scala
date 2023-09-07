@@ -62,8 +62,7 @@ class MaterializerBenchmark {
     new PrettyYamlRenderer(
       _,
       indent=3,
-      getCurrentPosition = () => null,
-      noUnquotedStringLiterals = false
+      getCurrentPosition = () => null
     )
   )
 
