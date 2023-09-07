@@ -17,7 +17,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indent: Int,
                          idealWidth: Int = 80,
                          getCurrentPosition: () => Position,
-                         noUnquotedStringLiterals: Boolean = true) extends BaseRenderer[Writer](out, indent){
+                         noUnquotedStringLiterals: Boolean) extends BaseRenderer[Writer](out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterColon = false
