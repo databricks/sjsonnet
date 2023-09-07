@@ -35,6 +35,8 @@ object PrettyYamlRendererTests extends TestSuite{
         os.read(nontrivial / "mixins.golden.comments.yaml")
     }
     test("nounquoted"){
+      // Ensure weird octal-number-like strings are quoted, to avoid
+      // edge cases that may cause problems for non-compliant parsers
       eval(nontrivial / "quotingNumberLikeStrings.jsonnet", comments = false) ==>
         os.read(nontrivial / "quotingNumberLikeStrings.yaml")
     }
