@@ -6,9 +6,9 @@ cancelable in Global := true
 
 lazy val main = (project in file("sjsonnet"))
   .settings(
-    scalacOptions in Compile ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**"),
-    fork in Test := true,
-    baseDirectory in Test := (baseDirectory in ThisBuild).value,
+    Compile / scalacOptions ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**"),
+    Test / fork := true,
+    Test / baseDirectory := (ThisBuild / baseDirectory).value,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "2.3.1",
       "com.lihaoyi" %% "pprint" % "0.6.1",
@@ -25,20 +25,20 @@ lazy val main = (project in file("sjsonnet"))
       "com.lihaoyi" %% "utest" % "0.7.7",
     ).map(_ % "test"),
     testFrameworks += new TestFramework("utest.runner.Framework"),
-    (unmanagedSourceDirectories in Compile) := Seq(
+    (Compile / unmanagedSourceDirectories) := Seq(
       baseDirectory.value / "src",
       baseDirectory.value / "src-jvm",
       baseDirectory.value / "src-jvm-native",
     ),
-    (unmanagedSourceDirectories in Test) := Seq(
+    (Test / unmanagedSourceDirectories) := Seq(
       baseDirectory.value / "test/src",
       baseDirectory.value / "test/src-jvm",
       baseDirectory.value / "test/src-jvm-native",
     ),
-    (unmanagedResourceDirectories in Test) := Seq(
+    (Test / unmanagedResourceDirectories) := Seq(
       baseDirectory.value / "test/resources",
     ),
-    (sourceGenerators in Compile) += Def.task {
+    (Compile / sourceGenerators) += Def.task {
       val file = (Compile / sourceManaged).value / "jsonnet" / "Version.scala"
       IO.write(file,
         s"""package sjsonnet
@@ -54,5 +54,5 @@ lazy val bench = (project in file("bench"))
   .dependsOn(main % "compile->test")
   .enablePlugins(JmhPlugin)
   .settings(
-    fork in run := true,
+    run / fork := true,
   )
