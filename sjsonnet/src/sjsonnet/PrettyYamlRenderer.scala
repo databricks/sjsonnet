@@ -442,9 +442,9 @@ object PrettyYamlRenderer{
       (digits.? ~ "." ~ digits | digits ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ digits).?
     )
     def yamlOctalSuffix[_: P] = P( "x" ~ CharIn("1-9a-fA-F") ~ CharsWhileIn("0-9a-fA-F").? )
-    def yamlHexSuffix[_: P] = P( "o".? ~ CharIn("1-7") ~ CharsWhileIn("0-7").? )
+    def yamlHexSuffix[_: P] = P( "o" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? )
     def yamlOctalHex[_: P] = P( "0" ~ (yamlOctalSuffix | yamlHexSuffix) )
-    def yamlNumber0[_: P] = P( ".inf" | yamlFloat | yamlOctalHex | CharIn("1-9") ~ digits.? | "0" )
+    def yamlNumber0[_: P] = P( ".inf" | yamlFloat | yamlOctalHex | digits )
 
     // Add a `CharIn` lookahead to bail out quickly if something cannot possibly be a number
     def yamlNumber[_: P] = P( "-".? ~ yamlNumber0 )
