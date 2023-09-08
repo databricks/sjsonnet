@@ -7,3 +7,4 @@ output/
 .metals
 .vscode
 out/
+/.bsp/
