@@ -250,6 +250,13 @@ Since the Sjsonnet client still has 0.2-0.3s of overhead, if using Sjsonnet
 heavily it is still better to include it in your JVM classpath and invoke it
 programmatically via `new Interpreter(...).interpret(...)`.
 
+## Testing
+
+To run unittests:
+```bash
+./mill "sjsonnet[2.13.12].jvm.test"
+```
+
 ## Publishing
 
 To publish, make sure the version number in `build.sc` is correct, then run the following commands:

@@ -18,6 +18,7 @@ object FormatTests extends TestSuite{
         def importer: sjsonnet.CachedImporter = ???
         def settings = Settings.default
         def warn(e: Error) = ()
+        def trace(s: String, pos: Position) = ()
       }
     )
     assert(formatted == expected)
