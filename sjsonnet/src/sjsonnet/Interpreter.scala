@@ -18,7 +18,8 @@ class Interpreter(extVars: Map[String, String],
                   settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   warnLogger: (String => Unit) = null,
-                  std: Val.Obj = new Std().Std
+                  std: Val.Obj = new Std().Std,
+                  traceLogger: (String, Position) => Unit = null
                   ) { self =>
 
   val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax) {
@@ -29,8 +30,8 @@ class Interpreter(extVars: Map[String, String],
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
   def createEvaluator(resolver: CachedResolver, extVars: String => Option[Expr], wd: Path,
-                      settings: Settings, warn: Error => Unit): Evaluator =
-    new Evaluator(resolver, extVars, wd, settings, warn)
+                      settings: Settings, warn: Error => Unit, trace: (String, Position) => Unit = null): Evaluator =
+    new Evaluator(resolver, extVars, wd, settings, warn, trace)
 
 
   def parseVar(k: String, v: String) = {
@@ -43,7 +44,8 @@ class Interpreter(extVars: Map[String, String],
     k => extVars.get(k).map(v => parseVar(s"ext-var $k", v)),
     wd,
     settings,
-    warn
+    warn,
+    traceLogger
   )
 
   evaluator // force the lazy val

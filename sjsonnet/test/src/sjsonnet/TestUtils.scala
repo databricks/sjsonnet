@@ -5,7 +5,8 @@ object TestUtils {
             preserveOrder: Boolean = false,
             strict: Boolean = false,
             noDuplicateKeysInComprehension: Boolean = false,
-            strictInheritedAssertions: Boolean = false) = {
+            strictInheritedAssertions: Boolean = false,
+            traceLogger: (String, Position) => Unit = null) = {
     new Interpreter(
       Map(),
       Map(),
@@ -17,7 +18,8 @@ object TestUtils {
         strict = strict,
         noDuplicateKeysInComprehension = noDuplicateKeysInComprehension,
         strictInheritedAssertions = strictInheritedAssertions
-      )
+      ),
+      traceLogger = traceLogger
     ).interpret(s, DummyPath("(memory)"))
   }
 
@@ -25,8 +27,9 @@ object TestUtils {
            preserveOrder: Boolean = false,
            strict: Boolean = false,
            noDuplicateKeysInComprehension: Boolean = false,
-           strictInheritedAssertions: Boolean = false) = {
-    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions) match {
+           strictInheritedAssertions: Boolean = false,
+           traceLogger: (String, Position) => Unit = null) = {
+    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, traceLogger) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }

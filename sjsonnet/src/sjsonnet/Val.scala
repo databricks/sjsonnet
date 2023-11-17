@@ -527,4 +527,5 @@ abstract class EvalScope extends EvalErrorScope {
 
   def settings: Settings
   def warn(e: Error): Unit
+  def trace(s: String, pos: Position): Unit
 }

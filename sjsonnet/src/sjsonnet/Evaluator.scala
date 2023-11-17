@@ -19,11 +19,20 @@ class Evaluator(resolver: CachedResolver,
                 val extVars: String => Option[Expr],
                 val wd: Path,
                 val settings: Settings,
-                warnLogger: Error => Unit = null) extends EvalScope {
+                warnLogger: Error => Unit = null,
+                traceLogger: (String, Position) => Unit = null) extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
 
   def warn(e: Error): Unit = if(warnLogger != null) warnLogger(e)
+
+  def trace(s: String, pos: Position): Unit = {
+    if (traceLogger != null) {
+      traceLogger(s, pos)
+    } else {
+      System.err.println(s"TRACE: ${pos.fileScope.currentFileLastPathElement} $s")
+    }
+  }
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.HashMap.empty[Path, Val]
