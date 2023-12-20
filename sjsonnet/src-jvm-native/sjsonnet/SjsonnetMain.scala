@@ -22,8 +22,13 @@ object SjsonnetMain {
         .find(os.exists)
         .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
 
-    def read(path: Path): Option[String] =
-      try Some(os.read(path.asInstanceOf[OsPath].p)) catch { case NonFatal(_) => None }
+    def read(path: Path): Option[ResolvedImport] = {
+      if (os.exists(path.asInstanceOf[OsPath].p)) {
+        Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
+      } else {
+        None
+      }
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -205,8 +210,13 @@ object SjsonnetMain {
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
             i(docBase, importName).map(OsPath)
-          def read(path: Path): Option[String] =
-            try Some(os.read(path.asInstanceOf[OsPath].p)) catch { case NonFatal(_) => None }
+          def read(path: Path): Option[ResolvedImport] = {
+            if (os.exists(path.asInstanceOf[OsPath].p)) {
+              Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
+            } else {
+              None
+            }
+          }
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
