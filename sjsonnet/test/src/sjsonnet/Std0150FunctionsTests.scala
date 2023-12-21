@@ -121,8 +121,8 @@ object Std0150FunctionsTests extends TestSuite {
           override def resolve(docBase: Path, importName: String): Option[Path] = importName match{
             case "bar.json" => Some(DummyPath("bar"))
           }
-          override def read(path: Path): Option[ResolvedFile] = path match{
-            case DummyPath("bar") => Some(StaticResolvedFile("""{"x": "y"}"""))
+          override def read(path: Path): Option[ResolvedImport] = path match{
+            case DummyPath("bar") => Some(StaticResolvedImport("""{"x": "y"}"""))
           }
         },
         parseCache = new DefaultParseCache,

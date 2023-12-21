@@ -22,17 +22,12 @@ object SjsonnetMain {
         .find(os.exists)
         .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
 
-    def read(path: Path): Option[ResolvedFile] = {
-      readPath(path)
-    }
-  }
-
-  private[this] def readPath(path: Path): Option[ResolvedFile] = {
-    val osPath = path.asInstanceOf[OsPath].p
-    if (os.exists(osPath) && os.isFile(osPath)) {
-      Some(new CachedResolvedFile(path.asInstanceOf[OsPath]))
-    } else {
-      None
+    def read(path: Path): Option[ResolvedImport] = {
+      if (os.exists(path.asInstanceOf[OsPath].p)) {
+        Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
+      } else {
+        None
+      }
     }
   }
 
@@ -215,8 +210,12 @@ object SjsonnetMain {
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
             i(docBase, importName).map(OsPath)
-          def read(path: Path): Option[ResolvedFile] = {
-            readPath(path)
+          def read(path: Path): Option[ResolvedImport] = {
+            if (os.exists(path.asInstanceOf[OsPath].p)) {
+              Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
+            } else {
+              None
+            }
           }
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
