@@ -1,10 +1,10 @@
 package sjsonnet
 
-import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, FileReader, InputStream, Reader, StringReader}
+import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, FileReader, InputStream, RandomAccessFile, Reader, StringReader}
 import java.nio.file.Files
 import java.security.MessageDigest
 import scala.collection.mutable
-import fastparse.Parsed
+import fastparse.{IndexedParserInput, Parsed, ParserInput}
 
 import java.nio.charset.StandardCharsets
 
@@ -32,8 +32,67 @@ object Importer {
   }
 }
 
+case class FileParserInput(file: RandomAccessFile) extends ParserInput {
+  private lazy val fileLength = file.length.toInt
+
+  override def apply(index: Int): Char = {
+    file.seek(index)
+    file.read().toChar
+  }
+
+  override def dropBuffer(index: Int): Unit = {}
+
+  override def slice(from: Int, until: Int): String = {
+    file.seek(from)
+    val length = until - from
+    val bytes = new Array[Byte](length)
+    file.readFully(bytes)
+    new String(bytes)
+  }
+
+  override def length: Int = fileLength
+
+  override def innerLength: Int = length
+
+  override def isReachable(index: Int): Boolean = index < length
+
+  override def checkTraceable(): Unit = {}
+
+  private[this] lazy val lineNumberLookup: Array[Int] = {
+    val lines = mutable.ArrayBuffer[Int]()
+    val bufferedStream = new BufferedInputStream(new RandomAccessFileInputStream(file))
+    var byteRead: Int = 0
+    var currentPosition = 0
+
+    while ({ byteRead = bufferedStream.read(); byteRead != -1 }) {
+      if (byteRead == '\n') {
+        lines += currentPosition + 1
+      }
+      currentPosition += 1
+    }
+
+    bufferedStream.close()
+
+    lines.toArray
+  }
+
+  def prettyIndex(index: Int): String = {
+    val line = lineNumberLookup.indexWhere(_ > index) match {
+      case -1 => lineNumberLookup.length - 1
+      case n => math.max(0, n - 1)
+    }
+    val col = index - lineNumberLookup(line)
+    s"${line + 1}:${col + 1}"
+  }
+
+  // Helper class to convert RandomAccessFile to InputStream
+  private class RandomAccessFileInputStream(raf: RandomAccessFile) extends java.io.InputStream {
+    override def read(): Int = raf.read()
+  }
+}
+
 trait ResolvedFile {
-  def getInputStream(): InputStream
+  def getParserInput(): ParserInput
 
   def readString(): String
 
@@ -42,7 +101,7 @@ trait ResolvedFile {
 
 case class StaticResolvedFile(content: String) extends ResolvedFile {
   // This is probably stupid, but it's the easiest way to get an InputStream from a String
-  def getInputStream(): InputStream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))
+  def getParserInput(): ParserInput = IndexedParserInput(content)
 
   def readString(): String = content
 
@@ -74,11 +133,11 @@ class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
    * A method that will return a reader for the resolved import. If the import is too large, then this will return
    * a reader that will read the file from disk. Otherwise, it will return a reader that reads from memory.
    */
-  def getInputStream(): InputStream = {
+  def getParserInput(): ParserInput = {
     if (resolvedImportContent == null) {
-      new BufferedInputStream(new FileInputStream(jFile))
+      FileParserInput(new RandomAccessFile(jFile, "r"))
     } else {
-      resolvedImportContent.getInputStream()
+      resolvedImportContent.getParserInput()
     }
   }
 
@@ -146,7 +205,7 @@ class CachedResolver(
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, content.contentHash()), {
-      val parsed = fastparse.parse(content.getInputStream(), new Parser(path, strictImportSyntax).document(_)) match {
+      val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()
           val pos = new Position(new FileScope(path), traced.index)
