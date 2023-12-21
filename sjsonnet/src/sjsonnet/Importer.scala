@@ -13,14 +13,14 @@ import java.nio.charset.StandardCharsets
 abstract class Importer {
   def resolve(docBase: Path, importName: String): Option[Path]
 
-  def read(path: Path): Option[ResolvedImport]
+  def read(path: Path): Option[ResolvedFile]
 
-  def resolveAndRead(docBase: Path, importName: String): Option[(Path, ResolvedImport)] = for {
+  def resolveAndRead(docBase: Path, importName: String): Option[(Path, ResolvedFile)] = for {
     path <- resolve(docBase, importName)
     txt <- read(path)
   } yield (path, txt)
 
-  def resolveAndReadOrFail(value: String, pos: Position)(implicit ev: EvalErrorScope): (Path, ResolvedImport) =
+  def resolveAndReadOrFail(value: String, pos: Position)(implicit ev: EvalErrorScope): (Path, ResolvedFile) =
     resolveAndRead(pos.fileScope.currentFile.parent(), value)
       .getOrElse(Error.fail("Couldn't import file: " + pprint.Util.literalize(value), pos))
 }
@@ -28,11 +28,11 @@ abstract class Importer {
 object Importer {
   val empty: Importer = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] = None
-    def read(path: Path): Option[ResolvedImport] = None
+    def read(path: Path): Option[ResolvedFile] = None
   }
 }
 
-trait ResolvedImport {
+trait ResolvedFile {
   def getInputStream(): InputStream
 
   def readString(): String
@@ -40,7 +40,7 @@ trait ResolvedImport {
   def contentHash(): String
 }
 
-case class StaticResolvedImport(content: String) extends ResolvedImport {
+case class StaticResolvedFile(content: String) extends ResolvedFile {
   // This is probably stupid, but it's the easiest way to get an InputStream from a String
   def getInputStream(): InputStream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))
 
@@ -55,18 +55,18 @@ case class StaticResolvedImport(content: String) extends ResolvedImport {
  * resolving an import. If the import is deemed too large (IE it's a large file), then we will avoid keeping it in
  * memory and instead will re-read it from disk.
  */
-class CachedResolvedImport(val resolvedImportPath: OsPath) extends ResolvedImport {
+class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
 
   private val jFile: File = resolvedImportPath.p.toIO
 
   assert(jFile.exists(), s"Resolved import path ${resolvedImportPath} does not exist")
 
-  private[this] val resolvedImportContent: StaticResolvedImport = {
+  private[this] val resolvedImportContent: StaticResolvedFile = {
     if (jFile.length() > 1024 * 1024) {
       // If the file is too large, then we will just read it from disk
       null
     } else {
-      StaticResolvedImport(Files.readString(jFile.toPath))
+      StaticResolvedFile(Files.readString(jFile.toPath))
     }
   }
 
@@ -125,11 +125,11 @@ class CachedResolvedImport(val resolvedImportPath: OsPath) extends ResolvedImpor
 }
 
 class CachedImporter(parent: Importer) extends Importer {
-  val cache = mutable.HashMap.empty[Path, ResolvedImport]
+  val cache = mutable.HashMap.empty[Path, ResolvedFile]
 
   def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
 
-  def read(path: Path): Option[ResolvedImport] = cache.get(path) match {
+  def read(path: Path): Option[ResolvedFile] = cache.get(path) match {
     case s @ Some(x) =>
       if(x == null) None else s
     case None =>
@@ -144,7 +144,7 @@ class CachedResolver(
   val parseCache: ParseCache,
   strictImportSyntax: Boolean) extends CachedImporter(parentImporter) {
 
-  def parse(path: Path, content: ResolvedImport)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
+  def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, content.contentHash()), {
       val parsed = fastparse.parse(content.getInputStream(), new Parser(path, strictImportSyntax).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>

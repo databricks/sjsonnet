@@ -22,12 +22,22 @@ object SjsonnetMain {
         .find(os.exists)
         .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
 
-    def read(path: Path): Option[ResolvedImport] = {
-      if (os.exists(path.asInstanceOf[OsPath].p)) {
-        Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
-      } else {
-        None
-      }
+    def read(path: Path): Option[ResolvedFile] = {
+      readPath(path)
+    }
+  }
+
+  /**
+   * Read a path into a [[ResolvedFile]] if it exists and is a file. A resolved file acts as a layer
+   * of caching on top of the underlying file system. Small files are read into memory, while large
+   * files are read from disk.
+   */
+  private[this] def readPath(path: Path): Option[ResolvedFile] = {
+    val osPath = path.asInstanceOf[OsPath].p
+    if (os.exists(osPath) && os.isFile(osPath)) {
+      Some(new CachedResolvedFile(path.asInstanceOf[OsPath]))
+    } else {
+      None
     }
   }
 
@@ -210,12 +220,8 @@ object SjsonnetMain {
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
             i(docBase, importName).map(OsPath)
-          def read(path: Path): Option[ResolvedImport] = {
-            if (os.exists(path.asInstanceOf[OsPath].p)) {
-              Some(new CachedResolvedImport(path.asInstanceOf[OsPath]))
-            } else {
-              None
-            }
+          def read(path: Path): Option[ResolvedFile] = {
+            readPath(path)
           }
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
