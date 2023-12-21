@@ -32,22 +32,20 @@ object Importer {
   }
 }
 
-case class FileParserInput(file: RandomAccessFile) extends ParserInput {
+case class FileParserInput(file: File) extends ParserInput {
+
+  private[this] val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 1024 * 8)
+
   private lazy val fileLength = file.length.toInt
 
   override def apply(index: Int): Char = {
-    file.seek(index)
-    file.read().toChar
+    bufferedFile.readChar(index)
   }
 
   override def dropBuffer(index: Int): Unit = {}
 
   override def slice(from: Int, until: Int): String = {
-    file.seek(from)
-    val length = until - from
-    val bytes = new Array[Byte](length)
-    file.readFully(bytes)
-    new String(bytes)
+    bufferedFile.readString(from, until)
   }
 
   override def length: Int = fileLength
@@ -60,7 +58,7 @@ case class FileParserInput(file: RandomAccessFile) extends ParserInput {
 
   private[this] lazy val lineNumberLookup: Array[Int] = {
     val lines = mutable.ArrayBuffer[Int]()
-    val bufferedStream = new BufferedInputStream(new RandomAccessFileInputStream(file))
+    val bufferedStream = new BufferedInputStream(new FileInputStream(file))
     var byteRead: Int = 0
     var currentPosition = 0
 
@@ -84,10 +82,55 @@ case class FileParserInput(file: RandomAccessFile) extends ParserInput {
     val col = index - lineNumberLookup(line)
     s"${line + 1}:${col + 1}"
   }
+}
 
-  // Helper class to convert RandomAccessFile to InputStream
-  private class RandomAccessFileInputStream(raf: RandomAccessFile) extends java.io.InputStream {
-    override def read(): Int = raf.read()
+class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
+
+  // The file is opened in read-only mode
+  private val file = new RandomAccessFile(fileName, "r")
+
+  private val buffer = new Array[Byte](bufferSize)
+
+  private var bufferStart: Long = -1
+
+  private var bufferEnd: Long = -1
+
+  private val fileLength: Long = file.length()
+
+  private def fillBuffer(position: Long): Unit = {
+    file.seek(position)
+    val bytesRead = file.read(buffer, 0, bufferSize)
+    bufferStart = position
+    bufferEnd = position + bytesRead
+  }
+
+  def readChar(index: Long): Char = {
+    assert(index < fileLength)
+    if (index < bufferStart || index >= bufferEnd) {
+      fillBuffer(index)
+    }
+    buffer((index - bufferStart).toInt).toChar
+  }
+
+  def readString(from: Long, until: Long): String = {
+    assert(from < fileLength && until <= fileLength && from <= until)
+    val length = (until - from).toInt
+    val stringBytes = new Array[Byte](length)
+
+    if (from >= bufferStart && until <= bufferEnd) {
+      // Range is within the buffer
+      System.arraycopy(buffer, (from - bufferStart).toInt, stringBytes, 0, length)
+    } else {
+      // Range is outside the buffer
+      file.seek(from)
+      file.readFully(stringBytes, 0, length)
+    }
+
+    new String(stringBytes)
+  }
+
+  def close(): Unit = {
+    file.close()
   }
 }
 
@@ -135,7 +178,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
    */
   def getParserInput(): ParserInput = {
     if (resolvedImportContent == null) {
-      FileParserInput(new RandomAccessFile(jFile, "r"))
+      FileParserInput(jFile)
     } else {
       resolvedImportContent.getParserInput()
     }
