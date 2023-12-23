@@ -2,6 +2,7 @@ package sjsonnet
 
 import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, FileReader, InputStream, RandomAccessFile, Reader, StringReader}
 import java.nio.file.Files
+import java.util.zip.CRC32
 import java.security.MessageDigest
 import scala.collection.mutable
 import fastparse.{IndexedParserInput, Parsed, ParserInput}
@@ -194,9 +195,9 @@ class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
     }
   }
 
-  private def md5HashFile(filePath: String): String = {
+  private def crcHashFile(filePath: String): String = {
     val buffer = new Array[Byte](8192)
-    val md5 = MessageDigest.getInstance("MD5")
+    val crc = new CRC32()
 
     val fis = new FileInputStream(new File(filePath))
     val bis = new BufferedInputStream(fis)
@@ -204,7 +205,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
     try {
       var bytesRead = bis.read(buffer)
       while (bytesRead != -1) {
-        md5.update(buffer, 0, bytesRead)
+        crc.update(buffer, 0, bytesRead)
         bytesRead = bis.read(buffer)
       }
     } finally {
@@ -212,14 +213,14 @@ class CachedResolvedFile(val resolvedImportPath: OsPath) extends ResolvedFile {
       fis.close()
     }
 
-    md5.digest().map("%02x".format(_)).mkString
+    crc.getValue().toString
   }
 
   // SHA1 hash of the resolved import content
   override def contentHash(): String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
-      md5HashFile(jFile.getAbsolutePath)
+      crcHashFile(jFile.getAbsolutePath)
     } else {
       resolvedImportContent.contentHash()
     }
