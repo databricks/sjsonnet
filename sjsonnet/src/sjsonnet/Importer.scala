@@ -35,7 +35,7 @@ object Importer {
 
 case class FileParserInput(file: File) extends ParserInput {
 
-  private[this] val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 1024 * 8)
+  private[this] val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 8)
 
   private lazy val fileLength = file.length.toInt
 
