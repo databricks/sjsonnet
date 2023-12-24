@@ -164,7 +164,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Int) 
 
   assert(jFile.exists(), s"Resolved import path ${resolvedImportPath} does not exist")
   // Assert that the file is less than limit
-  assert(jFile.length() <= memoryLimitBytes, s"Resolved import path ${resolvedImportPath} is too large")
+  assert(jFile.length() <= memoryLimitBytes, s"Resolved import path ${resolvedImportPath} is too large: ${jFile.length()} bytes > ${memoryLimitBytes} bytes")
 
   private[this] val resolvedImportContent: StaticResolvedFile = {
     if (jFile.length() > 1024 * 1024) {
