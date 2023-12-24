@@ -25,7 +25,8 @@ object Platform {
   }
   def xzBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
-    val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options())
+    // Set compression to 0
+    val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(0))
     xz.write(b)
     xz.close()
     val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
