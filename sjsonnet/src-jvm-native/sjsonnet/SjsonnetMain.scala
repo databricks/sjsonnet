@@ -35,7 +35,7 @@ object SjsonnetMain {
   private[this] def readPath(path: Path): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
     if (os.exists(osPath) && os.isFile(osPath)) {
-      Some(new CachedResolvedFile(path.asInstanceOf[OsPath]))
+      Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = 100 * 1024 * 1024))
     } else {
       None
     }
