@@ -158,7 +158,7 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
  * resolving an import. If the import is deemed too large (IE it's a large file), then we will avoid keeping it in
  * memory and instead will re-read it from disk.
  */
-class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Int) extends ResolvedFile {
+class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long) extends ResolvedFile {
 
   private val jFile: File = resolvedImportPath.p.toIO
 
