@@ -10,6 +10,10 @@ case class OsPath(p: os.Path) extends Path{
   def last: String = p.last
   def /(s: String): Path = OsPath(p / s)
 
+  def size: Long = {
+    os.size(p)
+  }
+
   override def equals(other: Any): Boolean = other match {
     case OsPath(p2) => p == p2
     case _ => false

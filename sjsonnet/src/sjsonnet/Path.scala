@@ -17,4 +17,9 @@ trait Path {
   def last: String
   def /(s: String): Path
   def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String
+
+  /**
+   * The size of the file in bytes.
+   */
+  def size: Long
 }
