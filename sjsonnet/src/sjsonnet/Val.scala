@@ -144,7 +144,7 @@ object Val{
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
-                  private[this] var allKeys: it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String] = null) extends Literal with Expr.ObjBody {
+                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
@@ -176,7 +176,7 @@ object Val{
     def prettyName = "object"
     override def asObj: Val.Obj = this
 
-    private def gatherKeys(mapping: it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]): Unit = {
+    private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if(static) mapping.putAll(allKeys)
       else {
         if(`super` != null) `super`.gatherKeys(mapping)
@@ -191,7 +191,7 @@ object Val{
 
     private def getAllKeys = {
       if(allKeys == null) {
-        allKeys = new it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]
+        allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
         gatherKeys(allKeys)
       }
       allKeys
@@ -299,7 +299,7 @@ object Val{
 
   def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
     val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]()
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
         cache.put(k, rhs)
