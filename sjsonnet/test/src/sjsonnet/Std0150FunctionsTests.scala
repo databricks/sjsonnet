@@ -158,5 +158,11 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.reverse([1])""") ==> ujson.Arr(1)
       eval("""std.reverse(["1", true, null])""") ==> ujson.Arr(ujson.Null, true, "1")
     }
+    test("xz"){
+      eval("""std.xz([1, 2])""")
+      eval("""std.xz("hi")""")
+      eval("""std.xzWithLevel([1, 2], compressionLevel = 0)""")
+      eval("""std.xzWithLevel("hi", compressionLevel = 1)""")
+    }
   }
 }

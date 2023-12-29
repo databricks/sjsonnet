@@ -1097,6 +1097,14 @@ class Std {
       }
     },
 
+    builtin("xzWithLevel", "v", "compressionLevel"){ (pos, ev, v: Val, compressionLevel: Int) =>
+      v match{
+        case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
+        case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray, compressionLevel)
+        case x => Error.fail("Cannot xz encode " + x.prettyName)
+      }
+    },
+
     "encodeUTF8" -> EncodeUTF8,
     "decodeUTF8" -> DecodeUTF8,
 
