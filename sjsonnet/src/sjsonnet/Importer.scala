@@ -135,21 +135,32 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
 }
 
 trait ResolvedFile {
+  /**
+   * Get an efficient parser input for this resolved file. Large files will be read from disk
+   * (buffered reads), while small files will be served from memory.
+   */
   def getParserInput(): ParserInput
 
+  // Use this to read the file as a string. This is generally used for `importstr`
   def readString(): String
 
-  def contentHash(): String
+  // Get a content hash of the file suitable for detecting changes in a given file.
+  def crcHash(): Long
 }
 
 case class StaticResolvedFile(content: String) extends ResolvedFile {
-  // This is probably stupid, but it's the easiest way to get an InputStream from a String
   def getParserInput(): ParserInput = IndexedParserInput(content)
 
   def readString(): String = content
 
   // We just cheat, the content hash can be the content itself for static imports
-  override def contentHash(): String = content
+  lazy val crcHash: Long = crcHashString(content)
+
+  private[this] def crcHashString(str: String): Long = {
+    val crc = new CRC32()
+    crc.update(str.getBytes())
+    crc.getValue()
+  }
 }
 
 /**
@@ -196,11 +207,11 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     }
   }
 
-  private def crcHashFile(filePath: String): String = {
+  private def crcHashFile(file: File): Long = {
     val buffer = new Array[Byte](8192)
     val crc = new CRC32()
 
-    val fis = new FileInputStream(new File(filePath))
+    val fis = new FileInputStream(file)
     val bis = new BufferedInputStream(fis)
 
     try {
@@ -214,16 +225,16 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
       fis.close()
     }
 
-    crc.getValue().toString
+    crc.getValue()
   }
 
   // SHA1 hash of the resolved import content
-  override def contentHash(): String = {
+  override lazy val crcHash: Long = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
-      crcHashFile(jFile.getAbsolutePath)
+      crcHashFile(jFile)
     } else {
-      resolvedImportContent.contentHash()
+      resolvedImportContent.crcHash
     }
   }
 }
@@ -249,7 +260,7 @@ class CachedResolver(
   strictImportSyntax: Boolean) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate((path, content.contentHash()), {
+    parseCache.getOrElseUpdate((path, content.crcHash.toString), {
       val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()
