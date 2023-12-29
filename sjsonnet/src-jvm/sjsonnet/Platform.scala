@@ -27,10 +27,11 @@ object Platform {
   /**
    *  Valid compression levels are 0 (no compression) to 9 (maximum compression).
    */
-  def xzBytes(b: Array[Byte], compressionLevel: Int): String = {
+  def xzBytes(b: Array[Byte], compressionLevel: Option[Int]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     // Set compression to specified level
-    val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(compressionLevel))
+    val level = compressionLevel.getOrElse(LZMA2Options.PRESET_DEFAULT)
+    val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
     xz.write(b)
     xz.close()
     val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
@@ -38,17 +39,8 @@ object Platform {
     xzedBase64
   }
 
-  def xzBytes(b: Array[Byte]): String = {
-    // Use default compression level
-    xzBytes(b, compressionLevel = LZMA2Options.PRESET_DEFAULT)
-  }
-
-  def xzString(s: String, compressionLevel: Int): String = {
+  def xzString(s: String, compressionLevel: Option[Int]): String = {
     xzBytes(s.getBytes(), compressionLevel)
-  }
-
-  def xzString(s: String): String = {
-    xzBytes(s.getBytes())
   }
 
   def yamlToJson(yamlString: String): String = {
