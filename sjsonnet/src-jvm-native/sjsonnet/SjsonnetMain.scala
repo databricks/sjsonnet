@@ -27,20 +27,6 @@ object SjsonnetMain {
     }
   }
 
-  /**
-   * Read a path into a [[ResolvedFile]] if it exists and is a file. A resolved file acts as a layer
-   * of caching on top of the underlying file system. Small files are read into memory, while large
-   * files are read from disk.
-   */
-  private[this] def readPath(path: Path): Option[ResolvedFile] = {
-    val osPath = path.asInstanceOf[OsPath].p
-    if (os.exists(osPath) && os.isFile(osPath)) {
-      Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = 2048L * 1024L * 1024L))
-    } else {
-      None
-    }
-  }
-
   def main(args: Array[String]): Unit = {
     val exitCode = main0(
       args match {
@@ -305,6 +291,20 @@ object SjsonnetMain {
         }
       case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
 
+    }
+  }
+
+  /**
+   * Read a path into a [[ResolvedFile]] if it exists and is a file. A resolved file acts as a layer
+   * of caching on top of the underlying file system. Small files are read into memory, while large
+   * files are read from disk.
+   */
+  private[this] def readPath(path: Path): Option[ResolvedFile] = {
+    val osPath = path.asInstanceOf[OsPath].p
+    if (os.exists(osPath) && os.isFile(osPath)) {
+      Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = 2048L * 1024L * 1024L))
+    } else {
+      None
     }
   }
 }

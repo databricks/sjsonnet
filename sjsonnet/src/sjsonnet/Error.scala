@@ -102,9 +102,8 @@ trait EvalErrorScope {
 
   def prettyIndex(pos: Position): Option[(Int, Int)] = {
     importer.read(pos.currentFile).map { s =>
-      val Array(line, col) = {
+      val Array(line, col) =
         s.getParserInput().prettyIndex(pos.offset).split(':')
-      }
       (line.toInt, col.toInt)
     }
   }

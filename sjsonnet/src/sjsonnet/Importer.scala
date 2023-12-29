@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets
 /** Resolve and read imported files */
 abstract class Importer {
   def resolve(docBase: Path, importName: String): Option[Path]
-
   def read(path: Path): Option[ResolvedFile]
 
   def resolveAndRead(docBase: Path, importName: String): Option[(Path, ResolvedFile)] = for {
