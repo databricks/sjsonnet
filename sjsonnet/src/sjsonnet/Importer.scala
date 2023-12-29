@@ -228,7 +228,6 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     crc.getValue()
   }
 
-  // SHA1 hash of the resolved import content
   override lazy val crcHash: Long = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
