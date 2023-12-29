@@ -12,6 +12,12 @@ object Platform {
   def xzString(s: String): String = {
     throw new Exception("XZ not implemented in Scala.js")
   }
+  def xzBytes(s: Array[Byte], compressionLevel: Int): String = {
+    throw new Exception("XZ not implemented in Scala.js")
+  }
+  def xzString(s: String, compressionLevel: Int): String = {
+    throw new Exception("XZ not implemented in Scala.js")
+  }
   def yamlToJson(s: String): String = {
     throw new Exception("parseYaml() not implemented in Scala.js")
   }
