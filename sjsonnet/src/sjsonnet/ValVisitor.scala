@@ -1,5 +1,7 @@
 package sjsonnet
 
+import java.util
+
 import ujson.JsVisitor
 import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 

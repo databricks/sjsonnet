@@ -3,7 +3,6 @@ package sjsonnet
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap
 
 /**
   * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
@@ -76,7 +75,7 @@ abstract class Materializer {
     case ujson.Str(s) => Val.Str(pos, s)
     case ujson.Arr(xs) => new Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Lazy).toArray[Lazy])
     case ujson.Obj(xs) =>
-      val builder = new Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
+      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(x <- xs) {
         val v = new Val.Obj.Member(false, Visibility.Normal) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = reverse(pos, x._2)

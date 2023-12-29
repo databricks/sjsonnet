@@ -8,8 +8,6 @@ import java.util.regex.Pattern
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.BinaryOp
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap
-
 import scala.collection.mutable
 import scala.util.matching.Regex
 
@@ -294,7 +292,7 @@ class Std {
       val func = _func.asFunc
       val obj = _obj.asObj
       val allKeys = obj.allKeyNames
-      val m = new Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]()
+      val m = new util.LinkedHashMap[String, Val.Obj.Member]()
       var i = 0
       while(i < allKeys.length) {
         val k = allKeys(i)

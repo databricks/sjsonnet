@@ -1,9 +1,9 @@
 package sjsonnet
 
+import java.util
+
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
-
-import it.unimi.dsi.fastutil.objects.{Object2BooleanLinkedOpenHashMap, Object2ObjectLinkedOpenHashMap}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -132,14 +132,14 @@ object Val{
     }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
-      val m = new Object2ObjectLinkedOpenHashMap[String, Obj.Member]()
+      val m = new util.LinkedHashMap[String, Obj.Member]()
       for((k, v) <- members) m.put(k, v)
       new Obj(pos, m, false, null, null)
     }
   }
 
   final class Obj(val pos: Position,
-                  private[this] var value0: Object2ObjectLinkedOpenHashMap[String, Obj.Member],
+                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
@@ -149,9 +149,9 @@ object Val{
 
     def getSuper = `super`
 
-    private[this] def getValue0: Object2ObjectLinkedOpenHashMap[String, Obj.Member] = {
+    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if(value0 == null) {
-        val value0 = new Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
+        val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
