@@ -1,11 +1,9 @@
 package sjsonnet
 
-import os.FilePath
-import ujson.{Arr, Obj}
-
 import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter, Writer}
 import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
+
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -242,17 +240,13 @@ object SjsonnetMain {
       std = std
     )
 
-    evaluateInterpreter(config, wd, jsonnetCode, path, currentPos, interp)
-  }
-
-  private def evaluateInterpreter(config: Config, wd: os.Path, jsonnetCode: String, path: os.Path, currentPos: Position, interp: Interpreter) = {
     (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
-        interp.interpret(jsonnetCode, OsPath(path)).flatMap {
-          case obj: Obj =>
-            val renderedFiles: Seq[Either[String, FilePath]] =
-              obj.value.toSeq.map { case (f, v) =>
-                for {
+        interp.interpret(jsonnetCode, OsPath(path)).flatMap{
+          case obj: ujson.Obj =>
+            val renderedFiles: Seq[Either[String, os.FilePath]] =
+              obj.value.toSeq.map{case (f, v) =>
+                for{
                   rendered <- {
                     if (config.expectString.value) {
                       v match {
@@ -271,9 +265,9 @@ object SjsonnetMain {
                 } yield relPath
               }
 
-            renderedFiles.collect { case Left(err) => err } match {
+            renderedFiles.collect{case Left(err) => err} match{
               case Nil =>
-                Right[String, String](renderedFiles.collect { case Right(path) => path }.mkString("\n"))
+                Right[String, String](renderedFiles.collect{case Right(path) => path}.mkString("\n"))
               case errs =>
                 Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
             }
@@ -286,8 +280,8 @@ object SjsonnetMain {
         // YAML stream
 
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
-          case arr: Arr =>
-            writeToFile(config, wd) { writer =>
+          case arr: ujson.Arr =>
+            writeToFile(config, wd){ writer =>
               arr.value.toSeq match {
                 case Nil => //donothing
                 case Seq(single) =>
@@ -295,7 +289,7 @@ object SjsonnetMain {
                   single.transform(renderer)
                   writer.write(if (isScalar(single)) "\n..." else "")
                 case multiple =>
-                  for ((v, i) <- multiple.zipWithIndex) {
+                  for((v, i) <- multiple.zipWithIndex){
                     if (i > 0) writer.write('\n')
                     if (isScalar(v)) writer.write("--- ")
                     else if (i != 0) writer.write("---\n")
