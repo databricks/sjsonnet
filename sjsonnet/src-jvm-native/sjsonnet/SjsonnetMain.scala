@@ -201,11 +201,6 @@ object SjsonnetMain {
         (os.read(p), p)
       }
 
-    val (interp, getCurrentPos) = getInterpreter(config, parseCache, wd, allowedInputs, importer, warnLogger, std)
-    evaluateInterpreter(config, wd, jsonnetCode, path, getCurrentPos, interp)
-  }
-
-  def getInterpreter(config: Config, parseCache: ParseCache, wd: os.Path, allowedInputs: Option[Set[os.Path]], importer: Option[(Path, String) => Option[os.Path]], warnLogger: String => Unit, std: Val.Obj): (Interpreter, () => Position) = {
     val extBinding = parseBindings(
       config.extStr, config.extStrFile,
       config.extCode, config.extCodeFile,
@@ -247,10 +242,10 @@ object SjsonnetMain {
       std = std
     )
 
-    (interp, () => currentPos)
+    evaluateInterpreter(config, wd, jsonnetCode, path, currentPos, interp)
   }
 
-  private def evaluateInterpreter(config: Config, wd: os.Path, jsonnetCode: String, path: os.Path, currentPos: () => Position, interp: Interpreter) = {
+  private def evaluateInterpreter(config: Config, wd: os.Path, jsonnetCode: String, path: os.Path, currentPos: Position, interp: Interpreter) = {
     (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
@@ -266,7 +261,7 @@ object SjsonnetMain {
                       }
                     } else {
                       val writer = new StringWriter()
-                      val renderer = rendererForConfig(writer, config, currentPos _)
+                      val renderer = rendererForConfig(writer, config, () => currentPos)
                       ujson.transform(v, renderer)
                       Right(writer.toString)
                     }
