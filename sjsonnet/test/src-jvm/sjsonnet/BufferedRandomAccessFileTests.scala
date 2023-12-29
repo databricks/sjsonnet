@@ -1,14 +1,11 @@
 package sjsonnet
 
+import utest._
 import java.io.{File, FileWriter}
 import java.nio.file.Files
-
 import scala.util.Random
 
-import utest._
-
 object BufferedRandomAccessFileTests extends TestSuite {
-
   // Utility function to create a temporary file with known content
   def createTempFile(content: String): File = {
     val tempFile = Files.createTempFile(null, null).toFile
@@ -21,35 +18,31 @@ object BufferedRandomAccessFileTests extends TestSuite {
     tempFile
   }
 
-  // Test content
-  val smallTestContent = "Hello, World! This is a test file."
-  val smallTempFile = createTempFile(smallTestContent)
-  val testContent = "Hello, World! This is a test file with enough content to test various buffer sizes."
-  val tempFile = createTempFile(testContent)
-
-  // Generate a large test content
+  // Test content and large test content
+  val testContent = "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
   val largeTestContent = Random.alphanumeric.take(100000).mkString // 100k characters
+  val tempFile = createTempFile(testContent)
   val largeTempFile = createTempFile(largeTestContent)
 
   val tests = Tests {
     test("readChar") {
-      val bufferedFile = new BufferedRandomAccessFile(smallTempFile.getAbsolutePath, 10)
+      val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 
       // Normal operation
       assert(bufferedFile.readChar(0) == 'H')
       assert(bufferedFile.readChar(7) == 'W')
 
       // Boundary conditions
-      assert(bufferedFile.readChar(smallTestContent.length - 1) == '.')
-      intercept[AssertionError] {
-        println(bufferedFile.readChar(smallTestContent.length))
+      assert(bufferedFile.readChar(testContent.length - 1) == '.')
+      intercept[IndexOutOfBoundsException] {
+        bufferedFile.readChar(testContent.length)
       }
 
       bufferedFile.close()
     }
 
     test("readString") {
-      val bufferedFile = new BufferedRandomAccessFile(smallTempFile.getAbsolutePath, 10)
+      val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 
       // Normal operation
       assert(bufferedFile.readString(0, 5) == "Hello")
@@ -59,23 +52,16 @@ object BufferedRandomAccessFileTests extends TestSuite {
       assert(bufferedFile.readString(0, 10) == "Hello, Wor")
 
       // String across buffer boundary
-      assert(bufferedFile.readString(5, 15) == ", World! Th")
+      assert(bufferedFile.readString(5, 15) == ", World! T")
 
       // Boundary conditions
-      assert(bufferedFile.readString(smallTestContent.length - 5, smallTestContent.length) == "file.")
-      intercept[AssertionError] {
-        bufferedFile.readString(0, smallTestContent.length + 1)
+      assert(bufferedFile.readString(testContent.length - 5, testContent.length) == "File.")
+      assert(bufferedFile.readString(0, testContent.length) == testContent)
+      intercept[IndexOutOfBoundsException] {
+        bufferedFile.readString(0, testContent.length + 1)
       }
 
       bufferedFile.close()
-    }
-
-    test("close") {
-      val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
-
-      bufferedFile.close()
-      // Testing further operations after close should be done carefully
-      // to avoid undefined behavior.
     }
 
     test("readChar") {
@@ -107,7 +93,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
       assert(bufferedFile.readString(0, 4) == "Hell")
 
       // Test reading over the buffer boundary
-      assert(bufferedFile.readString(3, 8) == "lo, Wo")
+      assert(bufferedFile.readString(3, 8) == "lo, W")
 
       bufferedFile.close()
     }
@@ -116,13 +102,13 @@ object BufferedRandomAccessFileTests extends TestSuite {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 
       // Test reading with invalid indices
-      intercept[AssertionError] {
+      intercept[java.io.IOException] {
         bufferedFile.readChar(-1)
       }
-      intercept[AssertionError] {
+      intercept[java.io.IOException] {
         bufferedFile.readString(-1, 2)
       }
-      intercept[AssertionError] {
+      intercept[IndexOutOfBoundsException] {
         bufferedFile.readString(2, 1) // 'from' is greater than 'until'
       }
 
@@ -139,10 +125,10 @@ object BufferedRandomAccessFileTests extends TestSuite {
       assert(smallBufferFile.readString(0, 4) == "Hell")
 
       // Medium buffer
-      assert(mediumBufferFile.readString(7, 22) == "World! This is a")
+      assert(mediumBufferFile.readString(7, 22) == "World! This is ")
 
       // Large buffer
-      assert(largeBufferFile.readString(14, 40).contains("is a test file with enough"))
+      assert(largeBufferFile.readString(14, 40).contains("This is a test file with v"))
 
       smallBufferFile.close()
       mediumBufferFile.close()
@@ -153,7 +139,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 
       // Read string at the very end of the file
-      assert(bufferedFile.readString(testContent.length - 6, testContent.length) == "sizes.")
+      assert(bufferedFile.readString(testContent.length - 6, testContent.length) == "sFile.")
 
       // Read single character at the end of the file
       assert(bufferedFile.readChar(testContent.length - 1) == '.')
@@ -166,8 +152,8 @@ object BufferedRandomAccessFileTests extends TestSuite {
 
       // Sequential reads to test buffer usage
       assert(bufferedFile.readChar(0) == 'H')
-      assert(bufferedFile.readString(1, 10) == "ello, Worl")
-      assert(bufferedFile.readString(10, 20) == "d! This is ")
+      assert(bufferedFile.readString(1, 10) == "ello, Wor")
+      assert(bufferedFile.readString(10, 20) == "ld! This i")
 
       bufferedFile.close()
     }
@@ -187,10 +173,10 @@ object BufferedRandomAccessFileTests extends TestSuite {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 15)
 
       // Reading across buffer reloads
-      assert(bufferedFile.readString(14, 29).contains("test file with"))
+      assert(bufferedFile.readString(14, 29) == "This is a test ")
 
       // Edge case: Reading exactly at the buffer end
-      assert(bufferedFile.readChar(14) == 't') // Last char of the first buffer load
+      assert(bufferedFile.readChar(14) == 'T') // Last char of the first buffer load
 
       bufferedFile.close()
     }
@@ -284,8 +270,8 @@ object BufferedRandomAccessFileTests extends TestSuite {
 
       // Perform sequential and random reads mixed
       assert(bufferedFile.readString(0, 5) == "Hello")
-      assert(bufferedFile.readChar(20) == 'i')
-      assert(bufferedFile.readString(10, 15) == "World")
+      assert(bufferedFile.readChar(20) == 's')
+      assert(bufferedFile.readString(10, 15) == "ld! T")
 
       bufferedFile.close()
     }

@@ -105,7 +105,9 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
   }
 
   def readChar(index: Long): Char = {
-    assert(index < fileLength)
+    if (index >= fileLength) {
+      throw new IndexOutOfBoundsException(s"Index $index is out of bounds for file of length $fileLength")
+    }
     if (index < bufferStart || index >= bufferEnd) {
       fillBuffer(index)
     }
@@ -113,7 +115,9 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
   }
 
   def readString(from: Long, until: Long): String = {
-    assert(from < fileLength && until <= fileLength && from <= until)
+    if (!(from < fileLength && until <= fileLength && from <= until)) {
+      throw new IndexOutOfBoundsException(s"Invalid range: $from-$until for file of length $fileLength")
+    }
     val length = (until - from).toInt
     val stringBytes = new Array[Byte](length)
 
