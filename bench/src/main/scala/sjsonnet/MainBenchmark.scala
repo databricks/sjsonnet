@@ -43,10 +43,10 @@ object MainBenchmark {
 }
 
 @BenchmarkMode(Array(Mode.AverageTime))
-@Fork(1)
+@Fork(4)
 @Threads(1)
-@Warmup(iterations = 5)
-@Measurement(iterations = 10)
+@Warmup(iterations = 30)
+@Measurement(iterations = 40)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
 class MainBenchmark {
