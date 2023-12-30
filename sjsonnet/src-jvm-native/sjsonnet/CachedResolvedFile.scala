@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.io.{BufferedInputStream, File, FileInputStream}
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.zip.CRC32
 import fastparse.ParserInput
@@ -23,8 +24,12 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
       // If the file is too large, then we will just read it from disk
       null
     } else {
-      StaticResolvedFile(Files.readString(jFile.toPath))
+      StaticResolvedFile(readString(jFile))
     }
+  }
+
+  private[this] def readString(jFile: File): String = {
+    new String(Files.readAllBytes(jFile.toPath), StandardCharsets.UTF_8);
   }
 
   /**
@@ -42,7 +47,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
   override def readString(): String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
-      Files.readString(jFile.toPath)
+      readString(jFile)
     } else {
       // Otherwise, we will read it from memory
       resolvedImportContent.readString()
