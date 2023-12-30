@@ -149,7 +149,7 @@ trait ResolvedFile {
   def readString(): String
 
   // Get a content hash of the file suitable for detecting changes in a given file.
-  def crcHash(): Long
+  def contentHash(): String
 }
 
 case class StaticResolvedFile(content: String) extends ResolvedFile {
@@ -158,13 +158,7 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
   def readString(): String = content
 
   // We just cheat, the content hash can be the content itself for static imports
-  lazy val crcHash: Long = crcHashString(content)
-
-  private[this] def crcHashString(str: String): Long = {
-    val crc = new CRC32()
-    crc.update(str.getBytes())
-    crc.getValue()
-  }
+  lazy val contentHash: String = content
 }
 
 class CachedImporter(parent: Importer) extends Importer {
@@ -188,7 +182,7 @@ class CachedResolver(
   strictImportSyntax: Boolean) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate((path, content.crcHash.toString), {
+    parseCache.getOrElseUpdate((path, content.contentHash.toString), {
       val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()

@@ -70,10 +70,10 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     crc.getValue()
   }
 
-  override lazy val crcHash: Long = {
+  override lazy val contentHash: String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
-      crcHashFile(jFile)
+      crcHashFile(jFile).toString
     } else {
       resolvedImportContent.crcHash
     }
