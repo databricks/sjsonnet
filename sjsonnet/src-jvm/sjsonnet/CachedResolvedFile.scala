@@ -75,7 +75,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
       // If the file is too large, then we will just read it from disk
       crcHashFile(jFile).toString
     } else {
-      resolvedImportContent.crcHash
+      resolvedImportContent.contentHash
     }
   }
 }
