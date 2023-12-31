@@ -98,7 +98,6 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
   }
   object jvm extends SjsonnetCrossModule with SjsonnetJvmNative {
     def mainClass = Some("sjsonnet.SjsonnetMain")
-    def moduleDeps = Seq(sevenZip)
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-jvm",
@@ -133,6 +132,41 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         millSourcePath / "src-jvm",
         millSourcePath / "src-jvm-native"
       )
+    }
+
+    override def resources = T.sources {
+      val resourceDir = T.ctx().dest
+      val osArchToUrl = Map(
+        "windows" -> "https://www.7-zip.org/a/7zr.exe",
+        "linux-x86" -> "https://www.7-zip.org/a/7z2301-linux-x64.tar.xz",
+        "linux-arm" -> "https://www.7-zip.org/a/7z2301-linux-arm64.tar.xz",
+        "osx" -> "https://www.7-zip.org/a/7z2301-mac.tar.xz"
+      )
+
+      for ((osArch, url) <- osArchToUrl) {
+        val targetDir = resourceDir / (if (osArch.startsWith("linux")) "linux" else osArch)
+        val fileName = if (osArch == "windows") "7z.exe" else "7z.tar.xz"
+        val file = targetDir / fileName
+        os.makeDir.all(targetDir)
+
+        if (!os.exists(file)) {
+          T.log.info(s"Downloading $url to ${file}")
+          os.write(file, requests.get.stream(url), createFolders = true)
+
+          if (osArch != "windows") {
+            os.proc("tar", "-xf", file, "-C", targetDir).call()
+            os.remove(file)
+
+            if (osArch.startsWith("linux")) {
+              val executableName = if (osArch.contains("x86")) "7z-x86" else "7z-arm"
+              os.move(targetDir / "7zz", targetDir / executableName)
+            } else {
+              os.move(targetDir / "7zz", targetDir / "7z")
+            }
+          }
+        }
+      }
+      Seq(PathRef(resourceDir))
     }
   }
 
@@ -191,47 +225,6 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     object test extends Tests{
       def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
-    }
-  }
-
-  object sevenZip extends JavaModule {
-    def downloadAndExtract = T {
-      val resourceDir = T.ctx().dest
-      val osArchToUrl = Map(
-        "windows" -> "https://www.7-zip.org/a/7zr.exe",
-        "linux-x86" -> "https://www.7-zip.org/a/7z2301-linux-x64.tar.xz",
-        "linux-arm" -> "https://www.7-zip.org/a/7z2301-linux-arm64.tar.xz",
-        "osx" -> "https://www.7-zip.org/a/7z2301-mac.tar.xz"
-      )
-
-      for ((osArch, url) <- osArchToUrl) {
-        val targetDir = resourceDir / (if (osArch.startsWith("linux")) "linux" else osArch)
-        val fileName = if (osArch == "windows") "7z.exe" else "7z.tar.xz"
-        val file = targetDir / fileName
-        os.makeDir.all(targetDir)
-
-        if (!os.exists(file)) {
-          T.log.info(s"Downloading $url to ${file}")
-          os.write(file, requests.get.stream(url), createFolders = true)
-
-          if (osArch != "windows") {
-            os.proc("tar", "-xf", file, "-C", targetDir).call()
-            os.remove(file)
-
-            if (osArch.startsWith("linux")) {
-              val executableName = if (osArch.contains("x86")) "7z-x86" else "7z-arm"
-              os.move(targetDir / "7z", targetDir / executableName)
-            } else {
-              os.move(targetDir / "7zz", targetDir / "7z")
-            }
-          }
-        }
-      }
-    }
-
-    override def resources: mill.define.Sources = T.sources {
-      val _ = downloadAndExtract()
-      super.resources()
     }
   }
 }
