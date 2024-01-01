@@ -135,7 +135,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
 
     override def resources = T.sources {
-      val resourceDir = T.ctx().dest
+      val resourceDir = T.ctx().dest / "7z"
       val osArchToUrl = Map(
         "windows" -> "https://www.7-zip.org/a/7zr.exe",
         "linux-x86" -> "https://www.7-zip.org/a/7z2301-linux-x64.tar.xz",
@@ -154,7 +154,8 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
           os.write(file, requests.get.stream(url), createFolders = true)
 
           if (osArch != "windows") {
-            os.proc("tar", "-xf", file, "-C", targetDir).call()
+            // Extract a single file, 7zz, from the tarball
+            os.proc("tar", "-xvf", file, "-C", targetDir, "7zz").call()
             os.remove(file)
 
             if (osArch.startsWith("linux")) {
