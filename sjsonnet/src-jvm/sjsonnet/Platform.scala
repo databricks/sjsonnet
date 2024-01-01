@@ -12,6 +12,7 @@ import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -26,7 +27,7 @@ object Platform {
   def gzipString(s: String): String = {
     gzipBytes(s.getBytes())
   }
-  
+
   private def withTime[T](f: => T): (T, Long) = {
     val start = System.currentTimeMillis()
     val result = f
@@ -34,7 +35,22 @@ object Platform {
     (result, end - start)
   }
 
-  private val xzCache: ConcurrentHashMap[(List[Byte], Option[Int]), String] = new ConcurrentHashMap()
+  private lazy val xzCache: Cache[(List[Byte], Option[Int]), String] = {
+    Scaffeine()
+      .recordStats()
+      // Use weakValues() to allow the cache to be garbage collected when a value is no longer in
+      // use
+      .weakValues()
+      .weigher(cacheWeigher)
+      // Max cache size is 100 MB
+      .maximumWeight(100 * 1024 * 1024)
+      .build()
+  }
+
+  private def cacheWeigher(k: (List[Byte], Option[Int]), v: String): Int = {
+    // The size of the cache is the sum of the sizes of the keys and values
+    k._1.size + v.length
+  }
 
   /**
    *  Valid compression levels are 0 (no compression) to 9 (maximum compression).
@@ -42,34 +58,28 @@ object Platform {
   def xzBytes(b: Array[Byte], compressionLevel: Option[Int]): String = {
     // For a given byte array and compression level, check the cache to see if we've already
     // compressed it
-    // Convert it to a List to make comparisons easy
-    // If it's not in the cache, compress it and add it to the cache
-    // Return the compressed bytes
-    // If the compression level is not specified, then use the default
-    val key = (b.toList, compressionLevel)
-    val cached: String = xzCache.get(key)
-    if (cached != null) {
-      System.err.println(s"Cache hit: ${b.size} bytes, ${cached.length} bytes")
-      cached
-    } else {
-      val compressed: String = xzBytesUncached(b, compressionLevel)
-      xzCache.put(key, compressed)
-      compressed
+    val (compressed, duration) = withTime {
+      xzCache.get((b.toList, compressionLevel), { _ =>
+        xzBytesUncached(b, compressionLevel)
+      })
     }
+    // Print the time it took to compress with XZ
+    System.err.println(s"XZ: $duration ms")
+    compressed
   }
 
   private def xzBytesUncached(b: Array[Byte], compressionLevel: Option[Int]): String = {
-    val (xzedBase64Length: Int, time1) = withTime {
-      val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
-      // Set compression to specified level
-      val level = compressionLevel.getOrElse(LZMA2Options.PRESET_DEFAULT)
-      val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
-      xz.write(b)
-      xz.close()
-      val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
-      outputStream.close()
-      xzedBase64.length
-    }
+    // val (xzedBase64Length: Int, time1) = withTime {
+    //   val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
+    //   // Set compression to specified level
+    //   val level = compressionLevel.getOrElse(LZMA2Options.PRESET_DEFAULT)
+    //   val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
+    //   xz.write(b)
+    //   xz.close()
+    //   val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
+    //   outputStream.close()
+    //   xzedBase64.length
+    // }
     val (zcompressed: String, time2) = withTime {
       val compressed = compressWith7z(b, compressionLevel)
       val xzedBase64: String = Base64.getEncoder.encodeToString(compressed)
@@ -77,9 +87,10 @@ object Platform {
     }
     // Print the time it took to compress with XZ and 7z
     // Print the ratio of the two compressed sizes
-    System.err.println(s"XZ: $time1 ms, 7z: $time2 ms")
-    System.err.println(s"XZ: $xzedBase64Length, 7z: ${zcompressed.length}")
-    System.err.println(s"Ratio: ${xzedBase64Length.toDouble / zcompressed.length}")
+    // System.err.println(s"XZ: $time1 ms, 7z: $time2 ms")
+    // System.err.println(s"XZ: $xzedBase64Length, 7z: ${zcompressed.length}")
+    // System.err.println(s"Ratio: ${xzedBase64Length.toDouble / zcompressed.length}")
+    System.err.println(s"7zip: $time2 ms ${b.length} -> ${zcompressed.length}")
     zcompressed
   }
 

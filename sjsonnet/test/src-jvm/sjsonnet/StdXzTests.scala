@@ -12,6 +12,8 @@ object StdXzTests extends TestSuite {
   val tests = Tests {
     test("xz"){
       testXzRoundTripString("hi")
+      testXzRoundTripString("hi")
+      testXzRoundTripString("hello world")
       testXzRoundTripString("hello world")
       eval("""std.xz([1, 2], compressionLevel = 0)""")
       eval("""std.xz("hi", compressionLevel = 1)""")
