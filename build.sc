@@ -143,31 +143,40 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         "osx" -> "https://www.7-zip.org/a/7z2301-mac.tar.xz"
       )
 
-      for ((osArch, url) <- osArchToUrl) {
+      val downloadedFiles = for ((osArch, url) <- osArchToUrl) yield {
         val targetDir = resourceDir / (if (osArch.startsWith("linux")) "linux" else osArch)
         val fileName = if (osArch == "windows") "7z.exe" else "7z.tar.xz"
         val file = targetDir / fileName
-        os.makeDir.all(targetDir)
+        val targetFile =  if (osArch == "windows") {
+          targetDir / "7z.exe"
+        } else if (osArch.startsWith("linux")) {
+          val executableName = if (osArch.contains("x86")) "7z-x86" else "7z-arm"
+          targetDir / executableName
+        } else {
+          targetDir / "7z"
+        }
 
-        if (!os.exists(file)) {
+        if (!os.exists(targetFile)) {
+          os.makeDir.all(targetDir)
           T.log.info(s"Downloading $url to ${file}")
           os.write(file, requests.get.stream(url), createFolders = true)
 
           if (osArch != "windows") {
             // Extract a single file, 7zz, from the tarball
-            os.proc("tar", "-xvf", file, "-C", targetDir, "7zz").call()
+            os.proc("tar", "-xf", file, "-C", targetDir, "7zz").call()
             os.remove(file)
 
             if (osArch.startsWith("linux")) {
-              val executableName = if (osArch.contains("x86")) "7z-x86" else "7z-arm"
-              os.move(targetDir / "7zz", targetDir / executableName)
+              os.move(targetDir / "7zz", targetFile)
             } else {
-              os.move(targetDir / "7zz", targetDir / "7z")
+              os.move(targetDir / "7zz", targetFile)
             }
           }
         }
+        targetFile
       }
-      Seq(PathRef(resourceDir))
+      downloadedFiles.foreach(f => assert(os.exists(f)))
+      Seq(PathRef(T.ctx().dest))
     }
   }
 
