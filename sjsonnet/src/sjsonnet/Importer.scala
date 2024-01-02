@@ -98,7 +98,9 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
   private val fileLength: Long = file.length()
 
   private def fillBuffer(position: Long): Unit = {
-    file.seek(position)
+    if (file.getFilePointer() != position) {
+      file.seek(position)
+    }
     val bytesRead = file.read(buffer, 0, bufferSize)
     bufferStart = position
     bufferEnd = position + bytesRead
