@@ -13,6 +13,7 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
+import it.unimi.dsi.fastutil.objects.{Object2BooleanLinkedOpenHashMap, Object2ObjectLinkedOpenHashMap}
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -184,5 +185,18 @@ object Platform {
     }
 
     tempFile
+  }
+
+  type Object2ObjectLinkedMap[K, V] = Object2ObjectLinkedOpenHashMap[K, V]
+  type Object2BooleanLinkedMap[K] = Object2BooleanLinkedOpenHashMap[K]
+
+  def newObjectToObjectLinkedHashMap[K, V](): Object2ObjectLinkedMap[K, V] = {
+    // Use fastutils linked hash map
+    new Object2ObjectLinkedOpenHashMap[K, V]()
+  }
+
+  def newObjectToBooleanLinkedHashMap[K](): Object2BooleanLinkedMap[K] = {
+    // Use fastutils linked hash map
+    new Object2BooleanLinkedOpenHashMap[K]()
   }
 }

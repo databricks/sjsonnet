@@ -573,7 +573,7 @@ class Evaluator(resolver: CachedResolver,
       newScope
     }
 
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    val builder = Platform.newObjectToObjectLinkedHashMap[String, Val.Obj.Member]
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -607,7 +607,7 @@ class Evaluator(resolver: CachedResolver,
     val compScope: ValScope = scope //.clearSuper
 
     lazy val newSelf: Val.Obj = {
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      val builder = Platform.newObjectToObjectLinkedHashMap[String, Val.Obj.Member]
       for(s <- visitComp(e.first :: e.rest, Array(compScope))){
         lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
 
