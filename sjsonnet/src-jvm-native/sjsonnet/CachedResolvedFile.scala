@@ -10,6 +10,11 @@ import fastparse.ParserInput
  * A class that encapsulates a resolved import. This is used to cache the result of
  * resolving an import. If the import is deemed too large (IE it's a large file), then we will avoid keeping it in
  * memory and instead will re-read it from disk.
+ *
+ * @param resolvedImportPath The path of the file on disk that was resolved
+ * @param memoryLimitBytes The maximum size of a file that we will resolve. This is not the size of
+ * the buffer, but a mechanism to fail when being asked to resolve (and downstream parse) a file
+ * that is beyond this limit.
  */
 class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long) extends ResolvedFile {
 
