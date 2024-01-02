@@ -5,7 +5,7 @@ import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.{Files, Paths, Path}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPOutputStream
-import java.util.{Base64, EnumSet}
+import java.util.{Arrays, Base64, EnumSet}
 
 import org.json.JSONObject
 import org.tukaani.xz.LZMA2Options
@@ -35,7 +35,22 @@ object Platform {
     (result, end - start)
   }
 
-  private lazy val xzCache: Cache[(List[Byte], Option[Int]), String] = {
+  private case class CacheKey(b: Array[Byte], compressionLevel: Option[Int]) {
+    override lazy val hashCode: Int = {
+      Arrays.hashCode(b) + compressionLevel.hashCode()
+    }
+
+    override def equals(obj: Any): Boolean = {
+      obj match {
+        case CacheKey(b2, compressionLevel2) =>
+          compressionLevel == compressionLevel2 && Arrays.equals(b, b2)
+        case _ =>
+          false
+      }
+    }
+  }
+
+  private lazy val xzCache: Cache[CacheKey, String] = {
     Scaffeine()
       .recordStats()
       // Use weakValues() to allow the cache to be garbage collected when a value is no longer in
@@ -47,9 +62,9 @@ object Platform {
       .build()
   }
 
-  private def cacheWeigher(k: (List[Byte], Option[Int]), v: String): Int = {
+  private def cacheWeigher(k: CacheKey, v: String): Int = {
     // The size of the cache is the sum of the sizes of the keys and values
-    k._1.size + v.length
+    k.b.length + v.length
   }
 
   /**
@@ -59,7 +74,7 @@ object Platform {
     // For a given byte array and compression level, check the cache to see if we've already
     // compressed it
     val (compressed, duration) = withTime {
-      xzCache.get((b.toList, compressionLevel), { _ =>
+      xzCache.get(CacheKey(b, compressionLevel), { _ =>
         xzBytesUncached(b, compressionLevel)
       })
     }
