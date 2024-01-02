@@ -82,7 +82,7 @@ abstract class Materializer {
         }
         builder.put(x._1, v)
       }
-      builder.trim()
+      Platform.compactHashMap(builder)
       new Val.Obj(pos, builder, false, null, null)
   }
 

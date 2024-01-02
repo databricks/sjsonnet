@@ -134,7 +134,7 @@ object Val{
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
       val m = Platform.newObjectToObjectLinkedHashMap[String, Obj.Member]()
       for((k, v) <- members) m.put(k, v)
-      m.trim()
+      Platform.compactHashMap(m)
       new Obj(pos, m, false, null, null)
     }
   }
@@ -156,7 +156,7 @@ object Val{
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
-        value0.trim()
+        Platform.compactHashMap(value0)
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
         this.value0 = value0
       }
@@ -195,7 +195,7 @@ object Val{
       if(allKeys == null) {
         allKeys = Platform.newObjectToBooleanLinkedHashMap[String]
         gatherKeys(allKeys)
-        allKeys.trim()
+        Platform.compactHashMap(allKeys)
       }
       allKeys
     }
@@ -308,7 +308,7 @@ object Val{
         cache.put(k, rhs)
         allKeys.put(k, false)
     }
-    allKeys.trim()
+    Platform.compactHashMap(allKeys)
     new Val.Obj(pos, null, true, null, null, cache, allKeys)
   }
 
