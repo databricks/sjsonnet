@@ -121,18 +121,17 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
       throw new IndexOutOfBoundsException(s"Invalid range: $from-$until for file of length $fileLength")
     }
     val length = (until - from).toInt
-    val stringBytes = new Array[Byte](length)
 
     if (from >= bufferStart && until <= bufferEnd) {
       // Range is within the buffer
-      System.arraycopy(buffer, (from - bufferStart).toInt, stringBytes, 0, length)
+      new String(buffer, (from - bufferStart).toInt, length, StandardCharsets.UTF_8)
     } else {
       // Range is outside the buffer
+      val stringBytes = new Array[Byte](length)
       file.seek(from)
       file.readFully(stringBytes, 0, length)
+      new String(stringBytes, StandardCharsets.UTF_8)
     }
-
-    new String(stringBytes)
   }
 
   def close(): Unit = {
