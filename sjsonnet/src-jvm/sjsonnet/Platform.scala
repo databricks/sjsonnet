@@ -9,7 +9,6 @@ import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
-import it.unimi.dsi.fastutil.objects.{Object2BooleanLinkedOpenHashMap, Object2ObjectLinkedOpenHashMap}
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -65,7 +64,6 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
-  /*
   def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val size = map.size()
     if (size == 0) {
@@ -93,5 +91,4 @@ object Platform {
       newMap
     }
   }
-  */
 }

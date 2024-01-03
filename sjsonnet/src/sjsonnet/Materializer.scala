@@ -75,15 +75,14 @@ abstract class Materializer {
     case ujson.Str(s) => Val.Str(pos, s)
     case ujson.Arr(xs) => new Val.Arr(pos, xs.map(x => (() => reverse(pos, x)): Lazy).toArray[Lazy])
     case ujson.Obj(xs) =>
-      val builder = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
+      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for(x <- xs) {
         val v = new Val.Obj.Member(false, Visibility.Normal) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = reverse(pos, x._2)
         }
         builder.put(x._1, v)
       }
-      builder.trim()
-      new Val.Obj(pos, builder, false, null, null)
+      new Val.Obj(pos, Platform.compactHashMap(builder), false, null, null)
   }
 
   def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match{
