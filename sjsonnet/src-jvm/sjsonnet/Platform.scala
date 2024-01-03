@@ -2,6 +2,8 @@ package sjsonnet
 
 import org.json.JSONObject
 
+import scala.collection.JavaConverters._
+
 import java.io.ByteArrayOutputStream
 import java.util.{Base64, Collections, LinkedHashMap, Map => JMap}
 import java.util.zip.GZIPOutputStream
@@ -70,6 +72,7 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
+  /*
   def compactHashMap[K, V: TypeTag](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val res = typeOf[V] match {
       case t if t =:= typeOf[java.lang.Boolean] => "It's an Int"
@@ -95,5 +98,19 @@ object Platform {
         }
     }
     res.asInstanceOf[JMap[K, V]]
+  }
+  */
+
+  // import scala.collection.immutable.ListMap
+  // import scala.collection.mutable.{LinkedHashMap => SLinkedHashMap}
+  import scala.collection.immutable.HashMap
+
+  def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
+    val size = map.size()
+    if (size == 0) {
+      Collections.emptyMap[K, V]()
+    } else {
+      HashMap(map.asScala.toSeq: _*).asJava
+    }
   }
 }
