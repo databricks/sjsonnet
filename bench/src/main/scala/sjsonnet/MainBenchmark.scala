@@ -53,16 +53,22 @@ class MainBenchmark {
 
   val dummyOut = MainBenchmark.createDummyOut
 
+  val cache = new DefaultParseCache
+
   @Benchmark
   def main(bh: Blackhole): Unit = {
-    bh.consume(SjsonnetMain.main0(
-      MainBenchmark.mainArgs,
-      new DefaultParseCache,
-      System.in,
-      dummyOut,
-      System.err,
-      os.pwd,
-      None
-    ))
+    bh.consume {
+      SjsonnetMain.main0(
+        MainBenchmark.mainArgs,
+        cache,
+        System.in,
+        dummyOut,
+        System.err,
+        os.pwd,
+        None
+      )
+      println("hi")
+      Thread.sleep(100000000)
+    }
   }
 }
