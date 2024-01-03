@@ -292,7 +292,7 @@ class Std {
       val func = _func.asFunc
       val obj = _obj.asObj
       val allKeys = obj.allKeyNames
-      val m = new util.LinkedHashMap[String, Val.Obj.Member]()
+      val m = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
       var i = 0
       while(i < allKeys.length) {
         val k = allKeys(i)
@@ -303,7 +303,8 @@ class Std {
         m.put(k, v)
         i += 1
       }
-      new Val.Obj(pos, Platform.compactHashMap(m), false, null, null)
+      m.trim()
+      new Val.Obj(pos, m, false, null, null)
     }
   }
 

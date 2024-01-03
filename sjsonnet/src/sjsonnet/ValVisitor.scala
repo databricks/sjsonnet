@@ -18,7 +18,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
 
   def visitObject(length: Int, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {
     val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    val allKeys = new it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]
     var key: String = null
     def subVisitor: Visitor[_, _] = self
     def visitKey(index: Int) = upickle.core.StringVisitor
@@ -28,7 +28,8 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
       allKeys.put(key, false)
     }
     def visitEnd(index: Int): Val = {
-      new Val.Obj(pos, null, true, null, null, cache, Platform.compactHashMap(allKeys))
+      allKeys.trim()
+      new Val.Obj(pos, null, true, null, null, cache, allKeys)
     }
   }
 

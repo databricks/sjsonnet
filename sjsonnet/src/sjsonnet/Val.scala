@@ -132,9 +132,10 @@ object Val{
     }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
-      val m = new util.LinkedHashMap[String, Obj.Member]()
+      val m = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
       for((k, v) <- members) m.put(k, v)
-      new Obj(pos, Platform.compactHashMap(m), false, null, null)
+      m.trim()
+      new Obj(pos, m, false, null, null)
     }
   }
 
@@ -144,19 +145,20 @@ object Val{
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
-                  private[this] var allKeys: util.Map[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+                  private[this] var allKeys: it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
 
     private[this] def getValue0: util.Map[String, Obj.Member] = {
       if(value0 == null) {
-        val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        val value0 = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
-        this.value0 = Platform.compactHashMap(value0)
+        value0.trim()
+        this.value0 = value0
       }
       value0
     }
@@ -176,7 +178,7 @@ object Val{
     def prettyName = "object"
     override def asObj: Val.Obj = this
 
-    private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
+    private def gatherKeys(mapping: it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]): Unit = {
       if(static) mapping.putAll(allKeys)
       else {
         if(`super` != null) `super`.gatherKeys(mapping)
@@ -191,9 +193,9 @@ object Val{
 
     private def getAllKeys = {
       if(allKeys == null) {
-        val tmpKeys = new util.LinkedHashMap[String, java.lang.Boolean]
-        gatherKeys(tmpKeys)
-        allKeys = Platform.compactHashMap(tmpKeys)
+        allKeys = new it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]
+        gatherKeys(allKeys)
+        allKeys.trim()
       }
       allKeys
     }
@@ -300,13 +302,14 @@ object Val{
 
   def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
     val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    val allKeys = new it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap[String]
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
         cache.put(k, rhs)
         allKeys.put(k, false)
     }
-    new Val.Obj(pos, null, true, null, null, cache, Platform.compactHashMap(allKeys))
+    allKeys.trim()
+    new Val.Obj(pos, null, true, null, null, cache, allKeys)
   }
 
   abstract class Func(val pos: Position,

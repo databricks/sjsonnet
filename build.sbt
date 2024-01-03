@@ -20,6 +20,7 @@ lazy val main = (project in file("sjsonnet"))
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0",
       "org.tukaani" % "xz" % "1.8",
       "org.yaml" % "snakeyaml" % "1.30",
+      "it.unimi.dsi" % "fastutil" % "8.5.12",
     ),
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "utest" % "0.7.7",

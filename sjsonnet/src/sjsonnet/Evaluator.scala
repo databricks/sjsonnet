@@ -573,7 +573,7 @@ class Evaluator(resolver: CachedResolver,
       newScope
     }
 
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    val builder = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -598,7 +598,8 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
     }
-    cachedObj = new Val.Obj(objPos, Platform.compactHashMap(builder), false, if(asserts != null) assertions else null, sup)
+    builder.trim()
+    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
     cachedObj
   }
 
@@ -607,7 +608,7 @@ class Evaluator(resolver: CachedResolver,
     val compScope: ValScope = scope //.clearSuper
 
     lazy val newSelf: Val.Obj = {
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      val builder = new it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap[String, Val.Obj.Member]
       for(s <- visitComp(e.first :: e.rest, Array(compScope))){
         lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
 
@@ -628,7 +629,8 @@ class Evaluator(resolver: CachedResolver,
           case Val.Null(_) => // do nothing
         }
       }
-      new Val.Obj(e.pos, Platform.compactHashMap(builder), false, null, sup)
+      builder.trim()
+      new Val.Obj(e.pos, builder, false, null, sup)
     }
 
     newSelf
