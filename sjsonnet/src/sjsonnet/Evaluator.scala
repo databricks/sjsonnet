@@ -598,7 +598,7 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
     }
-    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
+    cachedObj = new Val.Obj(objPos, Platform.compactHashMap(builder), false, if(asserts != null) assertions else null, sup)
     cachedObj
   }
 
@@ -628,7 +628,7 @@ class Evaluator(resolver: CachedResolver,
           case Val.Null(_) => // do nothing
         }
       }
-      new Val.Obj(e.pos, builder, false, null, sup)
+      new Val.Obj(e.pos, Platform.compactHashMap(builder), false, null, sup)
     }
 
     newSelf

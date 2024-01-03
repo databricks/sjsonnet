@@ -134,29 +134,29 @@ object Val{
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
       val m = new util.LinkedHashMap[String, Obj.Member]()
       for((k, v) <- members) m.put(k, v)
-      new Obj(pos, m, false, null, null)
+      new Obj(pos, Platform.compactHashMap(m), false, null, null)
     }
   }
 
   final class Obj(val pos: Position,
-                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
+                  private[this] var value0: util.Map[String, Obj.Member],
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
-                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+                  private[this] var allKeys: util.Map[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
 
-    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+    private[this] def getValue0: util.Map[String, Obj.Member] = {
       if(value0 == null) {
         val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
-        this.value0 = value0
+        this.value0 = Platform.compactHashMap(value0)
       }
       value0
     }
@@ -191,8 +191,9 @@ object Val{
 
     private def getAllKeys = {
       if(allKeys == null) {
-        allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
-        gatherKeys(allKeys)
+        val tmpKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+        gatherKeys(tmpKeys)
+        allKeys = Platform.compactHashMap(tmpKeys)
       }
       allKeys
     }
@@ -305,7 +306,7 @@ object Val{
         cache.put(k, rhs)
         allKeys.put(k, false)
     }
-    new Val.Obj(pos, null, true, null, null, cache, allKeys)
+    new Val.Obj(pos, null, true, null, null, cache, Platform.compactHashMap(allKeys))
   }
 
   abstract class Func(val pos: Position,

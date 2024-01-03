@@ -303,7 +303,7 @@ class Std {
         m.put(k, v)
         i += 1
       }
-      new Val.Obj(pos, m, false, null, null)
+      new Val.Obj(pos, Platform.compactHashMap(m), false, null, null)
     }
   }
 

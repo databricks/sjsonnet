@@ -27,7 +27,9 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
       cache.put(key, v)
       allKeys.put(key, false)
     }
-    def visitEnd(index: Int): Val = new Val.Obj(pos, null, true, null, null, cache, allKeys)
+    def visitEnd(index: Int): Val = {
+      new Val.Obj(pos, null, true, null, null, cache, Platform.compactHashMap(allKeys))
+    }
   }
 
   def visitNull(index: Int): Val = Val.Null(pos)
