@@ -101,7 +101,7 @@ object Platform {
   }
   */
 
-  import scala.collection.immutable.ListMap
+  import scala.collection.immutable.VectorMap
   // import scala.collection.mutable.{LinkedHashMap => SLinkedHashMap}
   // import scala.collection.immutable.HashMap
 
@@ -110,7 +110,7 @@ object Platform {
     if (size == 0) {
       Collections.emptyMap[K, V]()
     } else {
-      ListMap(map.asScala.toSeq: _*).asJava
+      VectorMap(map.asScala.toSeq: _*).asJava
     }
   }
 
