@@ -3,7 +3,7 @@ package sjsonnet
 import org.json.JSONObject
 
 import java.io.ByteArrayOutputStream
-import java.util.Base64
+import java.util.{Base64, Collections, LinkedHashMap, Map => JMap}
 import java.util.zip.GZIPOutputStream
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
@@ -46,33 +46,22 @@ object Platform {
       .mkString
   }
 
-  /*
-  type Object2ObjectLinkedMap[K, V] = Object2ObjectLinkedOpenHashMap[K, V]
-  type Object2BooleanLinkedMap[K] = Object2BooleanLinkedOpenHashMap[K]
-
-  def newObjectToObjectLinkedHashMap[K, V](): Object2ObjectLinkedMap[K, V] = {
-    // Use fastutils linked hash map
-    new Object2ObjectLinkedOpenHashMap[K, V]()
-  }
-
-  def newObjectToBooleanLinkedHashMap[K](): Object2BooleanLinkedMap[K] = {
-    // Use fastutils linked hash map
-    new Object2BooleanLinkedOpenHashMap[K]()
-  }
-  */
-
-  type Object2ObjectLinkedMap[K, V] = java.util.Map[K, V]
-  type Object2BooleanLinkedMap[K] = java.util.Map[K, Boolean]
-
-  def newObjectToObjectLinkedHashMap[K, V](): Object2ObjectLinkedMap[K, V] = {
-    new LinkedHashMap[K, V]()
-  }
-
-  def newObjectToBooleanLinkedHashMap[K](): Object2BooleanLinkedMap[K] = {
-    new LinkedHashMap[K, Boolean]()
-  }
-
-  def compactHashMap[K, V](map: Object2ObjectLinkedMap[K, V]): Object2ObjectLinkedMap[K, V] = {
+  /**
+   * Compacts a [[LinkedHashMap]] as small as possible. There are 3 different cases:
+   * 1. If the map is empty, return [[Collections.emptyMap]]. This is an immutable singleton - and
+   *    thus is space efficient.
+   * 2. If the map has 1 element, so we return an immutable single element map.
+   * 3. Otherwise, we return a new [[LinkedHashMap]] with the same contents as the original map
+   *    that's been compacted to the smallest size possible - subject to the desired load factor:
+   *    (num elements) / load-factor + 1. The default load factor is 0.75.
+   *
+   * Return types from (1) & (2) are [[java.util.Map]] - where as 3 is a [[LinkedHashMap]]. So we
+   * need to pick the common type - which is [[java.util.Map]].
+   *
+   * All returned maps preserve the insertion order of the original map. No map returned from this
+   * method should be mutated.
+   */
+  def compactHashMap[K, V](map: LinkedHashMap[K, V]): Map[K, V] = {
     val size = map.size()
     if (size == 0) {
       // Return an empty map
@@ -90,6 +79,11 @@ object Platform {
       //      Map copy = new LinkedHashMap(m);
       //      ...
       //  }
+
+      // This constructor's doc: Constructs an insertion-ordered LinkedHashMap instance with the
+      // same mappings as the specified map. The LinkedHashMap instance is created with a default
+      // load factor (0.75) and an initial capacity sufficient to hold the mappings in the specified
+      // map.
       val newMap = new LinkedHashMap[K, V](map)
       newMap
     }
