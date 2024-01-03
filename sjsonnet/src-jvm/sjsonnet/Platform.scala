@@ -72,35 +72,39 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
-  /*
+  // FASTUTIL SINGLETON
   def compactHashMap[K, V: TypeTag](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val res = typeOf[V] match {
-      case t if t =:= typeOf[java.lang.Boolean] => "It's an Int"
+      case t if t =:= typeOf[java.lang.Boolean] =>
         val size = map.size()
         if (size == 0) {
-          Object2BooleanMaps.emptyMap[K]()
+          Collections.emptyMap[K, V]()
         } else if (size == 1) {
           // Return a singleton map
           val entry = map.entrySet().iterator().next()
           Object2BooleanMaps.singleton(entry.getKey(), entry.getValue().asInstanceOf[java.lang.Boolean])
         } else {
-          new Object2BooleanLinkedOpenHashMap[K](map.asInstanceOf[LinkedHashMap[K, java.lang.Boolean]])
+          var r = new Object2BooleanLinkedOpenHashMap[K](map.asInstanceOf[LinkedHashMap[K, java.lang.Boolean]])
+          r.trim()
+          r
         }
       case _ =>
         val size = map.size()
         if (size == 0) {
-          Object2ObjectMaps.emptyMap[K, V]()
+          Collections.emptyMap[K, V]()
         } else if (size == 1) {
           val entry = map.entrySet().iterator().next()
           Object2ObjectMaps.singleton(entry.getKey(), entry.getValue())
         } else {
-          new Object2ObjectLinkedOpenHashMap[K, V](map)
+          val r = new Object2ObjectLinkedOpenHashMap[K, V](map)
+          r.trim()
+          r
         }
     }
     res.asInstanceOf[JMap[K, V]]
   }
-  */
 
+ /*
   import scala.collection.immutable.VectorMap
   // import scala.collection.mutable.{LinkedHashMap => SLinkedHashMap}
   // import scala.collection.immutable.HashMap
@@ -113,6 +117,7 @@ object Platform {
       VectorMap(map.asScala.toSeq: _*).asJava
     }
   }
+  */
 
  /*
   import scala.collection.JavaConverters._
