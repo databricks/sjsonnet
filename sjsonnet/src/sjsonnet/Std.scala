@@ -303,7 +303,6 @@ class Std {
         m.put(k, v)
         i += 1
       }
-      m.trim()
       new Val.Obj(pos, m, false, null, null)
     }
   }

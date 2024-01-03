@@ -598,7 +598,6 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
     }
-    builder.trim()
     cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
     cachedObj
   }
@@ -629,7 +628,6 @@ class Evaluator(resolver: CachedResolver,
           case Val.Null(_) => // do nothing
         }
       }
-      builder.trim()
       new Val.Obj(e.pos, builder, false, null, sup)
     }
 
