@@ -8,9 +8,12 @@ import org.openjdk.jmh.infra._
 
 object MainBenchmark {
   val mainArgs = Array[String](
-    "../../universe2/rulemanager/deploy/rulemanager.jsonnet",
+    // "../../universe/rulemanager/deploy/rulemanager.jsonnet",
+    "../../universe2/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
     "-J", "../../universe2",
     "-J", "../../universe2/mt-shards/dev/az-westus-c2",
+    "-J", "../../universe2/bazel-bin",
+    "--ext-code", "isKubecfg=false"
   )
 
   def findFiles(): (IndexedSeq[(Path, String)], EvalScope) = {
@@ -40,10 +43,10 @@ object MainBenchmark {
 }
 
 @BenchmarkMode(Array(Mode.AverageTime))
-@Fork(4)
+@Fork(1)
 @Threads(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 40)
+@Warmup(iterations = 5)
+@Measurement(iterations = 10)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
 class MainBenchmark {

@@ -24,6 +24,8 @@ object Platform {
     gzipBytes(s.getBytes())
   }
   def xzBytes(b: Array[Byte]): String = {
+    ""
+    /*
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options())
     xz.write(b)
@@ -31,6 +33,7 @@ object Platform {
     val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
     outputStream.close()
     xzedBase64
+    */
   }
   def xzString(s: String): String = {
     xzBytes(s.getBytes())
