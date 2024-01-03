@@ -101,6 +101,7 @@ object Platform {
   }
   */
 
+ /*
   // import scala.collection.immutable.ListMap
   // import scala.collection.mutable.{LinkedHashMap => SLinkedHashMap}
   import scala.collection.immutable.HashMap
@@ -113,4 +114,20 @@ object Platform {
       HashMap(map.asScala.toSeq: _*).asJava
     }
   }
+  */
+
+  import scala.collection.JavaConverters._
+  import com.google.common.collect.ImmutableMap
+  import java.util.{Map => JMap}
+
+  def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
+    val size = map.size
+    if (size == 0) {
+      java.util.Collections.emptyMap[K, V]()
+    } else {
+      val builder = ImmutableMap.builder[K, V]()
+      map.forEach { case (key, value) => builder.put(key, value) }
+      builder.build()
+    }
+}
 }
