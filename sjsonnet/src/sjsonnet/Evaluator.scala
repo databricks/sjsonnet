@@ -300,7 +300,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
-    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos)._2)
+    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos)._2.readString())
 
   def visitImport(e: Import)(implicit scope: ValScope): Val = {
     val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos)
@@ -573,7 +573,7 @@ class Evaluator(resolver: CachedResolver,
       newScope
     }
 
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    val builder = Platform.newObjectToObjectLinkedHashMap[String, Val.Obj.Member]
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -598,6 +598,7 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
     }
+    Platform.compactHashMap(builder)
     cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
     cachedObj
   }
@@ -607,7 +608,7 @@ class Evaluator(resolver: CachedResolver,
     val compScope: ValScope = scope //.clearSuper
 
     lazy val newSelf: Val.Obj = {
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+      val builder = Platform.newObjectToObjectLinkedHashMap[String, Val.Obj.Member]
       for(s <- visitComp(e.first :: e.rest, Array(compScope))){
         lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
 
@@ -628,6 +629,7 @@ class Evaluator(resolver: CachedResolver,
           case Val.Null(_) => // do nothing
         }
       }
+      Platform.compactHashMap(builder)
       new Val.Obj(e.pos, builder, false, null, sup)
     }
 
