@@ -303,8 +303,9 @@ object Val{
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
-        cache.put(k, rhs)
-        allKeys.put(k, false)
+        val internedKey = k.intern()
+        cache.put(internedKey, rhs)
+        allKeys.put(internedKey, false)
     }
     new Val.Obj(pos, null, true, null, null, cache, Platform.compactHashMap(allKeys))
   }

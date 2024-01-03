@@ -22,7 +22,9 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     var key: String = null
     def subVisitor: Visitor[_, _] = self
     def visitKey(index: Int) = upickle.core.StringVisitor
-    def visitKeyValue(s: Any): Unit = key = s.toString
+    def visitKeyValue(s: Any): Unit = {
+      key = s.toString.intern()
+    }
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)
       allKeys.put(key, false)
