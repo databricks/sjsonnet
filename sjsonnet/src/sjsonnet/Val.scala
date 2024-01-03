@@ -143,7 +143,7 @@ object Val{
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
-                  valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
+                  valueCache: mutable.HashMap[Any, Val] = new mutable.HashMap[Any, Val](initialCapacity = 3, loadFactor = mutable.HashMap.defaultLoadFactor),
                   private[this] var allKeys: util.Map[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
@@ -299,7 +299,7 @@ object Val{
   }
 
   def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
-    val cache = mutable.HashMap.empty[Any, Val]
+    val cache = new mutable.HashMap[Any, Val](initialCapacity = 3, loadFactor = mutable.HashMap.defaultLoadFactor)
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
