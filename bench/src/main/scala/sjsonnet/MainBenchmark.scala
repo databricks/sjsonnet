@@ -67,8 +67,8 @@ class MainBenchmark {
         os.pwd,
         None
       )
-      println("hi")
-      Thread.sleep(100000000)
     }
+    println("sleeping")
+    Thread.sleep(10000000)
   }
 }

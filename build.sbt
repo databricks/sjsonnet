@@ -23,6 +23,7 @@ lazy val main = (project in file("sjsonnet"))
       "it.unimi.dsi" % "fastutil" % "8.5.12",
       "org.scala-lang" % "scala-reflect" % scalaVersion.value,
       "com.google.guava" % "guava" % "33.0.0-jre",
+      "com.github.blemale" %% "scaffeine" % "4.1.0",
     ),
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "utest" % "0.7.7",

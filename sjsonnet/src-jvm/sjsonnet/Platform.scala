@@ -7,6 +7,7 @@ import scala.collection.JavaConverters._
 import java.io.ByteArrayOutputStream
 import java.util.{Base64, Collections, LinkedHashMap, Map => JMap}
 import java.util.zip.GZIPOutputStream
+import java.util.Arrays
 
 import scala.reflect.runtime.universe._
 
@@ -17,6 +18,7 @@ import org.yaml.snakeyaml.constructor.Constructor
 import it.unimi.dsi.fastutil.objects.{Object2ObjectLinkedOpenHashMap, Object2BooleanLinkedOpenHashMap}
 import it.unimi.dsi.fastutil.objects.Object2BooleanMaps
 import it.unimi.dsi.fastutil.objects.Object2ObjectMaps
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -72,6 +74,7 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
+  /*
   // FASTUTIL SINGLETON
   def compactHashMap[K, V: TypeTag](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val res = typeOf[V] match {
@@ -103,21 +106,46 @@ object Platform {
     }
     res.asInstanceOf[JMap[K, V]]
   }
+  */
 
- /*
   import scala.collection.immutable.VectorMap
   // import scala.collection.mutable.{LinkedHashMap => SLinkedHashMap}
   // import scala.collection.immutable.HashMap
+
+  private[this] val objectPool: Cache[CacheKey, JMap[_, _]] =
+    Scaffeine()
+      .recordStats()
+      .weakValues()
+      .build[CacheKey, JMap[_, _]]()
+
+  private case class CacheKey(keys: Array[Object], values: Array[Object]) {
+    override def hashCode(): Int = {
+      Arrays.hashCode(keys) + Arrays.hashCode(values)
+    }
+
+    override def equals(obj: Any): Boolean = {
+      obj match {
+        case that: CacheKey =>
+          keys.sameElements(that.keys) && values.sameElements(that.values)
+        case _ =>
+          false
+      }
+    }
+  }
 
   def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val size = map.size()
     if (size == 0) {
       Collections.emptyMap[K, V]()
     } else {
-      VectorMap(map.asScala.toSeq: _*).asJava
+      val cacheKey = CacheKey(map.keySet().toArray, map.values().toArray)
+      objectPool.get(cacheKey, { _ =>
+        val builder = VectorMap.newBuilder[K, V]
+        map.forEach { case (key, value) => builder += ((key, value)) }
+        builder.result().asJava
+      }).asInstanceOf[JMap[K, V]]
     }
   }
-  */
 
  /*
   import scala.collection.JavaConverters._
