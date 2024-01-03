@@ -107,9 +107,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.json:json:20211205",
       ivy"org.tukaani:xz::1.8",
-      ivy"org.yaml:snakeyaml::1.30",
-      ivy"com.github.blemale::scaffeine:4.1.0",
-      ivy"it.unimi.dsi:fastutil:8.5.12"
+      ivy"org.yaml:snakeyaml::1.30"
     )
     def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**")
     //def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
@@ -134,51 +132,6 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
         millSourcePath / "src-jvm",
         millSourcePath / "src-jvm-native"
       )
-    }
-
-    override def resources = T.sources {
-      val resourceDir = T.ctx().dest / "7z"
-      val osArchToUrl = Map(
-        "windows" -> "https://www.7-zip.org/a/7zr.exe",
-        "linux-x86" -> "https://www.7-zip.org/a/7z2301-linux-x64.tar.xz",
-        "linux-arm" -> "https://www.7-zip.org/a/7z2301-linux-arm64.tar.xz",
-        "osx" -> "https://www.7-zip.org/a/7z2301-mac.tar.xz"
-      )
-
-      val downloadedFiles = for ((osArch, url) <- osArchToUrl) yield {
-        val targetDir = resourceDir / (if (osArch.startsWith("linux")) "linux" else osArch)
-        val fileName = if (osArch == "windows") "7z.exe" else "7z.tar.xz"
-        val file = targetDir / fileName
-        val targetFile =  if (osArch == "windows") {
-          targetDir / "7z.exe"
-        } else if (osArch.startsWith("linux")) {
-          val executableName = if (osArch.contains("x86")) "7z-x86" else "7z-arm"
-          targetDir / executableName
-        } else {
-          targetDir / "7z"
-        }
-
-        if (!os.exists(targetFile)) {
-          os.makeDir.all(targetDir)
-          T.log.info(s"Downloading $url to ${file}")
-          os.write(file, requests.get.stream(url), createFolders = true)
-
-          if (osArch != "windows") {
-            // Extract a single file, 7zz, from the tarball
-            os.proc("tar", "-xf", file, "-C", targetDir, "7zz").call()
-            os.remove(file)
-
-            if (osArch.startsWith("linux")) {
-              os.move(targetDir / "7zz", targetFile)
-            } else {
-              os.move(targetDir / "7zz", targetFile)
-            }
-          }
-        }
-        targetFile
-      }
-      downloadedFiles.foreach(f => assert(os.exists(f)))
-      Seq(PathRef(T.ctx().dest))
     }
   }
 
@@ -239,4 +192,5 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
     }
   }
+
 }

@@ -6,10 +6,10 @@ object Platform {
   def gzipString(s: String): String = {
     throw new Exception("GZip not implemented in Scala.js")
   }
-  def xzBytes(s: Array[Byte], compressionLevel: Option[Int]): String = {
+  def xzBytes(s: Array[Byte]): String = {
     throw new Exception("XZ not implemented in Scala.js")
   }
-  def xzString(s: String, compressionLevel: Option[Int]): String = {
+  def xzString(s: String): String = {
     throw new Exception("XZ not implemented in Scala.js")
   }
   def yamlToJson(s: String): String = {

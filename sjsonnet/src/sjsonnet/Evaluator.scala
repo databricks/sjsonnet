@@ -300,7 +300,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
-    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos)._2.readString())
+    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos)._2)
 
   def visitImport(e: Import)(implicit scope: ValScope): Val = {
     val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos)

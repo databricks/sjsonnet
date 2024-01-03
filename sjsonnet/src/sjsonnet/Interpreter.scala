@@ -34,7 +34,7 @@ class Interpreter(extVars: Map[String, String],
 
 
   def parseVar(k: String, v: String) = {
-    resolver.parse(wd / s"<$k>", StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
+    resolver.parse(wd / s"<$k>", v)(evaluator).fold(throw _, _._1)
   }
 
   lazy val evaluator: Evaluator = createEvaluator(
@@ -76,10 +76,9 @@ class Interpreter(extVars: Map[String, String],
   }
 
   def evaluate(txt: String, path: Path): Either[Error, Val] = {
-    val resolvedImport = StaticResolvedFile(txt)
-    resolver.cache(path) = resolvedImport
+    resolver.cache(path) = txt
     for{
-      res <- resolver.parse(path, resolvedImport)(evaluator)
+      res <- resolver.parse(path, txt)(evaluator)
       (parsed, _) = res
       res0 <- handleException(evaluator.visitExpr(parsed)(ValScope.empty))
       res = res0 match{

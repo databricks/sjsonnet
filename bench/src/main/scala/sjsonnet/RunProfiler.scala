@@ -24,7 +24,7 @@ object RunProfiler extends App {
 
   def run(): Long = {
     val renderer = new Renderer(new StringWriter, indent = 3)
-    val start = interp.resolver.read(path).get.readString()
+    val start = interp.resolver.read(path).get
     val t0 = System.nanoTime()
     interp.interpret0(start, path, renderer).getOrElse(???)
     System.nanoTime() - t0
