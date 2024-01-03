@@ -25,7 +25,7 @@ object TestUtils {
            preserveOrder: Boolean = false,
            strict: Boolean = false,
            noDuplicateKeysInComprehension: Boolean = false,
-           strictInheritedAssertions: Boolean = false): ujson.Value = {
+           strictInheritedAssertions: Boolean = false) = {
     eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
