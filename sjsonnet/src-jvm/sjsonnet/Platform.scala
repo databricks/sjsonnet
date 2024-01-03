@@ -61,7 +61,7 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
-  def compactHashMap[K, V](map: LinkedHashMap[K, V]): Map[K, V] = {
+  def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
     val size = map.size()
     if (size == 0) {
       // Return an empty map
