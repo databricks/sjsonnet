@@ -5,10 +5,16 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.{Base64, Collections, LinkedHashMap, Map => JMap}
 import java.util.zip.GZIPOutputStream
+
+import scala.reflect.runtime.universe._
+
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
+import it.unimi.dsi.fastutil.objects.{Object2ObjectLinkedOpenHashMap, Object2BooleanLinkedOpenHashMap}
+import it.unimi.dsi.fastutil.objects.Object2BooleanMaps
+import it.unimi.dsi.fastutil.objects.Object2ObjectMaps
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -64,31 +70,30 @@ object Platform {
    * All returned maps preserve the insertion order of the original map. No map returned from this
    * method should be mutated.
    */
-  def compactHashMap[K, V](map: LinkedHashMap[K, V]): JMap[K, V] = {
-    val size = map.size()
-    if (size == 0) {
-      // Return an empty map
-      Collections.emptyMap[K, V]
-    } else if (size == 1) {
-      // Return a singleton map
-      val entry = map.entrySet().iterator().next()
-      Collections.singletonMap[K, V](entry.getKey(), entry.getValue())
-    } else {
-      // From LinkedHashMap javadoc: "This implementation spares its clients from the unspecified,
-      // generally chaotic ordering provided by HashMap (and Hashtable), without incurring the
-      // increased cost associated with TreeMap. It can be used to produce a copy of a map that has
-      // the same order as the original, regardless of the original map's implementation:
-      //  void foo(Map m) {
-      //      Map copy = new LinkedHashMap(m);
-      //      ...
-      //  }
-
-      // This constructor's doc: Constructs an insertion-ordered LinkedHashMap instance with the
-      // same mappings as the specified map. The LinkedHashMap instance is created with a default
-      // load factor (0.75) and an initial capacity sufficient to hold the mappings in the specified
-      // map.
-      val newMap = new LinkedHashMap[K, V](map)
-      newMap
+  def compactHashMap[K, V: TypeTag](map: LinkedHashMap[K, V]): JMap[K, V] = {
+    val res = typeOf[V] match {
+      case t if t =:= typeOf[java.lang.Boolean] => "It's an Int"
+        val size = map.size()
+        if (size == 0) {
+          Object2BooleanMaps.emptyMap[K]()
+        } else if (size == 1) {
+          // Return a singleton map
+          val entry = map.entrySet().iterator().next()
+          Object2BooleanMaps.singleton(entry.getKey(), entry.getValue().asInstanceOf[java.lang.Boolean])
+        } else {
+          new Object2BooleanLinkedOpenHashMap[K](map.asInstanceOf[LinkedHashMap[K, java.lang.Boolean]])
+        }
+      case _ =>
+        val size = map.size()
+        if (size == 0) {
+          Object2ObjectMaps.emptyMap[K, V]()
+        } else if (size == 1) {
+          val entry = map.entrySet().iterator().next()
+          Object2ObjectMaps.singleton(entry.getKey(), entry.getValue())
+        } else {
+          new Object2ObjectLinkedOpenHashMap[K, V](map)
+        }
     }
+    res.asInstanceOf[JMap[K, V]]
   }
 }
