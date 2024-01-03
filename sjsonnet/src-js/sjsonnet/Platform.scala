@@ -20,6 +20,7 @@ object Platform {
   }
 
   def compactHashMap[K, V](map: java.util.LinkedHashMap[K, V]): java.util.Map[K, V] = {
+    // No-op - we don't bother with compaction in Scala.js
     map
   }
 }
