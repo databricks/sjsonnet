@@ -5,7 +5,7 @@ import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.{Files, Paths, Path}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPOutputStream
-import java.util.{Arrays, Base64, Collections, EnumSet, LinkedHashMap}
+import java.util.{Arrays, Base64, EnumSet}
 
 import org.json.JSONObject
 import org.tukaani.xz.LZMA2Options
@@ -13,7 +13,7 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
-// import it.unimi.dsi.fastutil.objects.{Object2BooleanLinkedOpenHashMap, Object2ObjectLinkedOpenHashMap}
+import it.unimi.dsi.fastutil.objects.{Object2BooleanLinkedOpenHashMap, Object2ObjectLinkedOpenHashMap}
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -187,7 +187,6 @@ object Platform {
     tempFile
   }
 
-  /*
   type Object2ObjectLinkedMap[K, V] = Object2ObjectLinkedOpenHashMap[K, V]
   type Object2BooleanLinkedMap[K] = Object2BooleanLinkedOpenHashMap[K]
 
@@ -199,40 +198,5 @@ object Platform {
   def newObjectToBooleanLinkedHashMap[K](): Object2BooleanLinkedMap[K] = {
     // Use fastutils linked hash map
     new Object2BooleanLinkedOpenHashMap[K]()
-  }
-  */
-
-  type Object2ObjectLinkedMap[K, V] = java.util.Map[K, V]
-  type Object2BooleanLinkedMap[K] = java.util.Map[K, Boolean]
-
-  def newObjectToObjectLinkedHashMap[K, V](): Object2ObjectLinkedMap[K, V] = {
-    new LinkedHashMap[K, V]()
-  }
-
-  def newObjectToBooleanLinkedHashMap[K](): Object2BooleanLinkedMap[K] = {
-    new LinkedHashMap[K, Boolean]()
-  }
-
-  def compactHashMap[K, V](map: Object2ObjectLinkedMap[K, V]): Object2ObjectLinkedMap[K, V] = {
-    val size = map.size()
-    if (size == 0) {
-      // Return an empty map
-      Collections.emptyMap[K, V]
-    } else if (size == 1) {
-      // Return a singleton map
-      val entry = map.entrySet().iterator().next()
-      Collections.singletonMap[K, V](entry.getKey(), entry.getValue())
-    } else {
-      // From LinkedHashMap javadoc: "This implementation spares its clients from the unspecified,
-      // generally chaotic ordering provided by HashMap (and Hashtable), without incurring the
-      // increased cost associated with TreeMap. It can be used to produce a copy of a map that has
-      // the same order as the original, regardless of the original map's implementation:
-      //  void foo(Map m) {
-      //      Map copy = new LinkedHashMap(m);
-      //      ...
-      //  }
-      val newMap = new LinkedHashMap[K, V](map)
-      newMap
-    }
   }
 }
