@@ -7,10 +7,8 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 /**
@@ -147,7 +145,7 @@ object Val{
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
-                  private[this] var allKeys: util.Map[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
@@ -179,7 +177,7 @@ object Val{
     def prettyName = "object"
     override def asObj: Val.Obj = this
 
-    private def gatherKeys(mapping: util.Map[String, java.lang.Boolean]): Unit = {
+    private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if(static) mapping.putAll(allKeys)
       else {
         if(`super` != null) `super`.gatherKeys(mapping)
@@ -318,14 +316,15 @@ object Val{
   def staticObject(
       pos: Position,
       fields: Array[Expr.Member.Field],
-      internedKeyMaps: mutable.HashMap[FieldSet, java.util.Map[String, java.lang.Boolean]],
+      internedKeyMaps: mutable.HashMap[FieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
     // Set the initial capacity to the number of fields divided by the default load factor + 1 -
     // this ensures that we can fill up the map to the total number of fields without resizing.
-    val capacity = (fields.length / mutable.HashMap.defaultLoadFactor).toInt + 1
-    val cache = new mutable.HashMap[Any, Val](capacity, mutable.HashMap.defaultLoadFactor)
-    val allKeysBuilder = immutable.VectorMap.newBuilder[String, java.lang.Boolean]
-    allKeysBuilder.sizeHint(fields.length)
+    // From JavaDoc - true for both Scala & Java HashMaps
+    val hashMapDefaultLoadFactor = 0.75f
+    val capacity = (fields.length / hashMapDefaultLoadFactor).toInt + 1
+    val cache = mutable.HashMap.empty[Any, Val]
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean](capacity, hashMapDefaultLoadFactor)
     val keys = new Array[String](fields.length)
     val bitSet = new java.util.BitSet(fields.length)
     var idx = 0
@@ -333,14 +332,13 @@ object Val{
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
         val uniqueKey = internedStrings.getOrElseUpdate(k, k)
         cache.put(uniqueKey, rhs)
-        allKeysBuilder.addOne(uniqueKey, false)
+        allKeys.put(uniqueKey, false)
         keys(idx) = uniqueKey
         bitSet.set(idx, false)
         idx += 1
     }
     val fieldSet = new FieldSet(keys, bitSet)
-    val allKeys = internedKeyMaps.getOrElseUpdate(fieldSet, allKeysBuilder.result().asJava)
-    new Val.Obj(pos, null, true, null, null, cache, allKeys)
+    new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))
   }
 
   abstract class Func(val pos: Position,

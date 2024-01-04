@@ -52,7 +52,7 @@ class Parser(val currentFile: Path,
 
   private[this] val strings = new mutable.HashMap[String, String]
 
-  private[this] val fieldSet = new mutable.HashMap[Val.FieldSet, java.util.Map[String, java.lang.Boolean]]
+  private[this] val fieldSet = new mutable.HashMap[Val.FieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
