@@ -66,3 +66,34 @@ class MainBenchmark {
     ))
   }
 }
+
+@BenchmarkMode(Array(Mode.AverageTime))
+@Fork(1)
+@Threads(1)
+@Warmup(iterations = 5)
+@Measurement(iterations = 10)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@State(Scope.Benchmark)
+class MemoryBenchmark {
+
+  val dummyOut = MainBenchmark.createDummyOut
+
+  val cache = new DefaultParseCache
+
+  @Benchmark
+  def main(bh: Blackhole): Unit = {
+    bh.consume {
+      SjsonnetMain.main0(
+        MainBenchmark.mainArgs,
+        cache,
+        System.in,
+        dummyOut,
+        System.err,
+        os.pwd,
+        None
+      )
+    }
+    println("sleeping")
+    Thread.sleep(10000000)
+  }
+}

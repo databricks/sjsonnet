@@ -52,6 +52,8 @@ class Parser(val currentFile: Path,
 
   private[this] val strings = new mutable.HashMap[String, String]
 
+  private[this] val fieldSet = new mutable.HashMap[Val.FieldSet, java.util.Map[String, java.lang.Boolean]]
+
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
   def id[_: P] = P(
@@ -335,7 +337,7 @@ class Parser(val currentFile: Path,
         val a = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
         if(a.isEmpty) null else a
       }
-      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, strings)
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, fieldSet, strings)
       else Expr.ObjBody.MemberList(pos, binds, fields, asserts)
     case (pos, exprs, Some(comps)) =>
       val preLocals = exprs
