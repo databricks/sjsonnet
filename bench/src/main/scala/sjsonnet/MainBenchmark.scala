@@ -43,10 +43,10 @@ object MainBenchmark {
 }
 
 @BenchmarkMode(Array(Mode.AverageTime))
-@Fork(1)
+@Fork(4)
 @Threads(1)
-@Warmup(iterations = 5)
-@Measurement(iterations = 10)
+@Warmup(iterations = 30)
+@Measurement(iterations = 40)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
 class MainBenchmark {
@@ -74,6 +74,10 @@ class MainBenchmark {
 @Measurement(iterations = 10)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
+// This is a dummy benchmark to see how much memory is used by the interpreter.
+// You're meant to execute it, and once it prints "sleeping" you can attach yourkit and take a heap
+// dump. Because we store the cache, the parsed objects will have strong references - and thus will
+// be in the heap dump.
 class MemoryBenchmark {
 
   val dummyOut = MainBenchmark.createDummyOut
