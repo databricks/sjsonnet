@@ -21,7 +21,7 @@ class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
   // HashMap to deduplicate strings.
   private[this] val strings = new mutable.HashMap[String, String]
 
-  private[this] val fieldSet = new mutable.HashMap[Val.FieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
+  private[this] val fieldSet = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)

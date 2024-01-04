@@ -306,7 +306,7 @@ object Val{
 
     override def equals(obj: scala.Any): Boolean = {
       obj match {
-        case that: FieldSet =>
+        case that: StaticObjectFieldSet =>
           keys.sameElements(that.keys)
         case _ => false
       }
@@ -316,7 +316,7 @@ object Val{
   def staticObject(
       pos: Position,
       fields: Array[Expr.Member.Field],
-      internedKeyMaps: mutable.HashMap[FieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
+      internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
     // Set the initial capacity to the number of fields divided by the default load factor + 1 -
     // this ensures that we can fill up the map to the total number of fields without resizing.
