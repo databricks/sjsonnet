@@ -320,7 +320,10 @@ object Val{
       fields: Array[Expr.Member.Field],
       internedKeyMaps: mutable.HashMap[FieldSet, java.util.Map[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
-    val cache = mutable.HashMap.empty[Any, Val]
+    // Set the initial capacity to the number of fields divided by the default load factor + 1 -
+    // this ensures that we can fill up the map to the total number of fields without resizing.
+    val capacity = (fields.length / mutable.HashMap.defaultLoadFactor).toInt + 1
+    val cache = new mutable.HashMap[Any, Val](capacity, mutable.HashMap.defaultLoadFactor)
     val allKeysBuilder = immutable.VectorMap.newBuilder[String, java.lang.Boolean]
     allKeysBuilder.sizeHint(fields.length)
     val keys = new Array[String](fields.length)
