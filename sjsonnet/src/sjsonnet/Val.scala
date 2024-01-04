@@ -297,13 +297,14 @@ object Val{
     }
   }
 
-  def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
+  def staticObject(pos: Position, fields: Array[Expr.Member.Field], internedStrings: mutable.HashMap[String, String]): Obj = {
     val cache = mutable.HashMap.empty[Any, Val]
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
-        cache.put(k, rhs)
-        allKeys.put(k, false)
+        val uniqueKey = internedStrings.getOrElseUpdate(k, k)
+        cache.put(uniqueKey, rhs)
+        allKeys.put(uniqueKey, false)
     }
     new Val.Obj(pos, null, true, null, null, cache, allKeys)
   }

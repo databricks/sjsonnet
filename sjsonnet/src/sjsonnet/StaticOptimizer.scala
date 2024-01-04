@@ -1,5 +1,7 @@
 package sjsonnet
 
+import scala.collection.mutable
+
 import Expr._
 import ScopedExprTransform._
 
@@ -15,6 +17,9 @@ class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
       expr
     } else throw e
   }
+
+  // HashMap to deduplicate strings.
+  private[this] val strings = new mutable.HashMap[String, String]
 
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
@@ -61,7 +66,7 @@ class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
       new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
     case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, strings)
       else m
 
     case e => e
