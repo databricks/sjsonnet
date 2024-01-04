@@ -333,6 +333,7 @@ object Val{
         allKeysBuilder.addOne(uniqueKey, false)
         keys(idx) = uniqueKey
         bitSet.set(idx, false)
+        idx += 1
     }
     val fieldSet = new FieldSet(keys, bitSet)
     val allKeys = internedKeyMaps.getOrElseUpdate(fieldSet, allKeysBuilder.result().asJava)
