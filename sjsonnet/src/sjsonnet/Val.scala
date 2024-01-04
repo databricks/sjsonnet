@@ -298,16 +298,16 @@ object Val{
     }
   }
 
-  final case class FieldSet(keys: Array[String], bitSet: java.util.BitSet) {
+  final case class StaticObjectFieldSet(keys: Array[String]) {
 
     override def hashCode(): Int = {
-      Arrays.hashCode(keys.asInstanceOf[Array[Object]]) + bitSet.hashCode()
+      Arrays.hashCode(keys.asInstanceOf[Array[Object]])
     }
 
     override def equals(obj: scala.Any): Boolean = {
       obj match {
         case that: FieldSet =>
-          keys.sameElements(that.keys) && bitSet.equals(that.bitSet)
+          keys.sameElements(that.keys)
         case _ => false
       }
     }
@@ -326,7 +326,6 @@ object Val{
     val cache = mutable.HashMap.empty[Any, Val]
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean](capacity, hashMapDefaultLoadFactor)
     val keys = new Array[String](fields.length)
-    val bitSet = new java.util.BitSet(fields.length)
     var idx = 0
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
@@ -334,10 +333,9 @@ object Val{
         cache.put(uniqueKey, rhs)
         allKeys.put(uniqueKey, false)
         keys(idx) = uniqueKey
-        bitSet.set(idx, false)
         idx += 1
     }
-    val fieldSet = new FieldSet(keys, bitSet)
+    val fieldSet = new StaticObjectFieldSet(keys)
     new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))
   }
 
