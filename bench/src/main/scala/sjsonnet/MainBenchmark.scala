@@ -8,9 +8,12 @@ import org.openjdk.jmh.infra._
 
 object MainBenchmark {
   val mainArgs = Array[String](
-    "../../universe2/rulemanager/deploy/rulemanager.jsonnet",
-    "-J", "../../universe2",
-    "-J", "../../universe2/mt-shards/dev/az-westus-c2",
+    "../../universe/rulemanager/deploy/rulemanager.jsonnet",
+    // "../../universe/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
+    "-J", "../../universe",
+    "-J", "../../universe/mt-shards/dev/az-westus-c2",
+    "-J", "../../universe/bazel-bin",
+    "--ext-code", "isKubecfg=false"
   )
 
   def findFiles(): (IndexedSeq[(Path, String)], EvalScope) = {
@@ -28,7 +31,7 @@ object MainBenchmark {
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
-    interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
+    interp.interpret0(interp.resolver.read(path).get.readString(), path, renderer).getOrElse(???)
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 

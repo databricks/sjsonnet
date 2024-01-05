@@ -1089,10 +1089,19 @@ class Std {
       }
     },
 
-    builtin("xz", "v"){ (pos, ev, v: Val) =>
-      v match{
-        case Val.Str(_, value) => Platform.xzString(value)
-        case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
+    builtinWithDefaults("xz", "v" -> null, "compressionLevel" -> Val.Null(dummyPos)){ (args, pos, ev) =>
+      val compressionLevel: Option[Int] = args(1) match {
+        case Val.Null(_) =>
+          // Use default compression level if the user didn't set one
+          None
+        case Val.Num(_, n) =>
+          Some(n.toInt)
+        case x =>
+          Error.fail("Cannot xz encode with compression level " + x.prettyName)
+      }
+      args(0) match {
+        case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
+        case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray, compressionLevel)
         case x => Error.fail("Cannot xz encode " + x.prettyName)
       }
     },
