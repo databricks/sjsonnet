@@ -66,14 +66,20 @@ object Val{
 
   abstract class Literal extends Val with Expr
   abstract class Bool extends Literal {
-    override def asBoolean: Boolean = this.isInstanceOf[True]
+    override def asBoolean: Boolean = this == True
   }
+
+  private val NoPosition = new Position(null, -1)
 
   def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
 
-  case class True(pos: Position) extends Bool {
+  case object True extends Bool {
     def prettyName = "boolean"
+    def pos = NoPosition
+    def apply(pos: Position) = True
+    def unapply(arg: True.type): Option[Position] = Some(arg.pos)
   }
+
   case class False(pos: Position) extends Bool {
     def prettyName = "boolean"
   }

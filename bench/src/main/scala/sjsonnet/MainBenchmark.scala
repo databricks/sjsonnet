@@ -8,11 +8,11 @@ import org.openjdk.jmh.infra._
 
 object MainBenchmark {
   val mainArgs = Array[String](
-    "../../universe/rulemanager/deploy/rulemanager.jsonnet",
-    // "../../universe/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
-    "-J", "../../universe",
-    "-J", "../../universe/mt-shards/dev/az-westus-c2",
-    "-J", "../../universe/bazel-bin",
+    // "../../universe/rulemanager/deploy/rulemanager.jsonnet",
+    "../../universe2/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
+    "-J", "../../universe2",
+    "-J", "../../universe2/mt-shards/dev/az-westus-c2",
+    "-J", "../../universe2/bazel-bin",
     "--ext-code", "isKubecfg=false"
   )
 
