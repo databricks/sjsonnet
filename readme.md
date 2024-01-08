@@ -194,6 +194,19 @@ Profiler:
 sbt bench/run
 ```
 
+There's also a benchmark for memory usage:
+
+Execute and print stats:
+```
+sbt 'set fork in run := true' 'set javaOptions in run ++= Seq("-Xmx6G", "-XX:+UseG1GC")' 'bench/runMain sjsonnet.MemoryBenchmark'
+```
+
+Execute and pause - this is useful if you want to attach a profiler after the run and deep dive the
+object utilization.
+```
+sbt 'set fork in run := true' 'set javaOptions in run ++= Seq("-Xmx6G", "-XX:+UseG1GC")' 'bench/runMain sjsonnet.MemoryBenchmark --pause'
+```
+
 ## Laziness
 
 The Jsonnet language is _lazy_: expressions don't get evaluated unless
