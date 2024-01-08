@@ -67,37 +67,56 @@ class MainBenchmark {
   }
 }
 
-@BenchmarkMode(Array(Mode.AverageTime))
-@Fork(1)
-@Threads(1)
-@Warmup(iterations = 5)
-@Measurement(iterations = 10)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@State(Scope.Benchmark)
 // This is a dummy benchmark to see how much memory is used by the interpreter.
-// You're meant to execute it, and once it prints "sleeping" you can attach yourkit and take a heap
-// dump. Because we store the cache, the parsed objects will have strong references - and thus will
-// be in the heap dump.
-class MemoryBenchmark {
+// You're meant to execute it, and it will generate stats about memory usage before exiting.
+// dump. You can optionally pass an argument to instruct it to pause post run - then attach a
+// profiler.
+object MemoryBenchmark {
 
   val dummyOut = MainBenchmark.createDummyOut
 
   val cache = new DefaultParseCache
 
-  @Benchmark
-  def main(bh: Blackhole): Unit = {
-    bh.consume {
-      SjsonnetMain.main0(
-        MainBenchmark.mainArgs,
-        cache,
-        System.in,
-        dummyOut,
-        System.err,
-        os.pwd,
-        None
-      )
+  def main(args: Array[String]): Unit = {
+    assert(args.length <= 1, s"Too many arguments: ${args.mkString(",")}")
+    val pause: Boolean = if (args.length == 1) {
+      if (args(0) == "--pause") {
+        println("Run will pause after completion. Attach a profiler then.")
+        true
+      } else {
+        println("Unknown argument: " + args(0))
+        System.exit(1)
+        false
+      }
+    } else {
+      false
     }
-    println("sleeping")
-    Thread.sleep(10000000)
+    SjsonnetMain.main0(
+      MainBenchmark.mainArgs,
+      cache,
+      System.in,
+      dummyOut,
+      System.err,
+      os.pwd,
+      None
+    )
+    println("Pre-GC Stats")
+    println("============")
+    println("Total memory: " + Runtime.getRuntime.totalMemory())
+    println("Free memory: " + Runtime.getRuntime.freeMemory())
+    println("Used memory: " + (Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory()))
+    System.gc()
+    // Wait for GC to finish
+    Thread.sleep(5000)
+    println("Post-GC Stats")
+    println("============")
+    println("Total memory: " + Runtime.getRuntime.totalMemory())
+    println("Free memory: " + Runtime.getRuntime.freeMemory())
+    println("Used memory: " + (Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory()))
+
+    if (pause) {
+      println("Pausing. Attach a profiler")
+      Thread.sleep(1000000000)
+    }
   }
 }
