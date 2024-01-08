@@ -298,7 +298,7 @@ object Val{
     }
   }
 
-  final class StaticObjectFieldSet(keys: Array[String]) {
+  final class StaticObjectFieldSet(protected val keys: Array[String]) {
 
     override def hashCode(): Int = {
       Arrays.hashCode(keys.asInstanceOf[Array[Object]])
