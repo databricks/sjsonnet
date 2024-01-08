@@ -65,6 +65,7 @@ object PrettyNamed{
 object Val{
 
   abstract class Literal extends Val with Expr
+
   abstract class Bool extends Literal {
     override def asBoolean: Boolean = this == True
   }
@@ -77,19 +78,28 @@ object Val{
     def prettyName = "boolean"
     def pos = NoPosition
     def apply(pos: Position) = True
-    def unapply(arg: True.type): Option[Position] = Some(arg.pos)
+    def unapply(arg: True.type): Option[Position] = Some(NoPosition)
   }
 
-  case class False(pos: Position) extends Bool {
+  case object False extends Bool {
     def prettyName = "boolean"
+    def pos = NoPosition
+    def apply(pos: Position) = False
+    def unapply(arg: False.type): Option[Position] = Some(NoPosition)
   }
-  case class Null(pos: Position) extends Literal {
-    def prettyName = "null"
+
+  case object Null extends Bool {
+    def prettyName = "boolean"
+    def pos = NoPosition
+    def apply(pos: Position) = Null
+    def unapply(arg: Null.type): Option[Position] = Some(NoPosition)
   }
+
   case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
     override def asString: String = value
   }
+
   case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
     override def asInt: Int = value.toInt

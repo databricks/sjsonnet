@@ -127,7 +127,7 @@ class Std {
   private object Type extends Val.Builtin1("x") {
     def evalRhs(x: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, x match {
       case _: Val.Bool => "boolean"
-      case _: Val.Null => "null"
+      case Val.Null => "null"
       case _: Val.Obj => "object"
       case _: Val.Arr => "array"
       case _: Val.Func => "function"
@@ -402,7 +402,7 @@ class Std {
           var added = false
           while(i < arr.length) {
             arr.force(i) match {
-              case _: Val.Null =>
+              case Val.Null =>
               case Val.Str(_, x) =>
                 if(added) b.append(s)
                 added = true
@@ -565,7 +565,7 @@ class Std {
   private object Lines extends Val.Builtin1("arr") {
     def evalRhs(v1: Val, ev: EvalScope, pos: Position): Val = {
     v1.asArr.foreach {
-      case _: Val.Str | _: Val.Null => // donothing
+      case _: Val.Str | Val.Null => // donothing
       case x => Error.fail("Cannot call .lines on " + x.prettyName)
     }
     Val.Str(pos, Materializer.apply(v1)(ev).asInstanceOf[ujson.Arr]
@@ -643,7 +643,7 @@ class Std {
     }
 
     def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
-      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
+      if(_keyF.isInstanceOf[Val.False.type]) Spec2.evalRhs(_a, _b, ev, pos)
       else {
         val a = asArray(_a)
         val b = asArray(_b)
@@ -740,7 +740,7 @@ class Std {
             k <- (l.visibleKeyNames ++ r.visibleKeyNames).distinct
             val lValue = Option(l.valueRaw(k, l, pos)(ev))
             val rValue = Option(r.valueRaw(k, r, pos)(ev))
-            if !rValue.exists(_.isInstanceOf[Val.Null])
+            if !rValue.exists(_.isInstanceOf[Val.Null.type])
           } yield (lValue, rValue) match{
             case (Some(lChild), None) => k -> createMember{lChild}
             case (Some(lChild: Val.Obj), Some(rChild: Val.Obj)) => k -> createMember{recPair(lChild, rChild)}
@@ -756,7 +756,7 @@ class Std {
           val kvs = for{
             k <- obj.visibleKeyNames
             val value = obj.value(k, pos, obj)(ev)
-            if !value.isInstanceOf[Val.Null]
+            if !value.isInstanceOf[Val.Null.type]
           } yield (k, createMember{recSingle(value)})
 
           Val.Obj.mk(obj.pos, kvs:_*)
@@ -887,7 +887,7 @@ class Std {
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
-                case _: Val.Null => ""
+                case Val.Null => ""
                 case x => Error.fail("flatMap func must return string, got " + fres.asInstanceOf[Val].prettyName)
               }
             )
@@ -1148,7 +1148,7 @@ class Std {
       val out = new mutable.ArrayBuffer[Lazy]
 
       for (v <- a) {
-        if (keyF.isInstanceOf[Val.False]) {
+        if (keyF.isInstanceOf[Val.False.type]) {
           val vf = v.force
           if (!b.exists(value => {
             ev.equal(value.force, vf)
@@ -1178,7 +1178,7 @@ class Std {
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val keyF = args(2)
 
-      if (keyF.isInstanceOf[Val.False]) {
+      if (keyF.isInstanceOf[Val.False.type]) {
         val ujson.Arr(mArr) = Materializer(args(1))(ev)
         val mx = Materializer(args(0))(ev)
         mArr.contains(mx)
@@ -1325,11 +1325,11 @@ class Std {
     for (v <- arrValue) {
       if (out.isEmpty) {
         out.append(v)
-      } else if (keyF.isInstanceOf[Val.False]) {
+      } else if (keyF.isInstanceOf[Val.False.type]) {
         if (!ev.equal(out.last.force, v.force)) {
           out.append(v)
         }
-      } else if (!keyF.isInstanceOf[Val.False]) {
+      } else if (!keyF.isInstanceOf[Val.False.type]) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
 
         val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev)
@@ -1362,7 +1362,7 @@ class Std {
           }else if (vs.forall(_.isInstanceOf[Val.Num])) {
             vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.value)
           }else if (vs.forall(_.isInstanceOf[Val.Obj])){
-            if (keyF == null || keyF.isInstanceOf[Val.False]) {
+            if (keyF == null || keyF.isInstanceOf[Val.False.type]) {
               Error.fail("Unable to sort array of objects without key function")
             } else {
               val objs = vs.asStrictArray.map(_.cast[Val.Obj])

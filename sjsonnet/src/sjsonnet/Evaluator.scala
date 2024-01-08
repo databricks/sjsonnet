@@ -324,7 +324,7 @@ class Evaluator(resolver: CachedResolver,
           case unknown =>
             Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
         }
-      case _: Val.False => Val.False(e.pos)
+      case Val.False => Val.False(e.pos)
       case unknown =>
         Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
     }
@@ -333,7 +333,7 @@ class Evaluator(resolver: CachedResolver,
   def visitOr(e: Or)(implicit scope: ValScope) = {
     visitExpr(e.lhs) match {
       case Val.True => Val.True(e.pos)
-      case _: Val.False =>
+      case Val.False =>
         visitExpr(e.rhs) match{
           case b: Val.Bool => b
           case unknown =>
@@ -663,8 +663,8 @@ class Evaluator(resolver: CachedResolver,
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
     case Val.True => y.isInstanceOf[Val.True.type]
-    case _: Val.False => y.isInstanceOf[Val.False]
-    case _: Val.Null => y.isInstanceOf[Val.Null]
+    case Val.False => y.isInstanceOf[Val.False.type]
+    case Val.Null => y.isInstanceOf[Val.Null.type]
     case x: Val.Str => y match {
       case y: Val.Str => x.value == y.value
       case _ => false
