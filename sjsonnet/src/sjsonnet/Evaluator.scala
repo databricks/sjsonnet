@@ -237,7 +237,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
-    if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
+    if (!visitExpr(e.asserted.value).isInstanceOf[Val.True.type]) {
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
         case msg =>
@@ -318,7 +318,7 @@ class Evaluator(resolver: CachedResolver,
 
   def visitAnd(e: And)(implicit scope: ValScope) = {
     visitExpr(e.lhs) match {
-      case _: Val.True =>
+      case Val.True =>
         visitExpr(e.rhs) match{
           case b: Val.Bool => b
           case unknown =>
@@ -332,7 +332,7 @@ class Evaluator(resolver: CachedResolver,
 
   def visitOr(e: Or)(implicit scope: ValScope) = {
     visitExpr(e.lhs) match {
-      case _: Val.True => Val.True(e.pos)
+      case Val.True => Val.True(e.pos)
       case _: Val.False =>
         visitExpr(e.rhs) match{
           case b: Val.Bool => b
@@ -533,7 +533,7 @@ class Evaluator(resolver: CachedResolver,
       var i = 0
       while(i < asserts.length) {
         val a = asserts(i)
-        if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
+        if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True.type]) {
           a.msg match {
             case null => Error.fail("Assertion failed", a.value.pos, "Assert")
             case msg =>
@@ -662,7 +662,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
-    case _: Val.True => y.isInstanceOf[Val.True]
+    case Val.True => y.isInstanceOf[Val.True.type]
     case _: Val.False => y.isInstanceOf[Val.False]
     case _: Val.Null => y.isInstanceOf[Val.Null]
     case x: Val.Str => y match {

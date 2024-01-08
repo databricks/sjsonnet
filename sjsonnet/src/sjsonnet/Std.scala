@@ -60,7 +60,7 @@ class Std {
       var res = 0
       if(func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while(i < a.length) {
-          if(func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) res += 1
+          if(func.apply1(a(i), p)(ev).isInstanceOf[Val.True.type]) res += 1
           i += 1
         }
       } else {
@@ -71,7 +71,7 @@ class Std {
         val scopeIdx = newScope.length-1
         while(i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
-          if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) res += 1
+          if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True.type]) res += 1
           i += 1
         }
       }
@@ -233,12 +233,12 @@ class Std {
       val func = _func.asFunc
       if(func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while(i < a.length) {
-          if(!func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) {
+          if(!func.apply1(a(i), p)(ev).isInstanceOf[Val.True.type]) {
             var b = new Array[Lazy](a.length-1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i+1
             while(j < a.length) {
-              if(func.apply1(a(j), p)(ev).isInstanceOf[Val.True]) {
+              if(func.apply1(a(j), p)(ev).isInstanceOf[Val.True.type]) {
                 b(i) = a(j)
                 i += 1
               }
@@ -257,13 +257,13 @@ class Std {
         val scopeIdx = newScope.length-1
         while(i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
-          if(!func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+          if(!func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True.type]) {
             var b = new Array[Lazy](a.length-1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i+1
             while(j < a.length) {
               newScope.bindings(scopeIdx) = a(j)
-              if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+              if(func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True.type]) {
                 b(i) = a(j)
                 i += 1
               }
@@ -276,7 +276,7 @@ class Std {
         }
       }
       new Val.Arr(pos, a)
-      //new Val.Arr(pos, arr.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True]))
+      //new Val.Arr(pos, arr.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True.type]))
     }
   }
 
@@ -902,7 +902,7 @@ class Std {
         pos,
         arr.asLazyArray.flatMap { i =>
           i.force
-          if (!filter_func.apply1(i, pos.noOffset)(ev).isInstanceOf[Val.True]) None
+          if (!filter_func.apply1(i, pos.noOffset)(ev).isInstanceOf[Val.True.type]) None
           else Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev))
         }
       )
