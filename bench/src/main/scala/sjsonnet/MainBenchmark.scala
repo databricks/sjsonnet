@@ -8,11 +8,11 @@ import org.openjdk.jmh.infra._
 
 object MainBenchmark {
   val mainArgs = Array[String](
-    // "../../universe/rulemanager/deploy/rulemanager.jsonnet",
-    "../../universe2/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
-    "-J", "../../universe2",
-    "-J", "../../universe2/mt-shards/dev/az-westus-c2",
-    "-J", "../../universe2/bazel-bin",
+    "../../universe/rulemanager/deploy/rulemanager.jsonnet",
+    // "../../universe/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
+    "-J", "../../universe",
+    "-J", "../../universe/mt-shards/dev/az-westus-c2",
+    "-J", "../../universe/bazel-bin",
     "--ext-code", "isKubecfg=false"
   )
 
@@ -31,7 +31,7 @@ object MainBenchmark {
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
-    interp.interpret0(interp.resolver.read(path).get, path, renderer).getOrElse(???)
+    interp.interpret0(interp.resolver.read(path).get.readString(), path, renderer).getOrElse(???)
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 
