@@ -45,14 +45,12 @@ object Parser {
 }
 
 class Parser(val currentFile: Path,
-             strictImportSyntax: Boolean) {
+             strictImportSyntax: Boolean,
+             internedStrings: mutable.HashMap[String, String],
+             internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) {
   import Parser._
 
   private val fileScope = new FileScope(currentFile)
-
-  private[this] val strings = new mutable.HashMap[String, String]
-
-  private[this] val fieldSet = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
   def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
@@ -266,7 +264,7 @@ class Parser(val currentFile: Path,
 
   def constructString(pos: Position, lines: Seq[String]) = {
     val s = lines.mkString
-    val unique = strings.getOrElseUpdate(s, s)
+    val unique = internedStrings.getOrElseUpdate(s, s)
     Val.Str(pos, unique)
   }
 
@@ -337,7 +335,7 @@ class Parser(val currentFile: Path,
         val a = exprs.iterator.filter(_.isInstanceOf[Expr.Member.AssertStmt]).asInstanceOf[Iterator[Expr.Member.AssertStmt]].toArray
         if(a.isEmpty) null else a
       }
-      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, fieldSet, strings)
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
       else Expr.ObjBody.MemberList(pos, binds, fields, asserts)
     case (pos, exprs, Some(comps)) =>
       val preLocals = exprs

@@ -44,11 +44,13 @@ class CachedImporter(parent: Importer) extends Importer {
 class CachedResolver(
   parentImporter: Importer,
   val parseCache: ParseCache,
-  strictImportSyntax: Boolean) extends CachedImporter(parentImporter) {
+  strictImportSyntax: Boolean,
+  internedStrings: mutable.HashMap[String, String],
+  internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, txt: String)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, txt), {
-      val parsed = fastparse.parse(txt, new Parser(path, strictImportSyntax).document(_)) match {
+      val parsed = fastparse.parse(txt, new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()
           val pos = new Position(new FileScope(path), traced.index)

@@ -2,6 +2,8 @@ package sjsonnet
 
 import java.io.{PrintWriter, StringWriter}
 
+import scala.collection.mutable
+
 import sjsonnet.Expr.Params
 
 import scala.util.control.NonFatal
@@ -21,9 +23,13 @@ class Interpreter(extVars: Map[String, String],
                   std: Val.Obj = new Std().Std
                   ) { self =>
 
-  val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax) {
+  private val internedStrings = new mutable.HashMap[String, String]
+
+  private val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
+
+  val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
-      handleException(new StaticOptimizer(evaluator, std).optimize(expr), fs)
+      handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
   }
 
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
