@@ -3,7 +3,7 @@ package sjsonnet
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
 
-import scala.collection.mutable.HashMap
+import scala.collection.mutable
 
 import fastparse.Parsed.Success
 import org.openjdk.jmh.annotations._
@@ -28,13 +28,13 @@ class OptimizerBenchmark {
   def setup(): Unit = {
     val (allFiles, ev) = MainBenchmark.findFiles()
     this.inputs = allFiles.map { case (p, s) =>
-      fastparse.parse(s, new Parser(p, true, HashMap.empty, HashMap.empty).document(_)) match {
+      fastparse.parse(s, new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)) match {
         case Success(v, _) => v
       }
     }
     this.ev = ev
     val static = inputs.map {
-      case (expr, fs) => ((new StaticOptimizer(ev, new Std().Std, HashMap.empty, HashMap.empty)).optimize(expr), fs)
+      case (expr, fs) => ((new StaticOptimizer(ev, new Std().Std, mutable.HashMap.empty, mutable.HashMap.empty)).optimize(expr), fs)
     }
     val countBefore, countStatic = new Counter
     inputs.foreach(t => assert(countBefore.transform(t._1) eq t._1))
@@ -47,7 +47,7 @@ class OptimizerBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(inputs.foreach { case (expr, fs) =>
-      bh.consume((new StaticOptimizer(ev, new Std().Std, HashMap.empty, HashMap.empty)).optimize(expr))
+      bh.consume((new StaticOptimizer(ev, new Std().Std, mutable.HashMap.empty, mutable.HashMap.empty)).optimize(expr))
     })
   }
 
