@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.7" // SBT
-ivy"com.databricks::sjsonnet:0.4.7" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.8" // SBT
+ivy"com.databricks::sjsonnet:0.4.8" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.7/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.7/sjsonnet-0.4.7.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet-0.4.8.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.7/sjsonnet-0.4.7.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet-0.4.8.js > sjsonnet.js
 
 $ node
 
@@ -279,6 +279,10 @@ Please ensure that you are publishing with JDK 8, e.g. via
 to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
+
+### 0.4.8
+
+- Significant reduction in memory usage from importing and parsing large files [#194](https://github.com/databricks/sjsonnet/pull/194) [#197](https://github.com/databricks/sjsonnet/pull/197)
 
 ### 0.4.7
 
