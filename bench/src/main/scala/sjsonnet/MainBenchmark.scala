@@ -66,3 +66,57 @@ class MainBenchmark {
     ))
   }
 }
+
+// This is a dummy benchmark to see how much memory is used by the interpreter.
+// You're meant to execute it, and it will generate stats about memory usage before exiting.
+// dump. You can optionally pass an argument to instruct it to pause post run - then attach a
+// profiler.
+object MemoryBenchmark {
+
+  val dummyOut = MainBenchmark.createDummyOut
+
+  val cache = new DefaultParseCache
+
+  def main(args: Array[String]): Unit = {
+    assert(args.length <= 1, s"Too many arguments: ${args.mkString(",")}")
+    val pause: Boolean = if (args.length == 1) {
+      if (args(0) == "--pause") {
+        println("Run will pause after completion. Attach a profiler then.")
+        true
+      } else {
+        println("Unknown argument: " + args(0))
+        System.exit(1)
+        false
+      }
+    } else {
+      false
+    }
+    SjsonnetMain.main0(
+      MainBenchmark.mainArgs,
+      cache,
+      System.in,
+      dummyOut,
+      System.err,
+      os.pwd,
+      None
+    )
+    println("Pre-GC Stats")
+    println("============")
+    println("Total memory: " + Runtime.getRuntime.totalMemory())
+    println("Free memory: " + Runtime.getRuntime.freeMemory())
+    println("Used memory: " + (Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory()))
+    System.gc()
+    // Wait for GC to finish
+    Thread.sleep(5000)
+    println("Post-GC Stats")
+    println("============")
+    println("Total memory: " + Runtime.getRuntime.totalMemory())
+    println("Free memory: " + Runtime.getRuntime.freeMemory())
+    println("Used memory: " + (Runtime.getRuntime.totalMemory() - Runtime.getRuntime.freeMemory()))
+
+    if (pause) {
+      println("Pausing. Attach a profiler")
+      Thread.sleep(1000000000)
+    }
+  }
+}

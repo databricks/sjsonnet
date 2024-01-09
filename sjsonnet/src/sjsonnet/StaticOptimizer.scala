@@ -1,11 +1,17 @@
 package sjsonnet
 
+import scala.collection.mutable
+
 import Expr._
 import ScopedExprTransform._
 
 /** StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope
  * indices) plus additional optimizations (post-order) and static checking (pre-order). */
-class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
+class StaticOptimizer(
+    ev: EvalScope,
+    std: Val.Obj,
+    internedStrings: mutable.HashMap[String, String],
+    internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
   def failOrWarn(msg: String, expr: Expr): Expr = {
@@ -61,7 +67,7 @@ class StaticOptimizer(ev: EvalScope, std: Val.Obj) extends ScopedExprTransform {
       new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
     case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields)
+      if(binds == null && asserts == null && fields.forall(_.isStatic)) Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
       else m
 
     case e => e

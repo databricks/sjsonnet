@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.util
+import java.util.Arrays
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
@@ -297,15 +298,45 @@ object Val{
     }
   }
 
-  def staticObject(pos: Position, fields: Array[Expr.Member.Field]): Obj = {
+  final class StaticObjectFieldSet(protected val keys: Array[String]) {
+
+    override def hashCode(): Int = {
+      Arrays.hashCode(keys.asInstanceOf[Array[Object]])
+    }
+
+    override def equals(obj: scala.Any): Boolean = {
+      obj match {
+        case that: StaticObjectFieldSet =>
+          keys.sameElements(that.keys)
+        case _ => false
+      }
+    }
+  }
+
+  def staticObject(
+      pos: Position,
+      fields: Array[Expr.Member.Field],
+      internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
+      internedStrings: mutable.HashMap[String, String]): Obj = {
+    // Set the initial capacity to the number of fields divided by the default load factor + 1 -
+    // this ensures that we can fill up the map to the total number of fields without resizing.
+    // From JavaDoc - true for both Scala & Java HashMaps
+    val hashMapDefaultLoadFactor = 0.75f
+    val capacity = (fields.length / hashMapDefaultLoadFactor).toInt + 1
     val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean](capacity, hashMapDefaultLoadFactor)
+    val keys = new Array[String](fields.length)
+    var idx = 0
     fields.foreach {
       case Expr.Member.Field(_, Expr.FieldName.Fixed(k), _, _, _, rhs: Val.Literal) =>
-        cache.put(k, rhs)
-        allKeys.put(k, false)
+        val uniqueKey = internedStrings.getOrElseUpdate(k, k)
+        cache.put(uniqueKey, rhs)
+        allKeys.put(uniqueKey, false)
+        keys(idx) = uniqueKey
+        idx += 1
     }
-    new Val.Obj(pos, null, true, null, null, cache, allKeys)
+    val fieldSet = new StaticObjectFieldSet(keys)
+    new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))
   }
 
   abstract class Func(val pos: Position,
