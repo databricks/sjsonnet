@@ -16,8 +16,10 @@ import fastparse.ParserInput
  * @param memoryLimitBytes The maximum size of a file that we will resolve. This is not the size of
  * the buffer, but a mechanism to fail when being asked to resolve (and downstream parse) a file
  * that is beyond this limit.
+ * @param cacheThresholdBytes The maximum size of a file that we will cache in memory. If the file
+ * is larger than this, then we will serve it from disk
  */
-class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long) extends ResolvedFile {
+class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long, cacheThresholdBytes: Long = 1024 * 1024) extends ResolvedFile {
 
   private val jFile: File = resolvedImportPath.p.toIO
 
@@ -26,7 +28,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
   assert(jFile.length() <= memoryLimitBytes, s"Resolved import path ${resolvedImportPath} is too large: ${jFile.length()} bytes > ${memoryLimitBytes} bytes")
 
   private[this] val resolvedImportContent: StaticResolvedFile = {
-    if (jFile.length() > 1024 * 1024) {
+    if (jFile.length() > cacheThresholdBytes) {
       // If the file is too large, then we will just read it from disk
       null
     } else {
@@ -60,7 +62,20 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     }
   }
 
-  private def xxHashFile(file: File): Long = {
+  override lazy val contentHash: String = {
+    if (resolvedImportContent == null) {
+      // If the file is too large, then we will just read it from disk
+      CachedResolvedFile.xxHashFile(jFile).toString
+    } else {
+      resolvedImportContent.contentHash
+    }
+  }
+}
+
+object CachedResolvedFile {
+  val xxHashFactory = XXHashFactory.fastestInstance()
+
+  def xxHashFile(file: File): Long = {
     val buffer = new Array[Byte](8192)
     val hash: StreamingXXHash64 = CachedResolvedFile.xxHashFactory.newStreamingHash64(0)
 
@@ -80,17 +95,4 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
 
     hash.getValue()
   }
-
-  override lazy val contentHash: String = {
-    if (resolvedImportContent == null) {
-      // If the file is too large, then we will just read it from disk
-      xxHashFile(jFile).toString
-    } else {
-      resolvedImportContent.contentHash
-    }
-  }
-}
-
-object CachedResolvedFile {
-  val xxHashFactory = XXHashFactory.fastestInstance()
 }
