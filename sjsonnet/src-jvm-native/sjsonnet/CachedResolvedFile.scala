@@ -3,7 +3,8 @@ package sjsonnet
 import java.io.{BufferedInputStream, File, FileInputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.zip.CRC32
+
+import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory, XXHash64}
 import fastparse.ParserInput
 
 /**
@@ -59,9 +60,9 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     }
   }
 
-  private def crcHashFile(file: File): Long = {
+  private def xxHashFile(file: File): Long = {
     val buffer = new Array[Byte](8192)
-    val crc = new CRC32()
+    val hash: StreamingXXHash64 = CachedResolvedFile.xxHashFactory.newStreamingHash64(0)
 
     val fis = new FileInputStream(file)
     val bis = new BufferedInputStream(fis)
@@ -69,7 +70,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
     try {
       var bytesRead = bis.read(buffer)
       while (bytesRead != -1) {
-        crc.update(buffer, 0, bytesRead)
+        hash.update(buffer, 0, bytesRead)
         bytesRead = bis.read(buffer)
       }
     } finally {
@@ -77,15 +78,19 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long)
       fis.close()
     }
 
-    crc.getValue()
+    hash.getValue()
   }
 
   override lazy val contentHash: String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
-      crcHashFile(jFile).toString
+      xxHashFile(jFile).toString
     } else {
       resolvedImportContent.contentHash
     }
   }
+}
+
+object CachedResolvedFile {
+  val xxHashFactory = XXHashFactory.fastestInstance()
 }
