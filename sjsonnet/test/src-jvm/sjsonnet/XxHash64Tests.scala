@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path => JavaPath}
 
 import scala.util.Random
 
@@ -30,7 +30,7 @@ object XxHash64Tests extends TestSuite {
     }
   }
 
-  private def generateRandomContentAndSaveToFile(sizeInKb: Int): (Array[Byte], Path) = {
+  private def generateRandomContentAndSaveToFile(sizeInKb: Int): (Array[Byte], JavaPath) = {
     val random = new Random()
     val byteArraySize = 1024 * sizeInKb
     val randomContent = new Array[Byte](byteArraySize)
