@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.7</version>
+    <version>0.4.9</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.8" // SBT
-ivy"com.databricks::sjsonnet:0.4.8" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.9" // SBT
+ivy"com.databricks::sjsonnet:0.4.9" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.9/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet-0.4.8.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.9/sjsonnet-0.4.9.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.8/sjsonnet-0.4.8.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.9/sjsonnet-0.4.9.js > sjsonnet.js
 
 $ node
 
@@ -279,6 +279,10 @@ Please ensure that you are publishing with JDK 8, e.g. via
 to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
+
+### 0.4.9
+
+- Switch from CRC32 to XXHash64 for import cache keys [#198](https://github.com/databricks/sjsonnet/pull/198) 
 
 ### 0.4.8
 
