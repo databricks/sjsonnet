@@ -2,9 +2,10 @@ package sjsonnet
 
 import org.json.JSONObject
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, BufferedInputStream, File, FileInputStream}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory, XXHash64}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
@@ -52,5 +53,28 @@ object Platform {
       .digest(s.getBytes("UTF-8"))
       .map{ b => String.format("%02x", new java.lang.Integer(b & 0xff))}
       .mkString
+  }
+
+  private[this] val xxHashFactory = XXHashFactory.fastestInstance()
+
+  def hashFile(file: File): String = {
+    val buffer = new Array[Byte](8192)
+    val hash: StreamingXXHash64 = xxHashFactory.newStreamingHash64(0)
+
+    val fis = new FileInputStream(file)
+    val bis = new BufferedInputStream(fis)
+
+    try {
+      var bytesRead = bis.read(buffer)
+      while (bytesRead != -1) {
+        hash.update(buffer, 0, bytesRead)
+        bytesRead = bis.read(buffer)
+      }
+    } finally {
+      bis.close()
+      fis.close()
+    }
+
+    hash.getValue().toString
   }
 }
