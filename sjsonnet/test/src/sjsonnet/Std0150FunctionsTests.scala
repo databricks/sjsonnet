@@ -158,5 +158,13 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.reverse([1])""") ==> ujson.Arr(1)
       eval("""std.reverse(["1", true, null])""") ==> ujson.Arr(ujson.Null, true, "1")
     }
+
+    test("trace"){
+      var output: String = ""
+      eval("""std.trace("asdf", true)""", traceLogger=(s: String, p: Position) => {
+        output = s
+      }) ==> ujson.True
+      output ==> "asdf"
+    }
   }
 }
