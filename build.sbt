@@ -16,6 +16,7 @@ lazy val main = (project in file("sjsonnet"))
       "com.lihaoyi" %% "scalatags" % "0.9.3",
       "com.lihaoyi" %% "os-lib" % "0.7.2",
       "com.lihaoyi" %% "mainargs" % "0.2.0",
+      "org.lz4" % "lz4-java" % "1.8.0",
       "org.json" % "json" % "20211205",
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0",
       "org.tukaani" % "xz" % "1.8",

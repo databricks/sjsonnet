@@ -1,4 +1,5 @@
 package sjsonnet
+import java.io.File
 object Platform {
   def gzipBytes(s: Array[Byte]): String = {
     throw new Exception("GZip not implemented in Scala Native")
@@ -17,5 +18,10 @@ object Platform {
   }
   def md5(s: String): String = {
     throw new Exception("MD5 not implemented in Scala Native")
+  }
+
+  def hashFile(file: File): String = {
+    // File hashes in Scala Native are just the file content
+    scala.io.Source.fromFile(file).mkString
   }
 }

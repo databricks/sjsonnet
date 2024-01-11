@@ -2,7 +2,6 @@ package sjsonnet
 
 import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, FileReader, InputStream, RandomAccessFile, Reader, StringReader}
 import java.nio.file.Files
-import java.util.zip.CRC32
 import java.security.MessageDigest
 import scala.collection.mutable
 import fastparse.{IndexedParserInput, Parsed, ParserInput}
