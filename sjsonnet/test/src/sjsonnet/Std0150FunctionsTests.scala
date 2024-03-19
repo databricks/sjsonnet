@@ -166,5 +166,19 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.get({a: 1}, "b", default=2)""") ==> ujson.Num(2)
       eval("""std.get({a:: 1}, "a", inc_hidden=false)""") ==> ujson.Null
     }
+
+    test("any") {
+      eval("""std.any([])""") ==> ujson.Bool(false)
+      eval("""std.any([true, true, true])""") ==> ujson.Bool(true)
+      eval("""std.any([false, true, false])""") ==> ujson.Bool(true)
+      eval("""std.any([false, false, false])""") ==> ujson.Bool(false)
+    }
+
+    test("all") {
+      eval("""std.all([])""") ==> ujson.Bool(false)
+      eval("""std.all([true, true, true])""") ==> ujson.Bool(true)
+      eval("""std.all([false, true, false])""") ==> ujson.Bool(false)
+      eval("""std.all([false, false, false])""") ==> ujson.Bool(false)
+    }
   }
 }
