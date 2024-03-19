@@ -175,7 +175,7 @@ object Std0150FunctionsTests extends TestSuite {
     }
 
     test("all") {
-      eval("""std.all([])""") ==> ujson.Bool(false)
+      eval("""std.all([])""") ==> ujson.Bool(true)
       eval("""std.all([true, true, true])""") ==> ujson.Bool(true)
       eval("""std.all([false, true, false])""") ==> ujson.Bool(false)
       eval("""std.all([false, false, false])""") ==> ujson.Bool(false)
