@@ -1227,7 +1227,19 @@ class Std {
     "asciiUpper" -> AsciiUpper,
     "asciiLower" -> AsciiLower,
     "trace" -> Trace,
-    "extVar" -> ExtVar
+    "extVar" -> ExtVar,
+    builtinWithDefaults("get", "o" -> null, "f" -> null, "default" -> Val.Null(dummyPos), "inc_hidden" -> Val.True(dummyPos)) { (args, pos, ev) =>
+      val obj = args(0).asObj
+      val k = args(1).asString
+      val incHidden = args(3).asBoolean
+      if (incHidden && obj.containsKey(k)) {
+        obj.value(k, pos.noOffset, obj)(ev)
+      } else if (!incHidden && obj.containsVisibleKey(k)) {
+        obj.value(k, pos.noOffset, obj)(ev)
+      } else {
+        args(2)
+      }
+    }
   )
   val Std = Val.Obj.mk(
     null,

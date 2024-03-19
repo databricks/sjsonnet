@@ -158,5 +158,13 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.reverse([1])""") ==> ujson.Arr(1)
       eval("""std.reverse(["1", true, null])""") ==> ujson.Arr(ujson.Null, true, "1")
     }
+
+    test("get"){
+      eval("""std.get({a: 1}, "a")""") ==> ujson.Num(1)
+      eval("""std.get({a:: 1}, "a")""") ==> ujson.Num(1)
+      eval("""std.get({a: 1}, "b")""") ==> ujson.Null
+      eval("""std.get({a: 1}, "b", default=2)""") ==> ujson.Num(2)
+      eval("""std.get({a:: 1}, "a", inc_hidden=false)""") ==> ujson.Null
+    }
   }
 }
