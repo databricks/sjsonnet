@@ -280,6 +280,11 @@ to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
 
+### 0.4.10
+
+- Implement `std.get` [#202](https://github.com/databricks/sjsonnet/pull/202), 
+  `std.all` and `std.any` [#203](https://github.com/databricks/sjsonnet/pull/203)
+
 ### 0.4.9
 
 - Switch from CRC32 to XXHash64 for import cache keys [#198](https://github.com/databricks/sjsonnet/pull/198) 
