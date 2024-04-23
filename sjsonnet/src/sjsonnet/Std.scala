@@ -124,6 +124,18 @@ class Std {
     }
   }
 
+  private object All extends Val.Builtin1("arr") {
+    def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val = {
+      Val.bool(pos, arr.asArr.forall(v => v.asBoolean))
+    }
+  }
+
+  private object Any extends Val.Builtin1("arr") {
+    def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val = {
+      Val.bool(pos, arr.asArr.iterator.exists(v => v.asBoolean))
+    }
+  }
+
   private object Type extends Val.Builtin1("x") {
     def evalRhs(x: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, x match {
       case _: Val.Bool => "boolean"
@@ -1239,7 +1251,9 @@ class Std {
       } else {
         args(2)
       }
-    }
+    },
+    "all" -> All,
+    "any" -> Any
   )
   val Std = Val.Obj.mk(
     null,
