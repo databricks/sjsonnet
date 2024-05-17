@@ -11,9 +11,6 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
 import scala.jdk.CollectionConverters._
-import java.lang
-import java.util.stream.StreamSupport
-import java.util.stream.Collectors
 import org.json.JSONArray
 
 object Platform {
