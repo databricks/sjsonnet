@@ -10,6 +10,8 @@ import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.Constructor
+import scala.jdk.CollectionConverters._
+import org.json.JSONArray
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -45,9 +47,14 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new Constructor(classOf[java.util.LinkedHashMap[String, Object]])).load(yamlString)
-    new JSONObject(yaml).toString()
+    val yaml: Array[Object] = new Yaml(new Constructor()).loadAll(yamlString).asScala.toArray
+    yaml.size match {
+      case l if (l > 1) => new JSONArray(yaml).toString()
+      case l if (l == 1)  => new JSONObject(yaml(0).asInstanceOf[java.util.LinkedHashMap[String, Object]]).toString()
+      case _ => "{}"
+    }
   }
+
   def md5(s: String): String = {
     java.security.MessageDigest.getInstance("MD5")
       .digest(s.getBytes("UTF-8"))
