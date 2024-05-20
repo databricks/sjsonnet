@@ -47,10 +47,11 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: Seq[Object] = new Yaml(new Constructor()).loadAll(yamlString).asScala.toSeq
-    yaml match {
-      case l if(l.size > 1) => new JSONArray(yaml.asJava).toString()
-      case _  => new JSONObject(yaml.iterator.next().asInstanceOf[java.util.LinkedHashMap[String, Object]]).toString()
+    val yaml: Array[Object] = new Yaml(new Constructor()).loadAll(yamlString).asScala.toArray
+    yaml.size match {
+      case l if (l > 1) => new JSONArray(yaml).toString()
+      case l if (l == 1)  => new JSONObject(yaml(0).asInstanceOf[java.util.LinkedHashMap[String, Object]]).toString()
+      case _ => "{}"
     }
   }
 
