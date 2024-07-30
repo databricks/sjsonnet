@@ -49,8 +49,8 @@ object Std0150FunctionsTests extends TestSuite {
     }
 
     test("manifestJsonMinified"){
-      eval("""std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring"], y: { a: 1, b: 2, c: [1, 2] }, })""") ==>
-        ujson.Str("{\"x\":[1,2,3,true,false,null,\"string\\nstring\"],\"y\":{\"a\":1,\"b\":2,\"c\":[1,2]}}")
+      eval("""std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring", []], y: { a: 1, b: 2, c: [1, 2], d: {} }, })""") ==>
+        ujson.Str("{\"x\":[1,2,3,true,false,null,\"string\\nstring\",[]],\"y\":{\"a\":1,\"b\":2,\"c\":[1,2],\"d\":{}}}")
     }
 
     test("manifestXmlJsonml"){
