@@ -47,7 +47,7 @@ class BaseRenderer[T <: java.io.Writer]
     }
   }
 
-  def visitObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[T, T] {
     flushBuffer()
     out.append('{')
     depth += 1

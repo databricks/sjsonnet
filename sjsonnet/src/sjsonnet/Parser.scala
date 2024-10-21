@@ -1,7 +1,7 @@
 package sjsonnet
 
-import fastparse.JsonnetWhitespace._
-import fastparse._
+import fastparse.JsonnetWhitespace.*
+import fastparse.*
 import Expr.Member.Visibility
 
 import scala.annotation.switch
@@ -48,19 +48,19 @@ class Parser(val currentFile: Path,
              strictImportSyntax: Boolean,
              internedStrings: mutable.HashMap[String, String],
              internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) {
-  import Parser._
+  import Parser.*
 
   private val fileScope = new FileScope(currentFile)
 
-  def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
+  def Pos[A: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
-  def id[_: P] = P(
+  def id[A: P] = P(
     CharIn("_a-zA-Z") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
   ).!.filter(s => !keywords.contains(s))
 
-  def break[_: P] = P(!CharIn("_a-zA-Z0-9"))
-  def number[_: P]: P[Val.Num] = P(
+  def break[A: P] = P(!CharIn("_a-zA-Z0-9"))
+  def number[A: P]: P[Val.Num] = P(
     Pos ~~ (
       CharsWhileIn("0-9") ~~
       ("." ~ CharsWhileIn("0-9")).? ~~
@@ -68,8 +68,8 @@ class Parser(val currentFile: Path,
     ).!
   ).map(s => Val.Num(s._1, s._2.toDouble))
 
-  def escape[_: P] = P( escape0 | escape1 )
-  def escape0[_: P] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
+  def escape[A: P] = P( escape0 | escape1 )
+  def escape0[A: P] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
     case "\"" => "\""
     case "'" => "\'"
     case "\\" => "\\"
@@ -80,29 +80,29 @@ class Parser(val currentFile: Path,
     case "r" => "\r"
     case "t" => "\t"
   }
-  def escape1[_: P] = P( "\\u" ~~ CharIn("0-9a-fA-F").repX(min=4, max=4).! ).map{
+  def escape1[A: P] = P( "\\u" ~~ CharIn("0-9a-fA-F").repX(min=4, max=4).! ).map{
     s => Integer.parseInt(s, 16).toChar.toString
   }
-  def doubleString[_: P]: P[Seq[String]] =
+  def doubleString[A: P]: P[Seq[String]] =
     P( (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" )
-  def singleString[_: P]: P[Seq[String]] =
+  def singleString[A: P]: P[Seq[String]] =
     P( (CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'" )
-  def literalDoubleString[_: P]: P[Seq[String]] =
+  def literalDoubleString[A: P]: P[Seq[String]] =
     P( (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\""  )
-  def literalSingleString[_: P]: P[Seq[String]] =
+  def literalSingleString[A: P]: P[Seq[String]] =
     P( (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" )
 
-  def tripleBarStringLines[_: P]: P[Seq[String]] = P(
+  def tripleBarStringLines[A: P]: P[Seq[String]] = P(
     tripleBarStringHead.flatMapX { case (pre, w, head) =>
       tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
     }
   )
-  def tripleBarString[_: P]: P[Seq[String]] = P(
+  def tripleBarString[A: P]: P[Seq[String]] = P(
     "||"./ ~~ CharsWhileIn(" \t", 0) ~~
     "\n" ~~ tripleBarStringLines ~~ "\n" ~~
     CharsWhileIn(" \t", 0) ~~ "|||"
   )
-  def string[_: P]: P[String] = P(
+  def string[A: P]: P[String] = P(
     SingleChar.flatMapX{
       case '\"' => doubleString
       case '\'' => singleString
@@ -116,24 +116,24 @@ class Parser(val currentFile: Path,
     }
   ).map(_.mkString)
 
-  def tripleBarStringHead[_: P] = P(
+  def tripleBarStringHead[A: P] = P(
     (CharsWhileIn(" \t", 0) ~~ "\n".!).repX ~~
       CharsWhileIn(" \t", 1).! ~~
       CharsWhile(_ != '\n').!
   )
-  def tripleBarBlankHead[_: P]: P[String] =
+  def tripleBarBlankHead[A: P]: P[String] =
     P( CharsWhileIn(" \t", 0) ~~ &("\n").map(_ => "\n") )
 
-  def tripleBarBlank[_: P]: P[String] = P( "\n" ~~ tripleBarBlankHead )
+  def tripleBarBlank[A: P]: P[String] = P( "\n" ~~ tripleBarBlankHead )
 
-  def tripleBarStringBody[_: P](w: String): P[Seq[String]] = P(
+  def tripleBarStringBody[A: P](w: String): P[Seq[String]] = P(
     (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
 
 
-  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody )
-  def compSuffix[_: P] = P( forspec ~ compspec ).map(Left(_))
-  def arrBody[_: P]: P[Expr] = P(
+  def arr[A: P]: P[Expr] = P( (Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody )
+  def compSuffix[A: P] = P( forspec ~ compspec ).map(Left(_))
+  def arrBody[A: P]: P[Expr] = P(
     Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
@@ -152,19 +152,19 @@ class Parser(val currentFile: Path,
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 
-  def assertExpr[_: P](pos: Position): P[Expr] =
+  def assertExpr[A: P](pos: Position): P[Expr] =
     P( assertStmt ~ ";" ~ expr ).map(t => Expr.AssertExpr(pos, t._1, t._2))
 
-  def function[_: P](pos: Position): P[Expr] =
+  def function[A: P](pos: Position): P[Expr] =
     P( "(" ~/ params ~ ")" ~ expr ).map(t => Expr.Function(pos, t._1, t._2))
 
-  def ifElse[_: P](pos: Position): P[Expr] =
-    P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)) ).map(Expr.IfElse.tupled)
+  def ifElse[A: P](pos: Position): P[Expr] =
+    P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.orNull) ).map((Expr.IfElse.apply).tupled)
 
-  def localExpr[_: P]: P[Expr] =
-    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+  def localExpr[A: P]: P[Expr] =
+    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map((Expr.LocalExpr.apply).tupled)
 
-  def expr[_: P]: P[Expr] =
+  def expr[A: P]: P[Expr] =
     P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
       var remaining = fs
       def climb(minPrec: Int, current: Expr): Expr = {
@@ -214,11 +214,11 @@ class Parser(val currentFile: Path,
       climb(0, pre)
     }
 
-  def expr1[_: P]: P[Expr] = P(expr2 ~ exprSuffix2.rep).map{
+  def expr1[A: P]: P[Expr] = P(expr2 ~ exprSuffix2.rep).map{
     case (pre, fs) => fs.foldLeft(pre){case (p, f) => f(p) }
   }
 
-  def exprSuffix2[_: P]: P[Expr => Expr] = P(
+  def exprSuffix2[A: P]: P[Expr => Expr] = P(
     Pos.flatMapX{i =>
       CharIn(".[({")./.!.map(_(0)).flatMapX{ c =>
         (c: @switch) match{
@@ -237,12 +237,12 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def local[_: P] = P( localExpr )
-  def importStr[_: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
-  def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
-  def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
+  def local[A: P] = P( localExpr )
+  def importStr[A: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
+  def `import`[A: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
+  def error[A: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
 
-  def importExpr[_: P]: P[String] = P(
+  def importExpr[A: P]: P[String] = P(
     if (!strictImportSyntax) string
     else expr.flatMap {
       case Val.Str(_, s) => Pass(s)
@@ -250,7 +250,7 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def unaryOpExpr[_: P](pos: Position, op: Char) = P(
+  def unaryOpExpr[A: P](pos: Position, op: Char) = P(
     expr1.map{ e =>
       def k2 = op match{
         case '+' => Expr.UnaryOp.OP_+
@@ -269,7 +269,7 @@ class Parser(val currentFile: Path,
   }
 
   // Any `expr` that isn't naively left-recursive
-  def expr2[_: P]: P[Expr] = P(
+  def expr2[A: P]: P[Expr] = P(
     Pos.flatMapX{ pos =>
       SingleChar.flatMapX{ c =>
         (c: @switch) match {
@@ -289,7 +289,7 @@ class Parser(val currentFile: Path,
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             P.current.index = pos.offset; number
           case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
-            x + y match {
+            s"$x$y" match {
               case "null"      => Pass(Val.Null(pos))
               case "true"      => Pass(Val.True(pos))
               case "false"     => Pass(Val.False(pos))
@@ -311,7 +311,7 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def objinside[_: P]: P[Expr.ObjBody] = P(
+  def objinside[A: P]: P[Expr.ObjBody] = P(
     Pos ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
   ).flatMap { case t @ (pos, exprs, _) =>
     val seen = collection.mutable.Set.empty[String]
@@ -345,10 +345,10 @@ class Parser(val currentFile: Path,
         exprs(preLocals.length)
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      
-      /* 
+
+      /*
        * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
-       * 
+       *
        * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
        * Otherwise the field value will be overriden by the multiple iterations of forspec
        */
@@ -362,35 +362,35 @@ class Parser(val currentFile: Path,
       Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, plus, postLocals.toArray, comps._1, comps._2.toList)
   }
 
-  def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
-  def field[_: P] = P(
+  def member[A: P]: P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
+  def field[A: P] = P(
     (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
       case (pos, name, plus, p, h2, e) =>
-        Expr.Member.Field(pos, name, plus.nonEmpty, p.getOrElse(null), h2, e)
+        Expr.Member.Field(pos, name, plus.nonEmpty, p.orNull, h2, e)
     }
   )
-  def fieldKeySep[_: P] = P( StringIn(":::", "::", ":") ).!.map{
+  def fieldKeySep[A: P] = P( StringIn(":::", "::", ":") ).!.map{
     case ":" => Visibility.Normal
     case "::" => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
-  def objlocal[_: P] = P( "local" ~~ break ~/ bind )
-  def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
-  def forspec[_: P] =
-    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
-  def ifspec[_: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
-  def fieldname[_: P] = P(
-    id.map(Expr.FieldName.Fixed) |
-    string.map(Expr.FieldName.Fixed) |
-    "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]"
+  def objlocal[A: P] = P( "local" ~~ break ~/ bind )
+  def compspec[A: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
+  def forspec[A: P] =
+    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map((Expr.ForSpec.apply).tupled)
+  def ifspec[A: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map((Expr.IfSpec.apply).tupled)
+  def fieldname[A: P] = P(
+    id.map(Expr.FieldName.Fixed.apply) |
+    string.map(Expr.FieldName.Fixed.apply) |
+    "[" ~ expr.map(Expr.FieldName.Dyn.apply) ~ "]"
   )
-  def assertStmt[_: P] =
-    P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
+  def assertStmt[A: P] =
+    P( expr ~ (":" ~ expr).?.map(_.orNull) ).map((Expr.Member.AssertStmt.apply).tupled)
 
-  def bind[_: P] =
-    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+  def bind[A: P] =
+    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.orNull) ~ "=" ~ expr ).map((Expr.Bind.apply).tupled)
 
-  def args[_: P] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def args[A: P] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
     } else {
@@ -400,7 +400,7 @@ class Parser(val currentFile: Path,
     }
   }
 
-  def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def params[A: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     for((k, v) <- x){
@@ -416,7 +416,7 @@ class Parser(val currentFile: Path,
 
   }
 
-  def binaryop[_: P] = P(
+  def binaryop[A: P] = P(
     StringIn(
       "<<", ">>", "<=", ">=", "in", "==", "!=", "&&", "||",
       "*", "/", "%", "+", "-", "<", ">", "&", "^", "|"
@@ -424,7 +424,7 @@ class Parser(val currentFile: Path,
 
   ).!
 
-  def document[_: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
+  def document[A: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
 }
 
 final class Position(val fileScope: FileScope, val offset: Int) {

@@ -170,7 +170,7 @@ class Evaluator(resolver: CachedResolver,
         case _ => fail()
       }
       case Expr.UnaryOp.OP_~ => v match {
-        case Val.Num(_, v) => Val.Num(pos, ~v.toLong)
+        case Val.Num(_, v) => Val.Num(pos, (~v.toLong).toDouble)
         case _ => fail()
       }
       case Expr.UnaryOp.OP_+ => v match {
@@ -430,12 +430,12 @@ class Evaluator(resolver: CachedResolver,
       }
 
       case Expr.BinaryOp.OP_<< => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong << r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_>> => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong >> r.toLong).toDouble)
         case _ => fail()
       }
 
@@ -445,17 +445,17 @@ class Evaluator(resolver: CachedResolver,
       }
 
       case Expr.BinaryOp.OP_& => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong & r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_^ => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong ^ r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_| => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong | r.toLong).toDouble)
         case _ => fail()
       }
 
@@ -502,14 +502,20 @@ class Evaluator(resolver: CachedResolver,
   def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
-    var cachedSimpleScope: ValScope = null.asInstanceOf[ValScope]
+    var cachedSimpleScope: ValScope | Null = null
     var cachedObj: Val.Obj = null
     var asserting: Boolean = false
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       if((sup eq null) && (self eq cachedObj)) {
-        if(cachedSimpleScope == null.asInstanceOf[ValScope]) cachedSimpleScope = createNewScope(self, sup)
-        cachedSimpleScope
+        cachedSimpleScope match {
+          case null =>
+            val cachedScope = createNewScope(self, sup)
+            cachedSimpleScope = cachedScope
+            cachedScope
+          case cachedScope: ValScope =>
+            cachedScope
+        }
       } else createNewScope(self, sup)
     }
 
@@ -581,7 +587,8 @@ class Evaluator(resolver: CachedResolver,
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
               if(asserts != null) assertions(self)
-              visitExpr(rhs)(makeNewScope(self, sup))
+              val newScope = makeNewScope(self, sup)
+              visitExpr(rhs)(using newScope)
             }
           }
           builder.put(k, v)

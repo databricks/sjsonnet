@@ -20,7 +20,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
 
-  private[this] def appendString(s: String) = {
+  private def appendString(s: String) = {
     val len = s.length
     var i = 0
     elemBuilder.ensureLength(len)
@@ -48,7 +48,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       }
       depth -= 1
     } else {
-      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true)
+      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode = true, wrapQuotes = true)
     }
     flushCharBuilder()
     _out
@@ -116,7 +116,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       _out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1

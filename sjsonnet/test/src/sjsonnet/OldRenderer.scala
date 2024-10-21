@@ -63,7 +63,7 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')

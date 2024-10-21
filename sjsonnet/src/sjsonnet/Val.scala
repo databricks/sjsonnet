@@ -17,7 +17,7 @@ import scala.reflect.ClassTag
  * are all wrapped in [[Lazy]] and only truly evaluated on-demand
  */
 abstract class Lazy {
-  protected[this] var cached: Val = null
+  protected var cached: Val = null
   def compute(): Val
   final def force: Val = {
     if(cached == null)  cached = compute()
@@ -42,7 +42,7 @@ sealed abstract class Val extends Lazy {
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
     else Error.fail("Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName)
 
-  private[this] def failAs(err: String): Nothing =
+  private def failAs(err: String): Nothing =
     Error.fail("Wrong parameter type: expected " + err + ", got " + prettyName)
 
   def asString: String = failAs("String")
@@ -90,13 +90,13 @@ object Val{
     override def asDouble: Double = value
   }
 
-  class Arr(val pos: Position, private val value: Array[_ <: Lazy]) extends Literal {
+  class Arr(val pos: Position, private val value: Array[? <: Lazy]) extends Literal {
     def prettyName = "array"
     override def asArr: Arr = this
     def length: Int = value.length
     def force(i: Int) = value(i).force
 
-    def asLazy(i: Int) = value(i)
+    def asLazy(i: Int): Lazy = value(i)
     def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
     def asStrictArray: Array[Val] = value.map(_.force)
 
@@ -140,17 +140,17 @@ object Val{
   }
 
   final class Obj(val pos: Position,
-                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
+                  private var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
-                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+                  private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
 
-    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+    private def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if(value0 == null) {
         val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
         allKeys.forEach { (k, _) =>
@@ -353,7 +353,7 @@ object Val{
 
     override def asFunc: Func = this
 
-    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
@@ -491,7 +491,7 @@ object Val{
 
     def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
@@ -506,7 +506,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -522,7 +522,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -534,7 +534,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 4)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, argVals(3).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)

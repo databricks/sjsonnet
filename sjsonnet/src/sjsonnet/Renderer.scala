@@ -72,7 +72,7 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     elemBuilder.append('{')
@@ -141,7 +141,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
@@ -203,7 +203,7 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1

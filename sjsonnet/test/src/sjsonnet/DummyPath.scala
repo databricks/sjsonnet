@@ -9,13 +9,13 @@ case class DummyPath(segments: String*) extends Path{
 
   def debugRead(): Option[String] = None
 
-  def parent(): Path = DummyPath(segments.dropRight(1):_*)
+  def parent(): Path = DummyPath(segments.dropRight(1)*)
 
   def segmentCount(): Int = segments.length
 
   def last: String = segments.last
 
-  def /(s: String): Path = DummyPath(segments :+ s:_*)
+  def /(s: String): Path = DummyPath(segments :+ s*)
 
   def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     segments.mkString("/") + ":" + offset

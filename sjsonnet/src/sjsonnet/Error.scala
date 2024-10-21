@@ -32,11 +32,11 @@ class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Thro
   def asSeenFrom(ev: EvalErrorScope): Error =
     copy(stack = stack.map(_.asSeenFrom(ev)))
 
-  protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+  protected def copy(msg: String = msg, stack: List[Error.Frame] = stack,
                            underlying: Option[Throwable] = underlying) =
     new Error(msg, stack, underlying)
 
-  private[this] def alwaysAddPos(expr: Expr): Boolean = expr match {
+  private def alwaysAddPos(expr: Expr): Boolean = expr match {
     case _: Expr.LocalExpr | _: Expr.Arr | _: Expr.ObjExtend | _: Expr.ObjBody | _: Expr.IfElse => false
     case _ => true
   }
@@ -77,7 +77,7 @@ object Error {
 class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
   extends Error(msg, stack, underlying) {
 
-  override protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+  override protected def copy(msg: String = msg, stack: List[Error.Frame] = stack,
                                     underlying: Option[Throwable] = underlying) =
     new ParseError(msg, stack, underlying)
 }
@@ -85,7 +85,7 @@ class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option
 class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
   extends Error(msg, stack, underlying) {
 
-  override protected[this] def copy(msg: String = msg, stack: List[Error.Frame] = stack,
+  override protected def copy(msg: String = msg, stack: List[Error.Frame] = stack,
                                     underlying: Option[Throwable] = underlying) =
     new StaticError(msg, stack, underlying)
 }

@@ -84,7 +84,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1

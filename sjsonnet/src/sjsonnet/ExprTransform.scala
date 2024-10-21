@@ -188,10 +188,10 @@ abstract class ExprTransform {
     }
   }
 
-  protected[this] def transformArr[T <: Expr](a: Array[T]): Array[T] =
-    transformGenericArr(a)((transform _).asInstanceOf[T => T])
+  protected def transformArr[T <: Expr](a: Array[T]): Array[T] =
+    transformGenericArr(a)((transform).asInstanceOf[T => T])
 
-  protected[this] def transformParams(p: Params): Params = {
+  protected def transformParams(p: Params): Params = {
     if(p == null) return null
     val defs = p.defaultExprs
     if(defs == null) p
@@ -202,16 +202,16 @@ abstract class ExprTransform {
     }
   }
 
-  protected[this] def transformBinds(a: Array[Bind]): Array[Bind] =
+  protected def transformBinds(a: Array[Bind]): Array[Bind] =
     transformGenericArr(a)(transformBind)
 
-  protected[this] def transformFields(a: Array[Member.Field]): Array[Member.Field] =
+  protected def transformFields(a: Array[Member.Field]): Array[Member.Field] =
     transformGenericArr(a)(transformField)
 
-  protected[this] def transformAsserts(a: Array[Member.AssertStmt]): Array[Member.AssertStmt] =
+  protected def transformAsserts(a: Array[Member.AssertStmt]): Array[Member.AssertStmt] =
     transformGenericArr(a)(transformAssert)
 
-  protected[this] def transformBind(b: Bind): Bind = {
+  protected def transformBind(b: Bind): Bind = {
     val args = b.args
     val rhs = b.rhs
     val args2 = transformParams(args)
@@ -220,7 +220,7 @@ abstract class ExprTransform {
     else b.copy(args = args2, rhs = rhs2)
   }
 
-  protected[this] def transformField(f: Member.Field): Member.Field = {
+  protected def transformField(f: Member.Field): Member.Field = {
     val x = f.fieldName
     val y = f.args
     val z = f.rhs
@@ -231,14 +231,14 @@ abstract class ExprTransform {
     else f.copy(fieldName = x2, args = y2, rhs = z2)
   }
 
-  protected[this] def transformFieldName(f: FieldName): FieldName = f match {
+  protected def transformFieldName(f: FieldName): FieldName = f match {
     case FieldName.Dyn(x) =>
       val x2 = transform(x)
       if(x2 eq x) f else FieldName.Dyn(x2)
     case _ => f
   }
 
-  protected[this] def transformAssert(a: Member.AssertStmt): Member.AssertStmt = {
+  protected def transformAssert(a: Member.AssertStmt): Member.AssertStmt = {
     val x = a.value
     val y = a.msg
     val x2 = transform(x)
@@ -247,14 +247,14 @@ abstract class ExprTransform {
     else a.copy(value = x2, msg = y2)
   }
 
-  protected[this] def transformOption(o: Option[Expr]): Option[Expr] = o match {
+  protected def transformOption(o: Option[Expr]): Option[Expr] = o match {
     case Some(e) =>
       val e2 = transform(e)
       if(e2 eq e) o else Some(e2)
     case None => o
   }
 
-  protected[this] def transformList(l: List[Expr]): List[Expr] = {
+  protected def transformList(l: List[Expr]): List[Expr] = {
     val lb = List.newBuilder[Expr]
     var diff = false
     l.foreach { e =>
@@ -265,7 +265,7 @@ abstract class ExprTransform {
     if(diff) lb.result() else l
   }
 
-  protected[this] def transformGenericArr[T <: AnyRef](a: Array[T])(f: T => T): Array[T] = {
+  protected def transformGenericArr[T <: AnyRef](a: Array[T])(f: T => T): Array[T] = {
     if(a == null) return null
     var i = 0
     while(i < a.length) {

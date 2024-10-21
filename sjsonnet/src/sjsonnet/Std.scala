@@ -697,7 +697,7 @@ class Std {
     }
 
     private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("b") {
-      private[this] val a =
+      private val a =
         ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
         // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
 
@@ -750,8 +750,8 @@ class Std {
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
             k <- (l.visibleKeyNames ++ r.visibleKeyNames).distinct
-            val lValue = Option(l.valueRaw(k, l, pos)(ev))
-            val rValue = Option(r.valueRaw(k, r, pos)(ev))
+            lValue = Option(l.valueRaw(k, l, pos)(ev))
+            rValue = Option(r.valueRaw(k, r, pos)(ev))
             if !rValue.exists(_.isInstanceOf[Val.Null])
           } yield (lValue, rValue) match{
             case (Some(lChild), None) => k -> createMember{lChild}
@@ -759,7 +759,7 @@ class Std {
             case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
           }
 
-          Val.Obj.mk(mergePosition, kvs:_*)
+          Val.Obj.mk(mergePosition, kvs*)
 
         case (_, _) => recSingle(r)
       }
@@ -767,11 +767,11 @@ class Std {
         case obj: Val.Obj =>
           val kvs = for{
             k <- obj.visibleKeyNames
-            val value = obj.value(k, pos, obj)(ev)
+            value = obj.value(k, pos, obj)(ev)
             if !value.isInstanceOf[Val.Null]
           } yield (k, createMember{recSingle(value)})
 
-          Val.Obj.mk(obj.pos, kvs:_*)
+          Val.Obj.mk(obj.pos, kvs*)
 
         case _ => v
       }
@@ -1228,7 +1228,7 @@ class Std {
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-          Val.Obj.mk(pos, bindings: _*)
+          Val.Obj.mk(pos, bindings*)
         case a: Val.Arr =>
           new Val.Arr(pos, a.asStrictArray.map(rec).filter(filter).map(identity))
         case _ => x
@@ -1272,7 +1272,7 @@ class Std {
             Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
         }
       )
-    ): _*
+    )*
   )
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
@@ -1429,7 +1429,7 @@ class Std {
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
     maybeSortKeys(ev, v1.allKeyNames)
   
-  @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
+  @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
     if(ev.settings.preserveOrder) keys else keys.sorted
 
   def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr =
