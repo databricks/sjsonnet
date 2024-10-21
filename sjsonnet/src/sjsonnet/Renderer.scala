@@ -46,19 +46,23 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
+
+  override def visitArray(length: Int, index: Int): ArrVisitor[Writer, Writer] = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     elemBuilder.append('[')
     newlineBuffered = true
 
     depth += 1
-    def subVisitor = Renderer.this
+
+    def subVisitor: Renderer = Renderer.this
+
     def visitValue(v: Writer, index: Int): Unit = {
       empty = false
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       newlineBuffered = false
@@ -72,23 +76,28 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Writer, Writer] = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     elemBuilder.append('{')
     newlineBuffered = true
     depth += 1
-    def subVisitor = Renderer.this
-    def visitKey(index: Int) = Renderer.this
+
+    def subVisitor: Renderer = Renderer.this
+
+    def visitKey(index: Int): Renderer = Renderer.this
+
     def visitKeyValue(v: Any): Unit = {
       empty = false
       //flushBuffer()
       elemBuilder.append(':')
       elemBuilder.append(' ')
     }
+
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       newlineBuffered = false
@@ -141,21 +150,26 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Writer, Writer] = new ObjVisitor[Writer, Writer] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = PythonRenderer.this
-    def visitKey(index: Int) = PythonRenderer.this
+
+    def subVisitor: PythonRenderer = PythonRenderer.this
+
+    def visitKey(index: Int): PythonRenderer = PythonRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.ensureLength(2)
       elemBuilder.append(':')
       elemBuilder.append(' ')
     }
+
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -181,18 +195,21 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
 case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter())
   extends BaseCharRenderer(out, indent, escapeUnicode) {
 
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] = new ArrVisitor[StringWriter, StringWriter] {
     flushBuffer()
     elemBuilder.append('[')
 
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if(length == 0) elemBuilder.append('\n') else renderIndent()
-    def subVisitor = MaterializeJsonRenderer.this
+    if (length == 0) elemBuilder.append('\n') else renderIndent()
+
+    def subVisitor: MaterializeJsonRenderer = MaterializeJsonRenderer.this
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -203,21 +220,26 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
     }
   }
 
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if(length == 0) elemBuilder.append('\n') else renderIndent()
-    def subVisitor = MaterializeJsonRenderer.this
-    def visitKey(index: Int) = MaterializeJsonRenderer.this
+    if (length == 0) elemBuilder.append('\n') else renderIndent()
+
+    def subVisitor: MaterializeJsonRenderer = MaterializeJsonRenderer.this
+
+    def visitKey(index: Int): MaterializeJsonRenderer = MaterializeJsonRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.append(':')
       if (indent != -1) elemBuilder.append(' ')
     }
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1

@@ -15,7 +15,7 @@ case class DummyPath(segments: String*) extends Path{
 
   def last: String = segments.last
 
-  def /(s: String): Path = DummyPath(segments :+ s*)
+  def /(s: String): Path = DummyPath(segments :+ s:_*)
 
   def renderOffsetStr(offset: Int, loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     segments.mkString("/") + ":" + offset

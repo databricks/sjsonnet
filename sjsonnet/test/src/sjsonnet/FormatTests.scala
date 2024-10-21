@@ -10,7 +10,7 @@ object FormatTests extends TestSuite{
     val json = ujson.read(jsonStr)
     val formatted = Format.format(fmt, Materializer.reverse(null, json), dummyPos)(
       new EvalScope{
-        def extVars = _ => None
+        def extVars: String => Option[Expr] = _ => None
         def wd: Path = DummyPath()
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???

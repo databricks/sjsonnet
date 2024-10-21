@@ -21,7 +21,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     var key: String = null
     def subVisitor: Visitor[?, ?] = self
-    def visitKey(index: Int) = upickle.core.StringVisitor
+    def visitKey(index: Int): Visitor[?, ?] = upickle.core.StringVisitor
     def visitKeyValue(s: Any): Unit = key = s.toString
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)

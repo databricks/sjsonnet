@@ -28,17 +28,21 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       renderIndent()
     }
   }
-  def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
+
+  def visitArray(length: Int, index: Int): ArrVisitor[T, T] = new ArrVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('[')
 
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
+
+    def subVisitor: BaseCharRenderer[T] = BaseCharRenderer.this
+
     def visitValue(v: T, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -49,20 +53,25 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
-    def visitKey(index: Int) = BaseCharRenderer.this
+
+    def subVisitor: BaseCharRenderer[T] = BaseCharRenderer.this
+
+    def visitKey(index: Int): BaseCharRenderer[T] = BaseCharRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.append(':')
       if (indent != -1) elemBuilder.append(' ')
     }
+
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1

@@ -54,7 +54,8 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     newlineBuffered = false
     dashBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+
+  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
 
@@ -69,13 +70,15 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     if (dedentInObject) depth -= 1
     dashBuffered = true
 
-    def subVisitor = OldYamlRenderer.this
+    def subVisitor: OldYamlRenderer = OldYamlRenderer.this
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       empty = false
       flushBuffer()
       newlineBuffered = true
       dashBuffered = true
     }
+
     def visitEnd(index: Int) = {
       if (!dedentInObject) depth -= 1
       if (empty) out.append("[]")
@@ -84,7 +87,8 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
@@ -92,8 +96,10 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
 
     if (afterKey) newlineBuffered = true
 
-    def subVisitor = OldYamlRenderer.this
-    def visitKey(index: Int) = OldYamlRenderer.this
+    def subVisitor: OldYamlRenderer = OldYamlRenderer.this
+
+    def visitKey(index: Int): OldYamlRenderer = OldYamlRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
@@ -101,10 +107,12 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       afterKey = true
       newlineBuffered = false
     }
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       newlineBuffered = true
       afterKey = false
     }
+
     def visitEnd(index: Int) = {
       if (empty) out.append("{}")
       newlineBuffered = false

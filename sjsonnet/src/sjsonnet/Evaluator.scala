@@ -502,18 +502,18 @@ class Evaluator(resolver: CachedResolver,
   def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
-    var cachedSimpleScope: ValScope | Null = null
+    var cachedSimpleScope: Option[ValScope] = None
     var cachedObj: Val.Obj = null
     var asserting: Boolean = false
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       if((sup eq null) && (self eq cachedObj)) {
         cachedSimpleScope match {
-          case null =>
+          case None =>
             val cachedScope = createNewScope(self, sup)
-            cachedSimpleScope = cachedScope
+            cachedSimpleScope = Some(cachedScope)
             cachedScope
-          case cachedScope: ValScope =>
+          case Some(cachedScope) =>
             cachedScope
         }
       } else createNewScope(self, sup)

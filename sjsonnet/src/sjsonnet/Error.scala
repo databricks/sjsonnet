@@ -78,7 +78,7 @@ class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option
   extends Error(msg, stack, underlying) {
 
   override protected def copy(msg: String = msg, stack: List[Error.Frame] = stack,
-                                    underlying: Option[Throwable] = underlying) =
+                              underlying: Option[Throwable] = underlying): ParseError =
     new ParseError(msg, stack, underlying)
 }
 
@@ -86,7 +86,7 @@ class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Optio
   extends Error(msg, stack, underlying) {
 
   override protected def copy(msg: String = msg, stack: List[Error.Frame] = stack,
-                                    underlying: Option[Throwable] = underlying) =
+                              underlying: Option[Throwable] = underlying): StaticError =
     new StaticError(msg, stack, underlying)
 }
 

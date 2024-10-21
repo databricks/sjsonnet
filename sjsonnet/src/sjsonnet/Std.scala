@@ -1272,7 +1272,7 @@ class Std {
             Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
         }
       )
-    )*
+    ): _*
   )
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)

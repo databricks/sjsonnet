@@ -138,18 +138,20 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     dashBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
+
+  override def visitArray(length: Int, index: Int): ArrVisitor[Writer, Writer] = new ArrVisitor[Writer, Writer] {
     var empty = true
     val dedentInObject = afterKey && !indentArrayInObject
-    def subVisitor = {
-      if (empty){
+
+    def subVisitor: PrettyYamlRenderer = {
+      if (empty) {
         afterColon = false
         flushBuffer()
         val outerFirstElementInArray = firstElementInArray
         firstElementInArray = true
         if (!topLevel) {
           depth += 1
-          if (!firstElementInArray || !outerFirstElementInArray)  newlineBuffered = true
+          if (!firstElementInArray || !outerFirstElementInArray) newlineBuffered = true
         }
         topLevel = false
 
@@ -161,6 +163,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       leftHandPrefixOffset = 0
       PrettyYamlRenderer.this
     }
+
     def visitValue(v: Writer, index: Int): Unit = {
       firstElementInArray = true
       empty = false
@@ -169,6 +172,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
 
       dashBuffered = true
     }
+
     def visitEnd(index: Int) = {
       firstElementInArray = false
       if (!dedentInObject) depth -= 1
@@ -182,16 +186,19 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       out
     }
   }
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Writer, Writer] = new ObjVisitor[Writer, Writer] {
     firstElementInArray = false
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
     topLevel = false
-    def subVisitor = PrettyYamlRenderer.this
-    def visitKey(index: Int) = {
 
-      if (empty){
+    def subVisitor: PrettyYamlRenderer = PrettyYamlRenderer.this
+
+    def visitKey(index: Int): PrettyYamlRenderer = {
+
+      if (empty) {
         leftHandPrefixOffset = 0
 
         afterColon = false
@@ -200,12 +207,13 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       }
       PrettyYamlRenderer.this
     }
+
     def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
       out.append(":")
       saveCurrentPos()
-      if (bufferedComment != null){
+      if (bufferedComment != null) {
         out.append(bufferedComment)
         bufferedComment = null
       }
@@ -213,10 +221,12 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       afterColon = true
       newlineBuffered = false
     }
+
     def visitValue(v: Writer, index: Int): Unit = {
       newlineBuffered = true
       afterKey = false
     }
+
     def visitEnd(index: Int) = {
       if (empty) {
         addSpaceAfterColon()
@@ -473,7 +483,7 @@ object PrettyYamlRenderer{
       yamlPunctuation | (&(CharIn(".0-9\\-")) ~ (yamlTime | yamlDate | yamlNumber) | yamlKeyword) ~ End
     )
 
-    fastparse.parse(str, parser).isSuccess ||
+    fastparse.parse(str, parser(using _)).isSuccess ||
     str.contains(": ") || // Looks like a key-value pair
     str.contains(" #") || // Comments
     str.charAt(str.length - 1) == ':' || // Looks like a key-value pair

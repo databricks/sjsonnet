@@ -27,17 +27,21 @@ class BaseRenderer[T <: java.io.Writer]
       renderIndent()
     }
   }
-  def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
+
+  def visitArray(length: Int, index: Int): ArrVisitor[T, T] = new ArrVisitor[T, T] {
     flushBuffer()
     out.append('[')
 
     depth += 1
     renderIndent()
-    def subVisitor = BaseRenderer.this
+
+    def subVisitor: BaseRenderer[T] = BaseRenderer.this
+
     def visitValue(v: T, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -47,17 +51,22 @@ class BaseRenderer[T <: java.io.Writer]
     }
   }
 
-  def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
     flushBuffer()
     out.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = BaseRenderer.this
-    def visitKey(index: Int) = BaseRenderer.this
+
+    def subVisitor: BaseRenderer[T] = BaseRenderer.this
+
+    def visitKey(index: Int): BaseRenderer[T] = BaseRenderer.this
+
     def visitKeyValue(s: Any): Unit = out.append(colonSnippet)
+
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1

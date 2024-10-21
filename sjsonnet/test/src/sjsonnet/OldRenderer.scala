@@ -38,19 +38,23 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
+
+  override def visitArray(length: Int, index: Int): ArrVisitor[Writer, Writer] = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('[')
     newlineBuffered = true
 
     depth += 1
-    def subVisitor = OldRenderer.this
+
+    def subVisitor: OldRenderer = OldRenderer.this
+
     def visitValue(v: Writer, index: Int): Unit = {
       empty = false
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       newlineBuffered = false
@@ -63,22 +67,27 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitJsonableObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Writer, Writer] = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')
     newlineBuffered = true
     depth += 1
-    def subVisitor = OldRenderer.this
-    def visitKey(index: Int) = OldRenderer.this
+
+    def subVisitor: OldRenderer = OldRenderer.this
+
+    def visitKey(index: Int): OldRenderer = OldRenderer.this
+
     def visitKeyValue(v: Any): Unit = {
       empty = false
       flushBuffer()
       out.append(colonSnippet)
     }
+
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       newlineBuffered = false

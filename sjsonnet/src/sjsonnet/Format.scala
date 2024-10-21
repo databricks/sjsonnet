@@ -46,7 +46,7 @@ object Format{
 
 
   def plain[A: P] = P( CharsWhile(_ != '%', 0).! )
-  def format[A: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
+  def format0[A: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
 
 
@@ -81,7 +81,7 @@ object Format{
              values0: Val,
              pos: Position)
             (implicit evaluator: EvalScope): String = {
-    val (leading, chunks) = fastparse.parse(s, format).get.value
+    val (leading, chunks) = fastparse.parse(s, format0(using _)).get.value
     format(leading, chunks, values0, pos)
   }
 
@@ -257,7 +257,7 @@ object Format{
   }
 
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("values") {
-    val (leading, chunks) = fastparse.parse(fmt, format).get.value
+    val (leading, chunks) = fastparse.parse(fmt, format0(using _)).get.value
     def evalRhs(values0: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, format(leading, chunks, values0, pos)(ev))
   }
