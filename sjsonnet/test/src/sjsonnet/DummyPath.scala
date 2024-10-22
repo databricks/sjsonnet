@@ -9,7 +9,7 @@ case class DummyPath(segments: String*) extends Path{
 
   def debugRead(): Option[String] = None
 
-  def parent(): Path = DummyPath(segments.dropRight(1):_*)
+  def parent(): Path = DummyPath(segments.dropRight(1)*)
 
   def segmentCount(): Int = segments.length
 

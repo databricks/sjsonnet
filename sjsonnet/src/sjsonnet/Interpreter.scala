@@ -128,6 +128,6 @@ class Interpreter(extVars: Map[String, String],
           )
         }
       }
-    handleException(m.apply0(res, visitor)(evaluator))
+    handleException(m.apply0(res, visitor)(using evaluator))
   }
 }

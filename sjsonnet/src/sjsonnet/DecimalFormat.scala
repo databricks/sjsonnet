@@ -22,7 +22,7 @@ object DecimalFormat {
   def leftPad(n: Long, targetWidth: Int): String = {
     val sign = if (n < 0) "-" else ""
     val absN = math.abs(n)
-    val nWidth = if (absN == 0) 1 else Math.log10(absN).toInt + 1
+    val nWidth = if (absN == 0) 1 else Math.log10(absN.toDouble).toInt + 1
     sign + "0" * (targetWidth - nWidth) + absN
   }
   def rightPad(n0: Long, minWidth: Int, maxWidth: Int): String = {
@@ -31,7 +31,7 @@ object DecimalFormat {
       val n = (n0 / Math.pow(10, trailingZeroes(n0))).toInt
       assert(n == math.abs(n))
       val nWidth = if (n == 0) 1 else Math.log10(n).toInt + 1
-      (n + "0" * (minWidth - nWidth)).take(maxWidth)
+      (n.toString + "0" * (minWidth - nWidth)).take(maxWidth)
     }
   }
   def format(fracLengthOpt: Option[(Int, Int)], expLengthOpt: Option[Int], number: Double): String = {
@@ -39,13 +39,13 @@ object DecimalFormat {
       case Some(expLength) =>
         val roundLog10 = Math.ceil(Math.log10(Math.abs(number))).toLong
         val expNum = roundLog10 - 1
-        val scaled = number / math.pow(10, expNum)
+        val scaled = number / math.pow(10, expNum.toDouble)
         val prefix = scaled.toLong.toString
         val expFrag = leftPad(expNum, expLength)
         val fracFrag = fracLengthOpt.map{case (zeroes, hashes) =>
           if (zeroes == 0 && hashes == 0) ""
           else {
-            val divided = number / Math.pow(10, expNum - zeroes - hashes)
+            val divided = number / Math.pow(10, (expNum - zeroes - hashes).toDouble)
             val scaledFrac = divided % Math.pow(10, zeroes + hashes)
             rightPad(Math.abs(Math.round(scaledFrac)), zeroes, zeroes + hashes)
           }

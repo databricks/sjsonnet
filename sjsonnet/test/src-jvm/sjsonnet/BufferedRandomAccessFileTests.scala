@@ -166,8 +166,8 @@ object BufferedRandomAccessFileTests extends TestSuite {
       }
     }
 
-  // Test content
-  val testContent = "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
+    // Test content
+    val testContent = "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
 
     test("bufferReloadsAndEdgeReads") {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 15)

@@ -10,6 +10,7 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra._
 
 import scala.collection.mutable
+import scala.compiletime.uninitialized
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -20,16 +21,17 @@ import scala.collection.mutable
 @State(Scope.Benchmark)
 class OptimizerBenchmark {
 
-  private var inputs: Iterable[(Expr, FileScope)] = _
-  private var allFiles: IndexedSeq[(Path, String)] = _
-  private var ev: EvalScope = _
+  private var inputs: Iterable[(Expr, FileScope)] = uninitialized
+  private var allFiles: IndexedSeq[(Path, String)] = uninitialized
+  private var ev: EvalScope = uninitialized
 
   @Setup
   def setup(): Unit = {
     val (allFiles, ev) = MainBenchmark.findFiles()
     this.inputs = allFiles.map { case (p, s) =>
-      fastparse.parse(s, new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)) match {
+      fastparse.parse(s, new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(using _)) match {
         case Success(v, _) => v
+        case _ => throw new RuntimeException("Parse Failed")
       }
     }
     this.ev = ev

@@ -21,7 +21,7 @@ trait Expr{
   }
 }
 object Expr{
-  private final def arrStr(a: Array[_]): String = {
+  private final def arrStr(a: Array[?]): String = {
     if(a == null) "null" else a.mkString("[", ", ", "]")
   }
 
@@ -149,7 +149,7 @@ object Expr{
                    end: Option[Expr],
                    stride: Option[Expr]) extends Expr
   case class Function(pos: Position, params: Params, body: Expr) extends Expr
-  case class IfElse(pos: Position, cond: Expr, then: Expr, `else`: Expr) extends Expr
+  case class IfElse(pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr
 
   sealed trait CompSpec extends Expr
   case class IfSpec(pos: Position, cond: Expr) extends CompSpec

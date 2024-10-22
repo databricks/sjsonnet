@@ -8,7 +8,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 
 
 class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                   indent: Int = 2) extends BaseCharRenderer(_out, indent){
+                   indent: Int = 2) extends BaseCharRenderer[StringWriter](_out, indent){
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
@@ -20,7 +20,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
 
-  private[this] def appendString(s: String) = {
+  private def appendString(s: String) = {
     val len = s.length
     var i = 0
     elemBuilder.ensureLength(len)
@@ -48,7 +48,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       }
       depth -= 1
     } else {
-      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, true)
+      upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode = true, wrapQuotes = true)
     }
     flushCharBuilder()
     _out
@@ -81,7 +81,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     dashBuffered = false
   }
 
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
 
@@ -96,13 +96,15 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     if (dedentInObject) depth -= 1
     dashBuffered = true
 
-    def subVisitor = YamlRenderer.this
+    def subVisitor: YamlRenderer = YamlRenderer.this
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       empty = false
       flushBuffer()
       newlineBuffered = true
       dashBuffered = true
     }
+
     def visitEnd(index: Int) = {
       if (!dedentInObject) depth -= 1
       if (empty) {
@@ -116,7 +118,8 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       _out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
@@ -124,8 +127,10 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
 
     if (afterKey) newlineBuffered = true
 
-    def subVisitor = YamlRenderer.this
-    def visitKey(index: Int) = YamlRenderer.this
+    def subVisitor: YamlRenderer = YamlRenderer.this
+
+    def visitKey(index: Int): YamlRenderer = YamlRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
@@ -136,10 +141,12 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       afterKey = true
       newlineBuffered = false
     }
+
     def visitValue(v: StringWriter, index: Int): Unit = {
       newlineBuffered = true
       afterKey = false
     }
+
     def visitEnd(index: Int) = {
       if (empty) {
         elemBuilder.ensureLength(2)

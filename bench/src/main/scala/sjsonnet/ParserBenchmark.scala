@@ -7,6 +7,7 @@ import scala.collection.mutable.HashMap
 import fastparse.Parsed.Success
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra._
+import scala.compiletime.uninitialized
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -17,8 +18,8 @@ import org.openjdk.jmh.infra._
 @State(Scope.Benchmark)
 class ParserBenchmark {
 
-  private var allFiles: IndexedSeq[(Path, String)] = _
-  private var interp: Interpreter = _
+  private var allFiles: IndexedSeq[(Path, String)] = uninitialized
+  private var interp: Interpreter = uninitialized
 
   @Setup
   def setup(): Unit =
@@ -27,8 +28,8 @@ class ParserBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(allFiles.foreach { case (p, s) =>
-      val res = fastparse.parse(s, new Parser(p, true, HashMap.empty, HashMap.empty).document(_))
-      bh.consume(res.asInstanceOf[Success[_]])
+      val res = fastparse.parse(s, new Parser(p, true, HashMap.empty, HashMap.empty).document(using _))
+      bh.consume(res.asInstanceOf[Success[?]])
     })
   }
 }

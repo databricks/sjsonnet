@@ -35,12 +35,11 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
         i += 1
         j += 1
       }
-      b
     }
     new ValScope(b)
   }
 
-  def extendSimple(newBindingsV: Array[_ <: Lazy]) = {
+  def extendSimple(newBindingsV: Array[? <: Lazy]) = {
     if(newBindingsV == null || newBindingsV.length == 0) this
     else {
       val b = Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
@@ -76,6 +75,6 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
 }
 
 object ValScope{
-  private[this] val emptyArr = new Array[Lazy](0)
+  private val emptyArr = new Array[Lazy](0)
   def empty = new ValScope(emptyArr)
 }

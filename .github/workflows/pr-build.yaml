@@ -22,7 +22,11 @@ jobs:
           distribution: 'adopt'
       - name: Run mill tests
         run: ./mill __.test
-      - name: Compile with sbt
+      - name: Compile Scala 2.13 with sbt
+        run: sbt ++2.13 compile bench/compile bench/jmh:compile
+      - name: Compile Scala 2.13 with sbt
         run: sbt compile bench/compile bench/jmh:compile
-      - name: Run sbt tests
+      - name: Run sbt tests (Scala 2.13)
+        run: sbt ++2.13 test
+      - name: Run sbt tests (Scala 3)
         run: sbt test
