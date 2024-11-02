@@ -1253,9 +1253,36 @@ class Std {
       }
     },
     "all" -> All,
-    "any" -> Any
+    "any" -> Any,
+    builtin("isEmpty", "str") { (_, _, str: String) =>
+      str.isEmpty
+    },
+    builtin("trim", "str") { (_, _, str: String) =>
+      str.trim
+    },
+    builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
+      str1.equalsIgnoreCase(str2)
+    },
+    builtin("xor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
+        bool1 ^ bool2
+    },
+    builtin("xnor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
+        !(bool1 ^ bool2)
+    },
+    builtin("sha1", "str") { (_, _, str: String) =>
+      Platform.sha1(str)
+    },
+    builtin("sha256", "str") { (_, _, str: String) =>
+      Platform.sha256(str)
+    },
+    builtin("sha512", "str") { (_, _, str: String) =>
+      Platform.sha512(str)
+    },
+    builtin("sha3", "str") { (_, _, str: String) =>
+      Platform.sha3(str)
+    },
   )
-  val Std = Val.Obj.mk(
+  val Std: Val.Obj = Val.Obj.mk(
     null,
     functions.toSeq
       .map{
@@ -1382,7 +1409,6 @@ class Std {
       case vs: Val.Arr =>
         new Val.Arr(
           pos,
-
           if (vs.forall(_.isInstanceOf[Val.Str])){
             vs.asStrictArray.map(_.cast[Val.Str]).sortBy(_.value)
           }else if (vs.forall(_.isInstanceOf[Val.Num])) {

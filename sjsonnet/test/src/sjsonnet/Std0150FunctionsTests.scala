@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object Std0150FunctionsTests extends TestSuite {
 
   def tests = Tests {
@@ -179,6 +179,47 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.all([true, true, true])""") ==> ujson.Bool(true)
       eval("""std.all([false, true, false])""") ==> ujson.Bool(false)
       eval("""std.all([false, false, false])""") ==> ujson.Bool(false)
+    }
+
+    test("isEmpty") {
+      eval("""std.isEmpty("")""") ==> ujson.Bool(true)
+      eval("""std.isEmpty("non-empty string")""") ==> ujson.Bool(false)
+      assert(
+        evalErr("""std.isEmpty(10)""")
+          .startsWith("sjsonnet.Error: Wrong parameter type: expected String, got number")
+      )
+    }
+
+    test("trim") {
+      eval("""std.trim("already trimmed string")""") ==> ujson.Str("already trimmed string")
+      eval("""std.trim("    string with spaces on both ends     ")""") ==> ujson.Str("string with spaces on both ends")
+      eval("""std.trim("string with newline character at end\n")""") ==> ujson.Str("string with newline character at end")
+      eval("""std.trim("string with tabs at end\t\t")""") ==> ujson.Str("string with tabs at end")
+      assert(
+        evalErr("""std.trim(10)""").startsWith("sjsonnet.Error: Wrong parameter type: expected String, got number"))
+    }
+
+    test("xnor") {
+      eval("""std.xnor(false, true)""") ==> ujson.False
+      eval("""std.xnor(false, false)""") ==> ujson.True
+      assert(
+        evalErr("""std.xnor("false", false)""")
+          .startsWith("sjsonnet.Error: Wrong parameter type: expected Boolean, got string")
+      )
+    }
+
+    test("xor") {
+      eval("""std.xor(false, true)""") ==> ujson.True
+      eval("""std.xor(true, true)""") ==> ujson.False
+      assert(
+        evalErr("""std.xor("false", false)""")
+          .startsWith("sjsonnet.Error: Wrong parameter type: expected Boolean, got string")
+      )
+    }
+
+    test("equalsIgnoreCase") {
+      eval("""std.equalsIgnoreCase("hello", "HELLO")""") ==> ujson.True
+      eval("""std.equalsIgnoreCase("hello", "world")""") ==> ujson.False
     }
   }
 }

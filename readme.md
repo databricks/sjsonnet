@@ -280,6 +280,10 @@ to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
 
+### 0.4.11
+- Implement `std.isEmpty`, `std.xor`, `std.xnor`, `std.trim`,
+  `std.equalsIgnoreCase`, `std.sha1`, `std.sha256`, `std.sha512`, `std.sha3`
+
 ### 0.4.10
 
 - Implement `std.get` [#202](https://github.com/databricks/sjsonnet/pull/202), 
