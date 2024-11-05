@@ -282,7 +282,11 @@ to ensure the output bytecode remains compatible with users on older JVMs.
 
 ### 0.4.11
 - Implement `std.isEmpty`, `std.xor`, `std.xnor`, `std.trim`,
-  `std.equalsIgnoreCase`, `std.sha1`, `std.sha256`, `std.sha512`, `std.sha3`
+  `std.equalsIgnoreCase`, `std.sha1`, `std.sha256`, `std.sha512`, `std.sha3` [#204](https://github.com/databricks/sjsonnet/pull/210)
+- fix: std.manifestJsonMinified and empty arrays/objects [#207](https://github.com/databricks/sjsonnet/pull/207)
+- fix: Use different chars for synthetic paths. [#208](https://github.com/databricks/sjsonnet/pull/208)
+- Fix sorting algorithm to work for all array types [#211](https://github.com/databricks/sjsonnet/pull/211)
+- Add better error handling for format [#212](https://github.com/databricks/sjsonnet/pull/212)
 
 ### 0.4.10
 

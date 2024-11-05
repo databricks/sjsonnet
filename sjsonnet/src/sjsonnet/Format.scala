@@ -101,7 +101,9 @@ object Format{
       val cooked0 = formatted.conversion match{
         case '%' => widenRaw(formatted, "%")
         case _ =>
-
+          if  (values.isInstanceOf[Val.Arr] && i >= values.cast[Val.Arr].length) {
+            Error.fail("Too few values to format: %d, expected at least %d".format(values.cast[Val.Arr].length, i + 1))
+          }
           val raw = formatted.label match{
             case None => values.cast[Val.Arr].force(i)
             case Some(key) =>
@@ -116,9 +118,12 @@ object Format{
           }
           i += 1
           value match{
-            case ujson.Str(s) => widenRaw(formatted, s)
+            case ujson.Str(s) =>
+              if (formatted.conversion != 's' && formatted.conversion != 'c')
+                Error.fail("Format required a number at %d, got string".format(i))
+              widenRaw(formatted, s)
             case ujson.Num(s) =>
-              formatted.conversion match{
+              formatted.conversion match {
                 case 'd' | 'i' | 'u' => formatInteger(formatted, s)
                 case 'o' => formatOctal(formatted, s)
                 case 'x' => formatHexadecimal(formatted, s)
@@ -132,20 +137,33 @@ object Format{
                 case 's' =>
                   if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
                   else widenRaw(formatted, s.toString)
+                case _ => Error.fail("Format required a %s at %d, got string".format(raw.prettyName, i))
               }
-            case ujson.True => widenRaw(formatted, "true")
-            case ujson.False => widenRaw(formatted, "false")
+            case ujson.Bool(s) =>
+              formatted.conversion match {
+                case 'd' | 'i' | 'u' => formatInteger(formatted, s.compareTo(false))
+                case 'o' => formatOctal(formatted, s.compareTo(false))
+                case 'x' => formatHexadecimal(formatted, s.compareTo(false))
+                case 'X' => formatHexadecimal(formatted, s.compareTo(false)).toUpperCase
+                case 'e' => formatExponent(formatted, s.compareTo(false)).toLowerCase
+                case 'E' => formatExponent(formatted, s.compareTo(false))
+                case 'f' | 'F' => formatFloat(formatted, s.compareTo(false))
+                case 'g' => formatGeneric(formatted, s.compareTo(false)).toLowerCase
+                case 'G' => formatGeneric(formatted, s.compareTo(false))
+                case 'c' => widenRaw(formatted, Character.forDigit(s.compareTo(false), 10).toString)
+                case 's' => widenRaw(formatted, s.toString)
+                case _ => Error.fail("Format required a %s at %d, got string".format(raw.prettyName, i))
+              }
             case v => widenRaw(formatted, v.toString)
           }
-
       }
-
       output.append(cooked0)
       output.append(literal)
-
-
     }
 
+    if (values.isInstanceOf[Val.Arr] && i < values.cast[Val.Arr].length) {
+      Error.fail("Too many values to format: %d, expected %d".format(values.cast[Val.Arr].length, i))
+    }
     output.toString()
   }
 
