@@ -15,11 +15,13 @@ object Platform {
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
-    gzip.write(b)
-    gzip.close()
-    val gzippedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
-    outputStream.close()
-    gzippedBase64
+    try {
+      gzip.write(b)
+      Base64.getEncoder.encodeToString(outputStream.toByteArray)
+    } finally {
+      gzip.close()
+      outputStream.close()
+    }
   }
   def gzipString(s: String): String = {
     gzipBytes(s.getBytes())
@@ -33,11 +35,13 @@ object Platform {
     // Set compression to specified level
     val level = compressionLevel.getOrElse(LZMA2Options.PRESET_DEFAULT)
     val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
-    xz.write(b)
-    xz.close()
-    val xzedBase64: String = Base64.getEncoder.encodeToString(outputStream.toByteArray)
-    outputStream.close()
-    xzedBase64
+    try {
+      xz.write(b)
+      Base64.getEncoder.encodeToString(outputStream.toByteArray)
+    } finally {
+      xz.close()
+      outputStream.close()
+    }
   }
 
   def xzString(s: String, compressionLevel: Option[Int]): String = {
@@ -48,12 +52,24 @@ object Platform {
     val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new Constructor(classOf[java.util.LinkedHashMap[String, Object]])).load(yamlString)
     new JSONObject(yaml).toString()
   }
-  def md5(s: String): String = {
-    java.security.MessageDigest.getInstance("MD5")
+
+  private def computeHash(algorithm: String, s: String) = {
+    java.security.MessageDigest.getInstance(algorithm)
       .digest(s.getBytes("UTF-8"))
-      .map{ b => String.format("%02x", new java.lang.Integer(b & 0xff))}
+      .map{ b => String.format("%02x", (b & 0xff).asInstanceOf[Integer])}
       .mkString
   }
+
+  def md5(s: String): String = computeHash("MD5", s)
+
+  def sha1(s: String): String = computeHash("SHA-1", s)
+
+  def sha256(s: String): String = computeHash("SHA-256", s)
+
+  def sha512(s: String): String = computeHash("SHA-512", s)
+
+  // Same as go-jsonnet https://github.com/google/go-jsonnet/blob/2b4d7535f540f128e38830492e509a550eb86d57/builtins.go#L959
+  def sha3(s: String): String = computeHash("SHA3-512", s)
 
   private[this] val xxHashFactory = XXHashFactory.fastestInstance()
 
@@ -75,6 +91,6 @@ object Platform {
       fis.close()
     }
 
-    hash.getValue().toString
+    hash.getValue.toString
   }
 }
