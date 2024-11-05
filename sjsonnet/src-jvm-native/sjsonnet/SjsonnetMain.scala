@@ -50,8 +50,7 @@ object SjsonnetMain {
             stderr: PrintStream,
             wd: os.Path,
             allowedInputs: Option[Set[os.Path]] = None,
-            importer: Option[(Path, String) => Option[os.Path]] = None,
-            std: Val.Obj = new Std().Std): Int = {
+            importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
 
     var hasWarnings = false
     def warn(msg: String): Unit = {
@@ -73,7 +72,7 @@ object SjsonnetMain {
           Left("error: -i/--interactive must be passed in as the first argument")
         }else Right(config.file)
       }
-      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn, std)
+      outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn)
       res <- {
         if(hasWarnings && config.fatalWarnings.value) Left("")
         else Right(outputStr)
@@ -175,8 +174,7 @@ object SjsonnetMain {
                      wd: os.Path,
                      allowedInputs: Option[Set[os.Path]] = None,
                      importer: Option[(Path, String) => Option[os.Path]] = None,
-                     warnLogger: String => Unit = null,
-                     std: Val.Obj = new Std().Std): Either[String, String] = {
+                     warnLogger: String => Unit = null): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / "\uFE64exec\uFE65")
@@ -198,6 +196,15 @@ object SjsonnetMain {
     )
 
     var currentPos: Position = null
+    val settings = new Settings(
+      preserveOrder = config.preserveOrder.value,
+      strict = config.strict.value,
+      noStaticErrors = config.noStaticErrors.value,
+      noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
+      strictImportSyntax = config.strictImportSyntax.value,
+      strictInheritedAssertions = config.strictInheritedAssertions.value,
+      strictSetOperations = config.strictSetOperations.value
+    )
     val interp = new Interpreter(
       extBinding,
       tlaBinding,
@@ -213,17 +220,9 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
       },
       parseCache,
-      settings = new Settings(
-        preserveOrder = config.preserveOrder.value,
-        strict = config.strict.value,
-        noStaticErrors = config.noStaticErrors.value,
-        noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
-        strictImportSyntax = config.strictImportSyntax.value,
-        strictInheritedAssertions = config.strictInheritedAssertions.value
-      ),
+      settings = settings,
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       warnLogger = warnLogger,
-      std = std
     )
 
     (config.multi, config.yamlStream.value) match {

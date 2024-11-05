@@ -5,7 +5,8 @@ object TestUtils {
             preserveOrder: Boolean = false,
             strict: Boolean = false,
             noDuplicateKeysInComprehension: Boolean = false,
-            strictInheritedAssertions: Boolean = false) = {
+            strictInheritedAssertions: Boolean = false,
+            strictSetOperations: Boolean = true) = {
     new Interpreter(
       Map(),
       Map(),
@@ -16,7 +17,8 @@ object TestUtils {
         preserveOrder = preserveOrder,
         strict = strict,
         noDuplicateKeysInComprehension = noDuplicateKeysInComprehension,
-        strictInheritedAssertions = strictInheritedAssertions
+        strictInheritedAssertions = strictInheritedAssertions,
+        strictSetOperations = strictSetOperations
       )
     ).interpret(s, DummyPath("(memory)"))
   }
@@ -25,8 +27,9 @@ object TestUtils {
            preserveOrder: Boolean = false,
            strict: Boolean = false,
            noDuplicateKeysInComprehension: Boolean = false,
-           strictInheritedAssertions: Boolean = false) = {
-    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions) match {
+           strictInheritedAssertions: Boolean = false,
+           strictSetOperations: Boolean = true) = {
+    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }
@@ -36,8 +39,9 @@ object TestUtils {
               preserveOrder: Boolean = false,
               strict: Boolean = false,
               noDuplicateKeysInComprehension: Boolean = false,
-              strictInheritedAssertions: Boolean = false) = {
-    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions) match{
+              strictInheritedAssertions: Boolean = false,
+              strictSetOperations: Boolean = true) = {
+    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations) match{
       case Left(err) => err.split('\n').map(_.trim).mkString("\n")  // normalize inconsistent indenation on JVM vs JS
       case Right(r) => throw new Exception(s"Expected exception, got result: $r")
     }

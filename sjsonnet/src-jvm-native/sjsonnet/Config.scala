@@ -138,4 +138,9 @@ case class Config(
     doc = """Properly handle assertions defined in a Jsonnet dictionary that is extended more than once"""
   )
   strictInheritedAssertions: Flag = Flag(),
+  @arg(
+    name = "strict-set-operations",
+    doc = """Strict set operations"""
+  )
+  strictSetOperations: Flag = Flag(),
 )
