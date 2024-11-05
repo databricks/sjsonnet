@@ -129,6 +129,11 @@ case class Config(
   )
   strictInheritedAssertions: Flag = Flag(),
   @arg(
+    name = "strict-set-operations",
+    doc = """Strict set operations"""
+  )
+  strictSetOperations: Flag = Flag(),
+  @arg(
     doc = "The jsonnet file you wish to evaluate",
     positional = true
   )

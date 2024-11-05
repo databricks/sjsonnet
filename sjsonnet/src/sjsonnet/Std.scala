@@ -8,6 +8,7 @@ import java.util.regex.Pattern
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.BinaryOp
 
+import scala.collection.Searching.Found
 import scala.collection.mutable
 import scala.util.matching.Regex
 
@@ -16,7 +17,7 @@ import scala.util.matching.Regex
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
   * logic automatically
   */
-class Std {
+class Std(settings: Settings) {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
 
@@ -637,92 +638,6 @@ class Std {
     }
   }
 
-  private object SetInter extends Val.Builtin3("a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
-    private def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
-
-    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
-      case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
-      case Array(a, b: Val.Arr) if isStr(b) => (new Spec1Str(b), Array(a))
-      case args if args.length == 2 => (Spec2, args)
-      case _ => null
-    }
-
-    def asArray(a: Val): Array[Lazy] = a match {
-      case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str => stringChars(pos, str.value).asLazyArray
-      case _ => Error.fail("Arguments must be either arrays or strings")
-    }
-
-    def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
-      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
-      else {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val keyFFunc = _keyF.asInstanceOf[Val.Func]
-        val out = new mutable.ArrayBuffer[Lazy]
-        for (v <- a) {
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
-          if (b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyFFunc)
-      }
-    }
-
-    private object Spec2 extends Val.Builtin2("a", "b") {
-      def evalRhs(_a: Val, _b: Val, ev: EvalScope, pos: Position): Val = {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val out = new mutable.ArrayBuffer[Lazy](a.length)
-        for (v <- a) {
-          val vf = v.force
-          if (b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), null)
-      }
-    }
-
-    private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("b") {
-      private[this] val a =
-        ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
-        // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
-
-      def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
-        val b = asArray(_b)
-        val bs = new mutable.HashSet[String]
-        var i = 0
-        while(i < b.length) {
-          b(i).force match {
-            case s: Val.Str => bs.add(s.value)
-            case _ =>
-          }
-          i += 1
-        }
-        val out = new mutable.ArrayBuilder.ofRef[Lazy]
-        i = 0
-        while(i < a.length) {
-          val s = a(i).asInstanceOf[Val.Str]
-          if(bs.contains(s.value)) out.+=(s)
-          i += 1
-        }
-        new Val.Arr(pos, out.result())
-      }
-    }
-  }
-
   val functions: Map[String, Val.Func] = Map(
     "assertEqual" -> AssertEqual,
     "toString" -> ToString,
@@ -1144,17 +1059,15 @@ class Std {
       val concat = new Val.Arr(pos, a ++ b)
       uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
     },
-    "setInter" -> SetInter,
-    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
-
+    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val a = args(0) match {
         case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
+        case str: Val.Str if !settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
         case _ => Error.fail("Arguments must be either arrays or strings")
       }
       val b = args(1) match {
         case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
+        case str: Val.Str if !settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
         case _ => Error.fail("Arguments must be either arrays or strings")
       }
 
@@ -1162,49 +1075,47 @@ class Std {
       val out = new mutable.ArrayBuffer[Lazy]
 
       for (v <- a) {
-        if (keyF.isInstanceOf[Val.False]) {
-          val vf = v.force
-          if (!b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        } else {
-          val keyFFunc = keyF.asInstanceOf[Val.Func]
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
+        if (existsInSet(ev, pos, keyF, b, v.force) && !existsInSet(ev, pos, keyF, out.toArray, v.force)) {
+          out.append(v)
+        }
+      }
+      if (settings.strictSetOperations) {
+        new Val.Arr(pos, out.toArray)
+      } else {
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      }
+    },
+    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
+      val a = args(0) match {
+        case arr: Val.Arr => arr.asLazyArray
+        case str: Val.Str if !settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
+        case _ => Error.fail("Arguments must be either arrays or strings")
+      }
+      val b = args(1) match {
+        case arr: Val.Arr => arr.asLazyArray
+        case str: Val.Str if !settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
+        case _ => Error.fail("Arguments must be either arrays or strings")
+      }
 
-          if (!b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
+      val keyF = args(2)
+      val out = new mutable.ArrayBuffer[Lazy]
+
+      for (v <- a) {
+        if (!existsInSet(ev, pos, keyF, b, v.force) && !existsInSet(ev, pos, keyF, out.toArray, v.force)) {
+          out.append(v)
         }
       }
 
-      sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      if (settings.strictSetOperations) {
+        new Val.Arr(pos, out.toArray)
+      } else {
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      }
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val keyF = args(2)
-
-      if (keyF.isInstanceOf[Val.False]) {
-        val ujson.Arr(mArr) = Materializer(args(1))(ev)
-        val mx = Materializer(args(0))(ev)
-        mArr.contains(mx)
-      } else {
-        val arr = args(1).asInstanceOf[Val.Arr].asLazyArray
-        val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val appliedX = keyFFunc.apply1(args(0), pos.noOffset)(ev)
-        arr.exists(value => {
-          val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-          ev.equal(appliedValue, appliedX)
-        })
-      }
+      val arr = args(1).asInstanceOf[Val.Arr].asLazyArray
+      existsInSet(ev, pos, keyF, arr, args(0))
     },
 
     "split" -> Split,
@@ -1284,6 +1195,37 @@ class Std {
       Platform.sha3(str)
     },
   )
+
+  private def existsInSet(ev: EvalScope, pos: Position, keyF: Val, arr: Array[Lazy], toFind: Val): Boolean = {
+    val appliedX = keyF match {
+      case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev)
+      case _ => toFind
+    }
+    System.out.println(appliedX.force)
+    if (settings.strictSetOperations) {
+      arr.search(appliedX.force)((toFind: Lazy, value: Lazy) => {
+        val appliedValue = keyF match {
+          case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev).force
+          case _ => value.force
+        }
+        toFind.force match {
+          case s: Val.Str if appliedValue.isInstanceOf[Val.Str] => Ordering.String.compare(s.asString, appliedValue.force.asString)
+          case n: Val.Num if appliedValue.isInstanceOf[Val.Num] => Ordering.Double.TotalOrdering.compare(n.asDouble, appliedValue.force.asDouble)
+          case t: Val.Bool if appliedValue.isInstanceOf[Val.Bool] => Ordering.Boolean.compare(t.asBoolean, appliedValue.force.asBoolean)
+          case _ => Error.fail("Cannot call setMember on " + toFind.force.prettyName + " and " + appliedValue.force.prettyName)
+        }
+      }).isInstanceOf[Found]
+    } else {
+      arr.exists(value => {
+        val appliedValue = keyF match {
+          case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
+          case _ => value
+        }
+        ev.equal(appliedValue.force, appliedX.force)
+      })
+    }
+  }
+
   val Std: Val.Obj = Val.Obj.mk(
     null,
     functions.toSeq

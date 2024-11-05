@@ -9,6 +9,7 @@ class Settings(
   val noDuplicateKeysInComprehension: Boolean = false,
   val strictImportSyntax: Boolean = false,
   val strictInheritedAssertions: Boolean = false,
+  val strictSetOperations: Boolean = false,
 )
 
 object Settings {

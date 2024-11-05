@@ -47,8 +47,7 @@ object SjsonnetMain {
             stderr: PrintStream,
             wd: os.Path,
             allowedInputs: Option[Set[os.Path]] = None,
-            importer: Option[(Path, String) => Option[os.Path]] = None,
-            std: Val.Obj = new Std().Std): Int = {
+            importer: Option[(Path, String) => Option[os.Path]] = None): Int = {
 
     var hasWarnings = false
     def warn(msg: String): Unit = {
@@ -192,6 +191,15 @@ object SjsonnetMain {
     )
 
     var currentPos: Position = null
+    val settings = new Settings(
+      preserveOrder = config.preserveOrder.value,
+      strict = config.strict.value,
+      noStaticErrors = config.noStaticErrors.value,
+      noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
+      strictImportSyntax = config.strictImportSyntax.value,
+      strictInheritedAssertions = config.strictInheritedAssertions.value,
+      strictSetOperations = config.strictSetOperations.value
+    )
     val interp = new Interpreter(
       extBinding,
       tlaBinding,
@@ -207,17 +215,9 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath), allowedInputs)
       },
       parseCache,
-      settings = new Settings(
-        preserveOrder = config.preserveOrder.value,
-        strict = config.strict.value,
-        noStaticErrors = config.noStaticErrors.value,
-        noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
-        strictImportSyntax = config.strictImportSyntax.value,
-        strictInheritedAssertions = config.strictInheritedAssertions.value
-      ),
+      settings = settings,
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       warnLogger = warnLogger,
-      std = std
     )
 
     (config.multi, config.yamlStream.value) match {

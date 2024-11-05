@@ -20,12 +20,12 @@ class Interpreter(extVars: Map[String, String],
                   settings: Settings = Settings.default,
                   storePos: Position => Unit = null,
                   warnLogger: (String => Unit) = null,
-                  std: Val.Obj = new Std().Std
                   ) { self =>
 
   private val internedStrings = new mutable.HashMap[String, String]
 
   private val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
+  private val std = new Std(settings).Std
 
   val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
