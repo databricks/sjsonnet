@@ -11,7 +11,7 @@ case class Config(
   interactive: Flag = Flag(),
   @arg(
     name = "jpath", short = 'J',
-    doc = "Specify an additional library search dir (right-most wins)"
+    doc = "Specify an additional library search dir (left-most wins)"
   )
   jpaths: List[String] = Nil,
   @arg(
