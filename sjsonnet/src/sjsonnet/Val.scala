@@ -30,22 +30,18 @@ protected abstract class Lazy {
  * Uses double-checked initialization pattern with a volatile flag to ensure visibility
  * while keeping the fast path efficient.
  */
-final class LazyWithComputeFunc(private[this] var computeFunc: () => Val) extends Lazy {
-  @volatile private[this] var initialized = false
-
+final class LazyWithComputeFunc(@volatile private[this] var computeFunc: () => Val) extends Lazy {
   def compute(): Val = {
-    if (cached == null) {          // First check - non-volatile fast path
-      if (!initialized) {          // Second check - volatile read only when needed
-        val f = computeFunc        // Capture function reference
-        if (f != null) {           // We won the race to initialize
-          val result = f()
-          cached = result
-          computeFunc = null       // Allow closure to be GC'd
-          initialized = true       // Publish result with happens-before
-        }
-      }                           // Else: lost race, initialized == true guarantees we see cached
+    val f = computeFunc
+    if (f != null) {  // we won the race to initialize
+      val result = f()
+      cached = result
+      computeFunc = null  // allow closure to be GC'd
     }
-    cached                        // Fast path or guaranteed to see initialized value
+    // else: we lost the race to compute, but `cached` is already set and
+    // is visible in this thread due to the volatile read and writes via
+    // piggybacking; see https://stackoverflow.com/a/8769692 for background
+    cached
   }
 }
 
