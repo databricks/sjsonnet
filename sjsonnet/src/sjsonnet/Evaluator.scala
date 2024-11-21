@@ -80,7 +80,7 @@ class Evaluator(resolver: CachedResolver,
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
     case v: Val => v
-    case e => () => visitExpr(e)
+    case e => new LazyWithComputeFunc(() => visitExpr(e))
   }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
@@ -104,7 +104,7 @@ class Evaluator(resolver: CachedResolver,
           val b = bindings(i)
           newScope.bindings(base+i) = b.args match {
             case null => visitAsLazy(b.rhs)(newScope)
-            case argSpec => () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
+            case argSpec => new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
         }
@@ -490,9 +490,9 @@ class Evaluator(resolver: CachedResolver,
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          (self: Val.Obj, sup: Val.Obj) => () => visitExpr(b.rhs)(scope(self, sup))
+          (self: Val.Obj, sup: Val.Obj) => new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope(self, sup)))
         case argSpec =>
-          (self: Val.Obj, sup: Val.Obj) => () => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup))
+          (self: Val.Obj, sup: Val.Obj) => new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup)))
       }
       i += 1
     }
@@ -564,7 +564,7 @@ class Evaluator(resolver: CachedResolver,
             case null =>
               visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              () => visitMethod(b.rhs, argSpec, b.pos)(newScope)
+              new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
           j += 1
