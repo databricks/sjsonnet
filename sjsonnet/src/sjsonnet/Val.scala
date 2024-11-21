@@ -27,8 +27,6 @@ protected abstract class Lazy {
 
 /**
  * Thread-safe implementation that discards the compute function after initialization.
- * Uses double-checked initialization pattern with a volatile flag to ensure visibility
- * while keeping the fast path efficient.
  */
 final class LazyWithComputeFunc(@volatile private[this] var computeFunc: () => Val) extends Lazy {
   def compute(): Val = {
