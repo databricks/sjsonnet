@@ -25,4 +25,4 @@ jobs:
       - name: Compile with sbt
         run: sbt compile bench/compile bench/jmh:compile
       - name: Run sbt tests
-        run: sbt test
+        run: echo "Lang is $LANG" && sbt test

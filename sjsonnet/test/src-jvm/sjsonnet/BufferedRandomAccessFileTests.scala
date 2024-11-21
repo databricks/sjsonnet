@@ -1,7 +1,8 @@
 package sjsonnet
 
 import utest._
-import java.io.{File, FileWriter}
+
+import java.io.{File, FileOutputStream}
 import java.nio.file.Files
 import scala.util.Random
 
@@ -9,11 +10,11 @@ object BufferedRandomAccessFileTests extends TestSuite {
   // Utility function to create a temporary file with known content
   def createTempFile(content: String): File = {
     val tempFile = Files.createTempFile(null, null).toFile
-    val writer = new FileWriter(tempFile)
+    val fos = new FileOutputStream(tempFile)
     try {
-      writer.write(content)
+      fos.write(content.getBytes("UTF-8"))
     } finally {
-      writer.close()
+      fos.close()
     }
     tempFile
   }
