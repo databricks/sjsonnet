@@ -34,7 +34,10 @@ object Util{
     }
   }
 
-  val isWindows: Boolean = System.getProperty("os.name").toLowerCase.startsWith("windows")
+  val isWindows: Boolean = {
+    // This is normally non-null on the JVM, but it might be null in ScalaJS hence the Option:
+    Option(System.getProperty("os.name")).exists(_.toLowerCase.startsWith("windows"))
+  }
 
   /**
    * Wrap the given string in '<' and '>' brackets for pretty printing.
