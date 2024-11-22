@@ -922,13 +922,16 @@ class Std {
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
       if (pat.length == 0) new Val.Arr(pos, emptyLazyArray)
       else {
-        val indices = mutable.ArrayBuffer[Int]()
         var matchIndex = str.indexOf(pat)
-        while (0 <= matchIndex && matchIndex < str.length) {
-          indices.append(matchIndex)
-          matchIndex = str.indexOf(pat, matchIndex + 1)
+        if (matchIndex == -1) new Val.Arr(pos, emptyLazyArray)
+        else {
+          val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
+          while (0 <= matchIndex && matchIndex < str.length) {
+            indices.+=(Val.Num(pos, matchIndex))
+            matchIndex = str.indexOf(pat, matchIndex + 1)
+          }
+          new Val.Arr(pos, indices.result())
         }
-        new Val.Arr(pos, indices.map(x => Val.Num(pos, x)).toArray)
       }
     },
     "substr" -> Substr,
