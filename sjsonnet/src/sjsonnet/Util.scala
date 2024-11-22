@@ -33,4 +33,20 @@ object Util{
         new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
     }
   }
+
+  val isWindows: Boolean = System.getProperty("os.name").toLowerCase.startsWith("windows")
+
+  /**
+   * Wrap the given string in '<' and '>' brackets for pretty printing.
+   * On Windows, this uses Unicode less-than and greater-than characters, while on
+   * other platforms it uses ASCII '<' and '>;
+   * see https://github.com/databricks/sjsonnet/pull/208 for motivation and context.
+   */
+  def wrapInLessThanGreaterThan(s: String): String = {
+    if (isWindows) {
+      s"\uFE64$s\uFE65"
+    } else {
+      s"<$s>"
+    }
+  }
 }
