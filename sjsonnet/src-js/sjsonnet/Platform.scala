@@ -19,6 +19,18 @@ object Platform {
   def md5(s: String): String = {
     throw new Exception("MD5 not implemented in Scala.js")
   }
+  def sha1(s: String): String = {
+    throw new Exception("SHA1 not implemented in Scala.js")
+  }
+  def sha256(s: String): String = {
+    throw new Exception("SHA256 not implemented in Scala.js")
+  }
+  def sha512(s: String): String = {
+    throw new Exception("SHA512 not implemented in Scala.js")
+  }
+  def sha3(s: String): String = {
+    throw new Exception("SHA3 not implemented in Scala.js")
+  }
   def hashFile(file: File): String = {
     throw new Exception("hashFile not implemented in Scala.js")
   }

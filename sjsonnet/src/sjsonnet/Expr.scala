@@ -1,7 +1,6 @@
 package sjsonnet
 
-import java.util.{Arrays, BitSet}
-import scala.collection.mutable
+import java.util.Arrays
 
 /**
   * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the

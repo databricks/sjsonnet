@@ -638,8 +638,7 @@ class Std {
   }
 
   private object SetInter extends Val.Builtin3("a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
-    def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
-    def isNum(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Num])
+    private def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
 
     override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
       case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
@@ -1253,9 +1252,36 @@ class Std {
       }
     },
     "all" -> All,
-    "any" -> Any
+    "any" -> Any,
+    builtin("isEmpty", "str") { (_, _, str: String) =>
+      str.isEmpty
+    },
+    builtin("trim", "str") { (_, _, str: String) =>
+      str.trim
+    },
+    builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
+      str1.equalsIgnoreCase(str2)
+    },
+    builtin("xor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
+        bool1 ^ bool2
+    },
+    builtin("xnor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
+        !(bool1 ^ bool2)
+    },
+    builtin("sha1", "str") { (_, _, str: String) =>
+      Platform.sha1(str)
+    },
+    builtin("sha256", "str") { (_, _, str: String) =>
+      Platform.sha256(str)
+    },
+    builtin("sha512", "str") { (_, _, str: String) =>
+      Platform.sha512(str)
+    },
+    builtin("sha3", "str") { (_, _, str: String) =>
+      Platform.sha3(str)
+    },
   )
-  val Std = Val.Obj.mk(
+  val Std: Val.Obj = Val.Obj.mk(
     null,
     functions.toSeq
       .map{
@@ -1340,10 +1366,10 @@ class Std {
     }
   }
 
-  def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
+  private def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
     val arrValue = arr match {
-      case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str => stringChars(pos, str.value).asLazyArray
+      case arr: Val.Arr => arr
+      case str: Val.Str => stringChars(pos, str.asString)
       case _ => Error.fail("Argument must be either array or string")
     }
 
@@ -1377,39 +1403,50 @@ class Std {
     new Val.Arr(pos, out.toArray)
   }
 
-  def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
-    arr match{
-      case vs: Val.Arr =>
-        new Val.Arr(
-          pos,
+  private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
+    val vs = arr match {
+      case arr: Val.Arr => arr
+      case str: Val.Str => stringChars(pos, str.asString)
+      case _ => Error.fail("Cannot sort " + arr.prettyName)
+    }
+    if (vs.length <= 1) {
+      arr
+    } else {
+      val keyFFunc = if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
+      new Val.Arr(pos, if (keyFFunc != null) {
+        val keys = new Val.Arr(pos.noOffset, vs.asStrictArray.map((v) => keyFFunc(Array(v), null, pos.noOffset)(ev)))
+        val keyTypes = keys.iterator.map(_.getClass).toSet
+        if (keyTypes.size != 1) {
+          Error.fail("Cannot sort with key values that are not all the same type")
+        }
 
-          if (vs.forall(_.isInstanceOf[Val.Str])){
-            vs.asStrictArray.map(_.cast[Val.Str]).sortBy(_.value)
-          }else if (vs.forall(_.isInstanceOf[Val.Num])) {
-            vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.value)
-          }else if (vs.forall(_.isInstanceOf[Val.Obj])){
-            if (keyF == null || keyF.isInstanceOf[Val.False]) {
-              Error.fail("Unable to sort array of objects without key function")
-            } else {
-              val objs = vs.asStrictArray.map(_.cast[Val.Obj])
+        if (keyTypes.contains(classOf[Val.Str])) {
+          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Str].asString)
+        } else if (keyTypes.contains(classOf[Val.Num])) {
+          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Num].asDouble)
+        } else if (keyTypes.contains(classOf[Val.Bool])) {
+          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Bool].asBoolean)
+        } else {
+          Error.fail("Cannot sort with key values that are " + keys.force(0).prettyName + "s")
+        }
+      } else {
+        val keyTypes = vs.iterator.map(_.getClass).toSet
+        if (keyTypes.size != 1) {
+          Error.fail("Cannot sort with values that are not all the same type")
+        }
 
-              val keyFFunc = keyF.asInstanceOf[Val.Func]
-              val keys = objs.map((v) => keyFFunc(Array(v), null, pos.noOffset)(ev))
-
-              if (keys.forall(_.isInstanceOf[Val.Str])){
-                objs.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Str].value)
-              } else if (keys.forall(_.isInstanceOf[Val.Num])) {
-                objs.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Num].value)
-              } else {
-                Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
-              }
-            }
-          }else {
-            ???
-          }
-        )
-      case Val.Str(pos, s) => new Val.Arr(pos, s.sorted.map(c => Val.Str(pos, c.toString)).toArray)
-      case x => Error.fail("Cannot sort " + x.prettyName)
+        if (keyTypes.contains(classOf[Val.Str])) {
+          vs.asStrictArray.map(_.cast[Val.Str]).sortBy(_.asString)
+        } else if (keyTypes.contains(classOf[Val.Num])) {
+          vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.asDouble)
+        } else if (keyTypes.contains(classOf[Val.Bool])) {
+          vs.asStrictArray.map(_.cast[Val.Bool]).sortBy(_.asBoolean)
+        } else if (keyTypes.contains(classOf[Val.Obj])) {
+          Error.fail("Unable to sort array of objects without key function")
+        } else {
+          Error.fail("Cannot sort array of " + vs.force(0).prettyName)
+        }
+      })
     }
   }
 

@@ -59,8 +59,10 @@ object PrettyNamed{
   implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
   implicit def numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
   implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
+  implicit def boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
   implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
   implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
+  implicit def nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
 }
 object Val{
 
@@ -69,7 +71,7 @@ object Val{
     override def asBoolean: Boolean = this.isInstanceOf[True]
   }
 
-  def bool(pos: Position, b: Boolean) = if (b) True(pos) else False(pos)
+  def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
 
   case class True(pos: Position) extends Bool {
     def prettyName = "boolean"
@@ -92,11 +94,11 @@ object Val{
 
   class Arr(val pos: Position, private val value: Array[? <: Lazy]) extends Literal {
     def prettyName = "array"
+
     override def asArr: Arr = this
     def length: Int = value.length
-    def force(i: Int) = value(i).force
+    def force(i: Int): Val = value(i).force
 
-    def asLazy(i: Int): Lazy = value(i)
     def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
     def asStrictArray: Array[Val] = value.map(_.force)
 
@@ -104,7 +106,7 @@ object Val{
       new Arr(newPos, value ++ rhs.value)
 
     def iterator: Iterator[Val] = value.iterator.map(_.force)
-    def foreach[U](f: Val => U) = {
+    def foreach[U](f: Val => U): Unit = {
       var i = 0
       while(i < value.length) {
         f(value(i).force)

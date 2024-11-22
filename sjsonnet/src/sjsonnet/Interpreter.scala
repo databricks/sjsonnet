@@ -40,7 +40,7 @@ class Interpreter(extVars: Map[String, String],
 
 
   def parseVar(k: String, v: String) = {
-    resolver.parse(wd / s"<$k>", StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
+    resolver.parse(wd / s"\uFE64$k\uFE65", StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
 
   lazy val evaluator: Evaluator = createEvaluator(

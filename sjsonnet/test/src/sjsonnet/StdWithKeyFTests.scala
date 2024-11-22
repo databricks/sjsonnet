@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object StdWithKeyFTests extends TestSuite {
 
   def tests = Tests {
@@ -47,7 +47,16 @@ object StdWithKeyFTests extends TestSuite {
         """) ==> ujson.True
     }
     test("stdSortWithKeyF") {
-      eval("std.sort([\"c\", \"a\", \"b\"])").toString() ==> """["a","b","c"]"""
+      eval("""std.sort(["a","b","c"])""").toString() ==> """["a","b","c"]"""
+      eval("""std.sort([1, 2, 3])""").toString() ==> """[1,2,3]"""
+      eval("""std.sort([1,2,3], keyF=function(x) -x)""").toString() ==> """[3,2,1]"""
+      eval("""std.sort([1,2,3], function(x) -x)""").toString() ==> """[3,2,1]"""
+      assert(
+        evalErr("""std.sort([1,2,3], keyF=function(x) error "foo")""").startsWith("sjsonnet.Error: foo"))
+      assert(
+        evalErr("""std.sort([1,2, error "foo"])""").startsWith("sjsonnet.Error: foo"))
+      assert(
+        evalErr("""std.sort([1, [error "foo"]])""").startsWith("sjsonnet.Error: Cannot sort with values that are not all the same type"))
 
       eval(
         """local arr = [
