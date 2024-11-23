@@ -154,7 +154,7 @@ object Val{
     }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
-      val m = new util.LinkedHashMap[String, Obj.Member]()
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](members.length)
       for((k, v) <- members) m.put(k, v)
       new Obj(pos, m, false, null, null)
     }
@@ -173,7 +173,7 @@ object Val{
 
     private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if(value0 == null) {
-        val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
         }
@@ -366,7 +366,7 @@ object Val{
       fields: Array[Expr.Member.Field],
       internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
-    val cache = mutable.HashMap.empty[Any, Val]
+    val cache = Util.preSizedScalaMutableHashMap[Any, Val](fields.length)
     val allKeys = Util.preSizedJavaLinkedHashMap[String, java.lang.Boolean](fields.length)
     val keys = new Array[String](fields.length)
     var idx = 0

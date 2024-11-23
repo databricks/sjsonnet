@@ -579,7 +579,7 @@ class Evaluator(resolver: CachedResolver,
       newScope
     }
 
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    val builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
