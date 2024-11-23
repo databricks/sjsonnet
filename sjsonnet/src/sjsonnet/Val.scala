@@ -194,8 +194,10 @@ object Val{
 
     private def getAllKeys = {
       if(allKeys == null) {
-        allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
+        val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
         gatherKeys(allKeys)
+        // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
+        this.allKeys = allKeys
       }
       allKeys
     }
