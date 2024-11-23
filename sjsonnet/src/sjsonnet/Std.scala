@@ -392,7 +392,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         m.put(k, v)
         i += 1
       }
-      new Val.Obj(pos, m, false, null, null)
+      val valueCache = Val.Obj.getEmptyValueCacheForObjWithoutSuper(allKeys.length)
+      new Val.Obj(pos, m, false, null, null, valueCache)
     }
   }
 

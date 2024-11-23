@@ -606,7 +606,12 @@ class Evaluator(resolver: CachedResolver,
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
-    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
+    val valueCache = if (sup == null) {
+      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fields.length)
+    } else {
+      mutable.HashMap.empty[Any, Val]
+    }
+    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup, valueCache)
     cachedObj
   }
 
@@ -637,7 +642,12 @@ class Evaluator(resolver: CachedResolver,
           case _ =>
         }
       }
-      new Val.Obj(e.pos, builder, false, null, sup)
+      val valueCache = if (sup == null) {
+        Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
+      } else {
+        mutable.HashMap.empty[Any, Val]
+      }
+      new Val.Obj(e.pos, builder, false, null, sup, valueCache)
     }
 
     newSelf

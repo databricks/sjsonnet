@@ -144,6 +144,18 @@ object Val{
 
   object Obj{
 
+    def getEmptyValueCacheForObjWithoutSuper(numFields: Int): mutable.HashMap[Any, Val] = {
+      // Helper for saving space in valueCache for objects without a super object.
+      // For objects with no super, we (cheaply) know the exact number of fields and
+      // therefore can upper bound the number of fields that _might_ be computed.
+      // We only want to pre-size if it yields a smaller initial map size than the default.
+      if (numFields >= 12) {
+        scala.collection.mutable.HashMap.empty[Any, Val]
+      } else {
+        Util.preSizedScalaMutableHashMap[Any, Val](numFields)
+      }
+    }
+
     abstract class Member(val add: Boolean, val visibility: Visibility, val cached: Boolean = true) {
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
     }
