@@ -366,13 +366,8 @@ object Val{
       fields: Array[Expr.Member.Field],
       internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
-    // Set the initial capacity to the number of fields divided by the default load factor + 1 -
-    // this ensures that we can fill up the map to the total number of fields without resizing.
-    // From JavaDoc - true for both Scala & Java HashMaps
-    val hashMapDefaultLoadFactor = 0.75f
-    val capacity = (fields.length / hashMapDefaultLoadFactor).toInt + 1
     val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean](capacity, hashMapDefaultLoadFactor)
+    val allKeys = Util.preSizedJavaLinkedHashMap[String, java.lang.Boolean](fields.length)
     val keys = new Array[String](fields.length)
     var idx = 0
     fields.foreach {
