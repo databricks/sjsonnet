@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+    env:
+      # Set LANG=C to simulate least-common-denominator target deployment environments:
+      LANG: C
 
     steps:
       - uses: actions/checkout@v2

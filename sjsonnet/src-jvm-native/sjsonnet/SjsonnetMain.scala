@@ -179,7 +179,7 @@ object SjsonnetMain {
                      std: Val.Obj = new Std().Std): Either[String, String] = {
 
     val (jsonnetCode, path) =
-      if (config.exec.value) (file, wd / "\uFE64exec\uFE65")
+      if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
       else {
         val p = os.Path(file, wd)
         (os.read(p), p)
