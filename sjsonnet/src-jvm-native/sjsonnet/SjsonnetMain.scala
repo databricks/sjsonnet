@@ -64,7 +64,7 @@ object SjsonnetMain {
     val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
     val result = for{
       config <- parser.constructEither(
-        args,
+        args.toIndexedSeq,
         customName = name, customDoc = doc,
         autoPrintHelpAndExit = None
       )
@@ -113,7 +113,7 @@ object SjsonnetMain {
   def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
     handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs.value))
 
-  def writeToFile(config: Config, wd: os.Path)(materialize: Writer => Either[String, _]): Either[String, String] = {
+  def writeToFile(config: Config, wd: os.Path)(materialize: Writer => Either[String, ?]): Either[String, String] = {
     config.outputFile match{
       case None =>
         val sw = new StringWriter
@@ -205,12 +205,12 @@ object SjsonnetMain {
       importer = importer match{
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
-            i(docBase, importName).map(OsPath)
+            i(docBase, importName).map(OsPath.apply)
           def read(path: Path): Option[ResolvedFile] = {
             readPath(path)
           }
         }
-        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
+        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath.apply), allowedInputs)
       },
       parseCache,
       settings = new Settings(
@@ -246,8 +246,8 @@ object SjsonnetMain {
                       Right(writer.toString)
                     }
                   }
-                  relPath = os.FilePath(multiPath) / os.RelPath(f)
-                  _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
+                  relPath = os.Path(multiPath, wd) / f
+                  _ <- writeFile(config, relPath, rendered)
                 } yield relPath
               }
 
@@ -299,7 +299,7 @@ object SjsonnetMain {
    * of caching on top of the underlying file system. Small files are read into memory, while large
    * files are read from disk.
    */
-  private[this] def readPath(path: Path): Option[ResolvedFile] = {
+  private def readPath(path: Path): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
     if (os.exists(osPath) && os.isFile(osPath)) {
       Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = Int.MaxValue.toLong))

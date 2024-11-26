@@ -6,8 +6,8 @@ import Expr._
 import fastparse.Parsed
 import Val.{True, Num}
 object ParserTests extends TestSuite{
-  def parse(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(_)).get.value._1
-  def parseErr(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
+  def parse(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(using _)).get.value._1
+  def parseErr(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(using _), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
   val dummyFS = new FileScope(null)
   def pos(i: Int) = new Position(dummyFS, i)
   def tests = Tests{

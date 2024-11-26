@@ -20,7 +20,7 @@ trait Expr{
   }
 }
 object Expr{
-  private final def arrStr(a: Array[_]): String = {
+  private final def arrStr(a: Array[?]): String = {
     if(a == null) "null" else a.mkString("[", ", ", "]")
   }
 

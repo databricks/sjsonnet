@@ -10,16 +10,16 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 (out: T,
  indent: Int = -1,
  escapeUnicode: Boolean = false) extends JsVisitor[T, T]{
-  protected[this] val elemBuilder = new upickle.core.CharBuilder
-  protected[this] val unicodeCharBuilder = new upickle.core.CharBuilder()
+  protected val elemBuilder = new upickle.core.CharBuilder
+  protected val unicodeCharBuilder = new upickle.core.CharBuilder()
   def flushCharBuilder() = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
 
-  protected[this] var depth: Int = 0
+  protected var depth: Int = 0
 
 
-  protected[this] var commaBuffered = false
+  protected var commaBuffered = false
 
   def flushBuffer() = {
     if (commaBuffered) {
@@ -28,17 +28,21 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       renderIndent()
     }
   }
-  def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
+
+  def visitArray(length: Int, index: Int): ArrVisitor[T, T] = new ArrVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('[')
 
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
+
+    def subVisitor: BaseCharRenderer[T] = BaseCharRenderer.this
+
     def visitValue(v: T, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -49,20 +53,25 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
-    def visitKey(index: Int) = BaseCharRenderer.this
+
+    def subVisitor: BaseCharRenderer[T] = BaseCharRenderer.this
+
+    def visitKey(index: Int): BaseCharRenderer[T] = BaseCharRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.append(':')
       if (indent != -1) elemBuilder.append(' ')
     }
+
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
     }
+
     def visitEnd(index: Int) = {
       commaBuffered = false
       depth -= 1
@@ -144,7 +153,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode)
+    upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode, wrapQuotes = true)
     flushCharBuilder()
     out
   }

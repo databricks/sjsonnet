@@ -42,7 +42,7 @@ class StaticOptimizer(
 
     case e @ Id(pos, name) =>
       scope.get(name) match {
-        case ScopedVal(v: Val with Expr, _, _) => v
+        case ScopedVal(v: (Val & Expr), _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
         case null if name == "std" => std
         case _ => failOrWarn("Unknown variable: "+name, e)
@@ -98,7 +98,7 @@ class StaticOptimizer(
     case _ => false
   }
 
-  override protected[this] def transformFieldName(f: FieldName): FieldName = f match {
+  override protected def transformFieldName(f: FieldName): FieldName = f match {
     case FieldName.Dyn(x) =>
       transform(x) match {
         case x2: Val.Str =>
@@ -201,7 +201,7 @@ class StaticOptimizer(
     while(i < target.length) {
       if(target(i) == null) {
         params.defaultExprs(i) match {
-          case v: Val with Expr => target(i) = v
+          case v: (Val & Expr) => target(i) = v
           case _ => return null // no default or non-constant
         }
       }

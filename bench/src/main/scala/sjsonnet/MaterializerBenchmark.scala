@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra._
 import ujson.JsVisitor
+import scala.compiletime.uninitialized
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -16,8 +17,8 @@ import ujson.JsVisitor
 @State(Scope.Benchmark)
 class MaterializerBenchmark {
 
-  private var interp: Interpreter = _
-  private var value: Val = _
+  private var interp: Interpreter = uninitialized
+  private var value: Val = uninitialized
 
   @Setup
   def setup(): Unit = {
