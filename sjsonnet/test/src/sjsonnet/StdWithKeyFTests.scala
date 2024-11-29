@@ -209,7 +209,7 @@ object StdWithKeyFTests extends TestSuite {
         """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"},{"language":{"name":"Scala","version":"2.13"},"name":"Bar"}]"""
     }
     test("stdSetInterWithKeyF") {
-      eval("std.setInter([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["b"]"""
+      eval("std.setInter([\"b\", \"c\"], [\"a\", \"b\"])").toString() ==> """["b"]"""
 
       eval(
         """local arr1 = std.set([
@@ -263,7 +263,7 @@ object StdWithKeyFTests extends TestSuite {
         """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"}]"""
     }
     test("stdSetDiffWithKeyF") {
-      eval("std.setDiff([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["c"]"""
+      eval("std.setDiff([\"b\", \"c\"], [\"a\", \"b\"])").toString() ==> """["c"]"""
 
       eval(
         """local arr1 = std.set([

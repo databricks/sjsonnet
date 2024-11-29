@@ -10,6 +10,7 @@ class Settings(
   val strictImportSyntax: Boolean = false,
   val strictInheritedAssertions: Boolean = false,
   val strictSetOperations: Boolean = false,
+  val throwErrorForInvalidSets: Boolean = false,
 )
 
 object Settings {

@@ -1,12 +1,14 @@
 package sjsonnet
 
+import ujson.Value
+
 object TestUtils {
   def eval0(s: String,
             preserveOrder: Boolean = false,
             strict: Boolean = false,
             noDuplicateKeysInComprehension: Boolean = false,
             strictInheritedAssertions: Boolean = false,
-            strictSetOperations: Boolean = true) = {
+            strictSetOperations: Boolean = true): Either[String, Value] = {
     new Interpreter(
       Map(),
       Map(),
@@ -18,7 +20,8 @@ object TestUtils {
         strict = strict,
         noDuplicateKeysInComprehension = noDuplicateKeysInComprehension,
         strictInheritedAssertions = strictInheritedAssertions,
-        strictSetOperations = strictSetOperations
+        strictSetOperations = strictSetOperations,
+        throwErrorForInvalidSets = true
       )
     ).interpret(s, DummyPath("(memory)"))
   }
@@ -28,7 +31,7 @@ object TestUtils {
            strict: Boolean = false,
            noDuplicateKeysInComprehension: Boolean = false,
            strictInheritedAssertions: Boolean = false,
-           strictSetOperations: Boolean = true) = {
+           strictSetOperations: Boolean = true): Value = {
     eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
@@ -40,7 +43,7 @@ object TestUtils {
               strict: Boolean = false,
               noDuplicateKeysInComprehension: Boolean = false,
               strictInheritedAssertions: Boolean = false,
-              strictSetOperations: Boolean = true) = {
+              strictSetOperations: Boolean = true): String = {
     eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations) match{
       case Left(err) => err.split('\n').map(_.trim).mkString("\n")  // normalize inconsistent indenation on JVM vs JS
       case Right(r) => throw new Exception(s"Expected exception, got result: $r")

@@ -154,7 +154,7 @@ class ProfilingEvaluator(resolver: CachedResolver,
 
   def builtins(): Seq[BuiltinBox] = {
     val names = new util.IdentityHashMap[Val.Func, String]()
-    new Std(settings).functions.foreachEntry((n, f) => names.put(f, n))
+    new Std().functions.foreachEntry((n, f) => names.put(f, n))
     val m = new mutable.HashMap[String, BuiltinBox]
     def add(b: ExprBox, func: Val.Builtin): Unit = {
       val n = names.getOrDefault(func, func.getClass.getName)
