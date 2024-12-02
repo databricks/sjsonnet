@@ -17,12 +17,13 @@ object Platform {
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
     try {
       gzip.write(b)
-      Base64.getEncoder.encodeToString(outputStream.toByteArray)
     } finally {
       gzip.close()
       outputStream.close()
     }
+    Base64.getEncoder.encodeToString(outputStream.toByteArray)
   }
+
   def gzipString(s: String): String = {
     gzipBytes(s.getBytes())
   }
@@ -37,11 +38,11 @@ object Platform {
     val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
     try {
       xz.write(b)
-      Base64.getEncoder.encodeToString(outputStream.toByteArray)
     } finally {
       xz.close()
       outputStream.close()
     }
+    Base64.getEncoder.encodeToString(outputStream.toByteArray)
   }
 
   def xzString(s: String, compressionLevel: Option[Int]): String = {
