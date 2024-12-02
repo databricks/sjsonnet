@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.10</version>
+    <version>0.4.12</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.10" // SBT
-ivy"com.databricks::sjsonnet:0.4.10" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.12" // SBT
+ivy"com.databricks::sjsonnet:0.4.12" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.10/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.10/sjsonnet-0.4.10.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet-0.4.12.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.10/sjsonnet-0.4.10.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet-0.4.12.js > sjsonnet.js
 
 $ node
 
@@ -279,6 +279,18 @@ Please ensure that you are publishing with JDK 8, e.g. via
 to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
+
+### 0.4.12
+- Fix a bug introduced with 0.4.11 with synthetic paths [#215](https://github.com/databricks/sjsonnet/pull/215)
+- Fix thread-safety bug in Obj.getAllKeys [#217](https://github.com/databricks/sjsonnet/pull/217)
+
+### 0.4.11
+- Implement `std.isEmpty`, `std.xor`, `std.xnor`, `std.trim`,
+  `std.equalsIgnoreCase`, `std.sha1`, `std.sha256`, `std.sha512`, `std.sha3` [#204](https://github.com/databricks/sjsonnet/pull/210)
+- fix: std.manifestJsonMinified and empty arrays/objects [#207](https://github.com/databricks/sjsonnet/pull/207)
+- fix: Use different chars for synthetic paths. [#208](https://github.com/databricks/sjsonnet/pull/208)
+- Fix sorting algorithm to work for all array types [#211](https://github.com/databricks/sjsonnet/pull/211)
+- Add better error handling for format [#212](https://github.com/databricks/sjsonnet/pull/212)
 
 ### 0.4.10
 

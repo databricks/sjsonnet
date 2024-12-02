@@ -23,6 +23,15 @@ object FormatTests extends TestSuite{
     assert(formatted == expected)
   }
 
+  def checkErr(fmt: String, jsonStr: String, expectedErr: String) = {
+    try {
+      check(fmt, jsonStr, "")
+    } catch {
+      case e: Error =>
+        assert(e.getMessage == expectedErr)
+    }
+  }
+
   def tests = Tests{
     test("hash"){
       // #
@@ -290,6 +299,10 @@ object FormatTests extends TestSuite{
 
       // apparently you can pass in positional parameters to named interpolations
       check("XXX%(ignored_lols)sXXX %s", """[1.1, 2]""", "XXX1.1XXX 2")
+
+      checkErr("%s %s %s %s %s", """["foo"]""", "Too few values to format: 1, expected at least 2")
+      checkErr("%s %s", """["foo", "bar", "baz"]""", "Too many values to format: 3, expected 2")
+      checkErr("%d", """["foo"]""", "Format required a number at 1, got string")
     }
   }
 }
