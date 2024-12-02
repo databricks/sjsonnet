@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.12</version>
+    <version>0.4.12.1</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.12" // SBT
-ivy"com.databricks::sjsonnet:0.4.12" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.12.1" // SBT
+ivy"com.databricks::sjsonnet:0.4.12.1" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.12.1/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet-0.4.12.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12.1/sjsonnet-0.4.12.1.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet-0.4.12.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.12/sjsonnet-0.4.12.1.js > sjsonnet.js
 
 $ node
 
@@ -279,6 +279,9 @@ Please ensure that you are publishing with JDK 8, e.g. via
 to ensure the output bytecode remains compatible with users on older JVMs.
 
 ## Changelog
+
+### 0.4.12.1
+- Fix a bug leading to the truncation of the data returned by `std.gzip` and `std.xz` [#221](https://github.com/databricks/sjsonnet/pull/221).
 
 ### 0.4.12
 - Fix a bug introduced with 0.4.11 with synthetic paths [#215](https://github.com/databricks/sjsonnet/pull/215)
