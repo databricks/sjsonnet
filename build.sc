@@ -1,13 +1,13 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
-val sjsonnetVersion = "0.4.12.1"
+val sjsonnetVersion = "0.4.13"
 
-object sjsonnet extends Cross[SjsonnetModule]("2.12.13", "2.13.4")
+object sjsonnet extends Cross[SjsonnetModule]("2.12.18", "2.13.12")
 class SjsonnetModule(val crossScalaVersion: String) extends Module {
   def millSourcePath = super.millSourcePath / os.up
   trait SjsonnetJvmNative extends SjsonnetCrossModule {
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::os-lib::0.7.2",
-      ivy"com.lihaoyi::mainargs::0.2.0"
+      ivy"com.lihaoyi::os-lib::0.7.8",
+      ivy"com.lihaoyi::mainargs::0.2.5"
     )
   }
   trait SjsonnetCrossModule extends CrossScalaModule with PublishModule{
@@ -16,11 +16,11 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def crossScalaVersion = SjsonnetModule.this.crossScalaVersion
 
     def ivyDeps = Agg(
-      ivy"com.lihaoyi::fastparse::2.3.1",
-      ivy"com.lihaoyi::pprint::0.6.1",
-      ivy"com.lihaoyi::ujson::1.3.7",
-      ivy"com.lihaoyi::scalatags::0.9.3",
-      ivy"org.scala-lang.modules::scala-collection-compat::2.4.0"
+      ivy"com.lihaoyi::fastparse::2.3.3",
+      ivy"com.lihaoyi::pprint::0.6.6",
+      ivy"com.lihaoyi::ujson::1.3.15",
+      ivy"com.lihaoyi::scalatags::0.9.4",
+      ivy"org.scala-lang.modules::scala-collection-compat::2.11.0"
     )
     def publishVersion = sjsonnetVersion
 
@@ -46,12 +46,12 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       )
     )
     trait CrossTests extends ScalaModule with TestModule {
-      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.7.7")
-      def testFrameworks = Seq("utest.runner.Framework")
+      def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.2")
+      def testFramework = "utest.runner.Framework"
     }
   }
   object js extends SjsonnetCrossModule with ScalaJSModule{
-    def scalaJSVersion = "1.4.0"
+    def scalaJSVersion = "1.17.0"
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-js",
@@ -66,7 +66,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     }
   }
   object native extends SjsonnetCrossModule with SjsonnetJvmNative with ScalaNativeModule{
-    def scalaNativeVersion = "0.4.0"
+    def scalaNativeVersion = "0.4.17"
     def sources = T.sources(
       millSourcePath / "src",
       millSourcePath / "src-native",
@@ -87,7 +87,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       def releaseMode = ReleaseMode.ReleaseFast
       def nativeLTO = LTO.Thin
       def moduleDeps = Seq(native)
-      def scalaNativeVersion = "0.4.0"
+      def scalaNativeVersion = "0.4.17"
       def scalaVersion = crossScalaVersion
       def sources = T.sources(
         millSourcePath / "src",
@@ -105,10 +105,10 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       millSourcePath / "src-jvm-js"
     )
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"org.json:json:20211205",
-      ivy"org.tukaani:xz::1.8",
+      ivy"org.json:json:20240303",
+      ivy"org.tukaani:xz::1.10",
       ivy"org.lz4:lz4-java::1.8.0",
-      ivy"org.yaml:snakeyaml::1.30"
+      ivy"org.yaml:snakeyaml::1.33"
     )
     def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**")
     //def compileIvyDeps = Agg( ivy"com.lihaoyi::acyclic:0.2.0")
@@ -144,7 +144,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       )
     )
     object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+      def testFramework = "com.novocode.junit.JUnitFramework"
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
     }
   }
@@ -189,7 +189,7 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
       }
     )
     object test extends Tests{
-      def testFrameworks = Seq("com.novocode.junit.JUnitFramework")
+      def testFramework = "com.novocode.junit.JUnitFramework"
       def ivyDeps = Agg(ivy"com.novocode:junit-interface:0.11")
     }
   }
