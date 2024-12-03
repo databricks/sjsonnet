@@ -5,11 +5,11 @@ import org.json.JSONObject
 import java.io.{ByteArrayOutputStream, BufferedInputStream, File, FileInputStream}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
-import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory, XXHash64}
+import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.Constructor
+import org.yaml.snakeyaml.{LoaderOptions, Yaml}
+import org.yaml.snakeyaml.constructor.SafeConstructor
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -50,7 +50,8 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new Constructor(classOf[java.util.LinkedHashMap[String, Object]])).load(yamlString)
+    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new SafeConstructor(
+      new LoaderOptions())).load(yamlString)
     new JSONObject(yaml).toString()
   }
 
