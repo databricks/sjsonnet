@@ -16,11 +16,29 @@ import scala.reflect.ClassTag
  * evaluated dictionary values, array contents, or function parameters
  * are all wrapped in [[Lazy]] and only truly evaluated on-demand
  */
-abstract class Lazy {
+protected abstract class Lazy {
   protected[this] var cached: Val = null
   def compute(): Val
   final def force: Val = {
     if(cached == null)  cached = compute()
+    cached
+  }
+}
+
+/**
+ * Thread-safe implementation that discards the compute function after initialization.
+ */
+final class LazyWithComputeFunc(@volatile private[this] var computeFunc: () => Val) extends Lazy {
+  def compute(): Val = {
+    val f = computeFunc
+    if (f != null) {  // we won the race to initialize
+      val result = f()
+      cached = result
+      computeFunc = null  // allow closure to be GC'd
+    }
+    // else: we lost the race to compute, but `cached` is already set and
+    // is visible in this thread due to the volatile read and writes via
+    // piggybacking; see https://stackoverflow.com/a/8769692 for background
     cached
   }
 }
@@ -395,7 +413,7 @@ object Val{
             if(argVals(j) == null) {
               val default = params.defaultExprs(i)
               if(default != null) {
-                argVals(j) = () => evalDefault(default, newScope, ev)
+                argVals(j) = new LazyWithComputeFunc(() => evalDefault(default, newScope, ev))
               } else {
                 if(missing == null) missing = new ArrayBuffer
                 missing.+=(params.names(i))
