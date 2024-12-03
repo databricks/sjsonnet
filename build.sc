@@ -38,9 +38,9 @@ class SjsonnetModule(val crossScalaVersion: String) extends Module {
     def pomSettings = PomSettings(
       description = artifactName(),
       organization = "com.databricks",
-      url = "https://github.com/lihaoyi/sjsonnet",
+      url = "https://github.com/databricks/sjsonnet",
       licenses = Seq(License.MIT),
-      versionControl = VersionControl.github("lihaoyi", "sjsonnet"),
+      versionControl = VersionControl.github("databricks", "sjsonnet"),
       developers = Seq(
         Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
       )
