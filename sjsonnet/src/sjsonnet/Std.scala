@@ -463,15 +463,15 @@ class Std {
 
   private object FlattenArrays extends Val.Builtin1("arrs") {
     def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
-      val out = new mutable.ArrayBuffer[Lazy]
+      val out = new mutable.ArrayBuilder.ofRef[Lazy]
       for(x <- arrs.asArr) {
         x match{
           case Val.Null(_) => // do nothing
-          case v: Val.Arr => out.appendAll(v.asLazyArray)
+          case v: Val.Arr => out ++= v.asLazyArray
           case x => Error.fail("Cannot call flattenArrays on " + x)
         }
       }
-      new Val.Arr(pos, out.toArray)
+      new Val.Arr(pos, out.result())
     }
   }
   private object Reverse extends Val.Builtin1("arrs") {
@@ -922,13 +922,16 @@ class Std {
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
       if (pat.length == 0) new Val.Arr(pos, emptyLazyArray)
       else {
-        val indices = mutable.ArrayBuffer[Int]()
         var matchIndex = str.indexOf(pat)
-        while (0 <= matchIndex && matchIndex < str.length) {
-          indices.append(matchIndex)
-          matchIndex = str.indexOf(pat, matchIndex + 1)
+        if (matchIndex == -1) new Val.Arr(pos, emptyLazyArray)
+        else {
+          val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
+          while (0 <= matchIndex && matchIndex < str.length) {
+            indices.+=(Val.Num(pos, matchIndex))
+            matchIndex = str.indexOf(pat, matchIndex + 1)
+          }
+          new Val.Arr(pos, indices.result())
         }
-        new Val.Arr(pos, indices.map(x => Val.Num(pos, x)).toArray)
       }
     },
     "substr" -> Substr,
