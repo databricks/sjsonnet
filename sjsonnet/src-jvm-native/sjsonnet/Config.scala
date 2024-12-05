@@ -1,14 +1,9 @@
 package sjsonnet
 
-import mainargs.{main, arg, Leftover, Flag}
+import mainargs.{main, arg, Flag}
 
 @main
 case class Config(
-  @arg(
-    short = 'i',
-    doc = "Run Mill in interactive mode, suitable for opening REPLs and taking user input"
-  )
-  interactive: Flag = Flag(),
   @arg(
     name = "jpath", short = 'J',
     doc = "Specify an additional library search dir (right-most wins)"
@@ -99,11 +94,6 @@ case class Config(
   )
   yamlOut: Flag = Flag(),
   @arg(
-    doc = "The jsonnet file you wish to evaluate",
-    positional = true
-  )
-  file: String,
-  @arg(
     name = "yaml-debug",
     doc = "Generate source line comments in the output YAML doc to make it easier to figure out where values come from."
   )
@@ -138,4 +128,9 @@ case class Config(
     doc = """Properly handle assertions defined in a Jsonnet dictionary that is extended more than once"""
   )
   strictInheritedAssertions: Flag = Flag(),
+  @arg(
+    doc = "The jsonnet file you wish to evaluate",
+    positional = true
+  )
+  file: String,
 )

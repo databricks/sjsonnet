@@ -1,17 +1,15 @@
 package sjsonnet
 
-import org.json.JSONObject
-
 import java.io.{ByteArrayOutputStream, BufferedInputStream, File, FileInputStream}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
-import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory, XXHash64}
+import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
+import org.json.{JSONArray, JSONObject}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.Constructor
+import org.yaml.snakeyaml.{LoaderOptions, Yaml}
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import scala.jdk.CollectionConverters._
-import org.json.JSONArray
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -19,12 +17,13 @@ object Platform {
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
     try {
       gzip.write(b)
-      Base64.getEncoder.encodeToString(outputStream.toByteArray)
     } finally {
       gzip.close()
       outputStream.close()
     }
+    Base64.getEncoder.encodeToString(outputStream.toByteArray)
   }
+
   def gzipString(s: String): String = {
     gzipBytes(s.getBytes())
   }
@@ -39,11 +38,11 @@ object Platform {
     val xz: XZOutputStream = new XZOutputStream(outputStream, new LZMA2Options(level))
     try {
       xz.write(b)
-      Base64.getEncoder.encodeToString(outputStream.toByteArray)
     } finally {
       xz.close()
       outputStream.close()
     }
+    Base64.getEncoder.encodeToString(outputStream.toByteArray)
   }
 
   def xzString(s: String, compressionLevel: Option[Int]): String = {
@@ -51,7 +50,8 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: Array[Object] = new Yaml(new Constructor()).loadAll(yamlString).asScala.toArray
+    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new SafeConstructor(
+      new LoaderOptions())).load(yamlString)
     yaml.size match {
       case l if (l > 1) => new JSONArray(yaml).toString()
       case l if (l == 1)  => new JSONObject(yaml(0).asInstanceOf[java.util.LinkedHashMap[String, Object]]).toString()

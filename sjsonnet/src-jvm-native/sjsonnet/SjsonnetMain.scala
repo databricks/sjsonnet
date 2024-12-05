@@ -3,12 +3,12 @@ package sjsonnet
 import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter, Writer}
 import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
-
+import scala.annotation.unused
 import scala.util.Try
 import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None) = new Importer {
+  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None): Importer = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
       (docBase +: searchRoots0)
         .flatMap(base => os.FilePath(importName) match {
@@ -29,10 +29,7 @@ object SjsonnetMain {
 
   def main(args: Array[String]): Unit = {
     val exitCode = main0(
-      args match {
-        case Array(s, _*) if s == "-i" || s == "--interactive" => args.tail
-        case _ => args
-      },
+      args,
       new DefaultParseCache,
       System.in,
       System.out,
@@ -45,7 +42,7 @@ object SjsonnetMain {
 
   def main0(args: Array[String],
             parseCache: ParseCache,
-            stdin: InputStream,
+            @unused stdin: InputStream,
             stdout: PrintStream,
             stderr: PrintStream,
             wd: os.Path,
@@ -65,14 +62,11 @@ object SjsonnetMain {
     val result = for{
       config <- parser.constructEither(
         args,
+        allowRepeats = true,
         customName = name, customDoc = doc,
         autoPrintHelpAndExit = None
       )
-      file <- {
-        if (config.interactive.value) {
-          Left("error: -i/--interactive must be passed in as the first argument")
-        }else Right(config.file)
-      }
+      file <- Right(config.file)
       outputStr <- mainConfigured(file, config, parseCache, wd, allowedInputs, importer, warn, std)
       res <- {
         if(hasWarnings && config.fatalWarnings.value) Left("")
@@ -82,10 +76,10 @@ object SjsonnetMain {
 
     result match{
       case Left(err) =>
-        if (!err.isEmpty) stderr.println(err)
+        if (err.nonEmpty) stderr.println(err)
         1
       case Right((config, str)) =>
-        if (!str.isEmpty) {
+        if (str.nonEmpty) {
           config.outputFile match {
             case None => stdout.println(str)
             case Some(f) => os.write.over(os.Path(f, wd), str)
@@ -96,7 +90,7 @@ object SjsonnetMain {
     }
   }
 
-  def rendererForConfig(wr: Writer, config: Config, getCurrentPosition: () => Position) =
+  private def rendererForConfig(wr: Writer, config: Config, getCurrentPosition: () => Position) =
     if (config.yamlOut.value) new PrettyYamlRenderer(
       wr,
       indent = config.indent,
@@ -104,16 +98,16 @@ object SjsonnetMain {
     )
     else new Renderer(wr, indent = config.indent)
 
-  def handleWriteFile[T](f: => T): Either[String, T] =
+  private def handleWriteFile[T](f: => T): Either[String, T] =
     Try(f).toEither.left.map{
-      case e: NoSuchFileException => s"open $f: no such file or directory"
+      case _: NoSuchFileException => s"open $f: no such file or directory"
       case e => e.toString
     }
 
-  def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
+  private def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
     handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs.value))
 
-  def writeToFile(config: Config, wd: os.Path)(materialize: Writer => Either[String, _]): Either[String, String] = {
+  private def writeToFile(config: Config, wd: os.Path)(materialize: Writer => Either[String, _]): Either[String, String] = {
     config.outputFile match{
       case None =>
         val sw = new StringWriter
@@ -132,8 +126,8 @@ object SjsonnetMain {
     }
   }
 
-  def renderNormal(config: Config, interp: Interpreter, jsonnetCode: String, path: os.Path, wd: os.Path,
-                   getCurrentPosition: () => Position) = {
+  private def renderNormal(config: Config, interp: Interpreter, jsonnetCode: String, path: os.Path, wd: os.Path,
+                           getCurrentPosition: () => Position) = {
     writeToFile(config, wd){ writer =>
       val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
@@ -142,13 +136,13 @@ object SjsonnetMain {
     }
   }
 
-  def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+  private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
-  def parseBindings(strs: Seq[String],
-                    strFiles: Seq[String],
-                    codes: Seq[String],
-                    codeFiles: Seq[String],
-                    wd: os.Path) = {
+  private def parseBindings(strs: Seq[String],
+                            strFiles: Seq[String],
+                            codes: Seq[String],
+                            codeFiles: Seq[String],
+                            wd: os.Path) = {
 
     def split(s: String) = s.split("=", 2) match{
       case Array(x) => (x, System.getenv(x))
@@ -169,14 +163,14 @@ object SjsonnetMain {
    * @return Right(str) if there's some string that needs to be printed to stdout or
    *         --output-file, Left(err) if there is an error to be reported
    */
-  def mainConfigured(file: String,
-                     config: Config,
-                     parseCache: ParseCache,
-                     wd: os.Path,
-                     allowedInputs: Option[Set[os.Path]] = None,
-                     importer: Option[(Path, String) => Option[os.Path]] = None,
-                     warnLogger: String => Unit = null,
-                     std: Val.Obj = new Std().Std): Either[String, String] = {
+  private def mainConfigured(file: String,
+                             config: Config,
+                             parseCache: ParseCache,
+                             wd: os.Path,
+                             allowedInputs: Option[Set[os.Path]] = None,
+                             importer: Option[(Path, String) => Option[os.Path]] = None,
+                             warnLogger: String => Unit = null,
+                             std: Val.Obj = new Std().Std): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -210,7 +204,7 @@ object SjsonnetMain {
             readPath(path)
           }
         }
-        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), allowedInputs)
+        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath), allowedInputs)
       },
       parseCache,
       settings = new Settings(

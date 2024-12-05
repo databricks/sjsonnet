@@ -1,6 +1,6 @@
-val sjsonnetVersion = "0.4.12"
+val sjsonnetVersion = "0.4.13"
 
-scalaVersion in Global := "2.13.4"
+scalaVersion in Global := "2.13.12"
 
 cancelable in Global := true
 
@@ -10,20 +10,20 @@ lazy val main = (project in file("sjsonnet"))
     Test / fork := true,
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "fastparse" % "2.3.1",
-      "com.lihaoyi" %% "pprint" % "0.6.1",
-      "com.lihaoyi" %% "ujson" % "1.3.7",
-      "com.lihaoyi" %% "scalatags" % "0.9.3",
-      "com.lihaoyi" %% "os-lib" % "0.7.2",
-      "com.lihaoyi" %% "mainargs" % "0.2.0",
+      "com.lihaoyi" %% "fastparse" % "2.3.3",
+      "com.lihaoyi" %% "pprint" % "0.6.6",
+      "com.lihaoyi" %% "ujson" % "1.3.15",
+      "com.lihaoyi" %% "scalatags" % "0.9.4",
+      "com.lihaoyi" %% "os-lib" % "0.7.8",
+      "com.lihaoyi" %% "mainargs" % "0.2.5",
       "org.lz4" % "lz4-java" % "1.8.0",
-      "org.json" % "json" % "20211205",
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0",
+      "org.json" % "json" % "20240303",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.11.0",
       "org.tukaani" % "xz" % "1.8",
-      "org.yaml" % "snakeyaml" % "1.30",
+      "org.yaml" % "snakeyaml" % "1.33",
     ),
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "utest" % "0.7.7",
+      "com.lihaoyi" %% "utest" % "0.8.2",
     ).map(_ % "test"),
     testFrameworks += new TestFramework("utest.runner.Framework"),
     (Compile / unmanagedSourceDirectories) := Seq(
