@@ -467,7 +467,7 @@ class Std {
       for(x <- arrs.asArr) {
         x match{
           case Val.Null(_) => // do nothing
-          case v: Val.Arr => out.addAll(v.asLazyArray)
+          case v: Val.Arr => out ++= v.asLazyArray
           case x => Error.fail("Cannot call flattenArrays on " + x)
         }
       }
