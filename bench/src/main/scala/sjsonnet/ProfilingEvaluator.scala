@@ -157,7 +157,7 @@ class ProfilingEvaluator(resolver: CachedResolver,
     new Std().functions.foreachEntry((n, f) => names.put(f, n))
     val m = new mutable.HashMap[String, BuiltinBox]
     def add(b: ExprBox, func: Val.Builtin): Unit = {
-      val n = names.getOrDefault(func, func.getClass.getName)
+      val n = names.getOrDefault(func, func.functionName)
       val bb = m.getOrElseUpdate(n, new BuiltinBox(n))
       bb.time += b.time
       bb.count += b.count

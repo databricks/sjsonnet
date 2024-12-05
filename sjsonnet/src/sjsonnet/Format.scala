@@ -273,7 +273,7 @@ object Format{
     if (formatted.precision.contains(0) && !formatted.alternate) None else Some(fracLengths)
   }
 
-  class PartialApplyFmt(fmt: String) extends Val.Builtin1("values") {
+  class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
     val (leading, chunks) = fastparse.parse(fmt, format(_)).get.value
     def evalRhs(values0: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, format(leading, chunks, values0, pos)(ev))

@@ -20,7 +20,7 @@ class Std {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
 
-  private object AssertEqual extends Val.Builtin2("a", "b") {
+  private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
       val x1 = Materializer(v1)(ev)
       val x2 = Materializer(v2)(ev)
@@ -29,14 +29,14 @@ class Std {
     }
   }
 
-  private object ToString extends Val.Builtin1("a") {
+  private object ToString extends Val.Builtin1("toString", "a") {
     def evalRhs(v1: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, v1 match {
       case Val.Str(_, s) => s
       case v => Materializer.stringify(v)(ev)
     })
   }
 
-  private object Length extends Val.Builtin1("x") {
+  private object Length extends Val.Builtin1("length", "x") {
     def evalRhs(x: Val, ev: EvalScope, pos: Position): Val =
       Val.Num(pos, x match {
         case Val.Str(_, s) => s.length
@@ -51,7 +51,7 @@ class Std {
     }
   }
 
-  private object CountF extends Val.Builtin2("func", "arr") {
+  private object CountF extends Val.Builtin2("length", "func", "arr") {
     def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
       val p = pos.noOffset
       val a = arr.asArr.asLazyArray
@@ -79,68 +79,84 @@ class Std {
     }
   }
 
-  private object Codepoint extends Val.Builtin1("str") {
+  private object Codepoint extends Val.Builtin1("codepoint", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Num(pos, str.asString.charAt(0).toInt)
   }
 
-  private object ObjectHas extends Val.Builtin2("o", "f") {
+  private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
     def evalRhs(o: Val, f: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.asObj.containsVisibleKey(f.asString))
     override def specialize(args: Array[Expr]) = args match {
       case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
       case _ => null
     }
-    private class SpecF(f: String) extends Val.Builtin1("o") {
+    private class SpecF(f: String) extends Val.Builtin1("objectHas", "o") {
       def evalRhs(o: Val, ev: EvalScope, pos: Position): Val =
         Val.bool(pos, o.asObj.containsVisibleKey(f))
     }
   }
 
-  private object ObjectHasAll extends Val.Builtin2("o", "f") {
+  private object ObjectHasAll extends Val.Builtin2("objectHasAll", "o", "f") {
     def evalRhs(o: Val, f: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.asObj.containsKey(f.asString))
     override def specialize(args: Array[Expr]) = args match {
       case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
       case _ => null
     }
-    class SpecF(f: String) extends Val.Builtin1("o") {
+    class SpecF(f: String) extends Val.Builtin1("objectHasAll", "o") {
       def evalRhs(o: Val, ev: EvalScope, pos: Position): Val =
         Val.bool(pos, o.asObj.containsKey(f))
     }
   }
 
-  private object ObjectFields extends Val.Builtin1("o") {
+  private object ObjectFields extends Val.Builtin1("objectFields", "o") {
     def evalRhs(o: Val, ev: EvalScope, pos: Position): Val = {
       val keys = getVisibleKeys(ev, o.asObj)
       new Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
-  private object ObjectFieldsAll extends Val.Builtin1("o") {
+  private object ObjectFieldsAll extends Val.Builtin1("objectFieldsAll", "o") {
     def evalRhs(o: Val, ev: EvalScope, pos: Position): Val = {
       val keys = getAllKeys(ev, o.asObj)
       new Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
-  private object All extends Val.Builtin1("arr") {
+  private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val = {
       Val.bool(pos, arr.asArr.forall(v => v.asBoolean))
     }
   }
 
-  private object Any extends Val.Builtin1("arr") {
+
+private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hidden"), Array(null, null, Val.Null(dummyPos), Val.True(dummyPos))) {
+  override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+    val obj = args(0).force.asObj
+    val k = args(1).force.asString
+    val incHidden = args(3).force.asBoolean
+    if (incHidden && obj.containsKey(k)) {
+      obj.value(k, pos.noOffset, obj)(ev)
+    } else if (!incHidden && obj.containsVisibleKey(k)) {
+      obj.value(k, pos.noOffset, obj)(ev)
+    } else {
+      args(2).force
+    }
+  }
+}
+
+  private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val = {
       Val.bool(pos, arr.asArr.iterator.exists(v => v.asBoolean))
     }
   }
 
-  private object Type extends Val.Builtin1("x") {
+  private object Type extends Val.Builtin1("type", "x") {
     def evalRhs(x: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.prettyName)
   }
 
-  private object Format_ extends Val.Builtin2("str", "vals") {
+  private object Format_ extends Val.Builtin2("format", "str", "vals") {
     def evalRhs(str: Val, vals: Val, ev: EvalScope, pos: Position): Val =
       new Val.Str(pos, Format.format(str.asString, vals, pos)(ev))
     override def specialize(args: Array[Expr]) = args match {
@@ -150,7 +166,7 @@ class Std {
     }
   }
 
-  private object Foldl extends Val.Builtin3("func", "arr", "init") {
+  private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
     def evalRhs(_func: Val, arr: Val, init: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
       arr match{
@@ -177,7 +193,7 @@ class Std {
     }
   }
 
-  private object Foldr extends Val.Builtin3("func", "arr", "init") {
+  private object Foldr extends Val.Builtin3("foldr", "func", "arr", "init") {
     def evalRhs(_func: Val, arr: Val, init: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
       arr match {
@@ -200,31 +216,31 @@ class Std {
     }
   }
 
-  private object IsString extends Val.Builtin1("v") {
+  private object IsString extends Val.Builtin1("isString", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Str])
   }
 
-  private object IsBoolean extends Val.Builtin1("v") {
+  private object IsBoolean extends Val.Builtin1("isBoolean", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Bool])
   }
 
-  private object IsNumber extends Val.Builtin1("v") {
+  private object IsNumber extends Val.Builtin1("isNumber", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Num])
   }
 
-  private object IsObject extends Val.Builtin1("v") {
+  private object IsObject extends Val.Builtin1("isObject", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Obj])
   }
 
-  private object IsArray extends Val.Builtin1("v") {
+  private object IsArray extends Val.Builtin1("isArray", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Arr])
   }
 
-  private object IsFunction extends Val.Builtin1("v") {
+  private object IsFunction extends Val.Builtin1("isFunction", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val = Val.bool(pos, v.isInstanceOf[Val.Func])
   }
 
-  private object Count extends Val.Builtin2("arr", "x") {
+  private object Count extends Val.Builtin2("count", "arr", "x") {
     def evalRhs(arr: Val, x: Val, ev: EvalScope, pos: Position): Val = {
       var count = 0
       arr.asArr.foreach(v => if(ev.equal(v, x)) count += 1)
@@ -232,7 +248,7 @@ class Std {
     }
   }
 
-  private object Filter extends Val.Builtin2("func", "arr") {
+  private object Filter extends Val.Builtin2("filter", "func", "arr") {
     def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
       val p = pos.noOffset
       val a = arr.asArr.asLazyArray
@@ -287,14 +303,14 @@ class Std {
     }
   }
 
-  private object Map_ extends Val.Builtin2("func", "arr") {
+  private object Map_ extends Val.Builtin2("map", "func", "arr") {
     def evalRhs(_func: Val, arr: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
       new Val.Arr(pos, arr.asArr.asLazyArray.map(v => (() => func.apply1(v, pos.noOffset)(ev)): Lazy))
     }
   }
 
-  private object MapWithKey extends Val.Builtin2("func", "obj") {
+  private object MapWithKey extends Val.Builtin2("mapWithKey", "func", "obj") {
     def evalRhs(_func: Val, _obj: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
       val obj = _obj.asObj
@@ -314,7 +330,7 @@ class Std {
     }
   }
 
-  private object MapWithIndex extends Val.Builtin2("func", "arr") {
+  private object MapWithIndex extends Val.Builtin2("mapWithIndex", "func", "arr") {
     def evalRhs(_func: Val, _arr: Val, ev: EvalScope, pos: Position): Val = {
       val func = _func.asFunc
       val arr = _arr.asArr.asLazyArray
@@ -330,7 +346,7 @@ class Std {
     }
   }
 
-  private object Find extends Val.Builtin2("value", "arr") {
+  private object Find extends Val.Builtin2("find", "value", "arr") {
     def evalRhs(value: Val, _arr: Val, ev: EvalScope, pos: Position): Val = {
       val arr = _arr.asArr
       val b = new mutable.ArrayBuilder.ofRef[Lazy]
@@ -346,17 +362,17 @@ class Std {
     }
   }
 
-  private object EncodeUTF8 extends Val.Builtin1("s") {
+  private object EncodeUTF8 extends Val.Builtin1("encodeUtf8", "s") {
     def evalRhs(s: Val, ev: EvalScope, pos: Position): Val =
       new Val.Arr(pos, s.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
   }
 
-  private object DecodeUTF8 extends Val.Builtin1("arr") {
+  private object DecodeUTF8 extends Val.Builtin1("decodeUtf8", "arr") {
     def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val =
       new Val.Str(pos, new String(arr.asArr.iterator.map(_.cast[Val.Num].value.toByte).toArray, UTF_8))
   }
 
-  private object Substr extends Val.Builtin3("s", "from", "len") {
+  private object Substr extends Val.Builtin3("substr", "s", "from", "len") {
     def evalRhs(_s: Val, from: Val, len: Val, ev: EvalScope, pos: Position): Val = {
       val s = _s.asString
       val safeOffset = math.min(from.asInt, s.length)
@@ -365,27 +381,27 @@ class Std {
     }
   }
 
-  private object StartsWith extends Val.Builtin2("a", "b") {
+  private object StartsWith extends Val.Builtin2("startsWith", "a", "b") {
     def evalRhs(a: Val, b: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, a.asString.startsWith(b.asString))
   }
 
-  private object EndsWith extends Val.Builtin2("a", "b") {
+  private object EndsWith extends Val.Builtin2("endsWith", "a", "b") {
     def evalRhs(a: Val, b: Val, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, a.asString.endsWith(b.asString))
   }
 
-  private object Char_ extends Val.Builtin1("n") {
+  private object Char_ extends Val.Builtin1("char", "n") {
     def evalRhs(n: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, n.asInt.toChar.toString)
   }
 
-  private object StrReplace extends Val.Builtin3("str", "from", "to") {
+  private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
     def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.replace(from.asString, to.asString))
   }
 
-  private object StrReplaceAll extends Val.Builtin3("str", "from", "to") {
+  private object StrReplaceAll extends Val.Builtin3("strReplaceAll", "str", "from", "to") {
     def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.replaceAll(from.asString, to.asString))
     override def specialize(args: Array[Expr]) = args match {
@@ -393,13 +409,13 @@ class Std {
         try { (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) } catch { case _: Exception => null }
       case _ => null
     }
-    private class SpecFrom(from: Pattern) extends Val.Builtin2("str", "to") {
+    private class SpecFrom(from: Pattern) extends Val.Builtin2("strReplaceAll", "str", "to") {
       def evalRhs(str: Val, to: Val, ev: EvalScope, pos: Position): Val =
         Val.Str(pos, from.matcher(str.asString).replaceAll(to.asString))
     }
   }
 
-  private object Join extends Val.Builtin2("sep", "arr") {
+  private object Join extends Val.Builtin2("join", "sep", "arr") {
     def evalRhs(sep: Val, _arr: Val, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr)
       sep match {
@@ -438,7 +454,7 @@ class Std {
     }
   }
 
-  private object Member extends Val.Builtin2("arr", "x") {
+  private object Member extends Val.Builtin2("member", "arr", "x") {
     def evalRhs(arr: Val, x: Val, ev: EvalScope, pos: Position): Val = {
       Val.bool(pos, arr match {
         case str: Val.Str =>
@@ -454,7 +470,7 @@ class Std {
     }
   }
 
-  private object FlattenArrays extends Val.Builtin1("arrs") {
+  private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
     def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
       val out = new mutable.ArrayBuilder.ofRef[Lazy]
       for(x <- arrs.asArr) {
@@ -467,13 +483,13 @@ class Std {
       new Val.Arr(pos, out.result())
     }
   }
-  private object Reverse extends Val.Builtin1("arrs") {
+  private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
       new Val.Arr(pos, arrs.asArr.asLazyArray.reverse)
     }
   }
 
-  private object Split extends Val.Builtin2("str", "c") {
+  private object Split extends Val.Builtin2("split", "str", "c") {
     def evalRhs(_str: Val, _c: Val, ev: EvalScope, pos: Position): Val = {
       val str = _str.asString
       val cStr = _c.asString
@@ -495,55 +511,55 @@ class Std {
     }
   }
 
-  private object SplitLimit extends Val.Builtin3("str", "c", "maxSplits") {
+  private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxSplits") {
     def evalRhs(str: Val, c: Val, maxSplits: Val, ev: EvalScope, pos: Position): Val = {
       new Val.Arr(pos, str.asString.split(java.util.regex.Pattern.quote(c.asString), maxSplits.asInt + 1).map(s => Val.Str(pos, s)))
     }
   }
 
-  private object StringChars extends Val.Builtin1("str") {
+  private object StringChars extends Val.Builtin1("stringChars", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       stringChars(pos, str.asString)
   }
 
-  private object ParseInt extends Val.Builtin1("str") {
+  private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Num(pos, str.asString.toInt)
   }
 
-  private object ParseOctal extends Val.Builtin1("str") {
+  private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Num(pos, Integer.parseInt(str.asString, 8))
   }
 
-  private object ParseHex extends Val.Builtin1("str") {
+  private object ParseHex extends Val.Builtin1("parseHex", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Num(pos, Integer.parseInt(str.asString, 16))
   }
 
-  private object MD5 extends Val.Builtin1("s") {
+  private object MD5 extends Val.Builtin1("md5", "s") {
     def evalRhs(s: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Platform.md5(s.asString))
   }
 
-  private object AsciiUpper extends Val.Builtin1("str") {
+  private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.toUpperCase)
   }
 
-  private object AsciiLower extends Val.Builtin1("str") {
+  private object AsciiLower extends Val.Builtin1("asciiLower", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.toLowerCase)
   }
 
-  private object Trace extends Val.Builtin2("str", "rest") {
+  private object Trace extends Val.Builtin2("trace", "str", "rest") {
     def evalRhs(str: Val, rest: Val, ev: EvalScope, pos: Position): Val = {
       System.err.println(s"TRACE: ${pos.fileScope.currentFileLastPathElement} " + str.asString)
       rest
     }
   }
 
-  private object ExtVar extends Val.Builtin1("x") {
+  private object ExtVar extends Val.Builtin1("extVar", "x") {
     def evalRhs(_x: Val, ev: EvalScope, pos: Position): Val = {
       val Val.Str(_, x) = _x
       ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
@@ -551,7 +567,7 @@ class Std {
     override def staticSafe = false
   }
 
-  private object ObjectValues extends Val.Builtin1("o") {
+  private object ObjectValues extends Val.Builtin1("objectValues", "o") {
     def evalRhs(_o: Val, ev: EvalScope, pos: Position): Val = {
       val o = _o.asObj
       val keys = getVisibleKeys(ev, o)
@@ -559,7 +575,7 @@ class Std {
     }
   }
 
-  private object ObjectValuesAll extends Val.Builtin1("o") {
+  private object ObjectValuesAll extends Val.Builtin1("objectValuesAll", "o") {
     def evalRhs(_o: Val, ev: EvalScope, pos: Position): Val = {
       val o = _o.asObj
       val keys = getAllKeys(ev, o)
@@ -567,7 +583,7 @@ class Std {
     }
   }
 
-  private object Lines extends Val.Builtin1("arr") {
+  private object Lines extends Val.Builtin1("lines", "arr") {
     def evalRhs(v1: Val, ev: EvalScope, pos: Position): Val = {
     v1.asArr.foreach {
       case _: Val.Str | _: Val.Null => // donothing
@@ -584,7 +600,7 @@ class Std {
     }
   }
 
-  private object Range extends Val.Builtin2("from", "to") {
+  private object Range extends Val.Builtin2("range", "from", "to") {
     def evalRhs(from: Val, to: Val, ev: EvalScope, pos: Position): Val =
     new Val.Arr(
       pos,
@@ -592,29 +608,29 @@ class Std {
     )
   }
 
-  private object ManifestJson extends Val.Builtin1("v") {
+  private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer())(ev).toString)
   }
 
-  private object ManifestJsonMinified extends Val.Builtin1("v") {
+  private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer(indent = -1))(ev).toString)
   }
 
-  private object ManifestJsonEx extends Val.Builtin2("value", "indent") {
+  private object ManifestJsonEx extends Val.Builtin2("manifestJsonEx", "value", "indent") {
     def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer
         .apply0(v, new MaterializeJsonRenderer(indent = i.asString.length))(ev)
         .toString)
   }
 
-  private object ParseJson extends Val.Builtin1("str") {
+  private object ParseJson extends Val.Builtin1("parseJson", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
       ujson.StringParser.transform(str.asString, new ValVisitor(pos))
   }
 
-  private object ParseYaml extends Val.Builtin1("str") {
+  private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
       try {
         ujson.StringParser.transform(Platform.yamlToJson(str.asString), new ValVisitor(pos))
@@ -624,29 +640,115 @@ class Std {
     }
   }
 
-  private object Set_ extends Val.Builtin2("arr", "keyF", Array(null, Val.False(dummyPos))) {
+  private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
     def evalRhs(arr: Val, keyF: Val, ev: EvalScope, pos: Position): Val = {
       uniqArr(pos, ev, sortArr(pos, ev, arr, keyF), keyF)
     }
   }
 
+  private object SetInter extends Val.Builtin3("setInter", "a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
+    private def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
+
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
+      case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
+      case Array(a, b: Val.Arr) if isStr(b) => (new Spec1Str(b), Array(a))
+      case args if args.length == 2 => (Spec2, args)
+      case _ => null
+    }
+
+    def asArray(a: Val): Array[Lazy] = a match {
+      case arr: Val.Arr => arr.asLazyArray
+      case str: Val.Str => stringChars(pos, str.value).asLazyArray
+      case _ => Error.fail("Arguments must be either arrays or strings")
+    }
+
+    def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
+      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
+      else {
+        val a = asArray(_a)
+        val b = asArray(_b)
+        val keyFFunc = _keyF.asInstanceOf[Val.Func]
+        val out = new mutable.ArrayBuffer[Lazy]
+        for (v <- a) {
+          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
+          if (b.exists(value => {
+            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
+            ev.equal(appliedValue, appliedX)
+          }) && !out.exists(value => {
+            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
+            ev.equal(mValue, appliedX)
+          })) {
+            out.append(v)
+          }
+        }
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyFFunc)
+      }
+    }
+
+    private object Spec2 extends Val.Builtin2("setInter", "a", "b") {
+      def evalRhs(_a: Val, _b: Val, ev: EvalScope, pos: Position): Val = {
+        val a = asArray(_a)
+        val b = asArray(_b)
+        val out = new mutable.ArrayBuffer[Lazy](a.length)
+        for (v <- a) {
+          val vf = v.force
+          if (b.exists(value => {
+            ev.equal(value.force, vf)
+          }) && !out.exists(value => {
+            ev.equal(value.force, vf)
+          })) {
+            out.append(v)
+          }
+        }
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), null)
+      }
+    }
+
+    private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("setInter", "b") {
+      private[this] val a =
+        ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
+        // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
+
+      def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
+        val b = asArray(_b)
+        val bs = new mutable.HashSet[String]
+        var i = 0
+        while(i < b.length) {
+          b(i).force match {
+            case s: Val.Str => bs.add(s.value)
+            case _ =>
+          }
+          i += 1
+        }
+        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        i = 0
+        while(i < a.length) {
+          val s = a(i).asInstanceOf[Val.Str]
+          if(bs.contains(s.value)) out.+=(s)
+          i += 1
+        }
+        new Val.Arr(pos, out.result())
+      }
+    }
+  }
+
   val functions: Map[String, Val.Func] = Map(
-    "assertEqual" -> AssertEqual,
-    "toString" -> ToString,
-    "codepoint" -> Codepoint,
-    "length" -> Length,
-    "objectHas" -> ObjectHas,
-    "objectHasAll" -> ObjectHasAll,
-    "objectFields" -> ObjectFields,
-    "objectFieldsAll" -> ObjectFieldsAll,
-    "objectValues" -> ObjectValues,
-    "objectValuesAll" -> ObjectValuesAll,
-    "type" -> Type,
-    "lines" -> Lines,
-    "format" -> Format_,
-    "foldl" -> Foldl,
-    "foldr" -> Foldr,
-    "range" -> Range,
+    builtin(AssertEqual),
+    builtin(ToString),
+    builtin(Codepoint),
+    builtin(Length),
+    builtin(ObjectHas),
+    builtin(ObjectHasAll),
+    builtin(ObjectFields),
+    builtin(ObjectFieldsAll),
+    builtin(ObjectValues),
+    builtin(ObjectValuesAll),
+    builtin(Type),
+    builtin(Lines),
+    builtin(Format_),
+    builtin(Foldl),
+    builtin(Foldr),
+    builtin(Range),
     builtin("mergePatch", "target", "patch"){ (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
       def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
@@ -774,17 +876,17 @@ class Std {
       //val mantissa = value * Math.pow(2.0, -exponent)
       exponent
     },
-    "isString" -> IsString,
-    "isBoolean" -> IsBoolean,
-    "isNumber" -> IsNumber,
-    "isObject" -> IsObject,
-    "isArray" -> IsArray,
-    "isFunction" -> IsFunction,
-    "count" -> Count,
-    "filter" -> Filter,
-    "map" -> Map_,
-    "mapWithKey" -> MapWithKey,
-    "mapWithIndex" -> MapWithIndex,
+    builtin(IsString),
+    builtin(IsBoolean),
+    builtin(IsNumber),
+    builtin(IsObject),
+    builtin(IsArray),
+    builtin(IsFunction),
+    builtin(Count),
+    builtin(Filter),
+    builtin(Map_),
+    builtin(MapWithKey),
+    builtin(MapWithIndex),
     builtin("flatMap", "func", "arr"){ (pos, ev, func: Val.Func, arr: Val) =>
       val res: Val = arr match {
         case a: Val.Arr =>
@@ -827,7 +929,7 @@ class Std {
         }
       )
     },
-    "find" -> Find,
+    builtin(Find),
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
       if (pat.length == 0) new Val.Arr(pos, emptyLazyArray)
       else {
@@ -843,12 +945,12 @@ class Std {
         }
       }
     },
-    "substr" -> Substr,
-    "startsWith" -> StartsWith,
-    "endsWith" -> EndsWith,
-    "char" -> Char_,
-    "strReplace" -> StrReplace,
-    "strReplaceAll" -> StrReplaceAll,
+    builtin(Substr),
+    builtin(StartsWith),
+    builtin(EndsWith),
+    builtin(Char_),
+    builtin(StrReplace),
+    builtin(StrReplaceAll),
 
     builtin("rstripChars", "str", "chars"){ (pos, ev, str: String, chars: String) =>
       str.replaceAll("[" + Regex.quote(chars) + "]+$", "")
@@ -859,8 +961,8 @@ class Std {
     builtin("stripChars", "str", "chars"){ (pos, ev, str: String, chars: String) =>
       str.replaceAll("[" + Regex.quote(chars) + "]+$", "").replaceAll("^[" + Regex.quote(chars) + "]+", "")
     },
-    "join" -> Join,
-    "member" -> Member,
+    builtin(Join),
+    builtin(Member),
 
     builtin("repeat", "what", "count"){ (pos, ev, what: Val, count: Int) =>
       val res: Val = what match {
@@ -881,8 +983,8 @@ class Std {
       res
     },
 
-    "flattenArrays" -> FlattenArrays,
-    "reverse" -> Reverse,
+    builtin(FlattenArrays),
+    builtin(Reverse),
 
     builtin("manifestIni", "v"){ (pos, ev, v: Val) =>
       val materialized = Materializer(v)(ev)
@@ -919,9 +1021,9 @@ class Std {
     builtin("manifestPython", "v"){ (pos, ev, v: Val) =>
       Materializer.apply0(v, new PythonRenderer())(ev).toString
     },
-    "manifestJson" -> ManifestJson,
-    "manifestJsonMinified" -> ManifestJsonMinified,
-    "manifestJsonEx" -> ManifestJsonEx,
+    builtin(ManifestJson),
+    builtin(ManifestJsonMinified),
+    builtin(ManifestJsonEx),
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
                         "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>
@@ -1038,7 +1140,7 @@ class Std {
     builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       sortArr(pos, ev, args(0), args(1))
     },
-    "set" -> Set_,
+    builtin(Set_),
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val a = toSetArrOrString(args, 0, pos, ev)
       val b = toSetArrOrString(args, 1, pos, ev)
@@ -1135,24 +1237,13 @@ class Std {
       rec(s)
     },
 
-    "asciiUpper" -> AsciiUpper,
-    "asciiLower" -> AsciiLower,
-    "trace" -> Trace,
-    "extVar" -> ExtVar,
-    builtinWithDefaults("get", "o" -> null, "f" -> null, "default" -> Val.Null(dummyPos), "inc_hidden" -> Val.True(dummyPos)) { (args, pos, ev) =>
-      val obj = args(0).asObj
-      val k = args(1).asString
-      val incHidden = args(3).asBoolean
-      if (incHidden && obj.containsKey(k)) {
-        obj.value(k, pos.noOffset, obj)(ev)
-      } else if (!incHidden && obj.containsVisibleKey(k)) {
-        obj.value(k, pos.noOffset, obj)(ev)
-      } else {
-        args(2)
-      }
-    },
-    "all" -> All,
-    "any" -> Any,
+    builtin(AsciiUpper),
+    builtin(AsciiLower),
+    builtin(Trace),
+    builtin(ExtVar),
+    builtin(Get),
+    builtin(All),
+    builtin(Any),
     builtin("isEmpty", "str") { (_, _, str: String) =>
       str.isEmpty
     },
@@ -1187,7 +1278,7 @@ class Std {
       case arr: Val.Arr => arr.asLazyArray
       case str: Val.Str if !ev.settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
       case _ if !ev.settings.strictSetOperations => Error.fail(f"Argument $idx must be either arrays or strings")
-      case _ if ev.settings.strictSetOperations => Error.fail(f"Argument $idx must be an array")
+      case _ => Error.fail(f"Argument $idx must be an array")
     }
   }
 
@@ -1263,9 +1354,11 @@ class Std {
     ): _*
   )
 
+  private def builtin(obj : Val.Builtin) = (obj.functionName, obj)
+
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
                                             (eval: (Position, EvalScope, T1) => R): (String, Val.Func) = {
-    (name, new Val.Builtin1(p1) {
+    (name, new Val.Builtin1(name, p1) {
       def evalRhs(arg1: Val, ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
         val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1)
@@ -1276,7 +1369,7 @@ class Std {
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)
                                                             (eval: (Position, EvalScope, T1, T2) => R): (String, Val.Func) = {
-    (name, new Val.Builtin2(p1, p2) {
+    (name, new Val.Builtin2(name, p1, p2) {
       def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
         val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1)
@@ -1288,7 +1381,7 @@ class Std {
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter](name: String, p1: String, p2: String, p3: String)
                                                                             (eval: (Position, EvalScope, T1, T2, T3) => R): (String, Val.Func) = {
-    (name, new Val.Builtin3(p1, p2, p3) {
+    (name, new Val.Builtin3(name, p1, p2, p3) {
       def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
         val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1)
@@ -1302,7 +1395,7 @@ class Std {
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter, T3: ReadWriter, T4: ReadWriter]
              (name: String, p1: String, p2: String, p3: String, p4: String)
              (eval: (Position, EvalScope, T1, T2, T3, T4) => R): (String, Val.Func) = {
-    (name, new Val.Builtin4(p1, p2, p3, p4) {
+    (name, new Val.Builtin4(name, p1, p2, p3, p4) {
       def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, outerPos: Position): Val = {
         //println("--- calling builtin: "+name)
         val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1)
@@ -1321,9 +1414,9 @@ class Std {
     */
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
-    name -> new Val.Builtin(params.map(_._1).toArray, params.map(_._2).toArray) {
-      def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
-        implicitly[ReadWriter[R]].write(pos, eval(args, pos, ev))
+    name -> new Val.Builtin(name, params.map(_._1).toArray, params.map(_._2).toArray) {
+      def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+        implicitly[ReadWriter[R]].write(pos, eval(args.map(_.force), pos, ev))
     }
   }
 
