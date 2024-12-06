@@ -313,7 +313,7 @@ object ErrorTests extends TestSuite{
     test("format_func") - check(
       """|sjsonnet.Error: Cannot format function value
          |    at [Function].(sjsonnet/test/resources/db/error.format_func.jsonnet:1:9)
-         |    at [ApplyBuiltin1].(sjsonnet/test/resources/db/error.format_func.jsonnet:1:7)
+         |    at [std.format].(sjsonnet/test/resources/db/error.format_func.jsonnet:1:7)
          |""".stripMargin,
       suite = "db"
     )

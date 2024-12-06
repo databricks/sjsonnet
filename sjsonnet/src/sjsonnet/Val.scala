@@ -356,6 +356,7 @@ object Val{
         allKeys.put(uniqueKey, false)
         keys(idx) = uniqueKey
         idx += 1
+      case _ =>
     }
     val fieldSet = new StaticObjectFieldSet(keys)
     new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))
@@ -469,32 +470,25 @@ object Val{
   }
 
   /** Superclass for standard library functions */
-  abstract class Builtin(paramNames: Array[String], defaults: Array[Expr] = null)
+  abstract class Builtin(val functionName: String, paramNames: Array[String], defaults: Array[Expr] = null)
     extends Func(null, ValScope.empty, Params(paramNames,
       if(defaults == null) new Array[Expr](paramNames.length) else defaults)) {
 
     override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
 
     final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
-      val args = new Array[Val](params.names.length)
-      var i = 0
-      var j = scope.length - args.length
-      while(i < args.length) {
-        args(i) = scope.bindings(i).force
-        i += 1
-      }
-      evalRhs(args, ev, pos)
+      evalRhs(scope.bindings, ev, pos)
     }
 
-    def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val
+    def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val
 
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
-      else evalRhs(Array(argVal.force), ev, outerPos)
+      else evalRhs(Array(argVal), ev, outerPos)
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
-      else evalRhs(Array(argVal1.force, argVal2.force), ev, outerPos)
+      else evalRhs(Array(argVal1, argVal2), ev, outerPos)
 
     /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
      * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
@@ -507,9 +501,9 @@ object Val{
     def staticSafe: Boolean = true
   }
 
-  abstract class Builtin1(pn1: String, def1: Expr = null) extends Builtin(Array(pn1), if(def1 == null) null else Array(def1)) {
-    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0), ev, pos)
+  abstract class Builtin1(functionName: String, pn1: String, def1: Expr = null) extends Builtin(functionName: String, Array(pn1), if(def1 == null) null else Array(def1)) {
+    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).force, ev, pos)
 
     def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
 
@@ -522,9 +516,9 @@ object Val{
       else super.apply(Array(argVal), null, outerPos)
   }
 
-  abstract class Builtin2(pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2), defs) {
-    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0), args(1), ev, pos)
+  abstract class Builtin2(functionName: String, pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2), defs) {
+    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).force, args(1).force, ev, pos)
 
     def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
 
@@ -538,9 +532,9 @@ object Val{
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
 
-  abstract class Builtin3(pn1: String, pn2: String, pn3: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2, pn3), defs) {
-    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0), args(1), args(2), ev, pos)
+  abstract class Builtin3(functionName: String, pn1: String, pn2: String, pn3: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2, pn3), defs) {
+    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).force, args(1).force, args(2).force, ev, pos)
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
 
@@ -550,9 +544,9 @@ object Val{
       else super.apply(argVals, namedNames, outerPos)
   }
 
-  abstract class Builtin4(pn1: String, pn2: String, pn3: String, pn4: String, defs: Array[Expr] = null) extends Builtin(Array(pn1, pn2, pn3, pn4), defs) {
-    final def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0), args(1), args(2), args(3), ev, pos)
+  abstract class Builtin4(functionName: String, pn1: String, pn2: String, pn3: String, pn4: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2, pn3, pn4), defs) {
+    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).force, args(1).force, args(2).force, args(3).force, ev, pos)
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, pos: Position): Val
 
