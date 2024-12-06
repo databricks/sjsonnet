@@ -6,8 +6,8 @@ import java.util.Base64
 import java.util
 import java.util.regex.Pattern
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.BinaryOp
 
+import scala.collection.Searching._
 import scala.collection.mutable
 import scala.util.matching.Regex
 
@@ -137,15 +137,7 @@ class Std {
   }
 
   private object Type extends Val.Builtin1("x") {
-    def evalRhs(x: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, x match {
-      case _: Val.Bool => "boolean"
-      case _: Val.Null => "null"
-      case _: Val.Obj => "object"
-      case _: Val.Arr => "array"
-      case _: Val.Func => "function"
-      case _: Val.Num => "number"
-      case _: Val.Str => "string"
-    })
+    def evalRhs(x: Val, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.prettyName)
   }
 
   private object Format_ extends Val.Builtin2("str", "vals") {
@@ -177,6 +169,8 @@ class Std {
             current = func.apply2(c, Val.Str(pos, new String(Array(char))), pos.noOffset)(ev)
           }
           current
+
+        case _ => Error.fail("Cannot call foldl on " + arr.prettyName)
       }
 
 
@@ -201,6 +195,7 @@ class Std {
             current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(ev)
           }
           current
+        case _ => Error.fail("Cannot call foldr on " + arr.prettyName)
       }
     }
   }
@@ -453,10 +448,8 @@ class Std {
           }
           str.value.contains(secondArg)
         case a: Val.Arr =>
-          var c = 0
-          a.foreach(v => if(ev.equal(v, x)) c += 1)
-          c > 0
-        case x => Error.fail("std.member first argument must be an array or a string, got " + arr.prettyName)
+          a.asLazyArray.indexWhere(v => ev.equal(v.force, x)) >= 0
+        case _ => Error.fail("std.member first argument must be an array or a string, got " + arr.prettyName)
       })
     }
   }
@@ -637,92 +630,6 @@ class Std {
     }
   }
 
-  private object SetInter extends Val.Builtin3("a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
-    private def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
-
-    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
-      case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
-      case Array(a, b: Val.Arr) if isStr(b) => (new Spec1Str(b), Array(a))
-      case args if args.length == 2 => (Spec2, args)
-      case _ => null
-    }
-
-    def asArray(a: Val): Array[Lazy] = a match {
-      case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str => stringChars(pos, str.value).asLazyArray
-      case _ => Error.fail("Arguments must be either arrays or strings")
-    }
-
-    def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
-      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
-      else {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val keyFFunc = _keyF.asInstanceOf[Val.Func]
-        val out = new mutable.ArrayBuffer[Lazy]
-        for (v <- a) {
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
-          if (b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyFFunc)
-      }
-    }
-
-    private object Spec2 extends Val.Builtin2("a", "b") {
-      def evalRhs(_a: Val, _b: Val, ev: EvalScope, pos: Position): Val = {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val out = new mutable.ArrayBuffer[Lazy](a.length)
-        for (v <- a) {
-          val vf = v.force
-          if (b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), null)
-      }
-    }
-
-    private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("b") {
-      private[this] val a =
-        ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
-        // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
-
-      def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
-        val b = asArray(_b)
-        val bs = new mutable.HashSet[String]
-        var i = 0
-        while(i < b.length) {
-          b(i).force match {
-            case s: Val.Str => bs.add(s.value)
-            case _ =>
-          }
-          i += 1
-        }
-        val out = new mutable.ArrayBuilder.ofRef[Lazy]
-        i = 0
-        while(i < a.length) {
-          val s = a(i).asInstanceOf[Val.Str]
-          if(bs.contains(s.value)) out.+=(s)
-          i += 1
-        }
-        new Val.Arr(pos, out.result())
-      }
-    }
-  }
-
   val functions: Map[String, Val.Func] = Map(
     "assertEqual" -> AssertEqual,
     "toString" -> ToString,
@@ -756,6 +663,7 @@ class Std {
             case (Some(lChild), None) => k -> createMember{lChild}
             case (Some(lChild: Val.Obj), Some(rChild: Val.Obj)) => k -> createMember{recPair(lChild, rChild)}
             case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
+            case (None, None) => Error.fail("std.mergePatch: This should never happen")
           }
 
           Val.Obj.mk(mergePosition, kvs:_*)
@@ -904,6 +812,7 @@ class Std {
             )
           }
           Val.Str(pos, builder.toString)
+        case _ => Error.fail("Argument must be either array or string")
       }
       res
     },
@@ -1131,80 +1040,68 @@ class Std {
     },
     "set" -> Set_,
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
-      val a = args(0) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => Error.fail("Arguments must be either arrays or strings")
+      val a = toSetArrOrString(args, 0, pos, ev)
+      val b = toSetArrOrString(args, 1, pos, ev)
+      if (ev.settings.strictSetOperations && a.length == 0) {
+        args(0)
+      } else if (ev.settings.strictSetOperations && b.length == 0) {
+        args(1)
+      } else {
+        val concat = new Val.Arr(pos, a ++ b)
+        uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
       }
-      val b = args(1) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => Error.fail("Arguments must be either arrays or strings")
-      }
-      val concat = new Val.Arr(pos, a ++ b)
-      uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
     },
-    "setInter" -> SetInter,
-    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
-
-      val a = args(0) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => Error.fail("Arguments must be either arrays or strings")
-      }
-      val b = args(1) match {
-        case arr: Val.Arr => arr.asLazyArray
-        case str: Val.Str => stringChars(pos, str.value).asLazyArray
-        case _ => Error.fail("Arguments must be either arrays or strings")
-      }
-
+    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val keyF = args(2)
+      validateSet(ev, pos, keyF, args(0))
+      validateSet(ev, pos, keyF, args(1))
+
+      val a = toSetArrOrString(args, 0, pos, ev)
+      val b = toSetArrOrString(args, 1, pos, ev)
+
+      val out = new mutable.ArrayBuffer[Lazy]
+
+      // The intersection will always be, at most, the size of the smallest set.
+      val sets = if (b.length < a.length) (b, a) else (a, b)
+      for (v <- sets._1) {
+        if (existsInSet(ev, pos, keyF, sets._2, v.force) &&
+          (ev.settings.strictSetOperations || !existsInSet(ev, pos, keyF, out, v.force))) {
+          out.append(v)
+        }
+      }
+      if (ev.settings.strictSetOperations) {
+        new Val.Arr(pos, out.toArray)
+      } else {
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      }
+    },
+    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
+      val keyF = args(2)
+      validateSet(ev, pos, keyF, args(0))
+      validateSet(ev, pos, keyF, args(1))
+
+      val a = toSetArrOrString(args, 0, pos, ev)
+      val b = toSetArrOrString(args, 1, pos, ev)
       val out = new mutable.ArrayBuffer[Lazy]
 
       for (v <- a) {
-        if (keyF.isInstanceOf[Val.False]) {
-          val vf = v.force
-          if (!b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        } else {
-          val keyFFunc = keyF.asInstanceOf[Val.Func]
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
-
-          if (!b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
+        if (!existsInSet(ev, pos, keyF, b, v.force) &&
+          (ev.settings.strictSetOperations || !existsInSet(ev, pos, keyF, out, v.force))) {
+          out.append(v)
         }
       }
 
-      sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      if (ev.settings.strictSetOperations) {
+        new Val.Arr(pos, out.toArray)
+      } else {
+        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+      }
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val keyF = args(2)
-
-      if (keyF.isInstanceOf[Val.False]) {
-        val ujson.Arr(mArr) = Materializer(args(1))(ev)
-        val mx = Materializer(args(0))(ev)
-        mArr.contains(mx)
-      } else {
-        val arr = args(1).asInstanceOf[Val.Arr].asLazyArray
-        val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val appliedX = keyFFunc.apply1(args(0), pos.noOffset)(ev)
-        arr.exists(value => {
-          val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-          ev.equal(appliedValue, appliedX)
-        })
-      }
+      validateSet(ev, pos, keyF, args(1))
+      val arr = args(1).asArr.asLazyArray
+      existsInSet(ev, pos, keyF, arr, args(0))
     },
 
     "split" -> Split,
@@ -1284,6 +1181,68 @@ class Std {
       Platform.sha3(str)
     },
   )
+
+  private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
+    args(idx) match {
+      case arr: Val.Arr => arr.asLazyArray
+      case str: Val.Str if !ev.settings.strictSetOperations => stringChars(pos, str.value).asLazyArray
+      case _ if !ev.settings.strictSetOperations => Error.fail(f"Argument $idx must be either arrays or strings")
+      case _ if ev.settings.strictSetOperations => Error.fail(f"Argument $idx must be an array")
+    }
+  }
+
+  private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
+    arg match {
+      case arr: Val.Arr => arr.asLazyArray
+      case str: Val.Str => stringChars(pos, str.value).asLazyArray
+      case _ => Error.fail(f"Argument must be either arrays or strings")
+    }
+  }
+
+
+  private def validateSet(ev: EvalScope, pos: Position, keyF: Val, arr: Val): Unit = {
+    if (ev.settings.throwErrorForInvalidSets) {
+      val sorted = uniqArr(pos.noOffset, ev, sortArr(pos.noOffset, ev, arr, keyF), keyF)
+      if (!ev.equal(arr, sorted)) {
+        val err = new Error("Set operation on " + arr.prettyName + " was called with a non-set")
+        if (ev.settings.strictSetOperations) {
+          throw err
+        } else {
+          ev.warn(err)
+        }
+      }
+    }
+  }
+
+  private def existsInSet(ev: EvalScope, pos: Position, keyF: Val, arr: mutable.IndexedSeq[_ <: Lazy], toFind: Val): Boolean = {
+    val appliedX = keyF match {
+      case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev)
+      case _ => toFind
+    }
+    if (ev.settings.strictSetOperations) {
+      arr.search(appliedX.force)((toFind: Lazy, value: Lazy) => {
+        val appliedValue = keyF match {
+          case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
+          case _ => value
+        }
+        toFind.force match {
+          case s: Val.Str if appliedValue.isInstanceOf[Val.Str] => Ordering.String.compare(s.asString, appliedValue.force.asString)
+          case n: Val.Num if appliedValue.isInstanceOf[Val.Num] => java.lang.Double.compare(n.asDouble, appliedValue.force.asDouble)
+          case t: Val.Bool if appliedValue.isInstanceOf[Val.Bool] => Ordering.Boolean.compare(t.asBoolean, appliedValue.force.asBoolean)
+          case _ => Error.fail("Cannot perform set operation on " + toFind.force.prettyName + " and " + appliedValue.force.prettyName)
+        }
+      }).isInstanceOf[Found]
+    } else {
+      arr.exists(value => {
+        val appliedValue = keyF match {
+          case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
+          case _ => value
+        }
+        ev.equal(appliedValue.force, appliedX.force)
+      })
+    }
+  }
+
   val Std: Val.Obj = Val.Obj.mk(
     null,
     functions.toSeq
@@ -1362,7 +1321,6 @@ class Std {
     */
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
-    val indexedParamKeys = params.zipWithIndex.map{case ((k, v), i) => (k, i)}.toArray
     name -> new Val.Builtin(params.map(_._1).toArray, params.map(_._2).toArray) {
       def evalRhs(args: Array[Val], ev: EvalScope, pos: Position): Val =
         implicitly[ReadWriter[R]].write(pos, eval(args, pos, ev))
@@ -1370,11 +1328,7 @@ class Std {
   }
 
   private def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
-    val arrValue = arr match {
-      case arr: Val.Arr => arr
-      case str: Val.Str => stringChars(pos, str.asString)
-      case _ => Error.fail("Argument must be either array or string")
-    }
+    val arrValue = toArrOrString(arr, pos, ev)
 
     val out = new mutable.ArrayBuffer[Lazy]
     for (v <- arrValue) {
@@ -1386,18 +1340,9 @@ class Std {
         }
       } else if (!keyF.isInstanceOf[Val.False]) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
-
         val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev)
         val o2Key = keyFFunc.apply1(out.last, pos.noOffset)(ev)
-        val o1KeyExpr = Materializer.toExpr(Materializer.apply(o1Key)(ev))(ev)
-        val o2KeyExpr = Materializer.toExpr(Materializer.apply(o2Key)(ev))(ev)
-
-        val comparisonExpr = Expr.BinaryOp(dummyPos, o1KeyExpr, BinaryOp.OP_!=, o2KeyExpr)
-        val exprResult = ev.visitExpr(comparisonExpr)(ValScope.empty)
-
-        val res = Materializer.apply(exprResult)(ev).asInstanceOf[ujson.Bool]
-
-        if (res.value) {
+        if (!ev.equal(o1Key, o2Key)) {
           out.append(v)
         }
       }
@@ -1407,47 +1352,43 @@ class Std {
   }
 
   private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
-    val vs = arr match {
-      case arr: Val.Arr => arr
-      case str: Val.Str => stringChars(pos, str.asString)
-      case _ => Error.fail("Cannot sort " + arr.prettyName)
-    }
+    val vs = toArrOrString(arr, pos, ev)
     if (vs.length <= 1) {
       arr
     } else {
       val keyFFunc = if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
       new Val.Arr(pos, if (keyFFunc != null) {
-        val keys = new Val.Arr(pos.noOffset, vs.asStrictArray.map((v) => keyFFunc(Array(v), null, pos.noOffset)(ev)))
-        val keyTypes = keys.iterator.map(_.getClass).toSet
+        val keys = new Val.Arr(pos.noOffset, vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev)))
+        val keyTypes = keys.iterator.map(_.force.getClass).toSet
         if (keyTypes.size != 1) {
           Error.fail("Cannot sort with key values that are not all the same type")
         }
 
         if (keyTypes.contains(classOf[Val.Str])) {
-          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Str].asString)
+          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Str].asString)
         } else if (keyTypes.contains(classOf[Val.Num])) {
-          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Num].asDouble)
+          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Num].asDouble)
         } else if (keyTypes.contains(classOf[Val.Bool])) {
-          vs.asStrictArray.sortBy((v) => keyFFunc(Array(v), null, pos.noOffset)(ev).cast[Val.Bool].asBoolean)
+          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Bool].asBoolean)
         } else {
           Error.fail("Cannot sort with key values that are " + keys.force(0).prettyName + "s")
         }
       } else {
-        val keyTypes = vs.iterator.map(_.getClass).toSet
+        val keyTypes = vs.map(_.force.getClass).toSet
         if (keyTypes.size != 1) {
           Error.fail("Cannot sort with values that are not all the same type")
         }
 
         if (keyTypes.contains(classOf[Val.Str])) {
-          vs.asStrictArray.map(_.cast[Val.Str]).sortBy(_.asString)
+          vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
         } else if (keyTypes.contains(classOf[Val.Num])) {
-          vs.asStrictArray.map(_.cast[Val.Num]).sortBy(_.asDouble)
+          vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
         } else if (keyTypes.contains(classOf[Val.Bool])) {
-          vs.asStrictArray.map(_.cast[Val.Bool]).sortBy(_.asBoolean)
+          vs.map(_.force.cast[Val.Bool]).sortBy(_.asBoolean)
         } else if (keyTypes.contains(classOf[Val.Obj])) {
           Error.fail("Unable to sort array of objects without key function")
         } else {
-          Error.fail("Cannot sort array of " + vs.force(0).prettyName)
+          Error.fail("Cannot sort array of " + vs(0).force.prettyName)
         }
       })
     }
@@ -1462,13 +1403,13 @@ class Std {
     }
     new Val.Arr(pos, a)
   }
-  
+
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
     maybeSortKeys(ev, v1.visibleKeyNames)
 
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
     maybeSortKeys(ev, v1.allKeyNames)
-  
+
   @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
     if(ev.settings.preserveOrder) keys else keys.sorted
 

@@ -213,7 +213,9 @@ object SjsonnetMain {
         noStaticErrors = config.noStaticErrors.value,
         noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
         strictImportSyntax = config.strictImportSyntax.value,
-        strictInheritedAssertions = config.strictInheritedAssertions.value
+        strictInheritedAssertions = config.strictInheritedAssertions.value,
+        strictSetOperations = config.strictSetOperations.value,
+        throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
       ),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       warnLogger = warnLogger,

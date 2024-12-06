@@ -6,12 +6,12 @@ object StdWithKeyFTests extends TestSuite {
 
   def tests = Tests {
     test("stdSetMemberWithKeyF") {
-      eval("std.setMember(\"a\", [\"a\", \"b\", \"c\"], function(x) x)") ==> ujson.True
-      eval("std.setMember(\"a\", [\"a\", \"b\", \"c\"])") ==> ujson.True
-      eval("std.setMember(\"d\", [\"a\", \"b\", \"c\"], function(x) x)") ==> ujson.False
+      eval("std.setMember(\"a\", std.set([\"a\", \"b\", \"c\"], function(x) x), function(x) x)") ==> ujson.True
+      eval("std.setMember(\"a\", std.set([\"a\", \"b\", \"c\"]))") ==> ujson.True
+      eval("std.setMember(\"d\", std.set([\"a\", \"b\", \"c\"], function(x) x), function(x) x)") ==> ujson.False
 
       eval(
-        """local arr = [
+        """local arr = std.set([
                 {
                    "name": "Foo",
                    "language": {
@@ -33,7 +33,7 @@ object StdWithKeyFTests extends TestSuite {
                      "version": "n/a"
                    }
                  }
-              ];
+              ], function(x) x.language.name);
              
               local testObj = {
                    "name": "TestObj",
@@ -154,10 +154,11 @@ object StdWithKeyFTests extends TestSuite {
         """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"}]"""
     }
     test("stdSetUnionWithKeyF") {
-      eval("std.setUnion([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["a","b","c"]"""
+      eval("std.setUnion(std.set([\"c\", \"c\", \"b\"]), std.set([\"b\", \"b\", \"a\", \"b\", \"a\"]))").toString() ==>
+          """["a","b","c"]"""
 
       eval(
-        """local arr1 = [
+        """local arr1 = std.set([
                 {
                    "name": "Foo",
                    "language": {
@@ -179,8 +180,8 @@ object StdWithKeyFTests extends TestSuite {
                      "version": "n/a"
                    }
                  }
-              ];
-             local arr2 = [
+              ], function(x) x.language.name);
+             local arr2 = std.set([
                {
                   "name": "Foo",
                   "language": {
@@ -202,16 +203,16 @@ object StdWithKeyFTests extends TestSuite {
                     "version": "n/a"
                   }
                 }
-             ];
+             ], function(x) x.language.name);
              
              std.setUnion(arr1, arr2, function(x) x.language.name)""").toString() ==>
         """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"},{"language":{"name":"Scala","version":"2.13"},"name":"Bar"}]"""
     }
     test("stdSetInterWithKeyF") {
-      eval("std.setInter([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["b"]"""
+      eval("std.setInter([\"b\", \"c\"], [\"a\", \"b\"])").toString() ==> """["b"]"""
 
       eval(
-        """local arr1 = [
+        """local arr1 = std.set([
                 {
                    "name": "Foo",
                    "language": {
@@ -233,8 +234,8 @@ object StdWithKeyFTests extends TestSuite {
                      "version": "n/a"
                    }
                  }
-              ];
-             local arr2 = [
+              ], function(x) x.language.name);
+             local arr2 = std.set([
                {
                   "name": "Foo",
                   "language": {
@@ -256,16 +257,16 @@ object StdWithKeyFTests extends TestSuite {
                     "version": "n/a"
                   }
                 }
-             ];
+             ], function(x) x.language.name);
 
              std.setInter(arr1, arr2, function(x) x.language.name)""").toString() ==>
         """[{"language":{"name":"C++","version":"n/a"},"name":"FooBar"},{"language":{"name":"Java","version":"1.8"},"name":"Foo"}]"""
     }
     test("stdSetDiffWithKeyF") {
-      eval("std.setDiff([\"c\", \"c\", \"b\"], [\"b\", \"b\", \"a\", \"b\", \"a\"])").toString() ==> """["c"]"""
+      eval("std.setDiff([\"b\", \"c\"], [\"a\", \"b\"])").toString() ==> """["c"]"""
 
       eval(
-        """local arr1 = [
+        """local arr1 = std.set([
                 {
                    "name": "Foo",
                    "language": {
@@ -287,8 +288,8 @@ object StdWithKeyFTests extends TestSuite {
                      "version": "n/a"
                    }
                  }
-              ];
-           local arr2 = [
+              ], function(x) x.language.name);
+           local arr2 = std.set([
                 {
                    "name": "Foo",
                    "language": {
@@ -310,7 +311,7 @@ object StdWithKeyFTests extends TestSuite {
                      "version": "n/a"
                    }
                  }
-              ];
+              ], function(x) x.language.name);
 
              std.setDiff(arr1, arr2, function(x) x.language.name)""").toString() ==>
         """[{"language":{"name":"Scala","version":"2.13"},"name":"Bar"}]"""
