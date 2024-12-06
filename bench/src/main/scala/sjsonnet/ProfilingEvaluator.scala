@@ -2,6 +2,7 @@ package sjsonnet
 
 import java.util
 
+import scala.collection.compat._
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
