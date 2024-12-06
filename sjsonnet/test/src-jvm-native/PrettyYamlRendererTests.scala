@@ -1,5 +1,4 @@
-package sjsonnet
-
+import sjsonnet._
 import utest._
 
 object PrettyYamlRendererTests extends TestSuite{

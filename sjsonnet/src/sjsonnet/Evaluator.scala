@@ -661,6 +661,14 @@ class Evaluator(resolver: CachedResolver,
     case Nil => scopes
   }
 
+  def compare(x: Val, y: Val): Int = (x, y) match {
+    case (_: Val.Null, _: Val.Null) => 0
+    case (x: Val.Num, y: Val.Num) => x.value.compareTo(y.value)
+    case (x: Val.Str, y: Val.Str) => x.value.compareTo(y.value)
+    case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
+    case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+  }
+
   def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
     case _: Val.True => y.isInstanceOf[Val.True]
     case _: Val.False => y.isInstanceOf[Val.False]

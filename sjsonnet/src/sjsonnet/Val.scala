@@ -2,7 +2,6 @@ package sjsonnet
 
 import java.util
 import java.util.Arrays
-
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
@@ -561,13 +560,15 @@ object Val{
   * [[EvalScope]] models the per-evaluator context that is propagated
   * throughout the Jsonnet evaluation.
   */
-abstract class EvalScope extends EvalErrorScope {
+abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val
 
   def materialize(v: Val): ujson.Value
 
   def equal(x: Val, y: Val): Boolean
+
+  def compare(x: Val, y: Val): Int
 
   val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
