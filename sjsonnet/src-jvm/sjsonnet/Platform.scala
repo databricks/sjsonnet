@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.{ByteArrayOutputStream, BufferedInputStream, File, FileInputStream}
+import java.io.{BufferedInputStream, ByteArrayOutputStream, File, FileInputStream}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
@@ -50,12 +50,17 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new SafeConstructor(
-      new LoaderOptions())).load(yamlString)
-    yaml.size match {
-      case l if (l > 1) => new JSONArray(yaml).toString()
-      case l if (l == 1)  => new JSONObject(yaml(0).asInstanceOf[java.util.LinkedHashMap[String, Object]]).toString()
-      case _ => "{}"
+    try {
+      val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString)
+          .asInstanceOf[java.lang.Iterable[java.util.Map[String, Object]]].asScala.toSeq
+      yaml.size match {
+        case 0 => "{}"
+        case 1 => new JSONObject(yaml.head).toString()
+        case _ => new JSONArray(yaml.asJava).toString()
+      }
+    } catch {
+      case e: Exception =>
+        Error.fail("Error converting YAML to JSON: " + e)
     }
   }
 
