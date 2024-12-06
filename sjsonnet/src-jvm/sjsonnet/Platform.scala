@@ -1,15 +1,15 @@
 package sjsonnet
 
-import org.json.JSONObject
-
-import java.io.{ByteArrayOutputStream, BufferedInputStream, File, FileInputStream}
+import java.io.{BufferedInputStream, ByteArrayOutputStream, File, FileInputStream}
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
+import org.json.{JSONArray, JSONObject}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
+import scala.jdk.CollectionConverters._
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -50,9 +50,18 @@ object Platform {
   }
 
   def yamlToJson(yamlString: String): String = {
-    val yaml: java.util.LinkedHashMap[String, Object] = new Yaml(new SafeConstructor(
-      new LoaderOptions())).load(yamlString)
-    new JSONObject(yaml).toString()
+    try {
+      val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString)
+          .asInstanceOf[java.lang.Iterable[java.util.Map[String, Object]]].asScala.toSeq
+      yaml.size match {
+        case 0 => "{}"
+        case 1 => new JSONObject(yaml.head).toString()
+        case _ => new JSONArray(yaml.asJava).toString()
+      }
+    } catch {
+      case e: Exception =>
+        Error.fail("Error converting YAML to JSON: " + e)
+    }
   }
 
   private def computeHash(algorithm: String, s: String) = {
