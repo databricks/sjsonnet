@@ -66,7 +66,10 @@ object FormatTests extends TestSuite{
     test("d") {
       // d (also a quick test of i and u)
       check("thing-%d", """[10]""", "thing-10")
-      //    check("thing-%#ld", """[10]""", "thing-10")
+      // JSON does not support the full Long range anyway
+      check("thing-%d", """[9007199254740991]""", "thing-9007199254740991")
+      check("thing-%d", """[-9007199254740992]""", "thing--9007199254740992")
+      check("thing-%#ld", """[10]""", "thing-10")
       check("thing-%d", """[-10]""", "thing--10")
       check("thing-%4d", """[10]""", "thing-  10")
       check("thing-%04d", """[10]""", "thing-0010")

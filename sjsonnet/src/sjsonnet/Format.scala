@@ -168,7 +168,11 @@ object Format{
   }
 
   def formatInteger(formatted: FormatSpec, s: Double) = {
-    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toString)
+    val (lhs, rhs) = if (s < 0) {
+      ("-", s.toLong.toString.substring(1))
+    } else {
+      ("", s.toLong.toString)
+    }
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,
@@ -194,7 +198,11 @@ object Format{
   }
 
   def formatOctal(formatted: FormatSpec, s: Double) = {
-    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toOctalString)
+    val (lhs, rhs) = if (s < 0) {
+      ("-", s.toLong.abs.toOctalString)
+    } else {
+      ("", s.toLong.toOctalString)
+    }
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,
@@ -204,7 +212,11 @@ object Format{
   }
 
   def formatHexadecimal(formatted: FormatSpec, s: Double) = {
-    val (lhs, rhs) = (if (s < 0) "-" else "", math.abs(s.toInt).toHexString)
+    val (lhs, rhs) = if (s < 0) {
+      ("-", s.toLong.abs.toHexString)
+    } else {
+      ("", s.toLong.toHexString)
+    }
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,

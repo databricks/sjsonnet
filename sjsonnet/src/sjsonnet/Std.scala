@@ -81,7 +81,7 @@ class Std {
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.asString.charAt(0).toInt)
+      Val.Num(pos, str.asString.charAt(0).toLong)
   }
 
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
@@ -393,7 +393,7 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
 
   private object Char_ extends Val.Builtin1("char", "n") {
     def evalRhs(n: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, n.asInt.toChar.toString)
+      Val.Str(pos, n.asLong.toChar.toString)
   }
 
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
@@ -524,17 +524,17 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
 
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.asString.toInt)
+      Val.Num(pos, str.asString.toLong)
   }
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, Integer.parseInt(str.asString, 8))
+      Val.Num(pos, java.lang.Long.parseLong(str.asString, 8))
   }
 
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
     def evalRhs(str: Val, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, Integer.parseInt(str.asString, 16))
+      Val.Num(pos, java.lang.Long.parseLong(str.asString, 16))
   }
 
   private object MD5 extends Val.Builtin1("md5", "s") {
@@ -866,13 +866,13 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
     },
     builtin("mantissa", "x"){ (pos, ev, x: Double) =>
       val value = x
-      val exponent = (Math.log(value) / Math.log(2)).toInt + 1
+      val exponent = (Math.log(value) / Math.log(2)).toLong + 1
       val mantissa = value * Math.pow(2.0, -exponent)
       mantissa
     },
     builtin("exponent", "x"){ (pos, ev, x: Double) =>
       val value = x
-      val exponent = (Math.log(value) / Math.log(2)).toInt + 1
+      val exponent = (Math.log(value) / Math.log(2)).toLong + 1
       //val mantissa = value * Math.pow(2.0, -exponent)
       exponent
     },

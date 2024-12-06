@@ -20,6 +20,10 @@ object ReadWriter{
     def apply(t: Val) = t.asInt
     def write(pos: Position, t: Int) = Val.Num(pos, t)
   }
+  implicit object LongRead extends ReadWriter[Long]{
+    def apply(t: Val) = t.asLong
+    def write(pos: Position, t: Long) = Val.Num(pos, t)
+  }
   implicit object DoubleRead extends ReadWriter[Double]{
     def apply(t: Val) = t.asDouble
     def write(pos: Position, t: Double) = Val.Num(pos, t)
