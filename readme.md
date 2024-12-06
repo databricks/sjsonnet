@@ -61,7 +61,7 @@ usage: sjsonnet [sjsonnet-options] script-file
 
   -i, --interactive  Run Mill in interactive mode, suitable for opening REPLs and taking user input
   -n, --indent       How much to indent your output JSON
-  -J, --jpath        Specify an additional library search dir (right-most wins)
+  -J, --jpath        Specify an additional library search dir (left-most wins)
   -o, --output-file  Write to the output file rather than stdout
   ...
 
