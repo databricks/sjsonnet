@@ -9,6 +9,7 @@ import sjsonnet.Expr.Member.Visibility
 
 import scala.collection.Searching._
 import scala.collection.mutable
+import scala.util.control.Breaks.{break, breakable}
 import scala.util.matching.Regex
 
 /**
@@ -527,24 +528,46 @@ class Std {
     }
   }
 
+  private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Lazy] = {
+    val b = new mutable.ArrayBuilder.ofRef[Lazy]
+    var sz = 0
+    var i = 0
+    var start = 0
+    breakable {
+      while (i < str.length) {
+        if (maxSplits >= 0 && sz >= maxSplits) {
+          break
+        }
+        if (str.slice(i, i + cStr.length) == cStr) {
+          val finalStr = Val.Str(pos, str.slice(start, i))
+          b.+=(finalStr)
+          start = i + cStr.length
+          sz += 1
+        }
+        i += 1
+      }
+    }
+    b.+=(Val.Str(pos, str.substring(start)))
+    sz += 1
+    b.result()
+  }
+
   private object Split extends Val.Builtin2("split", "str", "c") {
-    def evalRhs(_str: Val, _c: Val, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(pos, _str.asString.split(java.util.regex.Pattern.quote(_c.asString), -1).map(s => Val.Str(pos, s)))
+    def evalRhs(str: Val, c: Val, ev: EvalScope, pos: Position): Val = {
+      new Val.Arr(pos, splitLimit(pos, str.asString, c.asString, -1))
     }
   }
 
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxSplits") {
     def evalRhs(str: Val, c: Val, maxSplits: Val, ev: EvalScope, pos: Position): Val = {
-      val maxSplitsInt = if (maxSplits.asInt == -1) -1 else maxSplits.asInt + 1
-      new Val.Arr(pos, str.asString.split(java.util.regex.Pattern.quote(c.asString), maxSplitsInt).map(s => Val.Str(pos, s)))
+      new Val.Arr(pos, splitLimit(pos, str.asString, c.asString, maxSplits.asInt))
     }
   }
 
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxSplits") {
     def evalRhs(str: Val, c: Val, maxSplits: Val, ev: EvalScope, pos: Position): Val = {
-      val maxSplitsInt = if (maxSplits.asInt == -1) -1 else maxSplits.asInt + 1
-      new Val.Arr(pos, str.asString.reverse.split(java.util.regex.Pattern.quote(c.asString.reverse), maxSplitsInt)
-        .map(s => Val.Str(pos, s.reverse)).reverse)
+      new Val.Arr(pos, splitLimit(pos, str.asString.reverse, c.asString.reverse, maxSplits.asInt)
+        .map(s => Val.Str(pos, s.force.asString.reverse)).reverse)
     }
   }
 
