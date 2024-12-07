@@ -63,6 +63,9 @@ std.assertEqual({ ["" + (k + 1)]: (k + 1) for k in [0, 1, 2] }, { ["" + k]: k fo
 std.assertEqual({ ["" + k]: k for k in [1, 2, 3] }, { "1": 1, "2": 2, "3": 3 }) &&
 std.assertEqual({ [x + ""]: x + foo, local foo = 3 for x in [1, 2, 3] }, { "1": 4, "2": 5, "3": 6 }) &&
 
+// Test for #791
+std.assertEqual({ [x]: true for x in ['\\k'] }, { '\\k': true }) &&
+
 
 local obj = {
     f14true: { x: 1, y: 4, z: true },
@@ -76,6 +79,11 @@ local obj = {
 };
 
 std.assertEqual(obj, { ["f" + x + y + z]: { x: x, y: y, z: z } for x in [1, 2, 3] for y in [1, 4, 6] if x + 2 < y for z in [true, false] }) &&
+
+// Tests for #1111 - object comprehension fields should use "inherit" visibility.
+std.assertEqual(std.objectFields({ x: 1 } + { [k]: 2 for k in ['x'] }), ['x']) &&
+std.assertEqual(std.objectFields({ x:: 1 } + { [k]: 2 for k in ['x'] }), []) &&
+std.assertEqual(std.objectFields({ x::: 1 } + { [k]: 2 for k in ['x'] }), ['x']) &&
 
 std.assertEqual({ f: { foo: 7, bar: 1 } { [self.name]+: 3, name:: "foo" }, name:: "bar" },
                 { f: { foo: 7, bar: 4 } }) &&

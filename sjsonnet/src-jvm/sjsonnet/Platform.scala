@@ -52,10 +52,13 @@ object Platform {
   def yamlToJson(yamlString: String): String = {
     try {
       val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString)
-          .asInstanceOf[java.lang.Iterable[java.util.Map[String, Object]]].asScala.toSeq
+          .asInstanceOf[java.lang.Iterable[java.util.Collection[Object]]].asScala.toSeq
       yaml.size match {
         case 0 => "{}"
-        case 1 => new JSONObject(yaml.head).toString()
+        case 1 if yaml.head.isInstanceOf[java.util.Map[String, Object]] =>
+          new JSONObject(yaml.head.asInstanceOf[java.util.Map[String, Object]]).toString()
+        case 1 if yaml.head.isInstanceOf[java.util.List[Object]] =>
+          new JSONArray(yaml.head.asInstanceOf[java.util.List[Object]]).toString()
         case _ => new JSONArray(yaml.asJava).toString()
       }
     } catch {

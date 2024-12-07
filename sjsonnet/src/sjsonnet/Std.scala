@@ -9,6 +9,7 @@ import sjsonnet.Expr.Member.Visibility
 
 import scala.collection.Searching._
 import scala.collection.mutable
+import scala.util.control.Breaks.{break, breakable}
 import scala.util.matching.Regex
 
 /**
@@ -19,6 +20,8 @@ import scala.util.matching.Regex
 class Std {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
+  private val leadingWhiteSpacePattern = Pattern.compile("^[ \t\n\f\r\u0085\u00A0']+")
+  private val trailingWhiteSpacePattern = Pattern.compile("[ \t\n\f\r\u0085\u00A0']+$")
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
@@ -131,20 +134,58 @@ class Std {
   }
 
 
-private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hidden"), Array(null, null, Val.Null(dummyPos), Val.True(dummyPos))) {
-  override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
-    val obj = args(0).force.asObj
-    val k = args(1).force.asString
-    val incHidden = args(3).force.asBoolean
-    if (incHidden && obj.containsKey(k)) {
-      obj.value(k, pos.noOffset, obj)(ev)
-    } else if (!incHidden && obj.containsVisibleKey(k)) {
-      obj.value(k, pos.noOffset, obj)(ev)
-    } else {
-      args(2).force
+  private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hidden"), Array(null, null, Val.Null(dummyPos), Val.True(dummyPos))) {
+    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+      val obj = args(0).force.asObj
+      val k = args(1).force.asString
+      val incHidden = args(3).force.asBoolean
+      if (incHidden && obj.containsKey(k)) {
+        obj.value(k, pos.noOffset, obj)(ev)
+      } else if (!incHidden && obj.containsVisibleKey(k)) {
+        obj.value(k, pos.noOffset, obj)(ev)
+      } else {
+        args(2).force
+      }
     }
   }
-}
+
+  private object MinArray extends Val.Builtin("minArray", Array("arr", "keyF", "onEmpty"), Array(null, Val.False(dummyPos), Val.False(dummyPos))) {
+    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+      val arr = args(0).force.asArr
+      val keyF = args(1).force
+      val onEmpty = args(2)
+      if (arr.length == 0) {
+        if (onEmpty.isInstanceOf[Val.False]) {
+          Error.fail("Expected at least one element in array. Got none")
+        } else {
+          onEmpty.force
+        }
+      } else if (keyF.isInstanceOf[Val.False]) {
+        arr.asStrictArray.min(ev)
+      } else {
+        arr.asStrictArray.map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev)).min(ev)
+      }
+    }
+  }
+
+  private object MaxArray extends Val.Builtin("maxArray", Array("arr", "keyF", "onEmpty"), Array(null, Val.False(dummyPos), Val.False(dummyPos))) {
+    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+      val arr = args(0).force.asArr
+      val keyF = args(1).force
+      val onEmpty = args(2)
+      if (arr.length == 0) {
+        if (onEmpty.isInstanceOf[Val.False]) {
+          Error.fail("Expected at least one element in array. Got none")
+        } else {
+          onEmpty.force
+        }
+      } else if (keyF.isInstanceOf[Val.False]) {
+        arr.asStrictArray.max(ev)
+      } else {
+        arr.asStrictArray.map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev)).max(ev)
+      }
+    }
+  }
 
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val = {
@@ -362,12 +403,12 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
     }
   }
 
-  private object EncodeUTF8 extends Val.Builtin1("encodeUtf8", "s") {
+  private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "s") {
     def evalRhs(s: Val, ev: EvalScope, pos: Position): Val =
       new Val.Arr(pos, s.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
   }
 
-  private object DecodeUTF8 extends Val.Builtin1("decodeUtf8", "arr") {
+  private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
     def evalRhs(arr: Val, ev: EvalScope, pos: Position): Val =
       new Val.Str(pos, new String(arr.asArr.iterator.map(_.cast[Val.Num].value.toByte).toArray, UTF_8))
   }
@@ -489,31 +530,46 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
     }
   }
 
-  private object Split extends Val.Builtin2("split", "str", "c") {
-    def evalRhs(_str: Val, _c: Val, ev: EvalScope, pos: Position): Val = {
-      val str = _str.asString
-      val cStr = _c.asString
-      if(cStr.length != 1) Error.fail("std.split second parameter should have length 1, got "+cStr.length)
-      val c = cStr.charAt(0)
-      val b = new mutable.ArrayBuilder.ofRef[Lazy]
-      var i = 0
-      var start = 0
-      while(i < str.length) {
-        if(str.charAt(i) == c) {
-          val finalStr = Val.Str(pos, str.substring(start, i))
+  private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Lazy] = {
+    val b = new mutable.ArrayBuilder.ofRef[Lazy]
+    var sz = 0
+    var i = 0
+    var start = 0
+    breakable {
+      while (i < str.length) {
+        if (maxSplits >= 0 && sz >= maxSplits) {
+          break
+        }
+        if (str.slice(i, i + cStr.length) == cStr) {
+          val finalStr = Val.Str(pos, str.slice(start, i))
           b.+=(finalStr)
-          start = i+1
+          start = i + cStr.length
+          sz += 1
         }
         i += 1
       }
-      b.+=(Val.Str(pos, str.substring(start, math.min(i, str.length))))
-      new Val.Arr(pos, b.result())
+    }
+    b.+=(Val.Str(pos, str.substring(start)))
+    sz += 1
+    b.result()
+  }
+
+  private object Split extends Val.Builtin2("split", "str", "c") {
+    def evalRhs(str: Val, c: Val, ev: EvalScope, pos: Position): Val = {
+      new Val.Arr(pos, splitLimit(pos, str.asString, c.asString, -1))
     }
   }
 
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxSplits") {
     def evalRhs(str: Val, c: Val, maxSplits: Val, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(pos, str.asString.split(java.util.regex.Pattern.quote(c.asString), maxSplits.asInt + 1).map(s => Val.Str(pos, s)))
+      new Val.Arr(pos, splitLimit(pos, str.asString, c.asString, maxSplits.asInt))
+    }
+  }
+
+  private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxSplits") {
+    def evalRhs(str: Val, c: Val, maxSplits: Val, ev: EvalScope, pos: Position): Val = {
+      new Val.Arr(pos, splitLimit(pos, str.asString.reverse, c.asString.reverse, maxSplits.asInt)
+        .map(s => Val.Str(pos, s.force.asString.reverse)).reverse)
     }
   }
 
@@ -1131,8 +1187,8 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
       }
     },
 
-    "encodeUTF8" -> EncodeUTF8,
-    "decodeUTF8" -> DecodeUTF8,
+    builtin(EncodeUTF8),
+    builtin(DecodeUTF8),
 
     builtinWithDefaults("uniq", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       uniqArr(pos, ev, args(0), args(1))
@@ -1206,15 +1262,16 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
       existsInSet(ev, pos, keyF, arr, args(0))
     },
 
-    "split" -> Split,
-    "splitLimit" -> SplitLimit,
-    "stringChars" -> StringChars,
-    "parseInt" -> ParseInt,
-    "parseOctal" -> ParseOctal,
-    "parseHex" -> ParseHex,
-    "parseJson" -> ParseJson,
-    "parseYaml" -> ParseYaml,
-    "md5" -> MD5,
+    builtin(Split),
+    builtin(SplitLimit),
+    builtin(SplitLimitR),
+    builtin(StringChars),
+    builtin(ParseInt),
+    builtin(ParseOctal),
+    builtin(ParseHex),
+    builtin(ParseJson),
+    builtin(ParseYaml),
+    builtin(MD5),
     builtin("prune", "x"){ (pos, ev, s: Val) =>
       def filter(x: Val) = x match{
         case c: Val.Arr if c.length == 0 => false
@@ -1248,7 +1305,7 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
       str.isEmpty
     },
     builtin("trim", "str") { (_, _, str: String) =>
-      str.trim
+      trailingWhiteSpacePattern.matcher(leadingWhiteSpacePattern.matcher(str).replaceAll("")).replaceAll("")
     },
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
       str1.equalsIgnoreCase(str2)
@@ -1271,6 +1328,64 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
     builtin("sha3", "str") { (_, _, str: String) =>
       Platform.sha3(str)
     },
+    builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
+      if (!arr.forall(_.isInstanceOf[Val.Num])) {
+        Error.fail("Argument must be an array of numbers")
+      }
+      arr.asLazyArray.map(_.force.asDouble).sum
+    },
+    builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
+      if (!arr.forall(_.isInstanceOf[Val.Num])) {
+        Error.fail("Argument must be an array of numbers")
+      }
+      if (arr.length == 0) {
+        Error.fail("Cannot calculate average of an empty array")
+      }
+      arr.asLazyArray.map(_.force.asDouble).sum/arr.length
+    },
+    builtin("contains", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
+      arr.asLazyArray.indexWhere(s => ev.equal(s.force, elem)) != -1
+    },
+    builtin("remove", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
+      val idx = arr.asLazyArray.indexWhere(s => ev.equal(s.force, elem))
+      if (idx == -1) {
+        arr
+      } else {
+        new Val.Arr(arr.pos, arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length))
+      }
+    },
+    builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Int) =>
+      if (!(0 <= idx && idx < arr.length)) {
+        Error.fail("index out of bounds: 0 <= " + idx + " < " + arr.length)
+      }
+      new Val.Arr(arr.pos, arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length))
+    },
+    builtin("objectKeysValues", "o") { (pos, ev, o: Val.Obj) =>
+      val keys = getVisibleKeys(ev, o)
+      new Val.Arr(pos, keys.map(k => Val.Obj.mk(
+        pos.fileScope.noOffsetPos,
+        "key" -> new Val.Obj.ConstMember(false, Visibility.Normal, Val.Str(pos.fileScope.noOffsetPos, k)),
+        "value" -> new Val.Obj.ConstMember(false, Visibility.Normal, o.value(k, pos.fileScope.noOffsetPos)(ev))
+      )))
+    },
+    builtin("objectKeysValuesAll", "o") { (pos, ev, o: Val.Obj) =>
+      val keys = getAllKeys(ev, o)
+      new Val.Arr(pos, keys.map(k => Val.Obj.mk(
+        pos.fileScope.noOffsetPos,
+        "key" -> new Val.Obj.ConstMember(false, Visibility.Normal, Val.Str(pos.fileScope.noOffsetPos, k)),
+        "value" -> new Val.Obj.ConstMember(false, Visibility.Normal, o.value(k, pos.fileScope.noOffsetPos)(ev))
+      )))
+    },
+    builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
+      val bindings = for{
+        k <- o.visibleKeyNames
+        v = o.value(k, pos.fileScope.noOffsetPos)(ev)
+        if k != key
+      }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
+      Val.Obj.mk(pos, bindings: _*)
+    },
+    builtin(MinArray),
+    builtin(MaxArray),
   )
 
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
@@ -1316,12 +1431,7 @@ private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hi
           case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
           case _ => value
         }
-        toFind.force match {
-          case s: Val.Str if appliedValue.isInstanceOf[Val.Str] => Ordering.String.compare(s.asString, appliedValue.force.asString)
-          case n: Val.Num if appliedValue.isInstanceOf[Val.Num] => java.lang.Double.compare(n.asDouble, appliedValue.force.asDouble)
-          case t: Val.Bool if appliedValue.isInstanceOf[Val.Bool] => Ordering.Boolean.compare(t.asBoolean, appliedValue.force.asBoolean)
-          case _ => Error.fail("Cannot perform set operation on " + toFind.force.prettyName + " and " + appliedValue.force.prettyName)
-        }
+        ev.compare(toFind.force, appliedValue.force)
       }).isInstanceOf[Found]
     } else {
       arr.exists(value => {

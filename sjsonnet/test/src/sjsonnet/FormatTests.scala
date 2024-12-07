@@ -15,6 +15,7 @@ object FormatTests extends TestSuite{
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
         def equal(x: Val, y: Val): Boolean = ???
+        def compare(x: Val, y: Val): Int = ???
         def importer: sjsonnet.CachedImporter = ???
         def settings = Settings.default
         def warn(e: Error) = ()
