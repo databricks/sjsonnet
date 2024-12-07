@@ -30,7 +30,11 @@ object YamlRendererTests extends TestSuite{
         """- "a":
           |  - 1""".stripMargin
     }
-
+    test("noQuote") {
+      ujson.transform(ujson.Obj("k0" -> "v0", "k1" -> "(\\d+)"), new YamlRenderer(quoteKeys = false)).toString ==>
+      """k0: "v0"
+        |k1: "(\\d+)"""".stripMargin
+    }
   }
 
 }
