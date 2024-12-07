@@ -20,6 +20,8 @@ import scala.util.matching.Regex
 class Std {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
+  private val leadingWhiteSpacePattern = Pattern.compile("^[ \t\n\f\r\u0085\u00A0']+")
+  private val trailingWhiteSpacePattern = Pattern.compile("[ \t\n\f\r\u0085\u00A0']+$")
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
@@ -1303,7 +1305,7 @@ class Std {
       str.isEmpty
     },
     builtin("trim", "str") { (_, _, str: String) =>
-      str.replaceAll("^[ \t\n\f\r\u0085\u00A0']+", "").replaceAll("[ \t\n\f\r\u0085\u00A0']+$", "")
+      trailingWhiteSpacePattern.matcher(leadingWhiteSpacePattern.matcher(str).replaceAll("")).replaceAll("")
     },
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
       str1.equalsIgnoreCase(str2)
