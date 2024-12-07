@@ -846,6 +846,8 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(std.parseInt('01234567890'), 1234567890) &&
+std.assertEqual(std.parseInt('9007199254740991'), 9007199254740991) &&
+std.assertEqual(std.parseInt('-9007199254740992'), -9007199254740992) &&
 std.assertEqual(std.parseInt('-01234567890'), -1234567890) &&
 std.assertEqual(std.parseOctal('755'), 493) &&
 std.assertEqual(std.parseOctal('0755'), 493) &&

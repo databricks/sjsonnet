@@ -66,6 +66,7 @@ sealed abstract class Val extends Lazy {
   def asString: String = failAs("String")
   def asBoolean: Boolean = failAs("Boolean")
   def asInt: Int = failAs("Int")
+  def asLong: Long = failAs("Long")
   def asDouble: Double = failAs("Number")
   def asObj: Val.Obj = failAs("Object")
   def asArr: Val.Arr = failAs("Array")
@@ -107,6 +108,7 @@ object Val{
   case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
     override def asInt: Int = value.toInt
+    override def asLong: Long = value.toLong
     override def asDouble: Double = value
   }
 

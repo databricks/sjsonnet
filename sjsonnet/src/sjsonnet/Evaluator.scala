@@ -282,6 +282,7 @@ class Evaluator(resolver: CachedResolver,
       case (v: Val.Arr, i: Val.Num) =>
         val int = i.value.toInt
         if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
+        if (v.length == 0) Error.fail(s"array bounds error: array is empty", pos)
         if (int >= v.length) Error.fail(s"array bounds error: ${int} not within [0, ${v.length})", pos)
         v.force(int)
       case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
@@ -597,6 +598,7 @@ class Evaluator(resolver: CachedResolver,
           }
           builder.put(k, v)
         }
+      case _ =>
     }
     cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
     cachedObj
@@ -626,6 +628,7 @@ class Evaluator(resolver: CachedResolver,
               Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
             }
           case Val.Null(_) => // do nothing
+          case _ =>
         }
       }
       new Val.Obj(e.pos, builder, false, null, sup)

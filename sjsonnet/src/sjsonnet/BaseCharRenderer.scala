@@ -126,7 +126,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       case Double.NegativeInfinity => visitNonNullString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d =>
-        val i = d.toInt
+        val i = d.toLong
         if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
         else super.visitFloat64(d, index)
         flushBuffer()
