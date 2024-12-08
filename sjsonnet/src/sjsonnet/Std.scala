@@ -524,6 +524,37 @@ class Std {
       new Val.Arr(pos, out.result())
     }
   }
+
+  private object FlattenDeepArrays extends Val.Builtin1("flattenDeepArray", "value") {
+    def evalRhs(value: Val, ev: EvalScope, pos: Position): Val = {
+      val out = new mutable.ArrayBuilder.ofRef[Lazy]
+      val q = new java.util.ArrayDeque[Lazy]()
+      value.asArr.asLazyArray.foreach(q.add)
+      while (!q.isEmpty) {
+        q.removeFirst().force match {
+          case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
+          case x => out += x
+        }
+      }
+      new Val.Arr(pos, out.result())
+    }
+  }
+
+  private object DeepJoin extends Val.Builtin1("deepJoin", "arr") {
+    def evalRhs(value: Val, ev: EvalScope, pos: Position): Val = {
+      val out = new StringWriter()
+      val q = new java.util.ArrayDeque[Lazy]()
+      q.add(value)
+      while (!q.isEmpty) {
+        q.removeFirst().force match {
+          case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
+          case s: Val.Str => out.write(s.value)
+        }
+      }
+      Val.Str(pos, out.toString)
+    }
+  }
+
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
       new Val.Arr(pos, arrs.asArr.asLazyArray.reverse)
@@ -889,6 +920,9 @@ class Std {
     builtin("floor", "x"){ (pos, ev, x: Double) =>
       math.floor(x)
     },
+    builtin("round", "x") { (pos, ev, x: Double) =>
+      math.round(x)
+    },
     builtin("ceil", "x"){ (pos, ev, x: Double) =>
       math.ceil(x)
     },
@@ -904,7 +938,18 @@ class Std {
     builtin("tan", "x"){ (pos, ev, x: Double) =>
       math.tan(x)
     },
-
+    builtin("isEven", "x"){ (_, _, x: Double) =>
+      math.round(x) % 2 == 0
+    },
+    builtin("isInteger", "x"){ (_, _, x: Double) =>
+      math.round(x).toDouble == x
+    },
+    builtin("isOdd", "x"){ (_, _, x: Double) =>
+      math.round(x) % 2 != 0
+    },
+    builtin("isDecimal", "x"){ (_, _, x: Double) =>
+      math.round(x).toDouble != x
+    },
     builtin("asin", "x"){ (pos, ev, x: Double) =>
       math.asin(x)
     },
@@ -1040,6 +1085,8 @@ class Std {
     },
 
     builtin(FlattenArrays),
+    builtin(FlattenDeepArrays),
+    builtin(DeepJoin),
     builtin(Reverse),
 
     builtin("manifestIni", "v"){ (pos, ev, v: Val) =>
@@ -1066,6 +1113,21 @@ class Std {
     builtin("escapeStringJson", "str"){ (pos, ev, str: String) =>
       val out = new StringWriter()
       BaseRenderer.escape(out, str, unicode = true)
+      out.toString
+    },
+
+    builtin("escapeStringXML", "str"){ (_, _, str: String) =>
+      val out = new StringWriter()
+      for (c <- str) {
+        c match {
+          case '<' => out.write("&lt;")
+          case '>' => out.write("&gt;")
+          case '&' => out.write("&amp;")
+          case '"' => out.write("&quot;")
+          case '\'' => out.write("&apos;")
+          case _ => out.write(c)
+        }
+      }
       out.toString
     },
     builtin("escapeStringBash", "str"){ (pos, ev, str: String) =>
