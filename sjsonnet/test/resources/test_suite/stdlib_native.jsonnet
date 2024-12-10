@@ -313,10 +313,10 @@ std.assertEqual(std.lines(['a', null, 'b']), 'a\nb\n') &&
 
 std.assertEqual(std.flattenArrays([[1, 2, 3], [4, 5, 6], []]), [1, 2, 3, 4, 5, 6]) &&
 
-//std.assertEqual(std.flattenDeepArray([]), []) &&
-//std.assertEqual(std.flattenDeepArray([1, 2, 3]), [1, 2, 3]) &&
-//std.assertEqual(std.flattenDeepArray([1, [2, 3]]), [1, 2, 3]) &&
-//std.assertEqual(std.flattenDeepArray([[1], [2, 3], [[null]]]), [1, 2, 3, null]) &&
+std.assertEqual(std.flattenDeepArray([]), []) &&
+std.assertEqual(std.flattenDeepArray([1, 2, 3]), [1, 2, 3]) &&
+std.assertEqual(std.flattenDeepArray([1, [2, 3]]), [1, 2, 3]) &&
+std.assertEqual(std.flattenDeepArray([[1], [2, 3], [[null]]]), [1, 2, 3, null]) &&
 
 std.assertEqual(
   std.manifestIni({
@@ -356,11 +356,11 @@ std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
 std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
 std.assertEqual(std.escapeStringBash("he\"l'lo"), "'he\"l'\"'\"'lo'") &&
 std.assertEqual(std.escapeStringDollars('The path is ${PATH}.'), 'The path is $${PATH}.') &&
-//std.assertEqual(std.escapeStringXML('2 < 3'), '2 &lt; 3') &&
-//std.assertEqual(std.escapeStringXML('3 > 2'), '3 &gt; 2') &&
-//std.assertEqual(std.escapeStringXML('"foo"'), '&quot;foo&quot;') &&
-//std.assertEqual(std.escapeStringXML("don't believe the hype"), 'don&apos;t believe the hype') &&
-//std.assertEqual(std.escapeStringXML('PB&J'), 'PB&amp;J') &&
+std.assertEqual(std.escapeStringXML('2 < 3'), '2 &lt; 3') &&
+std.assertEqual(std.escapeStringXML('3 > 2'), '3 &gt; 2') &&
+std.assertEqual(std.escapeStringXML('"foo"'), '&quot;foo&quot;') &&
+std.assertEqual(std.escapeStringXML("don't believe the hype"), 'don&apos;t believe the hype') &&
+std.assertEqual(std.escapeStringXML('PB&J'), 'PB&amp;J') &&
 std.assertEqual(std.escapeStringJson('!~'), '"!~"') &&
 
 std.assertEqual(std.manifestPython({
@@ -1518,8 +1518,8 @@ std.assertEqual(std.parseJson('{"a": {"b": ["c", 42]}}'), { a: { b: ['c', 42] } 
 std.assertEqual(std.asciiUpper('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()ASDFGHFGHJKL09876 ') &&
 std.assertEqual(std.asciiLower('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()asdfghfghjkl09876 ') &&
 
-//std.assertEqual(std.deepJoin(['a', ['b', 'c', [[], 'd', ['e'], 'f', 'g'], [], []], 'h']),
-//                'abcdefgh') &&
+std.assertEqual(std.deepJoin(['a', ['b', 'c', [[], 'd', ['e'], 'f', 'g'], [], []], 'h']),
+                'abcdefgh') &&
 
 std.assertEqual(std.findSubstr('', 'a'), []) &&
 std.assertEqual(std.findSubstr('aa', ''), []) &&
@@ -1579,8 +1579,8 @@ std.assertEqual(std.xor(true, true), false) &&
 std.assertEqual(std.xnor(true, false), false) &&
 std.assertEqual(std.xnor(true, true), true) &&
 
-//std.assertEqual(std.round(1.2), 1) &&
-//std.assertEqual(std.round(1.5), 2) &&
+std.assertEqual(std.round(1.2), 1) &&
+std.assertEqual(std.round(1.5), 2) &&
 
 std.assertEqual(std.isEmpty(''), true) &&
 std.assertEqual(std.isEmpty('non-empty string'), false) &&
@@ -1591,14 +1591,14 @@ std.assertEqual(std.contains([1, 2, 3], 'foo'), false) &&
 std.assertEqual(std.equalsIgnoreCase('foo', 'FOO'), true) &&
 std.assertEqual(std.equalsIgnoreCase('foo', 'bar'), false) &&
 
-//std.assertEqual(std.isEven(10), true) &&
-//std.assertEqual(std.isEven(5), false) &&
-//std.assertEqual(std.isOdd(5), true) &&
-//std.assertEqual(std.isOdd(10), false) &&
-//std.assertEqual(std.isInteger(1), true) &&
-//std.assertEqual(std.isInteger(1.1), false) &&
-//std.assertEqual(std.isDecimal(1.1), true) &&
-//std.assertEqual(std.isDecimal(1), false) &&
+std.assertEqual(std.isEven(10), true) &&
+std.assertEqual(std.isEven(5), false) &&
+std.assertEqual(std.isOdd(5), true) &&
+std.assertEqual(std.isOdd(10), false) &&
+std.assertEqual(std.isInteger(1), true) &&
+std.assertEqual(std.isInteger(1.1), false) &&
+std.assertEqual(std.isDecimal(1.1), true) &&
+std.assertEqual(std.isDecimal(1), false) &&
 
 std.assertEqual(std.remove([1, 2, 3], 2), [1, 3]) &&
 std.assertEqual(std.removeAt([1, 2, 3], 1), [1, 3]) &&
