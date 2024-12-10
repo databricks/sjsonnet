@@ -316,5 +316,17 @@ object ErrorTests extends TestSuite{
          |""".stripMargin,
       suite = "db"
     )
+
+    test("manifest_toml_wrong_type") - check(
+      """|sjsonnet.Error: Wrong parameter type: expected Object, got array
+         |    at [std.manifestTomlEx].(sjsonnet/test/resources/test_suite/error.manifest_toml_wrong_type.jsonnet:17:19)
+         |""".stripMargin
+    )
+
+    test("manifest_toml_null_value") - check(
+      """|sjsonnet.Error: Tried to manifest "null"
+         |    at [std.manifestTomlEx].(sjsonnet/test/resources/test_suite/error.manifest_toml_null_value.jsonnet:17:19)
+         |""".stripMargin
+    )
   }
 }

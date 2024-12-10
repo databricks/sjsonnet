@@ -62,9 +62,9 @@ abstract class Materializer {
           visitor
         )
     }
-
-  }catch {case e: StackOverflowError =>
-    Error.fail("Stackoverflow while materializing, possibly due to recursive value")
+  } catch {
+    case _: StackOverflowError =>
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value")
   }
 
   def reverse(pos: Position, v: ujson.Value): Val = v match{

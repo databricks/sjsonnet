@@ -666,18 +666,18 @@ class Std {
 
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer())(ev).toString)
+      Val.Str(pos, Materializer.apply0(v, MaterializeJsonRenderer())(ev).toString)
   }
 
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer(indent = -1))(ev).toString)
+      Val.Str(pos, Materializer.apply0(v, MaterializeJsonRenderer(indent = -1))(ev).toString)
   }
 
   private object ManifestJsonEx extends Val.Builtin2("manifestJsonEx", "value", "indent") {
     def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer
-        .apply0(v, new MaterializeJsonRenderer(indent = i.asString.length))(ev)
+        .apply0(v, MaterializeJsonRenderer(indent = i.asString.length))(ev)
         .toString)
   }
 
@@ -696,95 +696,68 @@ class Std {
     }
   }
 
-  private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
-    def evalRhs(arr: Val, keyF: Val, ev: EvalScope, pos: Position): Val = {
-      uniqArr(pos, ev, sortArr(pos, ev, arr, keyF), keyF)
+  private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
+    private def isTableArray(v: Val) = v match {
+      case s: Val.Arr => s.length > 0 && s.asLazyArray.forall(_.isInstanceOf[Val.Obj])
+      case _ => false
+    }
+
+    private def isSection(v: Val) = v.isInstanceOf[Val.Obj] || isTableArray(v)
+
+    private def renderTableInternal(out: StringWriter, v: Val.Obj, cumulatedIndent: String, indent: String, path: Seq[String], indexedPath: Seq[String])(implicit ev : EvalScope): StringWriter = {
+      val (sections, nonSections) = v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
+      for (k <- nonSections.sorted) {
+        out.write(cumulatedIndent)
+        out.write(TomlRenderer.escapeKey(k))
+        out.write(" = ")
+        Materializer.apply0(v.value(k, v.pos)(ev), new TomlRenderer(out, cumulatedIndent, indent))(ev)
+      }
+      out.write('\n')
+
+      for (k <- sections.sorted) {
+        val v0 = v.value(k, v.pos, v)(ev)
+        if (isTableArray(v0)) {
+          for (i <- 0 until v0.asArr.length) {
+            out.write(cumulatedIndent)
+            renderTableArrayHeader(out, path :+ k)
+            out.write('\n')
+            renderTableInternal(out, v0.asArr.force(i).asObj, cumulatedIndent + indent, indent, path :+ k,
+              indexedPath ++ Seq(k, i.toString))
+          }
+        } else {
+          out.write(cumulatedIndent)
+          renderTableHeader(out, path :+ k)
+          out.write('\n')
+          renderTableInternal(out, v0.asObj, cumulatedIndent + indent, indent, path :+ k, indexedPath :+ k)
+        }
+      }
+      out
+    }
+
+    private def renderTableHeader(out: StringWriter, path: Seq[String]) = {
+      out.write('[')
+      out.write(path.map(TomlRenderer.escapeKey).mkString("."))
+      out.write(']')
+      out
+    }
+
+    private def renderTableArrayHeader(out: StringWriter, path: Seq[String]) = {
+      out.write('[')
+      renderTableHeader(out, path)
+      out.write(']')
+      out
+    }
+
+    def evalRhs(v: Val, indent: Val, ev: EvalScope, pos: Position): Val = {
+      val out = new StringWriter
+      renderTableInternal(out, v.force.asObj, "", indent.asString, Seq.empty[String], Seq.empty[String])(ev)
+      Val.Str(pos, out.toString.strip)
     }
   }
 
-  private object SetInter extends Val.Builtin3("setInter", "a", "b", "keyF", Array(null, null, Val.False(dummyPos))) {
-    private def isStr(a: Val.Arr) = a.forall(_.isInstanceOf[Val.Str])
-
-    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
-      case Array(a: Val.Arr, b) if isStr(a) => (new Spec1Str(a), Array(b))
-      case Array(a, b: Val.Arr) if isStr(b) => (new Spec1Str(b), Array(a))
-      case args if args.length == 2 => (Spec2, args)
-      case _ => null
-    }
-
-    def asArray(a: Val): Array[Lazy] = a match {
-      case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str => stringChars(pos, str.value).asLazyArray
-      case _ => Error.fail("Arguments must be either arrays or strings")
-    }
-
-    def evalRhs(_a: Val, _b: Val, _keyF: Val, ev: EvalScope, pos: Position): Val = {
-      if(_keyF.isInstanceOf[Val.False]) Spec2.evalRhs(_a, _b, ev, pos)
-      else {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val keyFFunc = _keyF.asInstanceOf[Val.Func]
-        val out = new mutable.ArrayBuffer[Lazy]
-        for (v <- a) {
-          val appliedX = keyFFunc.apply1(v, pos.noOffset)(ev)
-          if (b.exists(value => {
-            val appliedValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(appliedValue, appliedX)
-          }) && !out.exists(value => {
-            val mValue = keyFFunc.apply1(value, pos.noOffset)(ev)
-            ev.equal(mValue, appliedX)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyFFunc)
-      }
-    }
-
-    private object Spec2 extends Val.Builtin2("setInter", "a", "b") {
-      def evalRhs(_a: Val, _b: Val, ev: EvalScope, pos: Position): Val = {
-        val a = asArray(_a)
-        val b = asArray(_b)
-        val out = new mutable.ArrayBuffer[Lazy](a.length)
-        for (v <- a) {
-          val vf = v.force
-          if (b.exists(value => {
-            ev.equal(value.force, vf)
-          }) && !out.exists(value => {
-            ev.equal(value.force, vf)
-          })) {
-            out.append(v)
-          }
-        }
-        sortArr(pos, ev, new Val.Arr(pos, out.toArray), null)
-      }
-    }
-
-    private class Spec1Str(_a: Val.Arr) extends Val.Builtin1("setInter", "b") {
-      private[this] val a =
-        ArrayOps.sortInPlaceBy(ArrayOps.distinctBy(_a.asLazyArray)(_.asInstanceOf[Val.Str].value))(_.asInstanceOf[Val.Str].value)
-        // 2.13+: _a.asLazyArray.distinctBy(_.asInstanceOf[Val.Str].value).sortInPlaceBy(_.asInstanceOf[Val.Str].value)
-
-      def evalRhs(_b: Val, ev: EvalScope, pos: Position): Val = {
-        val b = asArray(_b)
-        val bs = new mutable.HashSet[String]
-        var i = 0
-        while(i < b.length) {
-          b(i).force match {
-            case s: Val.Str => bs.add(s.value)
-            case _ =>
-          }
-          i += 1
-        }
-        val out = new mutable.ArrayBuilder.ofRef[Lazy]
-        i = 0
-        while(i < a.length) {
-          val s = a(i).asInstanceOf[Val.Str]
-          if(bs.contains(s.value)) out.+=(s)
-          i += 1
-        }
-        new Val.Arr(pos, out.result())
-      }
+  private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
+    def evalRhs(arr: Val, keyF: Val, ev: EvalScope, pos: Position): Val = {
+      uniqArr(pos, ev, sortArr(pos, ev, arr, keyF), keyF)
     }
   }
 
@@ -1080,6 +1053,10 @@ class Std {
     builtin(ManifestJson),
     builtin(ManifestJsonMinified),
     builtin(ManifestJsonEx),
+    builtin("manifestToml", "value"){ (pos, ev, value: Val) =>
+      ManifestTomlEx.evalRhs(value, Val.Str(pos, ""), ev, pos)
+    },
+    builtin(ManifestTomlEx),
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
                         "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>
