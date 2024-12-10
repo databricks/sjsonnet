@@ -60,7 +60,7 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
       case Double.PositiveInfinity => out.write("inf")
       case Double.NegativeInfinity => out.write("-inf")
       case d if java.lang.Double.isNaN(d) => out.write("nan")
-      case d if d.toLong == d => out.write(java.lang.Long.toString(d.toLong))
+      case d if math.round(d).toDouble == d => out.write(java.lang.Long.toString(d.toLong))
       case d => out.write(java.lang.Double.toString(d))
     }
     flush
