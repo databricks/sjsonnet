@@ -1362,6 +1362,9 @@ class Std {
     },
     builtin(MinArray),
     builtin(MaxArray),
+    builtin("primitiveEquals", "x", "y") { (_, ev, x: Val, y: Val) =>
+      x.isInstanceOf[y.type] && ev.compare(x, y) == 0
+    }
   )
 
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
