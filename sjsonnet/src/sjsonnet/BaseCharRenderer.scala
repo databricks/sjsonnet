@@ -4,16 +4,16 @@ package sjsonnet
 // with some private definitions made accessible to subclasses
 
 import ujson._
+
 import scala.annotation.switch
-import upickle.core.{ArrVisitor, ObjVisitor}
+import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 (out: T,
  indent: Int = -1,
  escapeUnicode: Boolean = false,
  newline: Array[Char] = Array('\n')) extends JsVisitor[T, T]{
   protected[this] val elemBuilder = new upickle.core.CharBuilder
-  protected[this] val unicodeCharBuilder = new upickle.core.CharBuilder()
-  def flushCharBuilder() = {
+  def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
 
@@ -22,25 +22,29 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   protected[this] var commaBuffered = false
 
-  def flushBuffer() = {
+  def flushBuffer(): Unit = {
     if (commaBuffered) {
       commaBuffered = false
       elemBuilder.append(',')
       renderIndent()
     }
   }
-  def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
+
+  def visitArray(length: Int, index: Int): ArrVisitor[T, T] = new ArrVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('[')
 
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
+
+    def subVisitor: Visitor[T, T] = BaseCharRenderer.this
+
     def visitValue(v: T, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+
+    def visitEnd(index: Int): T = {
       commaBuffered = false
       depth -= 1
       renderIndent()
@@ -50,21 +54,26 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitObject(length: Int, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = BaseCharRenderer.this
-    def visitKey(index: Int) = BaseCharRenderer.this
+
+    def subVisitor: Visitor[T, T] = BaseCharRenderer.this
+
+    def visitKey(index: Int): Visitor[T, T] = BaseCharRenderer.this
+
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.append(':')
       if (indent != -1) elemBuilder.append(' ')
     }
+
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+
+    def visitEnd(index: Int): T = {
       commaBuffered = false
       depth -= 1
       renderIndent()
@@ -74,7 +83,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitNull(index: Int) = {
+  def visitNull(index: Int): T = {
     flushBuffer()
     elemBuilder.ensureLength(4)
     elemBuilder.appendUnsafe('n')
@@ -85,7 +94,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-  def visitFalse(index: Int) = {
+  def visitFalse(index: Int): T = {
     flushBuffer()
     elemBuilder.ensureLength(5)
     elemBuilder.appendUnsafe('f')
@@ -97,7 +106,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-  def visitTrue(index: Int) = {
+  def visitTrue(index: Int): T = {
     flushBuffer()
     elemBuilder.ensureLength(4)
     elemBuilder.appendUnsafe('t')
@@ -108,7 +117,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-  def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int) = {
+  def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): T = {
     flushBuffer()
     elemBuilder.ensureLength(s.length())
     var i = 0
@@ -121,7 +130,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-  override def visitFloat64(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int): T = {
     d match{
       case Double.PositiveInfinity => visitNonNullString("Infinity", -1)
       case Double.NegativeInfinity => visitNonNullString("-Infinity", -1)
@@ -137,20 +146,20 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
   }
 
 
-  def visitString(s: CharSequence, index: Int) = {
+  def visitString(s: CharSequence, index: Int): T = {
 
     if (s eq null) visitNull(index)
     else visitNonNullString(s, index)
   }
 
-  def visitNonNullString(s: CharSequence, index: Int) = {
+  private def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(unicodeCharBuilder, elemBuilder, s, escapeUnicode)
+    upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode)
     flushCharBuilder()
     out
   }
 
-  final def renderIndent() = {
+  final def renderIndent(): Unit = {
     if (indent == -1) ()
     else {
       var i = indent * depth

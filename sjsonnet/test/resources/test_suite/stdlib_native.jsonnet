@@ -738,15 +738,15 @@ std.assertEqual(
   + '"x":[1,2,3,true,false,null,"string\\nstring\\n"],"y":{"a":1,"b":2,"c":[1,2]}}'
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc([{ x: [1, 2, 3] }], quote_keys=false) + '\n',
-//  |||
-//    - x:
-//      - 1
-//      - 2
-//      - 3
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], quote_keys=false) + '\n',
+  |||
+    - x:
+      - 1
+      - 2
+      - 3
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }]) + '\n',
@@ -809,20 +809,20 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc({ x: [[[1, { f: 3, g: [1, 2] }, 1]]] }, quote_keys=false) + '\n',
-//  |||
-//    x:
-//    -
-//      -
-//        - 1
-//        - f: 3
-//          g:
-//          - 1
-//          - 2
-//        - 1
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc({ x: [[[1, { f: 3, g: [1, 2] }, 1]]] }, quote_keys=false) + '\n',
+  |||
+    x:
+    -
+      -
+        - 1
+        - f: 3
+          g:
+          - 1
+          - 2
+        - 1
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc('hello\nworld\n') + '\n',
@@ -851,14 +851,14 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc({ f: 'hello\nworld\n' }, quote_keys=false) + '\n',
-//  |||
-//    f: |
-//      hello
-//      world
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc({ f: 'hello\nworld\n' }, quote_keys=false) + '\n',
+  |||
+    f: |
+      hello
+      world
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc(some_json) + '\n',
@@ -890,35 +890,35 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc(some_json, quote_keys=false) + '\n',
-//  |||
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc(some_json, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true) + '\n',
@@ -930,15 +930,15 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true, quote_keys=false) + '\n',
-//  |||
-//    - x:
-//        - 1
-//        - 2
-//        - 3
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    - x:
+        - 1
+        - 2
+        - 3
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc({ x: [1, 2, 3] }, indent_array_in_object=true) + '\n',
@@ -1048,36 +1048,38 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc(some_json, indent_array_in_object=true, quote_keys=false) + '\n',
-//  |||
-//    "\"": null
-//    arr:
-//      -
-//        - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//      - f: 3
-//    x:
-//      - 1
-//      - 2
-//      - 3
-//      - true
-//      - false
-//      - null
-//      - |
-//        string
-//        string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//        - 1
-//        - 2
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc(some_json, indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+      -
+        - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+      - f: 3
+    x:
+      - 1
+      - 2
+      - 3
+      - true
+      - false
+      - null
+      - |
+        string
+        string
+    "y":
+      a: 1
+      b: 2
+      c:
+        - 1
+        - 2
+  |||
+) &&
 
+// Scala native behaves differently from JVM regarding numerical separator like _.
+// so for now, this test is disabled.
 //std.assertEqual(
 //  std.manifestYamlDoc(bare_yaml_test, quote_keys=false) + '\n',
 //  |||
@@ -1144,7 +1146,7 @@ std.assertEqual(
 //    "~": "null key"
 //  |||
 //) &&
-//
+
 //std.assertEqual(
 //  std.manifestYamlStream([bare_yaml_quoted, bare_yaml_unquoted], quote_keys=false),
 //  |||
@@ -1280,70 +1282,70 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], quote_keys=false),
-//  |||
-//    ---
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//    ---
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//    ---
-//    {}
-//    ---
-//    []
-//    ---
-//    3
-//    ---
-//    "\""
-//    ...
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], quote_keys=false),
+  |||
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+    ---
+    {}
+    ---
+    []
+    ---
+    3
+    ---
+    "\""
+    ...
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], indent_array_in_object=true),
@@ -1410,19 +1412,19 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlStream([{}, [], 3, '"'], c_document_end=false),
-//  |||
-//    ---
-//    {}
-//    ---
-//    []
-//    ---
-//    3
-//    ---
-//    "\""
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlStream([{}, [], 3, '"'], c_document_end=false),
+  |||
+    ---
+    {}
+    ---
+    []
+    ---
+    3
+    ---
+    "\""
+  |||
+) &&
 
 std.assertEqual(std.parseInt('01234567890'), 1234567890) &&
 std.assertEqual(std.parseInt('-01234567890'), -1234567890) &&

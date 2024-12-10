@@ -738,15 +738,15 @@ std.assertEqual(
   + '"x":[1,2,3,true,false,null,"string\\nstring\\n"],"y":{"a":1,"b":2,"c":[1,2]}}'
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc([{ x: [1, 2, 3] }], quote_keys=false) + '\n',
-//  |||
-//    - x:
-//      - 1
-//      - 2
-//      - 3
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], quote_keys=false) + '\n',
+  |||
+    - x:
+      - 1
+      - 2
+      - 3
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }]) + '\n',
@@ -809,20 +809,20 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc({ x: [[[1, { f: 3, g: [1, 2] }, 1]]] }, quote_keys=false) + '\n',
-//  |||
-//    x:
-//    -
-//      -
-//        - 1
-//        - f: 3
-//          g:
-//          - 1
-//          - 2
-//        - 1
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc({ x: [[[1, { f: 3, g: [1, 2] }, 1]]] }, quote_keys=false) + '\n',
+  |||
+    x:
+    -
+      -
+        - 1
+        - f: 3
+          g:
+          - 1
+          - 2
+        - 1
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc('hello\nworld\n') + '\n',
@@ -851,14 +851,14 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc({ f: 'hello\nworld\n' }, quote_keys=false) + '\n',
-//  |||
-//    f: |
-//      hello
-//      world
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc({ f: 'hello\nworld\n' }, quote_keys=false) + '\n',
+  |||
+    f: |
+      hello
+      world
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc(some_json) + '\n',
@@ -890,35 +890,35 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc(some_json, quote_keys=false) + '\n',
-//  |||
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc(some_json, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true) + '\n',
@@ -930,15 +930,15 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true, quote_keys=false) + '\n',
-//  |||
-//    - x:
-//        - 1
-//        - 2
-//        - 3
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    - x:
+        - 1
+        - 2
+        - 3
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlDoc({ x: [1, 2, 3] }, indent_array_in_object=true) + '\n',
@@ -1048,172 +1048,172 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc(some_json, indent_array_in_object=true, quote_keys=false) + '\n',
-//  |||
-//    "\"": null
-//    arr:
-//      -
-//        - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//      - f: 3
-//    x:
-//      - 1
-//      - 2
-//      - 3
-//      - true
-//      - false
-//      - null
-//      - |
-//        string
-//        string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//        - 1
-//        - 2
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc(some_json, indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+      -
+        - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+      - f: 3
+    x:
+      - 1
+      - 2
+      - 3
+      - true
+      - false
+      - null
+      - |
+        string
+        string
+    "y":
+      a: 1
+      b: 2
+      c:
+        - 1
+        - 2
+  |||
+) &&
 
-//std.assertEqual(
-//  std.manifestYamlDoc(bare_yaml_test, quote_keys=false) + '\n',
-//  |||
-//    "": "empty key"
-//    "+.inf": "positive infinity"
-//    "+685_230": "decimal"
-//    "-": "invalid bare key"
-//    "---": "triple dash key"
-//    "-.inf": "negative infinity"
-//    "-0.1_0_0": "negative float"
-//    -0B1010_0111_0100_1010_1110: "BARE_KEY"
-//    "-0b1010_0111_0100_1010_1110": "binary"
-//    "-0x_0A_74_AE": "negative hexadecimal"
-//    "-190:20:30": "negative sexagesimal"
-//    "-190:20:30.15": "negative sexagesimal"
-//    "-1_0": "negative integer"
-//    "-6.8523015e+5": "negative canonical"
-//    "-685.230_15E-03": "negative w/ negative exponential"
-//    "-685.230_15e+03": "negative exponential"
-//    "-685.230_15e-03": "negative w/ negative exponential"
-//    "-685_230.15": "negative fixed"
-//    ".NaN": "not a number"
-//    ".inf": "positive infinity"
-//    "02472256": "octal"
-//    0X_0a_74_ae: "BARE_KEY"
-//    "0b1010_0111_0100_1010_1110": "binary"
-//    "0x_0A_74_AE": "hexadecimal"
-//    1-234-567-8901: "BARE_KEY"
-//    "190:20:30": "sexagesimal"
-//    "190:20:30.15": "sexagesimal"
-//    192.168.0.1: "BARE_KEY"
-//    "2001-12-14 21:59:43.10 -5": "space separated"
-//    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
-//    "2001-12-15 2:59:43.10": "no time zone (Z)"
-//    "2001-12-15T02:59:43.1Z": "canonical"
-//    "2002-12-14": "date"
-//    "6.8523015e+5": "canonical"
-//    "6.8523015e-5": "canonical"
-//    "685.230_15e+03": "exponential"
-//    "685230": "canonical"
-//    "685_230.15": "fixed"
-//    "N": "boolean false"
-//    "NO": "boolean false"
-//    "NULL": "null word capital"
-//    "Null": "null word"
-//    "OFF": "boolean false"
-//    "On": "boolean true"
-//    "True": "boolean true"
-//    "Yes": "boolean true"
-//    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
-//    __-0X_0a_74_ae: "BARE_KEY"
-//    b: "BARE_KEY"
-//    jsonnet.org/k8s-label-like: "BARE_KEY"
-//    just-letters-dashes: "BARE_KEY"
-//    just_letters_underscores: "BARE_KEY"
-//    "n": "boolean false"
-//    "null": "null word"
-//    "off": "boolean false"
-//    "on": "boolean true"
-//    "true": "boolean true"
-//    x: "BARE_KEY"
-//    "y": "boolean true"
-//    "yes": "boolean true"
-//    "~": "null key"
-//  |||
-//) &&
-//
-//std.assertEqual(
-//  std.manifestYamlStream([bare_yaml_quoted, bare_yaml_unquoted], quote_keys=false),
-//  |||
-//    ---
-//    "": "empty key"
-//    "+.inf": "positive infinity"
-//    "+685_230": "decimal"
-//    "-": "invalid bare key"
-//    "---": "triple dash key"
-//    "-.inf": "negative infinity"
-//    "-0.1_0_0": "negative float"
-//    "-0b1010_0111_0100_1010_1110": "binary"
-//    "-0x_0A_74_AE": "negative hexadecimal"
-//    "-190:20:30": "negative sexagesimal"
-//    "-190:20:30.15": "negative sexagesimal"
-//    "-1_0": "negative integer"
-//    "-6.8523015e+5": "negative canonical"
-//    "-685.230_15E-03": "negative w/ negative exponential"
-//    "-685.230_15e+03": "negative exponential"
-//    "-685.230_15e-03": "negative w/ negative exponential"
-//    "-685_230.15": "negative fixed"
-//    ".NaN": "not a number"
-//    ".inf": "positive infinity"
-//    "02472256": "octal"
-//    "0b1010_0111_0100_1010_1110": "binary"
-//    "0x_0A_74_AE": "hexadecimal"
-//    "190:20:30": "sexagesimal"
-//    "190:20:30.15": "sexagesimal"
-//    "2001-12-14 21:59:43.10 -5": "space separated"
-//    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
-//    "2001-12-15 2:59:43.10": "no time zone (Z)"
-//    "2001-12-15T02:59:43.1Z": "canonical"
-//    "2002-12-14": "date"
-//    "6.8523015e+5": "canonical"
-//    "6.8523015e-5": "canonical"
-//    "685.230_15e+03": "exponential"
-//    "685230": "canonical"
-//    "685_230.15": "fixed"
-//    "N": "boolean false"
-//    "NO": "boolean false"
-//    "NULL": "null word capital"
-//    "Null": "null word"
-//    "OFF": "boolean false"
-//    "On": "boolean true"
-//    "True": "boolean true"
-//    "Yes": "boolean true"
-//    "n": "boolean false"
-//    "null": "null word"
-//    "off": "boolean false"
-//    "on": "boolean true"
-//    "true": "boolean true"
-//    "y": "boolean true"
-//    "yes": "boolean true"
-//    "~": "null key"
-//    ---
-//    -0B1010_0111_0100_1010_1110: "BARE_KEY"
-//    0X_0a_74_ae: "BARE_KEY"
-//    1-234-567-8901: "BARE_KEY"
-//    192.168.0.1: "BARE_KEY"
-//    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
-//    __-0X_0a_74_ae: "BARE_KEY"
-//    b: "BARE_KEY"
-//    jsonnet.org/k8s-label-like: "BARE_KEY"
-//    just-letters-dashes: "BARE_KEY"
-//    just_letters_underscores: "BARE_KEY"
-//    x: "BARE_KEY"
-//    ...
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlDoc(bare_yaml_test, quote_keys=false) + '\n',
+  |||
+    "": "empty key"
+    "+.inf": "positive infinity"
+    "+685_230": "decimal"
+    "-": "invalid bare key"
+    "---": "triple dash key"
+    "-.inf": "negative infinity"
+    "-0.1_0_0": "negative float"
+    -0B1010_0111_0100_1010_1110: "BARE_KEY"
+    "-0b1010_0111_0100_1010_1110": "binary"
+    "-0x_0A_74_AE": "negative hexadecimal"
+    "-190:20:30": "negative sexagesimal"
+    "-190:20:30.15": "negative sexagesimal"
+    "-1_0": "negative integer"
+    "-6.8523015e+5": "negative canonical"
+    "-685.230_15E-03": "negative w/ negative exponential"
+    "-685.230_15e+03": "negative exponential"
+    "-685.230_15e-03": "negative w/ negative exponential"
+    "-685_230.15": "negative fixed"
+    ".NaN": "not a number"
+    ".inf": "positive infinity"
+    "02472256": "octal"
+    0X_0a_74_ae: "BARE_KEY"
+    "0b1010_0111_0100_1010_1110": "binary"
+    "0x_0A_74_AE": "hexadecimal"
+    1-234-567-8901: "BARE_KEY"
+    "190:20:30": "sexagesimal"
+    "190:20:30.15": "sexagesimal"
+    192.168.0.1: "BARE_KEY"
+    "2001-12-14 21:59:43.10 -5": "space separated"
+    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
+    "2001-12-15 2:59:43.10": "no time zone (Z)"
+    "2001-12-15T02:59:43.1Z": "canonical"
+    "2002-12-14": "date"
+    "6.8523015e+5": "canonical"
+    "6.8523015e-5": "canonical"
+    "685.230_15e+03": "exponential"
+    "685230": "canonical"
+    "685_230.15": "fixed"
+    "N": "boolean false"
+    "NO": "boolean false"
+    "NULL": "null word capital"
+    "Null": "null word"
+    "OFF": "boolean false"
+    "On": "boolean true"
+    "True": "boolean true"
+    "Yes": "boolean true"
+    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
+    __-0X_0a_74_ae: "BARE_KEY"
+    b: "BARE_KEY"
+    jsonnet.org/k8s-label-like: "BARE_KEY"
+    just-letters-dashes: "BARE_KEY"
+    just_letters_underscores: "BARE_KEY"
+    "n": "boolean false"
+    "null": "null word"
+    "off": "boolean false"
+    "on": "boolean true"
+    "true": "boolean true"
+    x: "BARE_KEY"
+    "y": "boolean true"
+    "yes": "boolean true"
+    "~": "null key"
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlStream([bare_yaml_quoted, bare_yaml_unquoted], quote_keys=false),
+  |||
+    ---
+    "": "empty key"
+    "+.inf": "positive infinity"
+    "+685_230": "decimal"
+    "-": "invalid bare key"
+    "---": "triple dash key"
+    "-.inf": "negative infinity"
+    "-0.1_0_0": "negative float"
+    "-0b1010_0111_0100_1010_1110": "binary"
+    "-0x_0A_74_AE": "negative hexadecimal"
+    "-190:20:30": "negative sexagesimal"
+    "-190:20:30.15": "negative sexagesimal"
+    "-1_0": "negative integer"
+    "-6.8523015e+5": "negative canonical"
+    "-685.230_15E-03": "negative w/ negative exponential"
+    "-685.230_15e+03": "negative exponential"
+    "-685.230_15e-03": "negative w/ negative exponential"
+    "-685_230.15": "negative fixed"
+    ".NaN": "not a number"
+    ".inf": "positive infinity"
+    "02472256": "octal"
+    "0b1010_0111_0100_1010_1110": "binary"
+    "0x_0A_74_AE": "hexadecimal"
+    "190:20:30": "sexagesimal"
+    "190:20:30.15": "sexagesimal"
+    "2001-12-14 21:59:43.10 -5": "space separated"
+    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
+    "2001-12-15 2:59:43.10": "no time zone (Z)"
+    "2001-12-15T02:59:43.1Z": "canonical"
+    "2002-12-14": "date"
+    "6.8523015e+5": "canonical"
+    "6.8523015e-5": "canonical"
+    "685.230_15e+03": "exponential"
+    "685230": "canonical"
+    "685_230.15": "fixed"
+    "N": "boolean false"
+    "NO": "boolean false"
+    "NULL": "null word capital"
+    "Null": "null word"
+    "OFF": "boolean false"
+    "On": "boolean true"
+    "True": "boolean true"
+    "Yes": "boolean true"
+    "n": "boolean false"
+    "null": "null word"
+    "off": "boolean false"
+    "on": "boolean true"
+    "true": "boolean true"
+    "y": "boolean true"
+    "yes": "boolean true"
+    "~": "null key"
+    ---
+    -0B1010_0111_0100_1010_1110: "BARE_KEY"
+    0X_0a_74_ae: "BARE_KEY"
+    1-234-567-8901: "BARE_KEY"
+    192.168.0.1: "BARE_KEY"
+    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
+    __-0X_0a_74_ae: "BARE_KEY"
+    b: "BARE_KEY"
+    jsonnet.org/k8s-label-like: "BARE_KEY"
+    just-letters-dashes: "BARE_KEY"
+    just_letters_underscores: "BARE_KEY"
+    x: "BARE_KEY"
+    ...
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlStream([some_json, some_json, {}, [], 3, '"']),
@@ -1280,70 +1280,70 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], quote_keys=false),
-//  |||
-//    ---
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//    ---
-//    "\"": null
-//    arr:
-//    -
-//      - []
-//    emptyArray: []
-//    emptyObject: {}
-//    objectInArray:
-//    - f: 3
-//    x:
-//    - 1
-//    - 2
-//    - 3
-//    - true
-//    - false
-//    - null
-//    - |
-//      string
-//      string
-//    "y":
-//      a: 1
-//      b: 2
-//      c:
-//      - 1
-//      - 2
-//    ---
-//    {}
-//    ---
-//    []
-//    ---
-//    3
-//    ---
-//    "\""
-//    ...
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], quote_keys=false),
+  |||
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+    ---
+    {}
+    ---
+    []
+    ---
+    3
+    ---
+    "\""
+    ...
+  |||
+) &&
 
 std.assertEqual(
   std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], indent_array_in_object=true),
@@ -1410,19 +1410,19 @@ std.assertEqual(
   |||
 ) &&
 
-//std.assertEqual(
-//  std.manifestYamlStream([{}, [], 3, '"'], c_document_end=false),
-//  |||
-//    ---
-//    {}
-//    ---
-//    []
-//    ---
-//    3
-//    ---
-//    "\""
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestYamlStream([{}, [], 3, '"'], c_document_end=false),
+  |||
+    ---
+    {}
+    ---
+    []
+    ---
+    3
+    ---
+    "\""
+  |||
+) &&
 
 std.assertEqual(std.parseInt('01234567890'), 1234567890) &&
 std.assertEqual(std.parseInt('9007199254740991'), 9007199254740991) &&
