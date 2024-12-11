@@ -4,7 +4,8 @@ import scala.collection.mutable
 import utest._
 import Expr._
 import fastparse.Parsed
-import Val.{True, Num}
+import Val.{Num, True}
+import sjsonnet.Expr.FieldName.Fixed
 object ParserTests extends TestSuite{
   def parse(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(_)).get.value._1
   def parseErr(s: String, strictImportSyntax: Boolean = false) = fastparse.parse(s, new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(_), verboseFailures = true).asInstanceOf[Parsed.Failure].msg
@@ -25,6 +26,18 @@ object ParserTests extends TestSuite{
     }
     test("duplicateFields") {
       parseErr("{ a: 1, a: 2 }") ==> """Expected no duplicate field: a:1:14, found "}""""
+    }
+    test("localInObj") {
+      parse("""{
+               |local x = 1,
+               |a: x,
+               |}""".stripMargin).toString ==> (ObjBody.MemberList(pos(2), Array(Bind(pos(8), "x", null, Num(pos(12), 1))),
+        Array(Member.Field(pos(15), Fixed("a"), false, null, Member.Visibility.Normal, Id(pos(18), "x"))), null)).toString
+      parseErr("""{
+                 |local x = 1,
+                 |local x = x + 1,
+                 |a: x,
+                 |}""".stripMargin) ==> """Expected no duplicate local: x:5:1, found "}""""
     }
     test("givenDuplicateFieldsInListComprehension_expectError") {
       parseErr("""{ ["bar"]: x for x in [1, 2]}""") ==> """Expected no duplicate field: "bar" :1:29, found "}""""
