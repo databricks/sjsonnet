@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.{eval, evalErr}
+import TestUtils.{eval, eval0, evalErr}
 object EvaluatorTests extends TestSuite{
 
 
@@ -30,6 +30,8 @@ object EvaluatorTests extends TestSuite{
       eval("local f(x) = function() true; f(42)") ==> ujson.True
       eval("local f(x) = function() true; f(42) == true") ==> ujson.False
       eval("local f(x) = function() true; f(42)() == true") ==> ujson.True
+      assert(evalErr("{foo: function() true}").startsWith("sjsonnet.Error: Couldn't manifest function as JSON"))
+      eval("{foo: (function() true)()}") ==> ujson.Obj{"foo" -> ujson.True}
     }
     test("members") {
       eval("{local x = 1, x: x}['x']") ==> ujson.Num(1)
