@@ -178,8 +178,10 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
 }
 
 /** Renderer used by std.manifestJson, std.manifestJsonMinified, and std.manifestJsonEx */
-case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter())
-  extends BaseCharRenderer(out, indent, escapeUnicode) {
+case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter(), newline: String = "\n", keyValueSeparator: String = ": ")
+  extends BaseCharRenderer(out, indent, escapeUnicode, newline.toCharArray) {
+  private val newLineCharArray = newline.toCharArray
+  private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
 
   override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
     flushBuffer()
@@ -187,7 +189,7 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
 
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if (length == 0 && indent != -1) elemBuilder.append('\n') else renderIndent()
+    if (length == 0 && indent != -1) elemBuilder.appendAll(newLineCharArray, newLineCharArray.length) else renderIndent()
     def subVisitor = MaterializeJsonRenderer.this
     def visitValue(v: StringWriter, index: Int): Unit = {
       flushBuffer()
@@ -208,12 +210,11 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
     elemBuilder.append('{')
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if (length == 0 && indent != -1) elemBuilder.append('\n') else renderIndent()
+    if (length == 0 && indent != -1) elemBuilder.appendAll(newLineCharArray, newLineCharArray.length) else renderIndent()
     def subVisitor = MaterializeJsonRenderer.this
     def visitKey(index: Int) = MaterializeJsonRenderer.this
     def visitKeyValue(s: Any): Unit = {
-      elemBuilder.append(':')
-      if (indent != -1) elemBuilder.append(' ')
+      elemBuilder.appendAll(keyValueSeparatorCharArray, keyValueSeparatorCharArray.length)
     }
     def visitValue(v: StringWriter, index: Int): Unit = {
       commaBuffered = true

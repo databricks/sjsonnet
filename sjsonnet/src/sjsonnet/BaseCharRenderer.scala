@@ -9,7 +9,8 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 (out: T,
  indent: Int = -1,
- escapeUnicode: Boolean = false) extends JsVisitor[T, T]{
+ escapeUnicode: Boolean = false,
+ newline: Array[Char] = Array('\n')) extends JsVisitor[T, T]{
   protected[this] val elemBuilder = new upickle.core.CharBuilder
   protected[this] val unicodeCharBuilder = new upickle.core.CharBuilder()
   def flushCharBuilder() = {
@@ -154,7 +155,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     else {
       var i = indent * depth
       elemBuilder.ensureLength(i + 1)
-      elemBuilder.appendUnsafe('\n')
+      elemBuilder.appendAll(newline, newline.length)
       while(i > 0) {
         elemBuilder.appendUnsafe(' ')
         i -= 1
