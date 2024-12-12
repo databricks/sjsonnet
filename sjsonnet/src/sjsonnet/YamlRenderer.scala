@@ -178,16 +178,21 @@ object YamlRenderer{
   private val safeYamlKeyPattern = Pattern.compile("^[a-zA-Z0-9/._-]+$")
   private val yamlReserved = Set("true", "false", "null", "yes", "no", "on", "off", "y", "n", ".nan",
     "+.inf", "-.inf", ".inf", "null", "-", "---", "''")
-  private val yamlTimestampPattern = Pattern.compile("^(?:[0-9]*-){2}[0-9]*$", Pattern.CASE_INSENSITIVE)
+  private val yamlTimestampPattern = Pattern.compile("^(?:[0-9]*-){2}[0-9]*$")
   private val yamlBinaryPattern = Pattern.compile("^[-+]?0b[0-1_]+$")
   private val yamlHexPattern = Pattern.compile("[-+]?0x[0-9a-fA-F_]+")
+  private val yamlFloatPattern = Pattern.compile( "^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$" )
+  private val yamlIntPattern = Pattern.compile("^[-+]?[0-9_]+$")
 
   private def isSafeBareKey(k: String) = {
     val l = k.toLowerCase
-    !yamlReserved.contains(l) && safeYamlKeyPattern.matcher(k).matches() &&
-      !yamlTimestampPattern.matcher(k).matches() && !yamlBinaryPattern.matcher(k).matches() &&
-      !yamlHexPattern.matcher(k).matches() && (Try(l.replace("_", "").toLong).isFailure
-      && Try(l.replace("_", "").toDouble).isFailure)
+    !yamlReserved.contains(l) &&
+      safeYamlKeyPattern.matcher(k).matches() &&
+      !yamlTimestampPattern.matcher(l).matches() &&
+      !yamlBinaryPattern.matcher(k).matches() &&
+      !yamlHexPattern.matcher(k).matches() &&
+      !yamlFloatPattern.matcher(l).matches() &&
+      !yamlIntPattern.matcher(l).matches()
   }
 
   def writeIndentation(out: upickle.core.CharBuilder, n: Int): Unit = {
