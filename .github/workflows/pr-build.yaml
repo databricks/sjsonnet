@@ -12,10 +12,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        lang: ['jvm', 'js', 'native']
         java: ['11', '17']
     env:
       # Set LANG=C to simulate least-common-denominator target deployment environments:
       LANG: C
+    name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}
@@ -23,9 +25,11 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'zulu'
-      - name: Run mill tests
-        run: ./mill __.test
+      - name: Run mill tests for ${{ matrix.lang }}
+        run: ./mill _.${{ matrix.lang }}[_].test
       - name: Compile with sbt
+        if: ${{ matrix.lang == 'jvm' }}
         run: sbt compile bench/compile bench/jmh:compile
       - name: Run sbt tests
+        if: ${{ matrix.lang == 'jvm' }}
         run: sbt test
