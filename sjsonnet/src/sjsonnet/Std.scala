@@ -702,13 +702,13 @@ class Std {
 
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer(indent = -1))(ev).toString)
+      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":"))(ev).toString)
   }
 
-  private object ManifestJsonEx extends Val.Builtin2("manifestJsonEx", "value", "indent") {
-    def evalRhs(v: Val, i: Val, ev: EvalScope, pos: Position): Val =
+  private object ManifestJsonEx extends Val.Builtin4("manifestJsonEx", "value", "indent", "newline", "key_val_sep", Array(null, null, Val.Str(dummyPos, "\n"), Val.Str(dummyPos, ": "))) {
+    def evalRhs(v: Val, i: Val, newline: Val, keyValSep: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer
-        .apply0(v, new MaterializeJsonRenderer(indent = i.asString.length))(ev)
+        .apply0(v, MaterializeJsonRenderer(indent = i.asString.length, newline = newline.asString, keyValueSeparator = keyValSep.asString))(ev)
         .toString)
   }
 
