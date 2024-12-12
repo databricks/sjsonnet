@@ -446,14 +446,14 @@ class Std {
         try {
           val pattern = Pattern.compile(from.value, Pattern.LITERAL)
           val quotedTo = java.util.regex.Matcher.quoteReplacement(to.value)
-          (new SpecStringReplace(pattern, quotedTo), Array(str))
+          (new SpecStrReplace(pattern, quotedTo), Array(str))
         } catch {
           case _: Exception => null
         }
       case _ => null
     }
 
-    private class SpecStringReplace(from: Pattern, quotedTo: String) extends Val.Builtin1("strReplace", "str") {
+    private class SpecStrReplace(from: Pattern, quotedTo: String) extends Val.Builtin1("strReplace", "str") {
       override def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val = {
         Val.Str(pos, from.matcher(arg1.asString).replaceAll(quotedTo))
       }
