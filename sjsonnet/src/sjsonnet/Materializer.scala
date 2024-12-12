@@ -56,11 +56,10 @@ abstract class Materializer {
       case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
       case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
       case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
-      case f: Val.Func =>
-        apply0(
-          f.apply(Materializer.emptyLazyArray, null, evaluator.emptyMaterializeFileScopePos),
-          visitor
-        )
+      case _: Val.Func =>
+        Error.fail("Couldn't manifest function as JSON")
+      case _ =>
+        Error.fail("Unknown value type " + v.prettyName)
     }
   } catch {
     case _: StackOverflowError =>
