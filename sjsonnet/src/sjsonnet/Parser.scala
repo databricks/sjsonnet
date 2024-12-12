@@ -328,6 +328,15 @@ class Parser(val currentFile: Path,
     case (pos, exprs, None) =>
       val binds = {
         val b = exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+        val seen = collection.mutable.Set.empty[String]
+        var overlap: String = null
+        b.foreach {
+          case Expr.Bind(_, n, _, _) =>
+            if (seen(n)) overlap = n
+            else seen.add(n)
+          case _ =>
+        }
+        if (overlap != null) Fail.opaque("no duplicate local: " + overlap)
         if(b.isEmpty) null else b
       }
       val fields = exprs.iterator.filter(_.isInstanceOf[Expr.Member.Field]).asInstanceOf[Iterator[Expr.Member.Field]].toArray

@@ -18,6 +18,8 @@ trait Expr{
     val n = getClass.getName
     if(n.startsWith("sjsonnet.Expr$")) n.substring(14) else n
   }
+
+  override def toString: String = s"$exprErrorString@$pos"
 }
 object Expr{
   private final def arrStr(a: Array[_]): String = {
@@ -165,7 +167,9 @@ object Expr{
 
   trait ObjBody extends Expr
   object ObjBody{
-    case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody
+    case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody {
+      override def toString: String = s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
+    }
     case class ObjComp(pos: Position,
                        preLocals: Array[Bind],
                        key: Expr,
