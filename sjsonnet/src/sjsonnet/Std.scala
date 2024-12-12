@@ -1121,36 +1121,54 @@ class Std {
     builtin(ManifestTomlEx),
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
-                        "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>
+                        "indent_array_in_object" -> Val.False(dummyPos),
+                        "quote_keys" -> Val.True(dummyPos)){ (args, pos, ev) =>
       val v = args(0)
       val indentArrayInObject = args(1)  match {
           case Val.False(_) => false
           case Val.True(_) => true
           case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
         }
+      val quoteKeys = args(2) match {
+        case Val.False(_) => false
+        case Val.True(_) => true
+        case _ => Error.fail("quote_keys has to be a boolean, got " + v.getClass)
+      }
       Materializer.apply0(
         v,
-        new YamlRenderer(indentArrayInObject = indentArrayInObject)
+        new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
       )(ev).toString
     },
     builtinWithDefaults("manifestYamlStream",
                         "v" -> null,
-                        "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>
+                        "indent_array_in_object" -> Val.False(dummyPos),
+                        "c_document_end" -> Val.True(dummyPos),
+                        "quote_keys" -> Val.True(dummyPos)){ (args, _, ev) =>
       val v = args(0)
       val indentArrayInObject = args(1)  match {
         case Val.False(_) => false
         case Val.True(_) => true
         case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
       }
+      val cDocumentEnd = args(2) match {
+        case Val.False(_) => false
+        case Val.True(_) => true
+        case _ => Error.fail("c_document_end has to be a boolean, got " + v.getClass)
+      }
+      val quoteKeys = args(3) match {
+        case Val.False(_) => false
+        case Val.True(_) => true
+        case _ => Error.fail("quote_keys has to be a boolean, got " + v.getClass)
+      }
       v match {
         case arr: Val.Arr => arr.asLazyArray
           .map { item =>
             Materializer.apply0(
               item.force,
-              new YamlRenderer(indentArrayInObject = indentArrayInObject)
+              new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
             )(ev).toString()
           }
-          .mkString("---\n", "\n---\n", "\n...\n")
+          .mkString("---\n", "\n---\n", if (cDocumentEnd) "\n...\n" else "\n")
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
