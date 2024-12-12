@@ -9,7 +9,6 @@ import sjsonnet.Expr.Member.Visibility
 
 import scala.collection.Searching._
 import scala.collection.mutable
-import scala.util.control.Breaks.{break, breakable}
 import scala.util.matching.Regex
 
 /**
@@ -642,17 +641,15 @@ class Std {
     var sz = 0
     var i = 0
     var start = 0
-    breakable {
-      while (i < str.length) {
-        if (maxSplits >= 0 && sz >= maxSplits) {
-          break
-        }
-        if (str.slice(i, i + cStr.length) == cStr) {
-          val finalStr = Val.Str(pos, str.slice(start, i))
-          b.+=(finalStr)
-          start = i + cStr.length
-          sz += 1
-        }
+
+    while (i <= str.length - cStr.length && (maxSplits < 0 || sz < maxSplits)) {
+      if (str.startsWith(cStr, i)) {
+        val finalStr = Val.Str(pos, str.substring(start, i))
+        b.+=(finalStr)
+        start = i + cStr.length
+        sz += 1
+        i += cStr.length
+      } else {
         i += 1
       }
     }
