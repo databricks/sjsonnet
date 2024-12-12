@@ -578,7 +578,6 @@ class Std {
         i += 1
       }
     }
-
     b.+=(Val.Str(pos, str.substring(start)))
     sz += 1
     b.result()
