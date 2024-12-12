@@ -456,6 +456,82 @@ class Std {
     }
   }
 
+  private object StripUtils {
+    private def getLeadingPattern(chars: String): Pattern =
+      Pattern.compile("^[" + Regex.quote(chars) + "]+")
+
+    private def getTrailingPattern(chars: String): Pattern =
+      Pattern.compile("[" + Regex.quote(chars) + "]+$")
+
+    def unspecializedStrip(str: String, chars: String, left: Boolean, right: Boolean): String = {
+      var s = str
+      if (right) s = getTrailingPattern(chars).matcher(s).replaceAll("")
+      if (left) s = getLeadingPattern(chars).matcher(s).replaceAll("")
+      s
+    }
+
+    private class SpecStrip(
+      chars: String,
+      left: Boolean,
+      right: Boolean,
+      functionName: String
+    ) extends Val.Builtin1(functionName, "str") {
+      private[this] val leftPattern = getLeadingPattern(chars)
+      private[this] val rightPattern = getTrailingPattern(chars)
+
+      def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
+        var s = str.asString
+        if (right) s = rightPattern.matcher(s).replaceAll("")
+        if (left) s = leftPattern.matcher(s).replaceAll("")
+        Val.Str(pos, s)
+      }
+    }
+
+    def trySpecialize(str: Expr, chars: Val.Str, left: Boolean, right: Boolean, name: String): (Val.Builtin, Array[Expr]) = {
+      try {
+        (new SpecStrip(chars.value, left, right, name), Array(str))
+      } catch {
+        case _: Exception => null
+      }
+    }
+  }
+
+  object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
+    def evalRhs(str: Val, chars: Val, ev: EvalScope, pos: Position): Val = {
+      Val.Str(pos, StripUtils.unspecializedStrip(str.asString, chars.asString, left = true, right = true))
+    }
+
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
+      case Array(str, chars: Val.Str) =>
+        StripUtils.trySpecialize(str, chars, left = true, right = true, functionName)
+      case _ => null
+    }
+  }
+
+  object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
+    def evalRhs(str: Val, chars: Val, ev: EvalScope, pos: Position): Val = {
+      Val.Str(pos, StripUtils.unspecializedStrip(str.asString, chars.asString,  left = true, right = false))
+    }
+
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
+      case Array(str, chars: Val.Str) =>
+        StripUtils.trySpecialize(str, chars, left = true, right = false, functionName)
+      case _ => null
+    }
+  }
+
+  object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
+    def evalRhs(str: Val, chars: Val, ev: EvalScope, pos: Position): Val = {
+      Val.Str(pos, StripUtils.unspecializedStrip(str.asString, chars.asString, left = false, right = true))
+    }
+
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
+      case Array(str, chars: Val.Str) =>
+        StripUtils.trySpecialize(str, chars, left = false, right = true, functionName)
+      case _ => null
+    }
+  }
+
   private object Join extends Val.Builtin2("join", "sep", "arr") {
     def evalRhs(sep: Val, _arr: Val, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr)
@@ -1025,16 +1101,9 @@ class Std {
     builtin(Char_),
     builtin(StrReplace),
     builtin(StrReplaceAll),
-
-    builtin("rstripChars", "str", "chars"){ (pos, ev, str: String, chars: String) =>
-      str.replaceAll("[" + Regex.quote(chars) + "]+$", "")
-    },
-    builtin("lstripChars", "str", "chars"){ (pos, ev, str: String, chars: String) =>
-      str.replaceAll("^[" + Regex.quote(chars) + "]+", "")
-    },
-    builtin("stripChars", "str", "chars"){ (pos, ev, str: String, chars: String) =>
-      str.replaceAll("[" + Regex.quote(chars) + "]+$", "").replaceAll("^[" + Regex.quote(chars) + "]+", "")
-    },
+    builtin(RStripChars),
+    builtin(LStripChars),
+    builtin(StripChars),
     builtin(Join),
     builtin(Member),
 
