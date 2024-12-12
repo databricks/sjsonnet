@@ -697,7 +697,7 @@ class Std {
 
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v, new MaterializeJsonRenderer())(ev).toString)
+      Val.Str(pos, Materializer.apply0(v, MaterializeJsonRenderer())(ev).toString)
   }
 
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "v") {
@@ -724,6 +724,65 @@ class Std {
       } catch {
         case _: Exception => null
       }
+    }
+  }
+
+  private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
+    private def isTableArray(v: Val) = v match {
+      case s: Val.Arr => s.length > 0 && s.asLazyArray.forall(_.isInstanceOf[Val.Obj])
+      case _ => false
+    }
+
+    private def isSection(v: Val) = v.isInstanceOf[Val.Obj] || isTableArray(v)
+
+    private def renderTableInternal(out: StringWriter, v: Val.Obj, cumulatedIndent: String, indent: String, path: Seq[String], indexedPath: Seq[String])(implicit ev : EvalScope): StringWriter = {
+      val (sections, nonSections) = v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
+      for (k <- nonSections.sorted) {
+        out.write(cumulatedIndent)
+        out.write(TomlRenderer.escapeKey(k))
+        out.write(" = ")
+        Materializer.apply0(v.value(k, v.pos)(ev), new TomlRenderer(out, cumulatedIndent, indent))(ev)
+      }
+      out.write('\n')
+
+      for (k <- sections.sorted) {
+        val v0 = v.value(k, v.pos, v)(ev)
+        if (isTableArray(v0)) {
+          for (i <- 0 until v0.asArr.length) {
+            out.write(cumulatedIndent)
+            renderTableArrayHeader(out, path :+ k)
+            out.write('\n')
+            renderTableInternal(out, v0.asArr.force(i).asObj, cumulatedIndent + indent, indent, path :+ k,
+              indexedPath ++ Seq(k, i.toString))
+          }
+        } else {
+          out.write(cumulatedIndent)
+          renderTableHeader(out, path :+ k)
+          out.write('\n')
+          renderTableInternal(out, v0.asObj, cumulatedIndent + indent, indent, path :+ k, indexedPath :+ k)
+        }
+      }
+      out
+    }
+
+    private def renderTableHeader(out: StringWriter, path: Seq[String]) = {
+      out.write('[')
+      out.write(path.map(TomlRenderer.escapeKey).mkString("."))
+      out.write(']')
+      out
+    }
+
+    private def renderTableArrayHeader(out: StringWriter, path: Seq[String]) = {
+      out.write('[')
+      renderTableHeader(out, path)
+      out.write(']')
+      out
+    }
+
+    def evalRhs(v: Val, indent: Val, ev: EvalScope, pos: Position): Val = {
+      val out = new StringWriter
+      renderTableInternal(out, v.force.asObj, "", indent.asString, Seq.empty[String], Seq.empty[String])(ev)
+      Val.Str(pos, out.toString.strip)
     }
   }
 
@@ -1056,6 +1115,10 @@ class Std {
     builtin(ManifestJson),
     builtin(ManifestJsonMinified),
     builtin(ManifestJsonEx),
+    builtin("manifestToml", "value"){ (pos, ev, value: Val) =>
+      ManifestTomlEx.evalRhs(value, Val.Str(pos, ""), ev, pos)
+    },
+    builtin(ManifestTomlEx),
     builtinWithDefaults("manifestYamlDoc",
                         "v" -> null,
                         "indent_array_in_object" -> Val.False(dummyPos)){ (args, pos, ev) =>
