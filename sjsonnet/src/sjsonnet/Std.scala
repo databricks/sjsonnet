@@ -440,24 +440,6 @@ class Std {
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
     def evalRhs(str: Val, from: Val, to: Val, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.asString.replace(from.asString, to.asString))
-
-    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = args match {
-      case Array(str, from: Val.Str, to: Val.Str) =>
-        try {
-          val pattern = Pattern.compile(from.value, Pattern.LITERAL)
-          val quotedTo = java.util.regex.Matcher.quoteReplacement(to.value)
-          (new SpecStrReplace(pattern, quotedTo), Array(str))
-        } catch {
-          case _: Exception => null
-        }
-      case _ => null
-    }
-
-    private class SpecStrReplace(from: Pattern, quotedTo: String) extends Val.Builtin1("strReplace", "str") {
-      override def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val = {
-        Val.Str(pos, from.matcher(arg1.asString).replaceAll(quotedTo))
-      }
-    }
   }
 
   private object StrReplaceAll extends Val.Builtin3("strReplaceAll", "str", "from", "to") {
