@@ -9,7 +9,6 @@ import sjsonnet.Expr.Member.Visibility
 
 import scala.collection.Searching._
 import scala.collection.mutable
-import scala.util.control.Breaks.{break, breakable}
 import scala.util.matching.Regex
 
 /**
