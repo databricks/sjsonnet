@@ -566,20 +566,19 @@ class Std {
     var sz = 0
     var i = 0
     var start = 0
-    breakable {
-      while (i < str.length) {
-        if (maxSplits >= 0 && sz >= maxSplits) {
-          break
-        }
-        if (str.slice(i, i + cStr.length) == cStr) {
-          val finalStr = Val.Str(pos, str.slice(start, i))
-          b.+=(finalStr)
-          start = i + cStr.length
-          sz += 1
-        }
+
+    while (i <= str.length - cStr.length && (maxSplits < 0 || sz < maxSplits)) {
+      if (str.startsWith(cStr, i)) {
+        val finalStr = Val.Str(pos, str.substring(start, i))
+        b.+=(finalStr)
+        start = i + cStr.length
+        sz += 1
+        i += cStr.length
+      } else {
         i += 1
       }
     }
+
     b.+=(Val.Str(pos, str.substring(start)))
     sz += 1
     b.result()
