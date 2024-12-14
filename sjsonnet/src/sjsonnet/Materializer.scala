@@ -37,7 +37,8 @@ abstract class Materializer {
           )
           if(sort) {
             if(prevKey != null && k.compareTo(prevKey) <= 0)
-              Error.fail(s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""")
+              Error.fail(
+                s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""", v.pos)
             prevKey = k
           }
         }
@@ -56,14 +57,14 @@ abstract class Materializer {
       case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
       case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
       case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
-      case _: Val.Func =>
-        Error.fail("Couldn't manifest function as JSON")
+      case s: Val.Func =>
+        Error.fail("Couldn't manifest function with params [" + s.params.names.mkString(",") + "]", v.pos)
       case _ =>
-        Error.fail("Unknown value type " + v.prettyName)
+        Error.fail("Unknown value type", v.pos)
     }
   } catch {
     case _: StackOverflowError =>
-      Error.fail("Stackoverflow while materializing, possibly due to recursive value")
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
   }
 
   def reverse(pos: Position, v: ujson.Value): Val = v match{

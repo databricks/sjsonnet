@@ -30,7 +30,7 @@ object EvaluatorTests extends TestSuite{
       eval("local f(x) = function() true; f(42)") ==> ujson.True
       eval("local f(x) = function() true; f(42) == true") ==> ujson.False
       eval("local f(x) = function() true; f(42)() == true") ==> ujson.True
-      assert(evalErr("{foo: function() true}").startsWith("sjsonnet.Error: Couldn't manifest function as JSON"))
+      assert(evalErr("{foo: function() true}").startsWith("sjsonnet.Error: Couldn't manifest function with params"))
       eval("{foo: (function() true)()}") ==> ujson.Obj{"foo" -> ujson.True}
     }
     test("members") {
