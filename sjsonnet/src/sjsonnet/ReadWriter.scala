@@ -44,4 +44,8 @@ object ReadWriter{
     def apply(t: Val) = t.asFunc
     def write(pos: Position, t: Val.Func) = t
   }
+  implicit object BuiltinRead  extends ReadWriter[Val.Builtin] {
+    def apply(t: Val) = t.asInstanceOf[Val.Builtin]
+    def write(pos: Position, t: Val.Builtin) = t
+  }
 }

@@ -16,11 +16,39 @@ import scala.util.matching.Regex
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
   * logic automatically
   */
-class Std {
+class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.empty) {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
   private val leadingWhiteSpacePattern = Pattern.compile("^[ \t\n\f\r\u0085\u00A0']+")
   private val trailingWhiteSpacePattern = Pattern.compile("[ \t\n\f\r\u0085\u00A0']+$")
+  private val oldNativeFunctions = Map(
+    builtin("gzip", "v"){ (_, _, v: Val) =>
+      v match{
+        case Val.Str(_, value) => Platform.gzipString(value)
+        case arr: Val.Arr => Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
+        case x => Error.fail("Cannot gzip encode " + x.prettyName)
+      }
+    },
+
+    builtinWithDefaults("xz", "v" -> null, "compressionLevel" -> Val.Null(dummyPos)){ (args, pos, ev) =>
+      val compressionLevel: Option[Int] = args(1) match {
+        case Val.Null(_) =>
+          // Use default compression level if the user didn't set one
+          None
+        case Val.Num(_, n) =>
+          Some(n.toInt)
+        case x =>
+          Error.fail("Cannot xz encode with compression level " + x.prettyName)
+      }
+      args(0) match {
+        case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
+        case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray, compressionLevel)
+        case x => Error.fail("Cannot xz encode " + x.prettyName)
+      }
+    },
+  )
+  require(oldNativeFunctions.forall(k => !additionalNativeFunctions.contains(k._1)), "Conflicting native functions")
+  private val nativeFunctions = oldNativeFunctions ++ additionalNativeFunctions
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
@@ -1285,31 +1313,6 @@ class Std {
       new Val.Arr(pos, Base64.getDecoder().decode(s).map(i => Val.Num(pos, i)))
     },
 
-    builtin("gzip", "v"){ (pos, ev, v: Val) =>
-      v match{
-        case Val.Str(_, value) => Platform.gzipString(value)
-        case arr: Val.Arr => Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
-        case x => Error.fail("Cannot gzip encode " + x.prettyName)
-      }
-    },
-
-    builtinWithDefaults("xz", "v" -> null, "compressionLevel" -> Val.Null(dummyPos)){ (args, pos, ev) =>
-      val compressionLevel: Option[Int] = args(1) match {
-        case Val.Null(_) =>
-          // Use default compression level if the user didn't set one
-          None
-        case Val.Num(_, n) =>
-          Some(n.toInt)
-        case x =>
-          Error.fail("Cannot xz encode with compression level " + x.prettyName)
-      }
-      args(0) match {
-        case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
-        case arr: Val.Arr => Platform.xzBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray, compressionLevel)
-        case x => Error.fail("Cannot xz encode " + x.prettyName)
-      }
-    },
-
     builtin(EncodeUTF8),
     builtin(DecodeUTF8),
 
@@ -1511,7 +1514,14 @@ class Std {
     builtin(MaxArray),
     builtin("primitiveEquals", "x", "y") { (_, ev, x: Val, y: Val) =>
       x.isInstanceOf[y.type] && ev.compare(x, y) == 0
-    }
+    },
+    builtin("native", "name") { (pos, ev, name: String) =>
+      if (nativeFunctions.contains(name)) {
+        nativeFunctions(name)
+      } else {
+        Error.fail("Native function " + name + " not found", pos)(ev)
+      }
+    },
   )
 
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {

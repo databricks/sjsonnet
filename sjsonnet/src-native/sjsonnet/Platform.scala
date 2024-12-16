@@ -1,12 +1,26 @@
 package sjsonnet
-import java.io.File
+
+import java.io.{ByteArrayOutputStream, File}
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
+
 object Platform {
-  def gzipBytes(s: Array[Byte]): String = {
-    throw new Exception("GZip not implemented in Scala Native")
+  def gzipBytes(b: Array[Byte]): String = {
+    val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
+    val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
+    try {
+      gzip.write(b)
+    } finally {
+      gzip.close()
+      outputStream.close()
+    }
+    Base64.getEncoder.encodeToString(outputStream.toByteArray)
   }
+
   def gzipString(s: String): String = {
-    throw new Exception("GZip not implemented in Scala Native")
+    gzipBytes(s.getBytes())
   }
+
   def xzBytes(s: Array[Byte], compressionLevel: Option[Int]): String = {
     throw new Exception("XZ not implemented in Scala Native")
   }
