@@ -157,6 +157,12 @@ object StdWithKeyFTests extends TestSuite {
       eval("std.setUnion(std.set([\"c\", \"c\", \"b\"]), std.set([\"b\", \"b\", \"a\", \"b\", \"a\"]))").toString() ==>
           """["a","b","c"]"""
 
+      eval("std.setUnion(std.set([]), std.set([\"b\", \"b\", \"a\", \"b\", \"a\"]))").toString() ==>
+        """["a","b"]"""
+
+      eval("std.setUnion(std.set([\"c\", \"c\", \"b\"]), std.set([]))").toString() ==>
+        """["b","c"]"""
+
       eval(
         """local arr1 = std.set([
                 {
