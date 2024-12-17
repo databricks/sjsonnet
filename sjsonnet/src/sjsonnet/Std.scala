@@ -1522,7 +1522,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         Error.fail("Native function " + name + " not found", pos)(ev)
       }
     },
-  )
+  ) ++ oldNativeFunctions
 
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
     args(idx) match {
