@@ -1323,10 +1323,10 @@ class Std {
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
       val a = toSetArrOrString(args, 0, pos, ev)
       val b = toSetArrOrString(args, 1, pos, ev)
-      if (ev.settings.strictSetOperations && a.length == 0) {
-        args(0)
-      } else if (ev.settings.strictSetOperations && b.length == 0) {
-        args(1)
+      if (a.isEmpty) {
+        uniqArr(pos, ev, sortArr(pos, ev, args(1), args(2)), args(2))
+      } else if (b.isEmpty) {
+        uniqArr(pos, ev, sortArr(pos, ev, args(0), args(2)), args(2))
       } else {
         val concat = new Val.Arr(pos, a ++ b)
         uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
@@ -1656,8 +1656,11 @@ class Std {
     }
   }
 
-  private def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
+  private def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val): Val = {
     val arrValue = toArrOrString(arr, pos, ev)
+    if (arrValue.length <= 1) {
+      return arr
+    }
 
     val out = new mutable.ArrayBuffer[Lazy]
     for (v <- arrValue) {
