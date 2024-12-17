@@ -4,7 +4,7 @@ import contrib.jmh.JmhModule
 
 val sjsonnetVersion = "0.4.13"
 
-val scalaVersions = Seq("2.12.18", "2.13.12")
+val scalaVersions = Seq("2.12.20", "2.13.15")
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
