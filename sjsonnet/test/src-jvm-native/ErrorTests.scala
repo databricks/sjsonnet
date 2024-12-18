@@ -259,9 +259,8 @@ object ErrorTests extends TestSuite{
       )
     }
     test("native_not_found") - check(
-      """sjsonnet.Error: Field does not exist: native
-        |    at [Select native].(sjsonnet/test/resources/test_suite/error.native_not_found.jsonnet:17:4)
-        |    at [Apply1].(sjsonnet/test/resources/test_suite/error.native_not_found.jsonnet:17:11)
+      """sjsonnet.Error: Native function non_existent_native not found
+        |    at [std.native].(sjsonnet/test/resources/test_suite/error.native_not_found.jsonnet:17:11)
         |""".stripMargin
     )
     test("obj_assert") - {

@@ -1,5 +1,7 @@
 package sjsonnet;
 
+import scala.collection.immutable.Map$;
+
 public class Example {
     public void example(){
         sjsonnet.SjsonnetMain.main0(
@@ -11,7 +13,7 @@ public class Example {
             os.package$.MODULE$.pwd(),
             scala.None$.empty(),
             scala.None$.empty(),
-            new sjsonnet.Std().Std()
+            new sjsonnet.Std(Map$.MODULE$.empty()).Std()
         );
     }
 }
