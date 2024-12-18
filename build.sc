@@ -2,7 +2,7 @@ import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativ
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 
-val sjsonnetVersion = "0.4.13"
+val sjsonnetVersion = "0.4.14"
 
 val scalaVersions = Seq("2.12.20", "2.13.15")
 

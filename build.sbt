@@ -1,4 +1,4 @@
-val sjsonnetVersion = "0.4.13"
+val sjsonnetVersion = "0.4.14"
 
 scalaVersion in Global := "2.13.12"
 

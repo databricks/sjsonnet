@@ -247,13 +247,13 @@ mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
 ```bash
-./mill -i show sjsonnet[2.13.4].jvm.assembly
+./mill -i show sjsonnet[2.13.15].jvm.assembly
 ```
 
 To create the executable. For the client-server executable, you can use
 
 ```bash
-./mill -i show sjsonnet[2.13.4].server.assembly
+./mill -i show sjsonnet[2.13.15].server.assembly
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
@@ -268,17 +268,17 @@ programmatically via `new Interpreter(...).interpret(...)`.
 To publish, make sure the version number in `build.sc` is correct, then run the following commands:
 
 ```bash
-./mill -i mill.scalalib.PublishModule/publishAll --sonatypeCreds lihaoyi:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true
+./mill -i mill.scalalib.PublishModule/publishAll --sonatypeCreds $SONATYPE_USER:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true
 
-./mill -i show sjsonnet[2.13.4].js.fullOpt
-./mill -i show sjsonnet[2.13.4].jvm.assembly
+./mill -i show sjsonnet[2.13.15].js.fullOpt
+./mill -i show sjsonnet[2.13.15].jvm.assembly
 ```
 
-Please ensure that you are publishing with JDK 8, e.g. via 
-`JAVA_HOME=/Library/Java/JavaVirtualMachines/adoptopenjdk-8.jdk/Contents/Home/`,
-to ensure the output bytecode remains compatible with users on older JVMs.
-
 ## Changelog
+
+### Pending Version
+- Fix a bug in new strict mode for set in std.setUnion [#242](https://github.com/databricks/sjsonnet/issues/242)
+- Add support for Java 21 and dropped support for Java 11.
 
 ### 0.4.13
 - Implemented every missing methods in `std`.
