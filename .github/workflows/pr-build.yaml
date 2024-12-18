@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         lang: ['jvm', 'js', 'native']
-        java: ['11', '17']
+        java: ['17', '21']
     env:
       # Set LANG=C to simulate least-common-denominator target deployment environments:
       LANG: C
