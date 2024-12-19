@@ -20,7 +20,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     val len = s.length()
     if (len == 0) out.append("\"\"")
     else if (s.charAt(len - 1) == '\n') {
-      val splits = YamlRenderer.newlinePattern.split(s)
+      val splits = Platform.getPatternFromCache("\n").split(s.toString)
       out.append('|')
       depth += 1
       splits.foreach { split =>

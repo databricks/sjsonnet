@@ -1,14 +1,17 @@
 package sjsonnet
 
 import java.io.{BufferedInputStream, ByteArrayOutputStream, File, FileInputStream}
+import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import com.google.re2j.Pattern
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
 import org.json.{JSONArray, JSONObject}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
+
 import scala.jdk.CollectionConverters._
 
 object Platform {
@@ -107,4 +110,11 @@ object Platform {
 
     hash.getValue.toString
   }
+
+  private val regexCache = new util.LinkedHashMap[String, Pattern](100, 0.75f, true) {
+    override def removeEldestEntry(eldest: util.Map.Entry[String, Pattern]): Boolean = size() > 100
+  }
+  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+
+  def regexQuote(s: String): String = Pattern.quote(s)
 }

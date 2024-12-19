@@ -1,11 +1,7 @@
 package sjsonnet
 
 import java.io.StringWriter
-import java.util.regex.Pattern
 import upickle.core.{ArrVisitor, ObjVisitor, SimpleVisitor, Visitor}
-
-import scala.util.Try
-
 
 
 class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
@@ -52,7 +48,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       elemBuilder.append('"')
       elemBuilder.append('"')
     } else if (s.charAt(len - 1) == '\n') {
-      val splits = YamlRenderer.newlinePattern.split(s)
+      val splits = Platform.getPatternFromCache("\n").split(s.toString)
       elemBuilder.append('|')
       depth += 1
       splits.foreach { split =>
@@ -174,15 +170,14 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
   }
 }
 object YamlRenderer{
-  val newlinePattern: Pattern = Pattern.compile("\n")
-  private val safeYamlKeyPattern = Pattern.compile("^[a-zA-Z0-9/._-]+$")
+  private val safeYamlKeyPattern = Platform.getPatternFromCache("^[a-zA-Z0-9/._-]+$")
   private val yamlReserved = Set("true", "false", "null", "yes", "no", "on", "off", "y", "n", ".nan",
     "+.inf", "-.inf", ".inf", "null", "-", "---", "''")
-  private val yamlTimestampPattern = Pattern.compile("^(?:[0-9]*-){2}[0-9]*$")
-  private val yamlBinaryPattern = Pattern.compile("^[-+]?0b[0-1_]+$")
-  private val yamlHexPattern = Pattern.compile("[-+]?0x[0-9a-fA-F_]+")
-  private val yamlFloatPattern = Pattern.compile( "^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$" )
-  private val yamlIntPattern = Pattern.compile("^[-+]?[0-9_]+$")
+  private val yamlTimestampPattern = Platform.getPatternFromCache("^(?:[0-9]*-){2}[0-9]*$")
+  private val yamlBinaryPattern = Platform.getPatternFromCache("^[-+]?0b[0-1_]+$")
+  private val yamlHexPattern = Platform.getPatternFromCache("[-+]?0x[0-9a-fA-F_]+")
+  private val yamlFloatPattern = Platform.getPatternFromCache( "^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$" )
+  private val yamlIntPattern = Platform.getPatternFromCache("^[-+]?[0-9_]+$")
 
   private def isSafeBareKey(k: String) = {
     val l = k.toLowerCase
