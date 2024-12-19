@@ -3,7 +3,6 @@ package sjsonnet
 import upickle.core.{ArrVisitor, CharBuilder, ObjVisitor, SimpleVisitor, Visitor}
 
 import java.io.StringWriter
-import java.util.regex.Pattern
 
 
 class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedIndent: String, indent: String) extends SimpleVisitor[StringWriter, StringWriter]{
@@ -117,7 +116,7 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
 }
 
 object TomlRenderer {
-  private val bareAllowed = Pattern.compile("[A-Za-z0-9_-]+")
+  private val bareAllowed = Platform.getPatternFromCache("[A-Za-z0-9_-]+")
   def escapeKey(key: String): String = if (bareAllowed.matcher(key).matches()) key else {
     val out = new StringWriter()
     BaseRenderer.escape(out, key, unicode = true)
