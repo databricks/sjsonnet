@@ -4,12 +4,10 @@ import java.io.StringWriter
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import java.util
-import java.util.regex.Pattern
 import sjsonnet.Expr.Member.Visibility
 
 import scala.collection.Searching._
 import scala.collection.mutable
-import scala.util.matching.Regex
 
 /**
   * The Jsonnet standard library, `std`, with each builtin function implemented
@@ -19,8 +17,8 @@ import scala.util.matching.Regex
 class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.empty) {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
-  private val leadingWhiteSpacePattern = Pattern.compile("^[ \t\n\f\r\u0085\u00A0']+")
-  private val trailingWhiteSpacePattern = Pattern.compile("[ \t\n\f\r\u0085\u00A0']+$")
+  private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
+  private val trailingWhiteSpacePattern = Platform.getPatternFromCache("[ \t\n\f\r\u0085\u00A0']+$")
   private val oldNativeFunctions = Map(
     builtin("gzip", "v"){ (_, _, v: Val) =>
       v match{
@@ -48,7 +46,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     },
   )
   require(oldNativeFunctions.forall(k => !additionalNativeFunctions.contains(k._1)), "Conflicting native functions")
-  private val nativeFunctions = oldNativeFunctions ++ additionalNativeFunctions
+  private val nativeFunctions = oldNativeFunctions ++ additionalNativeFunctions ++ StdRegex.functions
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
@@ -474,26 +472,24 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       Val.Str(pos, str.asString.replaceAll(from.asString, to.asString))
     override def specialize(args: Array[Expr]) = args match {
       case Array(str, from: Val.Str, to) =>
-        try { (new SpecFrom(Pattern.compile(from.value)), Array(str, to)) } catch { case _: Exception => null }
+        try { (new SpecFrom(from.value), Array(str, to)) } catch { case _: Exception => null }
       case _ => null
     }
-    private class SpecFrom(from: Pattern) extends Val.Builtin2("strReplaceAll", "str", "to") {
+    private class SpecFrom(from: String) extends Val.Builtin2("strReplaceAll", "str", "to") {
       def evalRhs(str: Val, to: Val, ev: EvalScope, pos: Position): Val =
-        Val.Str(pos, from.matcher(str.asString).replaceAll(to.asString))
+        Val.Str(pos, Platform.getPatternFromCache(from).matcher(str.asString).replaceAll(to.asString))
     }
   }
 
   private object StripUtils {
-    private def getLeadingPattern(chars: String): Pattern =
-      Pattern.compile("^[" + Regex.quote(chars) + "]+")
+    private def getLeadingPattern(chars: String): String = "^[" + Platform.regexQuote(chars) + "]+"
 
-    private def getTrailingPattern(chars: String): Pattern =
-      Pattern.compile("[" + Regex.quote(chars) + "]+$")
+    private def getTrailingPattern(chars: String): String = "[" + Platform.regexQuote(chars) + "]+$"
 
     def unspecializedStrip(str: String, chars: String, left: Boolean, right: Boolean): String = {
       var s = str
-      if (right) s = getTrailingPattern(chars).matcher(s).replaceAll("")
-      if (left) s = getLeadingPattern(chars).matcher(s).replaceAll("")
+      if (right) s = Platform.getPatternFromCache(getTrailingPattern(chars)).matcher(s).replaceAll("")
+      if (left) s = Platform.getPatternFromCache(getLeadingPattern(chars)).matcher(s).replaceAll("")
       s
     }
 
@@ -508,8 +504,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
       def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
         var s = str.asString
-        if (right) s = rightPattern.matcher(s).replaceAll("")
-        if (left) s = leftPattern.matcher(s).replaceAll("")
+        if (right) s = Platform.getPatternFromCache(rightPattern).matcher(s).replaceAll("")
+        if (left) s = Platform.getPatternFromCache(leftPattern).matcher(s).replaceAll("")
         Val.Str(pos, s)
       }
     }
