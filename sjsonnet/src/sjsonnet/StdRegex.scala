@@ -40,7 +40,12 @@ object StdRegex {
           val captures = Array.newBuilder[Val.Str]
           val groupCount = matcher.groupCount()
           for (i <- 0 to groupCount) {
-            captures += Val.Str(pos.noOffset, matcher.group(i))
+            val m = matcher.group(i)
+            if (m == null) {
+              captures += Val.Null(pos.noOffset)
+            } else {
+              captures += Val.Str(pos.noOffset, m)
+            }
           }
           val result = captures.result()
           Val.Obj.mk(pos.noOffset,
