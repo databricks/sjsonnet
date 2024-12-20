@@ -10,7 +10,7 @@ object StdRegex {
         val compiledPattern = Platform.getPatternFromCache(pattern.asString)
         val matcher = compiledPattern.matcher(str.asString)
         var returnStr: Val = null
-        val captures = Array.newBuilder[Val.Str]
+        val captures = Array.newBuilder[Val]
         val groupCount = matcher.groupCount()
         while (matcher.find()) {
           if (returnStr == null) {
@@ -48,7 +48,7 @@ object StdRegex {
             "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, Array.empty[Lazy]))
           )
         } else {
-          val captures = Array.newBuilder[Val.Str]
+          val captures = Array.newBuilder[Val]
           val groupCount = matcher.groupCount()
           for (i <- 0 to groupCount) {
             val m = matcher.group(i)
