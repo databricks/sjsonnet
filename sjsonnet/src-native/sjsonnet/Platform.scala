@@ -53,9 +53,7 @@ object Platform {
     scala.io.Source.fromFile(file).mkString
   }
 
-  private val regexCache = new util.LinkedHashMap[String, Pattern](100, 0.75f, true) {
-    override def removeEldestEntry(eldest: util.Map.Entry[String, Pattern]): Boolean = size() > 100
-  }
+  private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
   def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
   def regexQuote(s: String): String = Pattern.quote(s)
