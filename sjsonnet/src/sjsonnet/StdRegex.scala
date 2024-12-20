@@ -9,12 +9,17 @@ object StdRegex {
       override def evalRhs(pattern: Val, str: Val, ev: EvalScope, pos: Position): Val = {
         val compiledPattern = Platform.getPatternFromCache(pattern.asString)
         val matcher = compiledPattern.matcher(str.asString)
-        var returnStr: Val = Val.Null(pos.noOffset)
+        var returnStr: Val = null
         val captures = Array.newBuilder[Val.Str]
         val groupCount = matcher.groupCount()
         while (matcher.find()) {
-          if (returnStr.isInstanceOf[Val.Null]) {
-            returnStr = Val.Str(pos.noOffset, matcher.group(0))
+          if (returnStr == null) {
+            val m = matcher.group(0)
+            if (m != null) {
+              returnStr = Val.Str(pos.noOffset, matcher.group(0))
+            } else {
+              returnStr = Val.Null(pos.noOffset)
+            }
           }
           for (i <- 1 to groupCount) {
             val m = matcher.group(i)
@@ -27,7 +32,8 @@ object StdRegex {
         }
         val result = captures.result()
         Val.Obj.mk(pos.noOffset,
-          "string" -> new Obj.ConstMember(true, Visibility.Normal, returnStr),
+          "string" -> new Obj.ConstMember(true, Visibility.Normal,
+            if (returnStr == null) Val.Null(pos.noOffset) else returnStr),
           "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, result))
         )
       }
