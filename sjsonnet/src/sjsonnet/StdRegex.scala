@@ -17,7 +17,12 @@ object StdRegex {
             returnStr = Val.Str(pos.noOffset, matcher.group(0))
           }
           for (i <- 1 to groupCount) {
-            captures += Val.Str(pos.noOffset, matcher.group(i))
+            val m = matcher.group(i)
+            if (m == null) {
+              captures += Val.Null(pos.noOffset)
+            } else {
+              captures += Val.Str(pos.noOffset, m)
+            }
           }
         }
         val result = captures.result()
