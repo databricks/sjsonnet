@@ -1702,6 +1702,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       new Val.Arr(pos, if (keyFFunc != null) {
         val keys: Array[Val] = vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).force)
         val keyType = keys(0).getClass
+        if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          Error.fail("Cannot sort with key values that are booleans")
+        }
         if (!keys.forall(_.getClass == keyType)) {
           Error.fail("Cannot sort with key values that are not all the same type")
         }
@@ -1712,8 +1715,6 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           indices.sortBy(i => keys(i).cast[Val.Str].asString)
         } else if (keyType == classOf[Val.Num]) {
           indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
-        } else if (keyType == classOf[Val.Bool]) {
-          indices.sortBy(i => keys(i).cast[Val.Bool].asBoolean)
         } else {
           Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
         }
@@ -1721,6 +1722,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         sortedIndices.map(i => vs(i))
       } else {
         val keyType = vs(0).force.getClass
+        if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          Error.fail("Cannot sort with values that are booleans")
+        }
         if (!vs.forall(_.force.getClass == keyType))
           Error.fail("Cannot sort with values that are not all the same type")
 
@@ -1728,8 +1732,6 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
         } else if (keyType == classOf[Val.Num]) {
           vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
-        } else if (keyType == classOf[Val.Bool]) {
-          vs.map(_.force.cast[Val.Bool]).sortBy(_.asBoolean)
         } else if (keyType == classOf[Val.Obj]) {
           Error.fail("Unable to sort array of objects without key function")
         } else {

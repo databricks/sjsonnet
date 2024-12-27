@@ -57,6 +57,11 @@ object StdWithKeyFTests extends TestSuite {
         evalErr("""std.sort([1,2, error "foo"])""").startsWith("sjsonnet.Error: foo"))
       assert(
         evalErr("""std.sort([1, [error "foo"]])""").startsWith("sjsonnet.Error: Cannot sort with values that are not all the same type"))
+      // google/go-jsonnet and google/jsonnet also error on sorting of booleans:
+      assert(
+        evalErr("""std.sort([false, true])""").startsWith("sjsonnet.Error: Cannot sort with values that are booleans"))
+      assert(
+        evalErr("""std.sort([1, 2], keyF=function(x) x == 1)""").startsWith("sjsonnet.Error: Cannot sort with key values that are booleans"))
 
       eval(
         """local arr = [
