@@ -35,7 +35,6 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
         i += 1
         j += 1
       }
-      b
     }
     new ValScope(b)
   }

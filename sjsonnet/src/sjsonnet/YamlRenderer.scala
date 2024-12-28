@@ -21,7 +21,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     override def visitString(s: CharSequence, index: Int): StringWriter = {
       YamlRenderer.this.flushBuffer()
       if (quoteKeys || !YamlRenderer.isSafeBareKey(s.toString)) {
-        upickle.core.RenderUtils.escapeChar(null, YamlRenderer.this.elemBuilder, s, unicode = true)
+        upickle.core.RenderUtils.escapeChar(null, YamlRenderer.this.elemBuilder, s, escapeUnicode = true, wrapQuotes = true)
       } else {
         YamlRenderer.this.appendString(s.toString)
       }
@@ -62,7 +62,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       }
       depth -= 1
     } else {
-      upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, unicode=true)
+      upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode=true, wrapQuotes=true)
     }
     flushCharBuilder()
     _out
@@ -131,7 +131,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     }
   }
 
-  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1

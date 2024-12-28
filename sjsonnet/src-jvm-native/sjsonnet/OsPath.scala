@@ -29,6 +29,6 @@ case class OsPath(p: os.Path) extends Path{
         ":" + Util.prettyIndex(lineStarts, offset)
       }
 
-    p.relativeTo(os.pwd) + offsetStr
+    s"${p.relativeTo(os.pwd)}${offsetStr}"
   }
 }

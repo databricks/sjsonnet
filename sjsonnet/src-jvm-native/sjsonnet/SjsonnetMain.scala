@@ -199,12 +199,12 @@ object SjsonnetMain {
       importer = importer match{
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
-            i(docBase, importName).map(OsPath)
+            i(docBase, importName).map(OsPath.apply)
           def read(path: Path): Option[ResolvedFile] = {
             readPath(path)
           }
         }
-        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath), allowedInputs)
+        case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath.apply), allowedInputs)
       },
       parseCache,
       settings = new Settings(
@@ -242,7 +242,7 @@ object SjsonnetMain {
                       Right(writer.toString)
                     }
                   }
-                  relPath = os.FilePath(multiPath) / os.RelPath(f)
+                  relPath = os.RelPath(multiPath) / f
                   _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
                 } yield relPath
               }

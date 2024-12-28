@@ -182,7 +182,7 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
       out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int) = new ObjVisitor[Writer, Writer] {
     firstElementInArray = false
     var empty = true
     flushBuffer()
@@ -402,7 +402,7 @@ object PrettyYamlRenderer{
   def stringNeedsToBeQuoted(str: String) = {
     import fastparse._
     import NoWhitespace._
-    def yamlPunctuation[_: P] = P(
+    def yamlPunctuation[$: P] = P(
       // http://blogs.perl.org/users/tinita/2018/03/strings-in-yaml---to-quote-or-not-to-quote.html
       StringIn(
         "!", // ! Tag like !!null
@@ -420,7 +420,7 @@ object PrettyYamlRenderer{
         " " // leading or trailing empty spaces need quotes to define them
       )
     )
-    def yamlKeyword[_: P] = P(
+    def yamlKeyword[$: P] = P(
       StringIn(
         // https://makandracards.com/makandra/24809-yaml-keys-like-yes-or-no-evaluate-to-true-and-false
         // y|Y|yes|Yes|YES|n|N|no|No|NO
@@ -437,17 +437,17 @@ object PrettyYamlRenderer{
       )
     )
 
-    def digits[_: P] = P( CharsWhileIn("0-9") )
-    def yamlFloat[_: P] = P(
+    def digits[$: P] = P( CharsWhileIn("0-9") )
+    def yamlFloat[$: P] = P(
       (digits.? ~ "." ~ digits | digits ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ digits).?
     )
-    def yamlOctalSuffix[_: P] = P( "x" ~ CharIn("1-9a-fA-F") ~ CharsWhileIn("0-9a-fA-F").? )
-    def yamlHexSuffix[_: P] = P( "o" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? )
-    def yamlOctalHex[_: P] = P( "0" ~ (yamlOctalSuffix | yamlHexSuffix) )
-    def yamlNumber0[_: P] = P( ".inf" | yamlFloat | yamlOctalHex | digits )
+    def yamlOctalSuffix[$: P] = P( "x" ~ CharIn("1-9a-fA-F") ~ CharsWhileIn("0-9a-fA-F").? )
+    def yamlHexSuffix[$: P] = P( "o" ~ CharIn("1-7") ~ CharsWhileIn("0-7").? )
+    def yamlOctalHex[$: P] = P( "0" ~ (yamlOctalSuffix | yamlHexSuffix) )
+    def yamlNumber0[$: P] = P( ".inf" | yamlFloat | yamlOctalHex | digits )
 
     // Add a `CharIn` lookahead to bail out quickly if something cannot possibly be a number
-    def yamlNumber[_: P] = P( "-".? ~ yamlNumber0 )
+    def yamlNumber[$: P] = P( "-".? ~ yamlNumber0 )
 
     // Strings and numbers aren't the only scalars that YAML can understand.
     // ISO-formatted date and datetime literals are also parsed.
@@ -455,19 +455,19 @@ object PrettyYamlRenderer{
     // datetime:              2001-12-15T02:59:43.1Z
     // datetime_with_spaces:  2001-12-14 21:59:43.10 -5
 
-    def fourDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") )
-    def oneTwoDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9").? )
-    def twoDigits[_: P] = P( CharIn("0-9") ~ CharIn("0-9") )
-    def dateTimeSuffix[_: P] = P(
+    def fourDigits[$: P] = P( CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") )
+    def oneTwoDigits[$: P] = P( CharIn("0-9") ~ CharIn("0-9").? )
+    def twoDigits[$: P] = P( CharIn("0-9") ~ CharIn("0-9") )
+    def dateTimeSuffix[$: P] = P(
       ("T" | " ") ~ twoDigits ~ ":" ~ twoDigits ~ ":" ~ twoDigits ~
         ("." ~ digits.?).? ~ ((" " | "Z").? ~ ("-".? ~ oneTwoDigits).?).?
     )
-    def yamlDate[_: P] = P( fourDigits ~ "-" ~ oneTwoDigits ~ "-" ~ oneTwoDigits ~ dateTimeSuffix.? )
+    def yamlDate[$: P] = P( fourDigits ~ "-" ~ oneTwoDigits ~ "-" ~ oneTwoDigits ~ dateTimeSuffix.? )
 
     // Not in the YAML, but included to match PyYAML behavior
-    def yamlTime[_: P] = P( twoDigits ~ ":" ~ twoDigits )
+    def yamlTime[$: P] = P( twoDigits ~ ":" ~ twoDigits )
 
-    def parser[_: P] = P(
+    def parser[$: P] = P(
       // Use a `&` lookahead to bail out early in the common case, so we don't
       // need to try parsing times/dates/numbers one by one
       yamlPunctuation | (&(CharIn(".0-9\\-")) ~ (yamlTime | yamlDate | yamlNumber) | yamlKeyword) ~ End

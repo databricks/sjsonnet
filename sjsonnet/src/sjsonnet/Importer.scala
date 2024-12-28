@@ -158,7 +158,7 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
   def readString(): String = content
 
   // We just cheat, the content hash can be the content itself for static imports
-  lazy val contentHash: String = content
+  def contentHash(): String = content
 }
 
 class CachedImporter(parent: Importer) extends Importer {
@@ -184,7 +184,7 @@ class CachedResolver(
   internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate((path, content.contentHash.toString), {
+    parseCache.getOrElseUpdate((path, content.contentHash().toString), {
       val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()

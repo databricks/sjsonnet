@@ -16,7 +16,10 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     def visitEnd(index: Int): Val = new Val.Arr(pos, a.result())
   }
 
-  def visitObject(length: Int, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val, Val] =
+    throw new RuntimeException("jsonable objects are not supported. This should never be called")
+
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {
     val cache = mutable.HashMap.empty[Any, Val]
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     var key: String = null
@@ -39,7 +42,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): Val =
     Val.Num(pos,
       if (decIndex != -1 || expIndex != -1) s.toString.toDouble
-      else upickle.core.Util.parseIntegralNum(s, decIndex, expIndex, index)
+      else upickle.core.ParseUtils.parseIntegralNum(s, decIndex, expIndex, index)
     )
 
   def visitString(s: CharSequence, index: Int): Val = Val.Str(pos, s.toString)

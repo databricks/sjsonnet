@@ -4,18 +4,18 @@ import contrib.jmh.JmhModule
 
 val sjsonnetVersion = "0.4.14"
 
-val scalaVersions = Seq("2.12.20", "2.13.15")
+val scalaVersions = Seq("2.12.20", "2.13.15", "3.3.4")
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
   def artifactName = "sjsonnet"
 
   def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse::2.3.3",
-    ivy"com.lihaoyi::pprint::0.6.6",
-    ivy"com.lihaoyi::ujson::1.3.15",
-    ivy"com.lihaoyi::scalatags::0.9.4",
-    ivy"org.scala-lang.modules::scala-collection-compat::2.11.0"
+    ivy"com.lihaoyi::fastparse::3.1.1",
+    ivy"com.lihaoyi::pprint::0.9.0",
+    ivy"com.lihaoyi::ujson::4.0.2",
+    ivy"com.lihaoyi::scalatags::0.13.1",
+    ivy"org.scala-lang.modules::scala-collection-compat::2.12.0"
   )
   def publishVersion = sjsonnetVersion
 
@@ -47,8 +47,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
 
 trait SjsonnetJvmNative extends ScalaModule {
   def ivyDeps = super.ivyDeps() ++ Agg(
-    ivy"com.lihaoyi::os-lib::0.7.8",
-    ivy"com.lihaoyi::mainargs::0.2.5"
+    ivy"com.lihaoyi::os-lib::0.11.3",
+    ivy"com.lihaoyi::mainargs::0.7.6"
   )
 }
 
@@ -74,17 +74,14 @@ object sjsonnet extends Module {
   object native extends Cross[SjsonnetNativeModule](scalaVersions)
   trait SjsonnetNativeModule extends SjsonnetCrossModule with ScalaNativeModule with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
-    def scalaNativeVersion = "0.4.17"
+    def scalaNativeVersion = "0.5.6"
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-native",
       this.millSourcePath / "src-jvm-native"
     )
-    def releaseMode = ReleaseMode.ReleaseFast
-    def nativeLTO = LTO.Thin
 
     object test extends ScalaNativeTests with CrossTests {
-      def releaseMode = ReleaseMode.Debug
       def scalaNativeVersion = SjsonnetNativeModule.this.scalaNativeVersion
       def nativeLTO = LTO.None
       def sources = T.sources(
