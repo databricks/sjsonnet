@@ -41,7 +41,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
     )
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.2")
+    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.4")
   }
 }
 
