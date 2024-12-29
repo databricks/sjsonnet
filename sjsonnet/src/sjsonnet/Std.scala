@@ -499,13 +499,13 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       right: Boolean,
       functionName: String
     ) extends Val.Builtin1(functionName, "str") {
-      private[this] val leftPattern = getLeadingPattern(chars)
-      private[this] val rightPattern = getTrailingPattern(chars)
+      private[this] val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
+      private[this] val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
 
       def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
         var s = str.asString
-        if (right) s = Platform.getPatternFromCache(rightPattern).matcher(s).replaceAll("")
-        if (left) s = Platform.getPatternFromCache(leftPattern).matcher(s).replaceAll("")
+        if (right) s = rightPattern.matcher(s).replaceAll("")
+        if (left) s = leftPattern.matcher(s).replaceAll("")
         Val.Str(pos, s)
       }
     }
