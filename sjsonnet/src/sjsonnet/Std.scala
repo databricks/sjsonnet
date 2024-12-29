@@ -1700,34 +1700,39 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     } else {
       val keyFFunc = if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
       new Val.Arr(pos, if (keyFFunc != null) {
-        val keys = new Val.Arr(pos.noOffset, vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev)))
-        val keyTypes = keys.iterator.map(_.force.getClass).toSet
-        if (keyTypes.size != 1) {
+        val keys: Array[Val] = vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).force)
+        val keyType = keys(0).getClass
+        if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          Error.fail("Cannot sort with key values that are booleans")
+        }
+        if (!keys.forall(_.getClass == keyType)) {
           Error.fail("Cannot sort with key values that are not all the same type")
         }
 
-        if (keyTypes.contains(classOf[Val.Str])) {
-          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Str].asString)
-        } else if (keyTypes.contains(classOf[Val.Num])) {
-          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Num].asDouble)
-        } else if (keyTypes.contains(classOf[Val.Bool])) {
-          vs.sortBy(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).cast[Val.Bool].asBoolean)
+        val indices = Array.range(0, vs.length)
+
+        val sortedIndices = if (keyType == classOf[Val.Str]) {
+          indices.sortBy(i => keys(i).cast[Val.Str].asString)
+        } else if (keyType == classOf[Val.Num]) {
+          indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
         } else {
-          Error.fail("Cannot sort with key values that are " + keys.force(0).prettyName + "s")
-        }
-      } else {
-        val keyTypes = vs.map(_.force.getClass).toSet
-        if (keyTypes.size != 1) {
-          Error.fail("Cannot sort with values that are not all the same type")
+          Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
         }
 
-        if (keyTypes.contains(classOf[Val.Str])) {
+        sortedIndices.map(i => vs(i))
+      } else {
+        val keyType = vs(0).force.getClass
+        if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          Error.fail("Cannot sort with values that are booleans")
+        }
+        if (!vs.forall(_.force.getClass == keyType))
+          Error.fail("Cannot sort with values that are not all the same type")
+
+        if (keyType == classOf[Val.Str]) {
           vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
-        } else if (keyTypes.contains(classOf[Val.Num])) {
+        } else if (keyType == classOf[Val.Num]) {
           vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
-        } else if (keyTypes.contains(classOf[Val.Bool])) {
-          vs.map(_.force.cast[Val.Bool]).sortBy(_.asBoolean)
-        } else if (keyTypes.contains(classOf[Val.Obj])) {
+        } else if (keyType == classOf[Val.Obj]) {
           Error.fail("Unable to sort array of objects without key function")
         } else {
           Error.fail("Cannot sort array of " + vs(0).force.prettyName)
