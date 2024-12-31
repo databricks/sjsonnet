@@ -19,7 +19,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   private val emptyLazyArray = new Array[Lazy](0)
   private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
   private val trailingWhiteSpacePattern = Platform.getPatternFromCache("[ \t\n\f\r\u0085\u00A0']+$")
-  private val oldNativeFunctions = Map(
+  private val builtinNativeFunctions = Map(
     builtin("gzip", "v"){ (_, _, v: Val) =>
       v match{
         case Val.Str(_, value) => Platform.gzipString(value)
@@ -44,9 +44,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case x => Error.fail("Cannot xz encode " + x.prettyName)
       }
     },
-  )
-  require(oldNativeFunctions.forall(k => !additionalNativeFunctions.contains(k._1)), "Conflicting native functions")
-  private val nativeFunctions = oldNativeFunctions ++ additionalNativeFunctions ++ StdRegex.functions
+  ) ++ StdRegex.functions
+  require(builtinNativeFunctions.forall(k => !additionalNativeFunctions.contains(k._1)), "Conflicting native functions")
+  private val nativeFunctions = builtinNativeFunctions ++ additionalNativeFunctions
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Val, v2: Val, ev: EvalScope, pos: Position): Val = {
@@ -1518,7 +1518,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         Error.fail("Native function " + name + " not found", pos)(ev)
       }
     },
-  ) ++ oldNativeFunctions
+  ) ++ builtinNativeFunctions
 
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
     args(idx) match {
