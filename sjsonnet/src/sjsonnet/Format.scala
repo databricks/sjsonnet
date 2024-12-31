@@ -22,13 +22,13 @@ object Format{
                         precision: Option[Int],
                         conversion: Char)
   import fastparse._, NoWhitespace._
-  def integer[_: P]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
-  def label[_: P] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
-  def flags[_: P] = P( CharsWhileIn("#0\\- +", 0).! )
-  def width[_: P] = P( (integer | "*").!.? )
-  def precision[_: P] = P( ("." ~/ integer.!).? )
-  def conversion[_: P] = P( CharIn("diouxXeEfFgGcrsa%").! )
-  def formatSpec[_: P] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
+  def integer[$: P]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
+  def label[$: P] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
+  def flags[$: P] = P( CharsWhileIn("#0\\- +", 0).! )
+  def width[$: P] = P( (integer | "*").!.? )
+  def precision[$: P] = P( ("." ~/ integer.!).? )
+  def conversion[$: P] = P( CharIn("diouxXeEfFgGcrsa%").! )
+  def formatSpec[$: P] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
     case (label, flags, width, precision, conversion) =>
       FormatSpec(
         label,
@@ -44,8 +44,8 @@ object Format{
   }
 
 
-  def plain[_: P] = P( CharsWhile(_ != '%', 0).! )
-  def format[_: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
+  def plain[$: P] = P( CharsWhile(_ != '%', 0).! )
+  def format[$: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
 
 

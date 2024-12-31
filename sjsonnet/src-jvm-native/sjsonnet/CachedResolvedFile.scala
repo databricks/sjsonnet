@@ -61,13 +61,13 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
     }
   }
 
-  override lazy val contentHash: String = {
+  private lazy val contentHashImpl: String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
       Platform.hashFile(jFile)
     } else {
-      resolvedImportContent.contentHash
+      resolvedImportContent.contentHash()
     }
   }
+  override def contentHash(): String = contentHashImpl
 }
-

@@ -11,7 +11,8 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 (out: T,
  indent: Int = -1,
  escapeUnicode: Boolean = false,
- newline: Array[Char] = Array('\n')) extends JsVisitor[T, T]{
+ newline: Array[Char] = Array('\n'),
+ wrapQuotes: Boolean = true) extends JsVisitor[T, T]{
   protected[this] val elemBuilder = new upickle.core.CharBuilder
   def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
@@ -54,7 +55,10 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     }
   }
 
-  def visitObject(length: Int, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
+  def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] =
+    throw new RuntimeException("jsonable objects are not supported. This should never be called")
+
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int): ObjVisitor[T, T] = new ObjVisitor[T, T] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
@@ -154,7 +158,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   private def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode)
+    upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode, wrapQuotes)
     flushCharBuilder()
     out
   }
