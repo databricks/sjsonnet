@@ -83,9 +83,13 @@ object StdMergePatchTests extends TestSuite {
       eval("{a: 1} + {a+: 2}") ==> ujson.Obj("a" -> 3)
       // But mergePatch intentionally does not consider `+:` fields to be special:
       eval("std.mergePatch({a: 1}, {a+: 2})") ==> ujson.Obj("a" -> 2)
-      // We also need to check that the resulting output fields aren't treated as plus fields for
+      // We also need to check that the resulting output fields aren't treated as `+:` fields for
       // the purposes of subsequent object inheritance:
       eval("{a: 1} + std.mergePatch({}, {a+: 2})") ==> ujson.Obj("a" -> 2)
+      // The `+:` behavior is lost even if it is from the target:
+      eval("{a: 1} + std.mergePatch({a+: 2}, {})") ==> ujson.Obj("a" -> 2)
+      // It's also lost in nested fields:
+      eval("{a: {b: 1}} + std.mergePatch({a: {b +: 2}}, {})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 2))
     }
   }
 }
