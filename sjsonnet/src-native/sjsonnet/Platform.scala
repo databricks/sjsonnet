@@ -1,8 +1,10 @@
 package sjsonnet
 
 import java.io.{ByteArrayOutputStream, File}
+import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import java.util.regex.Pattern
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -50,4 +52,11 @@ object Platform {
     // File hashes in Scala Native are just the file content
     scala.io.Source.fromFile(file).mkString
   }
+
+  private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
+  // scala native is powered by RE2, per https://scala-native.org/en/latest/lib/javalib.html#regular-expressions-java-util-regexp
+  // It should perform similarly to the JVM implementation.
+  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+
+  def regexQuote(s: String): String = Pattern.quote(s)
 }

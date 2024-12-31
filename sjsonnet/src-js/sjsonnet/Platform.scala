@@ -1,5 +1,10 @@
 package sjsonnet
+
 import java.io.File
+import java.util
+import java.util.regex.Pattern
+
+
 object Platform {
   def gzipBytes(s: Array[Byte]): String = {
     throw new Exception("GZip not implemented in Scala.js")
@@ -34,4 +39,12 @@ object Platform {
   def hashFile(file: File): String = {
     throw new Exception("hashFile not implemented in Scala.js")
   }
+
+  private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
+
+  // scala.js does not rely on re2. Per https://www.scala-js.org/doc/regular-expressions.html.
+  // Expect to see some differences in behavior.
+  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+
+  def regexQuote(s: String): String = Pattern.quote(s)
 }
