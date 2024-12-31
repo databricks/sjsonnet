@@ -1,8 +1,10 @@
 package sjsonnet
 
 import java.io.{StringWriter, Writer}
+import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
+import fastparse.IndexedParserInput
 
 import scala.collection.mutable
 /**
@@ -238,7 +240,7 @@ object PrettyYamlRenderer{
    */
   def writeBlockString(str: String, out: Writer, depth: Int, indent: Int, lineComment: String) = {
     val len = str.length()
-    val splits = Platform.getPatternFromCache("\n").split(str, -1)
+    val splits = YamlRenderer.newlinePattern.split(str, -1)
     val blockOffsetNumeral = if (str.charAt(0) != ' ') "" else indent
     val (blockStyle, dropRight) =
       (str.charAt(len - 1), if (len > 2) Some(str.charAt(len - 2)) else None) match{

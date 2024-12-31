@@ -48,7 +48,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       elemBuilder.append('"')
       elemBuilder.append('"')
     } else if (s.charAt(len - 1) == '\n') {
-      val splits = Platform.getPatternFromCache("\n").split(s.toString)
+      val splits = YamlRenderer.newlinePattern.split(s.toString)
       elemBuilder.append('|')
       depth += 1
       splits.foreach { split =>
@@ -170,6 +170,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
   }
 }
 object YamlRenderer{
+  private[sjsonnet] val newlinePattern = Platform.getPatternFromCache("\n")
   private val safeYamlKeyPattern = Platform.getPatternFromCache("^[a-zA-Z0-9/._-]+$")
   private val yamlReserved = Set("true", "false", "null", "yes", "no", "on", "off", "y", "n", ".nan",
     "+.inf", "-.inf", ".inf", "null", "-", "---", "''")

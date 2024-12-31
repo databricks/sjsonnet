@@ -54,6 +54,8 @@ object Platform {
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
+  // scala native is powered by RE2, per https://scala-native.org/en/latest/lib/javalib.html#regular-expressions-java-util-regexp
+  // It should perform similarly to the JVM implementation.
   def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
   def regexQuote(s: String): String = Pattern.quote(s)

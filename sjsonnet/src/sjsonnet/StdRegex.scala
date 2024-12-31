@@ -73,7 +73,7 @@ object StdRegex {
         Val.Str(pos.noOffset, matcher.replaceAll(to.asString))
       }
     },
-    "regexReplace" -> new Val.Builtin3("regexGlobalReplace", "str", "pattern", "to") {
+    "regexReplace" -> new Val.Builtin3("regexReplace", "str", "pattern", "to") {
       override def evalRhs(str: Val, pattern: Val, to: Val, ev: EvalScope, pos: Position): Val = {
         val compiledPattern = Platform.getPatternFromCache(pattern.asString)
         val matcher = compiledPattern.matcher(str.asString)
