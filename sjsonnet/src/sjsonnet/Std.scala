@@ -655,6 +655,100 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     }
   }
 
+  /**
+   * Optimized equivalent of `std.foldl(std.mergePatch, arr, {})`
+   */
+  private object MergePatchAll extends Val.Builtin1("mergePatchAll", "array") {
+
+    def evalRhs(target: Val, ev: EvalScope, pos: Position): Val = {
+      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
+        def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+      }
+
+      // Here, `objectSize` is the number of valid entries in the `objects` array.
+      // This is an optimization to avoid having to trim or resize intermediate arrays.
+      def recMerge(objects: Array[Val.Obj], objectsSize: Int): Val.Obj = {
+        // Early return for empty array
+        if (objectsSize == 0) return Val.Obj.mk(pos)
+
+        // Fast path for single object
+        if (objectsSize == 1) return objects(0)
+
+        // Determine an upper bound of the final key set (only a bound because a key
+        // might end up being removed and we can only know that after futehr processing).
+        val allKeys = new java.util.LinkedHashSet[String]
+        var idx = 0
+        while (idx < objectsSize) {
+          objects(idx).visibleKeyNames.foreach(allKeys.add)
+          idx += 1
+        }
+
+        // Allocate space to hold the object members
+        val kvs = new Array[(String, Val.Obj.Member)](allKeys.size)
+
+        val keysIter = allKeys.iterator()
+        var numNonEmptyKeys = 0
+        while (keysIter.hasNext) {
+          val key = keysIter.next()
+          var lastValue: Val = null
+          val objValues = new Array[Val.Obj](objectsSize)
+          var objCount = 0
+
+          var i = 0
+          while (i < objectsSize) {
+            val obj = objects(i)
+            if (obj.containsVisibleKey(key)) {
+              lastValue = obj.valueRaw(key, obj, pos)(ev)
+              lastValue match {
+                case _: Val.Obj =>
+                  objValues(objCount) = lastValue.asInstanceOf[Val.Obj]
+                  objCount += 1
+                case _ =>
+                  // Got either a Null or a non-Obj, but in either case we
+                  // won't use any of the earlier values for this key in the
+                  // merged result since they would be overwritten and discarded
+                  // at this step.
+                  objCount = 0
+              }
+            }
+            i += 1
+          }
+
+          if (lastValue != null && !lastValue.isInstanceOf[Val.Null]) {
+            val finalValue = {
+              if (objCount > 0) recMerge(objValues, objCount)
+              else lastValue
+            }
+
+            kvs(numNonEmptyKeys) = (key, createMember(finalValue))
+            numNonEmptyKeys += 1
+          }
+        }
+        val finalFields = {
+          if (numNonEmptyKeys == kvs.length) kvs
+          else java.util.Arrays.copyOf(kvs, numNonEmptyKeys)
+        }
+        Val.Obj.mk(pos, finalFields: _*)
+      }
+
+      target match {
+        case arr: Val.Arr =>
+          val objects = new Array[Val.Obj](arr.length)
+          var i = 0
+          while (i < arr.length) {
+            arr.force(i) match {
+              case obj: Val.Obj => objects(i) = obj
+              case _ => Error.fail(s"Expected array of objects, got ${target.prettyName}", pos)(ev)
+            }
+            i += 1
+          }
+          recMerge(objects, arr.length)
+
+        case v => Error.fail(s"Expected array, got ${v.prettyName}", pos)(ev)
+      }
+    }
+  }
+
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Val, ev: EvalScope, pos: Position): Val = {
       new Val.Arr(pos, arrs.asArr.asLazyArray.reverse)
@@ -944,6 +1038,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       recPair(target, patch)
     },
+    // TODO: place into native intrinsics namespace:
+    builtin(MergePatchAll),
     builtin("sqrt", "x"){ (pos, ev, x: Double) =>
       math.sqrt(x)
     },
