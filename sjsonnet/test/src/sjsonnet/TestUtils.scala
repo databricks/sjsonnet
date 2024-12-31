@@ -8,7 +8,8 @@ object TestUtils {
             strict: Boolean = false,
             noDuplicateKeysInComprehension: Boolean = false,
             strictInheritedAssertions: Boolean = false,
-            strictSetOperations: Boolean = true): Either[String, Value] = {
+            strictSetOperations: Boolean = true,
+            optimizeBuiltinFunctionApplication: Boolean = false): Either[String, Value] = {
     new Interpreter(
       Map(),
       Map(),
@@ -21,6 +22,7 @@ object TestUtils {
         noDuplicateKeysInComprehension = noDuplicateKeysInComprehension,
         strictInheritedAssertions = strictInheritedAssertions,
         strictSetOperations = strictSetOperations,
+        optimizeBuiltinFunctionApplication = optimizeBuiltinFunctionApplication,
         throwErrorForInvalidSets = true
       )
     ).interpret(s, DummyPath("(memory)"))
@@ -31,8 +33,9 @@ object TestUtils {
            strict: Boolean = false,
            noDuplicateKeysInComprehension: Boolean = false,
            strictInheritedAssertions: Boolean = false,
-           strictSetOperations: Boolean = true): Value = {
-    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations) match {
+           strictSetOperations: Boolean = true,
+           optimizeBuiltinFunctionApplication: Boolean = false): Value = {
+    eval0(s, preserveOrder, strict, noDuplicateKeysInComprehension, strictInheritedAssertions, strictSetOperations, optimizeBuiltinFunctionApplication) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }

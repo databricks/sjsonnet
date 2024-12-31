@@ -84,13 +84,18 @@ object StdMergePatchTests extends TestSuite {
 
     // TODO: need way way way more test cases for equivalence here.
     test("mergePatchAll - equivalent to foldl mergePatch") {
-      eval("""
-        local arr = [{a: 1}, {b: 2}, {a: 3}];
-        std.assertEqual(
-          std.mergePatchAll(arr),
-          std.foldl(std.mergePatch, arr, {})
-        )
-      """) ==> ujson.Bool(true)
+      // TODO: this is just a quick hack to ensure test coverage;
+      // ideally we'd directly test the rewrite itself independently of execution
+      for (rewriteEnabled <- Seq(false, true)) {
+        eval(
+          """
+          local arr = [{a: 1}, {b: 2}, {a: 3}];
+          std.assertEqual(
+            std.mergePatchAll(arr),
+            std.foldl(std.mergePatch, arr, {})
+          )
+        """, optimizeBuiltinFunctionApplication = rewriteEnabled) ==> ujson.Bool(true)
+      }
     }
   }
 }
