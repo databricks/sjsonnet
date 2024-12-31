@@ -476,8 +476,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       case _ => null
     }
     private class SpecFrom(from: String) extends Val.Builtin2("strReplaceAll", "str", "to") {
+      private[this] val pattern = Platform.getPatternFromCache(from)
       def evalRhs(str: Val, to: Val, ev: EvalScope, pos: Position): Val =
-        Val.Str(pos, Platform.getPatternFromCache(from).matcher(str.asString).replaceAll(to.asString))
+        Val.Str(pos, pattern.matcher(str.asString).replaceAll(to.asString))
     }
   }
 
