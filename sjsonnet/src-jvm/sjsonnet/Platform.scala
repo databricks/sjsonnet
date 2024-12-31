@@ -29,7 +29,7 @@ object Platform {
   }
 
   /**
-   *  Valid compression levels are 0 (no compression) to 9 (maximum compression).
+   * Valid compression levels are 0 (no compression) to 9 (maximum compression).
    */
   def xzBytes(b: Array[Byte], compressionLevel: Option[Int]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
@@ -51,14 +51,14 @@ object Platform {
 
   def yamlToJson(yamlString: String): String = {
     try {
-      val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString)
-          .asInstanceOf[java.lang.Iterable[java.util.Collection[Object]]].asScala.toSeq
+      val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
       yaml.size match {
         case 0 => "{}"
-        case 1 if yaml.head.isInstanceOf[java.util.Map[String, Object]] =>
-          new JSONObject(yaml.head.asInstanceOf[java.util.Map[String, Object]]).toString()
-        case 1 if yaml.head.isInstanceOf[java.util.List[Object]] =>
-          new JSONArray(yaml.head.asInstanceOf[java.util.List[Object]]).toString()
+        case 1 => yaml.head match {
+          case m: java.util.Map[_, _] => new JSONObject(m).toString()
+          case l: java.util.List[_] => new JSONArray(l).toString()
+          case _ => new JSONArray(yaml.asJava).get(0).toString
+        }
         case _ => new JSONArray(yaml.asJava).toString()
       }
     } catch {
@@ -70,7 +70,7 @@ object Platform {
   private def computeHash(algorithm: String, s: String) = {
     java.security.MessageDigest.getInstance(algorithm)
       .digest(s.getBytes("UTF-8"))
-      .map{ b => String.format("%02x", (b & 0xff).asInstanceOf[Integer])}
+      .map { b => String.format("%02x", (b & 0xff).asInstanceOf[Integer]) }
       .mkString
   }
 
