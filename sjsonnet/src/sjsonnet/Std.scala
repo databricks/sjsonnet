@@ -683,11 +683,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           idx += 1
         }
 
-        // Allocate space to hold the object members
-        val kvs = new Array[(String, Val.Obj.Member)](allKeys.size)
+        val outputFields = new util.LinkedHashMap[String, Val.Obj.Member](allKeys.size())
 
         val keysIter = allKeys.iterator()
-        var numNonEmptyKeys = 0
         val objValues = new Array[Val.Obj](objectsSize)
         while (keysIter.hasNext) {
           val key = keysIter.next()
@@ -720,15 +718,10 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
               else lastValue
             }
 
-            kvs(numNonEmptyKeys) = (key, createMember(finalValue))
-            numNonEmptyKeys += 1
+            outputFields.put(key, createMember(finalValue))
           }
         }
-        val finalFields = {
-          if (numNonEmptyKeys == kvs.length) kvs
-          else java.util.Arrays.copyOf(kvs, numNonEmptyKeys)
-        }
-        Val.Obj.mk(pos, finalFields: _*)
+        new Val.Obj(pos, outputFields, false, null, null)
       }
 
       target match {
