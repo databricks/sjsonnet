@@ -207,16 +207,7 @@ object SjsonnetMain {
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath), allowedInputs)
       },
       parseCache,
-      settings = new Settings(
-        preserveOrder = config.preserveOrder.value,
-        strict = config.strict.value,
-        noStaticErrors = config.noStaticErrors.value,
-        noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
-        strictImportSyntax = config.strictImportSyntax.value,
-        strictInheritedAssertions = config.strictInheritedAssertions.value,
-        strictSetOperations = config.strictSetOperations.value,
-        throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
-      ),
+      settings = Settings.fromConfig(config),
       storePos = if (config.yamlDebug.value) currentPos = _ else null,
       warnLogger = warnLogger,
       std = std

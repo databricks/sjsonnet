@@ -11,8 +11,22 @@ class Settings(
   val strictInheritedAssertions: Boolean = false,
   val strictSetOperations: Boolean = false,
   val throwErrorForInvalidSets: Boolean = false,
+  val optimizeBuiltinFunctionApplication: Boolean = false,
 )
 
 object Settings {
   val default = new Settings()
+  def fromConfig(config: Config): Settings = {
+    new Settings(
+      preserveOrder = config.preserveOrder.value,
+      strict = config.strict.value,
+      noStaticErrors = config.noStaticErrors.value,
+      noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
+      strictImportSyntax = config.strictImportSyntax.value,
+      strictInheritedAssertions = config.strictInheritedAssertions.value,
+      strictSetOperations = config.strictSetOperations.value,
+      throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
+      optimizeBuiltinFunctionApplication = config.optimizeBuiltinFunctionApplication.value
+    )
+  }
 }

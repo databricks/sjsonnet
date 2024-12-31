@@ -23,7 +23,7 @@ class StaticOptimizer(
   }
 
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
-    case a: Apply => transformApply(a)
+    case a: Apply => transformApply(optimizeBuiltInFunctionApplication(a))
 
     case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
       try obj.value(name, p)(ev).asInstanceOf[Expr] catch { case _: Exception => e }
@@ -119,6 +119,18 @@ class StaticOptimizer(
       case a2: Apply => specializeApplyArity(a2)
       case e => e
     }
+  }
+
+  private def optimizeBuiltInFunctionApplication(a: Apply): Apply = a match {
+    case _ if !ev.settings.optimizeBuiltinFunctionApplication => a
+    // Rewrite std.foldl(std.mergePatch, arr, {}) as std.mergePatchAll(arr)
+    case Apply(pos, f1: Val.Builtin, Array(f2: Val.Builtin, xs, obj: Val.Obj), null)
+      if f1.functionName == "foldl"
+        && f2.functionName == "mergePatch"
+        && !obj.hasKeys => // only match {}
+      println(s"Transforming apply $a to MergePatchAll") // TODO: remove before merge
+      Apply(pos, std.value("mergePatchAll", pos)(ev).asInstanceOf[Expr], Array(xs), null)
+    case _ => a
   }
 
   private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
