@@ -688,10 +688,10 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
         val keysIter = allKeys.iterator()
         var numNonEmptyKeys = 0
+        val objValues = new Array[Val.Obj](objectsSize)
         while (keysIter.hasNext) {
           val key = keysIter.next()
           var lastValue: Val = null
-          val objValues = new Array[Val.Obj](objectsSize)
           var objCount = 0
 
           var i = 0
