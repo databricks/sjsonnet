@@ -675,17 +675,18 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         if (objectsSize == 1) return objects(0)
 
         // Determine an upper bound of the final key set (only a bound because a key
-        // might end up being removed and we can only know that after futehr processing).
-        val allKeys = new java.util.LinkedHashSet[String]
+        // might end up being removed and we can only know that after further processing).
+        // We need an `outputFields` LinkedHashMap anyways, so we'll first use it to
+        // collect the distinct fields and then will update it to either populate the members
+        // or remove fields that were later determined to be unused.
+        val outputFields = new util.LinkedHashMap[String, Val.Obj.Member]()
         var idx = 0
         while (idx < objectsSize) {
-          objects(idx).visibleKeyNames.foreach(allKeys.add)
+          objects(idx).visibleKeyNames.foreach(k => outputFields.put(k, null))
           idx += 1
         }
 
-        val outputFields = new util.LinkedHashMap[String, Val.Obj.Member](allKeys.size())
-
-        val keysIter = allKeys.iterator()
+        val keysIter = outputFields.keySet().iterator()
         val objValues = new Array[Val.Obj](objectsSize)
         while (keysIter.hasNext) {
           val key = keysIter.next()
@@ -717,8 +718,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
               if (objCount > 0) recMerge(objValues, objCount)
               else lastValue
             }
-
             outputFields.put(key, createMember(finalValue))
+          } else {
+            keysIter.remove()
           }
         }
         new Val.Obj(pos, outputFields, false, null, null)
