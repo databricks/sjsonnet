@@ -63,7 +63,7 @@ object StdMergePatchTests extends TestSuite {
       eval("std.objectFieldsAll(std.mergePatch({a: {h:: 1, v: 1}}, {a: {}}).a)") ==> ujson.Arr("v")
       // Hidden target fields are ineligible to merge with visible patch fields;
       // it should be as if the hidden target field doesn't exist:
-      eval("std.mergePatch({ hidden:: { a: 1 } , visible: 1 }, { hidden: { b: 2 }})") ==> ujson.Obj("visible" -> 1, "hidden" -> ujson.Obj("b" -> 2))
+      eval("std.mergePatch({ a:: { a: 1 } , visible: 1 }, { a: { b: 2 }})") ==> ujson.Obj("visible" -> 1, "a" -> ujson.Obj("b" -> 2))
     }
 
     test("hidden patch fields") {
