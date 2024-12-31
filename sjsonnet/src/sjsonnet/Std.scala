@@ -668,11 +668,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       // Here, `objectSize` is the number of valid entries in the `objects` array.
       // This is an optimization to avoid having to trim or resize intermediate arrays.
       def recMerge(objects: Array[Val.Obj], objectsSize: Int): Val.Obj = {
-        // Early return for empty array
-        if (objectsSize == 0) return Val.Obj.mk(pos)
-
         // Fast path for single object
         if (objectsSize == 1) return objects(0)
+
+        // Don't have to worry about special casing the objectsSize == 0 case because
+        // code ensures precondition that objectsSize >= 1. For performance reasons
+        // we don't explicit assert this, though.
 
         // Determine an upper bound of the final key set (only a bound because a key
         // might end up being removed and we can only know that after further processing).
@@ -728,16 +729,21 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
       target match {
         case arr: Val.Arr =>
-          val objects = new Array[Val.Obj](arr.length)
-          var i = 0
-          while (i < arr.length) {
-            arr.force(i) match {
-              case obj: Val.Obj => objects(i) = obj
-              case _ => Error.fail(s"Expected array of objects, got ${target.prettyName}", pos)(ev)
+          val length = arr.length
+          if (length == 0) {
+            Val.Obj.mk(pos)
+          } else {
+            val objects = new Array[Val.Obj](length)
+            var i = 0
+            while (i < length) {
+              arr.force(i) match {
+                case obj: Val.Obj => objects(i) = obj
+                case _ => Error.fail(s"Expected array of objects, got ${target.prettyName}", pos)(ev)
+              }
+              i += 1
             }
-            i += 1
+            recMerge(objects, length)
           }
-          recMerge(objects, arr.length)
 
         case v => Error.fail(s"Expected array, got ${v.prettyName}", pos)(ev)
       }
