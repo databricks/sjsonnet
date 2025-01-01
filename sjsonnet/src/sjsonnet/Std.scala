@@ -660,21 +660,64 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
    */
   private object MergePatchAll extends Val.Builtin1("mergePatchAll", "array") {
 
-    def evalRhs(target: Val, ev: EvalScope, pos: Position): Val = {
-      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
-        def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+    /**
+     * Recursively process an object by:
+     *   Removing any fields explicitly set to null.
+     *   Removing any non-visible fields.
+     *   Stripping the `add` modifier off of any fields with it.
+     */
+    def cleanObject(obj: Val.Obj, ev: EvalScope): Val.Obj = {
+      val visibleKeys = obj.visibleKeyNames
+      val newFields: Array[Val] = new Array(visibleKeys.length)
+      var i = 0
+      var updateNeeded: Boolean = (visibleKeys.length != obj.allKeysSize) || obj.hasAPlusField
+      while (i < visibleKeys.length) {
+        val key = visibleKeys(i)
+        val value = obj.value(key, obj.pos.noOffset, obj)(ev)
+        if (value.isInstanceOf[Val.Null]) {
+          newFields(i) = null
+          updateNeeded = true
+        } else {
+          val newValue = value match {
+            case obj: Val.Obj => cleanObject(obj, ev)
+            case _ => value
+          }
+          newFields(i) = newValue
+          if (newValue ne value) updateNeeded = true
+        }
+        i += 1
       }
+      if (updateNeeded) {
+        val newFieldsMap = new util.LinkedHashMap[String, Val.Obj.Member](visibleKeys.length)
+        i = 0
+        while (i < visibleKeys.length) {
+          val key = visibleKeys(i)
+          val value = newFields(i)
+          if (value != null) {
+            // TODO: can this be a ConstMember?
+            newFieldsMap.put(key, createMember(value))
+          }
+          i += 1
+        }
+        new Val.Obj(pos, newFieldsMap, false, null, null)
+      } else {
+        obj
+      }
+    }
+
+    private def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
+      def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+    }
+
+    def evalRhs(target: Val, ev: EvalScope, pos: Position): Val = {
+
+      // Placeholder to represent absence of a value. We use this instead of `null` because
+      // LinkedHashMap.putIfAbsent still affects insertion order if the existing value is null.
+      val nullCanary = new Val.Obj.ConstMember(false, Visibility.Normal, Val.Null(pos))
 
       // Here, `objectSize` is the number of valid entries in the `objects` array.
       // This is an optimization to avoid having to trim or resize intermediate arrays.
       def recMerge(objects: Array[Val.Obj], objectsSize: Int): Val.Obj = {
-        // Fast path for single object
-        if (objectsSize == 1) return objects(0)
-
-        // Don't have to worry about special casing the objectsSize == 0 case because
-        // code ensures precondition that objectsSize >= 1. For performance reasons
-        // we don't explicit assert this, though.
-
         // Determine an upper bound of the final key set (only a bound because a key
         // might end up being removed and we can only know that after further processing).
         // We need an `outputFields` LinkedHashMap anyways, so we'll first use it to
@@ -683,7 +726,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         val outputFields = new util.LinkedHashMap[String, Val.Obj.Member]()
         var idx = 0
         while (idx < objectsSize) {
-          objects(idx).visibleKeyNames.foreach(k => outputFields.put(k, null))
+          objects(idx).visibleKeyNames.foreach(k => outputFields.putIfAbsent(k, nullCanary))
           idx += 1
         }
 
@@ -716,10 +759,11 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
           if (lastValue != null && !lastValue.isInstanceOf[Val.Null]) {
             val finalValue = {
-              if (objCount > 0) recMerge(objValues, objCount)
+              if (objCount > 1) recMerge(objValues, objCount)
+              else if (objCount == 1) cleanObject(objValues(0), ev)
               else lastValue
             }
-            outputFields.put(key, createMember(finalValue))
+            outputFields.replace(key, createMember(finalValue))
           } else {
             keysIter.remove()
           }
@@ -732,6 +776,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           val length = arr.length
           if (length == 0) {
             Val.Obj.mk(pos)
+          } else if (length == 1) {
+            cleanObject(arr.force(0).asObj, ev)
           } else {
             val objects = new Array[Val.Obj](length)
             var i = 0

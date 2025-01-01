@@ -8,6 +8,7 @@ import sjsonnet.Expr.Params
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 /**
@@ -226,6 +227,9 @@ object Val{
     @inline def containsKey(k: String): Boolean = getAllKeys.containsKey(k)
 
     @inline def containsVisibleKey(k: String): Boolean = getAllKeys.get(k) == java.lang.Boolean.FALSE
+
+    def allKeysSize: Int = getAllKeys.size()
+    def hasAPlusField: Boolean = getValue0.values().asScala.exists(_.add)
 
     lazy val allKeyNames: Array[String] = getAllKeys.keySet().toArray(new Array[String](getAllKeys.size()))
 

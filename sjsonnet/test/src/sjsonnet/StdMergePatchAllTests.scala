@@ -121,7 +121,7 @@ object StdMergePatchAllTests extends TestSuite {
           {a: {w: 5}}
         ];
         std.objectFieldsAll(std.mergePatchAll(arr).a)
-      """) ==> ujson.Arr("y", "w")
+      """, preserveOrder = true) ==> ujson.Arr("y", "w")
 
       // Verify all hidden field cases against foldl
       eval("""
