@@ -1011,8 +1011,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case (l: Val.Obj, r: Val.Obj) =>
           val kvs = for {
             k <- (l.visibleKeyNames ++ r.visibleKeyNames).distinct
-            lValue = Option(l.valueRaw(k, l, pos)(ev))
-            rValue = Option(r.valueRaw(k, r, pos)(ev))
+            lValue = if (l.containsVisibleKey(k)) Option(l.valueRaw(k, l, pos)(ev)) else None
+            rValue = if (r.containsVisibleKey(k)) Option(r.valueRaw(k, r, pos)(ev)) else None
             if !rValue.exists(_.isInstanceOf[Val.Null])
           } yield (lValue, rValue) match{
             case (Some(lChild), None) => k -> createMember{lChild}
