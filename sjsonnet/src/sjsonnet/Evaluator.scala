@@ -61,6 +61,7 @@ class Evaluator(resolver: CachedResolver,
       case e: Import => visitImport(e)
       case e: Apply0 => visitApply0(e)
       case e: ImportStr => visitImportStr(e)
+      case e: ImportBin => visitImportBin(e)
       case e: Expr.Error => visitError(e)
       case e => visitInvalid(e)
     }
@@ -301,10 +302,14 @@ class Evaluator(resolver: CachedResolver,
   }
 
   def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
-    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos)._2.readString())
+    Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)._2.readString())
+
+  def visitImportBin(e: ImportBin): Val.Arr =
+    new Val.Arr(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)._2.readRawBytes().map(
+      x => Val.Num(e.pos, (x & 0xff).doubleValue)))
 
   def visitImport(e: Import)(implicit scope: ValScope): Val = {
-    val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos)
+    val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)
     cachedImports.getOrElseUpdate(
       p,
       {

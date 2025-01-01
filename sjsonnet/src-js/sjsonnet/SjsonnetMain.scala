@@ -24,7 +24,7 @@ object SjsonnetMain {
             case null => None
             case s => Some(JsVirtualPath(s))
           }
-        def read(path: Path): Option[ResolvedFile] =
+        def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
           Option(StaticResolvedFile(importLoader(path.asInstanceOf[JsVirtualPath].path)))
       },
       parseCache = new DefaultParseCache,

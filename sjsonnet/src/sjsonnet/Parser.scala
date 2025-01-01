@@ -36,7 +36,7 @@ object Parser {
 
   val keywords = Set(
     "assert", "else", "error", "false", "for", "function", "if", "import", "importstr",
-    "in", "local", "null", "tailstrict", "then", "self", "super", "true"
+    "in", "local", "null", "tailstrict", "then", "self", "super", "true", "importbin"
   )
 
   def idStartChar(c: Char) = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
@@ -239,6 +239,7 @@ class Parser(val currentFile: Path,
 
   def local[_: P] = P( localExpr )
   def importStr[_: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
+  def importBin[_: P](pos: Position) = P( importExpr.map(Expr.ImportBin(pos, _)) )
   def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
   def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
 
@@ -298,6 +299,7 @@ class Parser(val currentFile: Path,
               case "if"        => Pass ~ ifElse(pos)
               case "function"  => Pass ~ function(pos)
               case "importstr" => Pass ~ importStr(pos)
+              case "importbin" => Pass ~ importBin(pos)
               case "import"    => Pass ~ `import`(pos)
               case "error"     => Pass ~ error(pos)
               case "assert"    => Pass ~ assertExpr(pos)

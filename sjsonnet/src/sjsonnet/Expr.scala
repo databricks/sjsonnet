@@ -126,6 +126,7 @@ object Expr{
   case class Bind(pos: Position, name: String, args: Params, rhs: Expr) extends Member
   case class Import(pos: Position, value: String) extends Expr
   case class ImportStr(pos: Position, value: String) extends Expr
+  case class ImportBin(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
   case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String]) extends Expr
   case class Apply0(pos: Position, value: Expr) extends Expr
@@ -181,5 +182,4 @@ object Expr{
       override def toString = s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
     }
   }
-
 }

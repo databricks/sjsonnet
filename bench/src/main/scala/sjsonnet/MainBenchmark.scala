@@ -31,7 +31,7 @@ object MainBenchmark {
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
-    interp.interpret0(interp.resolver.read(path).get.readString(), path, renderer).getOrElse(???)
+    interp.interpret0(interp.resolver.read(path, binaryData = false).get.readString(), path, renderer).getOrElse(???)
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 
