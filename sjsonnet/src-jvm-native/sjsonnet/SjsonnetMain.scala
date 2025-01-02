@@ -22,8 +22,8 @@ object SjsonnetMain {
         .find(os.exists)
         .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
 
-    def read(path: Path): Option[ResolvedFile] = {
-      readPath(path)
+    def read(path: Path, binaryData: Boolean = false): Option[ResolvedFile] = {
+      readPath(path, binaryData)
     }
   }
 
@@ -200,8 +200,8 @@ object SjsonnetMain {
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
             i(docBase, importName).map(OsPath)
-          def read(path: Path): Option[ResolvedFile] = {
-            readPath(path)
+          def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
+            readPath(path, binaryData)
           }
         }
         case None => resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath), allowedInputs)
@@ -295,10 +295,10 @@ object SjsonnetMain {
    * of caching on top of the underlying file system. Small files are read into memory, while large
    * files are read from disk.
    */
-  private[this] def readPath(path: Path): Option[ResolvedFile] = {
+  private[this] def readPath(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
     if (os.exists(osPath) && os.isFile(osPath)) {
-      Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = Int.MaxValue.toLong))
+      Some(new CachedResolvedFile(path.asInstanceOf[OsPath], memoryLimitBytes = Int.MaxValue.toLong, binaryData = binaryData))
     } else {
       None
     }

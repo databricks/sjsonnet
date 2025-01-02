@@ -101,7 +101,7 @@ trait EvalErrorScope {
   def wd: Path
 
   def prettyIndex(pos: Position): Option[(Int, Int)] = {
-    importer.read(pos.currentFile).map { s =>
+    importer.read(pos.currentFile, binaryData = false).map { s =>
       val Array(line, col) =
         s.getParserInput().prettyIndex(pos.offset).split(':')
       (line.toInt, col.toInt)

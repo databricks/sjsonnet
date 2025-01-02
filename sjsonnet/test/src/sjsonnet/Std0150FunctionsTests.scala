@@ -89,7 +89,7 @@ object Std0150FunctionsTests extends TestSuite {
         parseCache = new DefaultParseCache,
       )
 
-      def check(s: String, expected: ujson.Value) =
+      def check(s: String, expected: ujson.Value): Unit =
         interpreter.interpret(s, DummyPath("(memory)")) ==> Right(expected)
 
       check("""std.extVar("num")""", 1)
@@ -121,14 +121,14 @@ object Std0150FunctionsTests extends TestSuite {
           override def resolve(docBase: Path, importName: String): Option[Path] = importName match{
             case "bar.json" => Some(DummyPath("bar"))
           }
-          override def read(path: Path): Option[ResolvedFile] = path match{
+          override def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = path match{
             case DummyPath("bar") => Some(StaticResolvedFile("""{"x": "y"}"""))
           }
         },
         parseCache = new DefaultParseCache,
       )
 
-      def check(s: String, expected: ujson.Value) =
+      def check(s: String, expected: ujson.Value): Unit =
         interpreter.interpret(s, DummyPath("(memory)")) ==> Right(expected)
 
       check("""function(num) num""", 1)

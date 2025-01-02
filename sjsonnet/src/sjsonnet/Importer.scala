@@ -1,33 +1,31 @@
 package sjsonnet
 
-import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, FileReader, InputStream, RandomAccessFile, Reader, StringReader}
-import java.nio.file.Files
-import java.security.MessageDigest
-import scala.collection.mutable
 import fastparse.{IndexedParserInput, Parsed, ParserInput}
 
+import java.io.{BufferedInputStream, File, FileInputStream, RandomAccessFile}
 import java.nio.charset.StandardCharsets
+import scala.collection.mutable
 
 
 /** Resolve and read imported files */
 abstract class Importer {
   def resolve(docBase: Path, importName: String): Option[Path]
-  def read(path: Path): Option[ResolvedFile]
+  def read(path: Path, binaryData: Boolean): Option[ResolvedFile]
 
-  def resolveAndRead(docBase: Path, importName: String): Option[(Path, ResolvedFile)] = for {
+  private def resolveAndRead(docBase: Path, importName: String, binaryData: Boolean): Option[(Path, ResolvedFile)] = for {
     path <- resolve(docBase, importName)
-    txt <- read(path)
+    txt <- read(path, binaryData)
   } yield (path, txt)
 
-  def resolveAndReadOrFail(value: String, pos: Position)(implicit ev: EvalErrorScope): (Path, ResolvedFile) =
-    resolveAndRead(pos.fileScope.currentFile.parent(), value)
+  def resolveAndReadOrFail(value: String, pos: Position, binaryData: Boolean)(implicit ev: EvalErrorScope): (Path, ResolvedFile) =
+    resolveAndRead(pos.fileScope.currentFile.parent(), value, binaryData = binaryData)
       .getOrElse(Error.fail("Couldn't import file: " + pprint.Util.literalize(value), pos))
 }
 
 object Importer {
   val empty: Importer = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] = None
-    def read(path: Path): Option[ResolvedFile] = None
+    def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = None
   }
 }
 
@@ -97,7 +95,7 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
   private val fileLength: Long = file.length()
 
   private def fillBuffer(position: Long): Unit = {
-    if (file.getFilePointer() != position) {
+    if (file.getFilePointer != position) {
       file.seek(position)
     }
     val bytesRead = file.read(buffer, 0, bufferSize)
@@ -150,6 +148,9 @@ trait ResolvedFile {
 
   // Get a content hash of the file suitable for detecting changes in a given file.
   def contentHash(): String
+
+  // Used by importbin
+  def readRawBytes(): Array[Byte]
 }
 
 case class StaticResolvedFile(content: String) extends ResolvedFile {
@@ -159,6 +160,8 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
 
   // We just cheat, the content hash can be the content itself for static imports
   lazy val contentHash: String = content
+
+  override def readRawBytes(): Array[Byte] = content.getBytes(StandardCharsets.UTF_8)
 }
 
 class CachedImporter(parent: Importer) extends Importer {
@@ -166,12 +169,12 @@ class CachedImporter(parent: Importer) extends Importer {
 
   def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
 
-  def read(path: Path): Option[ResolvedFile] = cache.get(path) match {
+  def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = cache.get(path) match {
     case s @ Some(x) =>
       if(x == null) None else s
     case None =>
-      val x = parent.read(path)
-      cache.put(path, x.getOrElse(null))
+      val x = parent.read(path, binaryData)
+      cache.put(path, x.orNull)
       x
   }
 }
@@ -184,7 +187,7 @@ class CachedResolver(
   internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends CachedImporter(parentImporter) {
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate((path, content.contentHash.toString), {
+    parseCache.getOrElseUpdate((path, content.contentHash()), {
       val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()
