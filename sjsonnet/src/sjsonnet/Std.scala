@@ -390,19 +390,26 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           val length = arr.length
           if (length == 0) {
             Val.Obj.mk(pos)
-          } else if (length == 1) {
-            cleanObject(arr.force(0).asObj, ev)
           } else {
             val objects = new Array[Val.Obj](length)
-            var i = 0
-            while (i < length) {
-              arr.force(i) match {
-                case obj: Val.Obj => objects(i) = obj
-                case _ => Error.fail(s"Expected array of objects, got ${target.prettyName}", pos)(ev)
+            var arrIdx = 0
+            var objectsIdx = 0
+            while (arrIdx < length) {
+              arr.force(arrIdx) match {
+                case obj: Val.Obj =>
+                  objects(objectsIdx) = obj
+                  objectsIdx += 1
+                case _ =>
+                  objectsIdx = 0
               }
-              i += 1
+              arrIdx += 1
             }
-            recMerge(objects, length)
+            if (objectsIdx == 0) {
+              // The last element is a non-object, so it overwrites everything.
+              arr.force(length - 1)
+            } else {
+              recMerge(objects, objectsIdx)
+            }
           }
 
         case v => Error.fail(s"Expected array, got ${v.prettyName}", pos)(ev)
