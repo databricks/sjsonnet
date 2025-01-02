@@ -312,7 +312,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           }
           i += 1
         }
-        new Val.Obj(pos, newFieldsMap, false, null, null)
+        new Val.Obj(obj.pos, newFieldsMap, false, null, null)
       } else {
         obj
       }

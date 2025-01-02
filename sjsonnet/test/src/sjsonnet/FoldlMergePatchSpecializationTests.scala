@@ -24,9 +24,11 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
     test("single patch") {
       check("""std.foldl(std.mergePatch, [1], {})""")
       check("""std.foldl(std.mergePatch, [null], {})""")
+      check("""std.foldl(std.mergePatch, [{}], {})""")
       check("""std.foldl(std.mergePatch, [{a: 1}], {})""")
       check("""std.foldl(std.mergePatch, [{a: null}], {})""")
       check("""std.foldl(std.mergePatch, [{a: {b: null}}], {})""")
+      check("""std.foldl(std.mergePatch, [{a: {b: {c: null}}}], {})""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{a: 1, b:: 1}], {}))""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{a: {b: { c:: 1, d: 2}}}], {}).a.b)""")
     }
