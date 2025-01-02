@@ -268,10 +268,12 @@ programmatically via `new Interpreter(...).interpret(...)`.
 To publish, make sure the version number in `build.sc` is correct, then run the following commands:
 
 ```bash
-./mill -i mill.scalalib.PublishModule/publishAll --sonatypeCreds $SONATYPE_USER:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true
+./mill -i mill.scalalib.PublishModule/publishAll \
+    --sonatypeCreds $SONATYPE_USER:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true \
+    --gpgArgs --passphrase=$GPG_PASSPHRASE,--batch,--yes,-a,-b,--pinentry-mode=loopback
 
-./mill -i show sjsonnet[2.13.15].js.fullOpt
-./mill -i show sjsonnet[2.13.15].jvm.assembly
+./mill -i show "sjsonnet.js[2.13.15].fullOpt"
+./mill -i show "sjsonnet.jvm[2.13.15].assembly"
 ```
 
 ## Changelog
