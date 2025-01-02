@@ -254,8 +254,18 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
         case _ => Error.fail("Cannot call foldl on " + arr.prettyName)
       }
+    }
 
-
+    override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = {
+      try {
+        args match {
+          // Rewrite std.foldl(std.mergePatch, arr, {}) as std.mergePatchAll(arr)
+          case Array(f: Val.Builtin, arr, init: Val.Obj) if f.functionName == "mergePatch" && !init.hasKeys =>
+            (MergePatchAll, Array(arr))
+        }
+      } catch {
+        case _: Exception => null
+      }
     }
   }
 

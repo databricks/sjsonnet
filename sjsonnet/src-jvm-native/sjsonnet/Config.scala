@@ -139,10 +139,10 @@ case class Config(
   )
   throwErrorForInvalidSets: Flag = Flag(),
   @arg(
-    name = "optimize-builtin-function-application",
-    doc = """Enables rewrites of builtin function applications to use more efficient equivalents"""
+    name = "disable-builtin-specialization",
+    doc = """Disables specialization of builtin function applications to use more efficient equivalents"""
   )
-  optimizeBuiltinFunctionApplication: Flag = Flag(),
+  disableBuiltinSpecialization: Flag = Flag(),
   @arg(
     doc = "The jsonnet file you wish to evaluate",
     positional = true

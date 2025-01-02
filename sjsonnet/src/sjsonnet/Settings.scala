@@ -11,7 +11,7 @@ class Settings(
   val strictInheritedAssertions: Boolean = false,
   val strictSetOperations: Boolean = false,
   val throwErrorForInvalidSets: Boolean = false,
-  val optimizeBuiltinFunctionApplication: Boolean = false,
+  val disableBuiltinSpecialization: Boolean = false,
 )
 
 object Settings {
@@ -26,7 +26,7 @@ object Settings {
       strictInheritedAssertions = config.strictInheritedAssertions.value,
       strictSetOperations = config.strictSetOperations.value,
       throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
-      optimizeBuiltinFunctionApplication = config.optimizeBuiltinFunctionApplication.value
+      disableBuiltinSpecialization = config.disableBuiltinSpecialization.value
     )
   }
 }
