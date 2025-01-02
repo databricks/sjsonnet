@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.{assertSameEvalWithAndWithoutSpecialization, eval, evalErr}
+import TestUtils.{assertSameEvalWithAndWithoutSpecialization, evalErr}
 
 object FoldlMergePatchSpecializationTests extends TestSuite {
 
@@ -11,17 +11,12 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
   }
 
   def tests = Tests {
-
-    test("abc") {
-      check("""std.foldl(std.mergePatch, [{a: 1, b: 1}, {a: null}], {})""")
-    }
-
     test("empty array handling") {
       check("""std.foldl(std.mergePatch, [], {})""")
       check("""std.foldl(std.mergePatch, [{}], {})""")
     }
 
-    test("single patch") {
+    test("single patch to empty object") {
       check("""std.foldl(std.mergePatch, [1], {})""")
       check("""std.foldl(std.mergePatch, [null], {})""")
       check("""std.foldl(std.mergePatch, [{}], {})""")
@@ -35,9 +30,16 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
 
     test("basic non-nested merging") {
       check("""std.foldl(std.mergePatch, [{a: 1}, {b: 2}], {})""")
+      check("""std.foldl(std.mergePatch, [{b: 2}], {a: 1})""")
+
       check("""std.foldl(std.mergePatch, [{a: 1}, {b: 2}, {c: 3}], {})""")
+      check("""std.foldl(std.mergePatch, [{b: 2}, {c: 3}], {a: 1})""")
+
       check("""std.foldl(std.mergePatch, [{a: 1}, {a: 2}, {a: 3}], {})""")
+      check("""std.foldl(std.mergePatch, [{a: 2}, {a: 3}], {a: 1})""")
+
       check("""std.foldl(std.mergePatch, [{a: 1, b: 1}, {b: 2, c: 2}, {c: 3, d: 3}], {})""")
+      check("""std.foldl(std.mergePatch, [{b: 2, c: 2}, {c: 3, d: 3}], {a: 1, b: 1})""")
     }
 
     test("merging of non-object patches") {
@@ -72,6 +74,10 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
       // Hidden fields should always be dropped
       check("""std.foldl(std.mergePatch, [{a:: 1}, {b: 2}], {})""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{a:: 1}, {b: 2}], {}))""")
+
+      check("""std.foldl(std.mergePatch, [{b: 2}], {a:: 1})""")
+      check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{b: 2}], {a:: 1}))""")
+
       check("""std.foldl(std.mergePatch, [{a: 1}, {b:: 2}], {})""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{a: 1}, {b:: 2}], {}))""")
 
@@ -92,22 +98,28 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
 
     test("ordering preservation") {
       check("""std.foldl(std.mergePatch, [{b: 1, a: 1}, {c: 1, d: 1}], {})""")
-      check("""std.foldl(std.mergePatch, [{b: 1, a: 1}, {a: 2, b: 2}], {})""")
+      check("""std.foldl(std.mergePatch, [{a: 2, b: 2}], {b: 1, a: 1})""")
     }
 
     test("plus operator handling") {
       // The +: operator should be ignored during merging
       check("""std.foldl(std.mergePatch, [{a: 1}, {a+: 2}], {})""")
+      check("""std.foldl(std.mergePatch, [{a+: 2}], {a: 1})""")
 
       // The resulting field should not be treated as +: in future merges
       check("""
         local result = std.foldl(std.mergePatch, [{}, {a+: 2}], {});
         {a: 1} + result
       """)
+      check(
+        """
+        local result = std.foldl(std.mergePatch, [{}, {a+: 2}], {});
+        {a: 1} + result
+      """)
 
       // +: in first object should also be ignored
       check("""
-        local result = std.foldl(std.mergePatch, [{a+: 2}, {}], {});
+        local result = std.foldl(std.mergePatch, [{}], {a+: 2});
         {a: 1} + result
       """)
 

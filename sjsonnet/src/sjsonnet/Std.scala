@@ -259,9 +259,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     override def specialize(args: Array[Expr]): (Val.Builtin, Array[Expr]) = {
       try {
         args match {
-          // Specialize std.foldl(std.mergePatch, arr, {})
-          case Array(f: Val.Builtin, arr, init: Val.Obj) if f.functionName == "mergePatch" && !init.hasKeys =>
-            (FoldlMergePatch, Array(arr))
+          // Specialize std.foldl(std.mergePatch, arr, target)
+          case Array(f: Val.Builtin, arr, target: Val.Obj) if f.functionName == "mergePatch" =>
+            (FoldlMergePatch, Array(arr, target))
         }
       } catch {
         case _: Exception => null
@@ -270,9 +270,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   /**
-   * Optimized equivalent of `std.foldl(std.mergePatch, arr, {})`
+   * Optimized equivalent of `std.foldl(std.mergePatch, arr, target)`
    */
-  private object FoldlMergePatch extends Val.Builtin1("mergePatchAll", "array") {
+  private object FoldlMergePatch extends Val.Builtin2("mergePatchAll", "array", "target") {
 
     /**
      * Recursively process an object by:
@@ -322,35 +322,53 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
     }
 
-    def evalRhs(target: Val, ev: EvalScope, pos: Position): Val = {
+    // Placeholder to represent absence of a value. We use this instead of `null` because
+    // LinkedHashMap.putIfAbsent still affects insertion order if the existing value is null.
+    private[this] val nullCanary = new Val.Obj.ConstMember(false, Visibility.Normal, Val.Null(pos))
 
-      // Placeholder to represent absence of a value. We use this instead of `null` because
-      // LinkedHashMap.putIfAbsent still affects insertion order if the existing value is null.
-      val nullCanary = new Val.Obj.ConstMember(false, Visibility.Normal, Val.Null(pos))
-
+    def evalRhs(arr: Val, target: Val, ev: EvalScope, pos: Position): Val = {
       // Here, `objectSize` is the number of valid entries in the `objects` array.
       // This is an optimization to avoid having to trim or resize intermediate arrays.
-      def recMerge(objects: Array[Val.Obj], objectsSize: Int): Val.Obj = {
+      def recMerge(target: Val, objects: Array[Val.Obj], objectsSize: Int): Val.Obj = {
         // Determine an upper bound of the final key set (only a bound because a key
         // might end up being removed and we can only know that after further processing).
         // We need an `outputFields` LinkedHashMap anyways, so we'll first use it to
         // collect the distinct fields and then will update it to either populate the members
         // or remove fields that were later determined to be unused.
         val outputFields = new util.LinkedHashMap[String, Val.Obj.Member]()
+        val targetObj = target match {
+          case t: Val.Obj =>
+            t.visibleKeyNames.foreach(k => outputFields.putIfAbsent(k, nullCanary))
+            t
+          case _ =>
+            // Target isn't an object, so it will be overwritten by object or objects.
+            null
+        }
         var idx = 0
         while (idx < objectsSize) {
           objects(idx).visibleKeyNames.foreach(k => outputFields.putIfAbsent(k, nullCanary))
           idx += 1
         }
 
+        // Perform the merge for each key:
         val keysIter = outputFields.keySet().iterator()
         val objValues = new Array[Val.Obj](objectsSize)
         while (keysIter.hasNext) {
           val key = keysIter.next()
+          val targetValue: Val = target match {
+            case targetObj: Val.Obj if targetObj.containsVisibleKey(key) =>
+              targetObj.valueRaw(key, targetObj, pos)(ev)
+            case _ =>
+              null
+          }
+
           var lastValue: Val = null
           var objCount = 0
-
           var i = 0
+
+          // Loop over the patches, determining either the final non-object
+          // value which overwrites the target key or determining the subset
+          // of patches which contribute to the final value.
           while (i < objectsSize) {
             val obj = objects(i)
             if (obj.containsVisibleKey(key)) {
@@ -369,26 +387,27 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             }
             i += 1
           }
-
-          if (lastValue != null && !lastValue.isInstanceOf[Val.Null]) {
+          val removeField = lastValue.isInstanceOf[Val.Null]
+          if (removeField) {
+            keysIter.remove()
+          } else {
             val finalValue = {
-              if (objCount > 1) recMerge(objValues, objCount)
+              if (objCount > 1) recMerge(targetValue, objValues, objCount)
               else if (objCount == 1) cleanObject(objValues(0), ev)
-              else lastValue
+              else if (lastValue != null) lastValue
+              else targetValue
             }
             outputFields.replace(key, createMember(finalValue))
-          } else {
-            keysIter.remove()
           }
         }
         new Val.Obj(pos, outputFields, false, null, null)
       }
 
-      target match {
+      arr match {
         case arr: Val.Arr =>
           val length = arr.length
           if (length == 0) {
-            Val.Obj.mk(pos)
+            target
           } else {
             val objects = new Array[Val.Obj](length)
             var arrIdx = 0
@@ -407,7 +426,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
               // The last element is a non-object, so it overwrites everything.
               arr.force(length - 1)
             } else {
-              recMerge(objects, objectsIdx)
+              recMerge(target, objects, objectsIdx)
             }
           }
 
