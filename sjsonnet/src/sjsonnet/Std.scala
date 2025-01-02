@@ -308,7 +308,6 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           val key = visibleKeys(i)
           val value = newFields(i)
           if (value != null) {
-            // TODO: can this be a ConstMember?
             newFieldsMap.put(key, createMember(value))
           }
           i += 1
@@ -319,7 +318,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
     }
 
-    private def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
+    private def createMember(v: Val) = new Val.Obj.Member(false, Visibility.Unhide) {
       def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
     }
 
