@@ -25,7 +25,7 @@ abstract class Importer {
 object Importer {
   val empty: Importer = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] = None
-    def read(path: Path, binaryData: Boolean = false): Option[ResolvedFile] = None
+    def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = None
   }
 }
 
@@ -141,7 +141,7 @@ trait ResolvedFile {
    * Get an efficient parser input for this resolved file. Large files will be read from disk
    * (buffered reads), while small files will be served from memory.
    */
-  def getParserInput: ParserInput
+  def getParserInput(): ParserInput
 
   // Use this to read the file as a string. This is generally used for `importstr`
   def readString(): String
@@ -154,7 +154,7 @@ trait ResolvedFile {
 }
 
 case class StaticResolvedFile(content: String) extends ResolvedFile {
-  def getParserInput: ParserInput = IndexedParserInput(content)
+  def getParserInput(): ParserInput = IndexedParserInput(content)
 
   def readString(): String = content
 
@@ -188,7 +188,7 @@ class CachedResolver(
 
   def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate((path, content.contentHash()), {
-      val parsed = fastparse.parse(content.getParserInput, new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
+      val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
         case f @ Parsed.Failure(_, _, _) =>
           val traced = f.trace()
           val pos = new Position(new FileScope(path), traced.index)

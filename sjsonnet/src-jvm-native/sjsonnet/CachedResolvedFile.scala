@@ -46,11 +46,11 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
    * A method that will return a reader for the resolved import. If the import is too large, then this will return
    * a reader that will read the file from disk. Otherwise, it will return a reader that reads from memory.
    */
-  def getParserInput: ParserInput = {
+  def getParserInput(): ParserInput = {
     if (resolvedImportContent == null) {
       FileParserInput(jFile)
     } else {
-      resolvedImportContent.getParserInput
+      resolvedImportContent.getParserInput()
     }
   }
 

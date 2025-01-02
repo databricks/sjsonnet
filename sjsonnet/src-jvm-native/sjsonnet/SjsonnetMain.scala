@@ -200,7 +200,7 @@ object SjsonnetMain {
         case Some(i) => new Importer {
           def resolve(docBase: Path, importName: String): Option[Path] =
             i(docBase, importName).map(OsPath)
-          def read(path: Path, binaryData: Boolean = false): Option[ResolvedFile] = {
+          def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
             readPath(path, binaryData)
           }
         }
