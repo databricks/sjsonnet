@@ -483,14 +483,26 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   private object StripUtils {
+    private val dashPattern = Platform.getPatternFromCache("-")
+
+    private def cleanupPattern(chars: String): String = {
+      val matcher = dashPattern.matcher(chars)
+      if (matcher.find()) {
+        matcher.replaceAll("") + "-"
+      } else {
+        chars
+      }
+    }
+
     private def getLeadingPattern(chars: String): String = "^[" + Platform.regexQuote(chars) + "]+"
 
     private def getTrailingPattern(chars: String): String = "[" + Platform.regexQuote(chars) + "]+$"
 
     def unspecializedStrip(str: String, chars: String, left: Boolean, right: Boolean): String = {
       var s = str
-      if (right) s = Platform.getPatternFromCache(getTrailingPattern(chars)).matcher(s).replaceAll("")
-      if (left) s = Platform.getPatternFromCache(getLeadingPattern(chars)).matcher(s).replaceAll("")
+      val cleanedUpPattern = cleanupPattern(chars)
+      if (right) s = Platform.getPatternFromCache(getTrailingPattern(cleanedUpPattern)).matcher(s).replaceAll("")
+      if (left) s = Platform.getPatternFromCache(getLeadingPattern(cleanedUpPattern)).matcher(s).replaceAll("")
       s
     }
 
@@ -500,8 +512,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       right: Boolean,
       functionName: String
     ) extends Val.Builtin1(functionName, "str") {
-      private[this] val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
-      private[this] val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
+      private[this] val cleanedUpPattern = cleanupPattern(chars)
+      private[this] val leftPattern = Platform.getPatternFromCache(getLeadingPattern(cleanedUpPattern))
+      private[this] val rightPattern = Platform.getPatternFromCache(getTrailingPattern(cleanedUpPattern))
 
       def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
         var s = str.asString
