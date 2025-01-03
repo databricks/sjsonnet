@@ -6,6 +6,8 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
 
+import scala.collection.compat._
+
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)

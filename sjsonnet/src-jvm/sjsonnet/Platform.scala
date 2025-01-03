@@ -12,6 +12,7 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
+import scala.collection.compat._
 import scala.jdk.CollectionConverters._
 
 object Platform {
