@@ -922,7 +922,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     builtin(Range),
     builtin("mergePatch", "target", "patch"){ (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
-      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Unhide) {
+      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Normal) {
         def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
       }
       def recPair(l: Val, r: Val): Val = (l, r) match{
