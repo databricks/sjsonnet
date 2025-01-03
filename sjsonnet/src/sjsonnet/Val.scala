@@ -382,7 +382,8 @@ object Val{
         allKeys.put(uniqueKey, false)
         keys(idx) = uniqueKey
         idx += 1
-      case _ =>
+      case other =>
+        throw new Error(s"Unexpected non-literal field in static object: ${other} of class ${other.getClass}")
     }
     val fieldSet = new StaticObjectFieldSet(keys)
     new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))

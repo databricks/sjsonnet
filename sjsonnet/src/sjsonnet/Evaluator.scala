@@ -604,6 +604,7 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
       case _ =>
+        Error.fail("This case should never be hit", objPos)
     }
     cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
     cachedObj
