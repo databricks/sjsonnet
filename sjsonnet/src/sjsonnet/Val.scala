@@ -221,18 +221,43 @@ object Val{
       allKeys
     }
 
-    @inline def hasKeys = !getAllKeys.isEmpty
+    @inline def hasKeys: Boolean = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      !m.isEmpty
+    }
 
-    @inline def containsKey(k: String): Boolean = getAllKeys.containsKey(k)
+    @inline def containsKey(k: String): Boolean = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      m.containsKey(k)
+    }
 
-    @inline def containsVisibleKey(k: String): Boolean = getAllKeys.get(k) == java.lang.Boolean.FALSE
+    @inline def containsVisibleKey(k: String): Boolean = {
+      if (static || `super` != null) {
+        getAllKeys.get(k) == java.lang.Boolean.FALSE
+      } else {
+        val m = value0.get(k)
+        m != null && (m.visibility != Visibility.Hidden)
+      }
+    }
 
-    lazy val allKeyNames: Array[String] = getAllKeys.keySet().toArray(new Array[String](getAllKeys.size()))
+    lazy val allKeyNames: Array[String] = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      m.keySet().toArray(new Array[String](m.size()))
+    }
 
-    lazy val visibleKeyNames: Array[String] = if(static) allKeyNames else {
-      val buf = mutable.ArrayBuilder.make[String]
-      getAllKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
-      buf.result()
+    lazy val visibleKeyNames: Array[String] = {
+      if (static) {
+        allKeyNames
+      } else {
+        val buf = new mutable.ArrayBuilder.ofRef[String]
+        if (`super` == null) {
+          buf.sizeHint(Math.min(value0.size(), 16))
+          value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
+        } else {
+          getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
+        }
+        buf.result()
+      }
     }
 
     def value(k: String,
