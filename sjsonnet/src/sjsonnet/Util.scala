@@ -62,9 +62,9 @@ object Util{
     new java.util.LinkedHashMap[K, V](capacity, hashMapDefaultLoadFactor)
   }
 
-  def preSizedScalaMutableHashMap[K, V](expectedElems: Int): scala.collection.mutable.HashMap[K, V] = {
+  def preSizedJavaHashMap[K, V](expectedElems: Int): java.util.HashMap[K, V] = {
     val hashMapDefaultLoadFactor = 0.75f
     val capacity = (expectedElems / hashMapDefaultLoadFactor).toInt + 1
-    new scala.collection.mutable.HashMap[K, V](capacity, hashMapDefaultLoadFactor)
+    new java.util.HashMap[K, V](capacity, hashMapDefaultLoadFactor)
   }
 }

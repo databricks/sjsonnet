@@ -144,15 +144,15 @@ object Val{
 
   object Obj{
 
-    def getEmptyValueCacheForObjWithoutSuper(numFields: Int): mutable.HashMap[Any, Val] = {
+    def getEmptyValueCacheForObjWithoutSuper(numFields: Int): util.HashMap[Any, Val] = {
       // Helper for saving space in valueCache for objects without a super object.
       // For objects with no super, we (cheaply) know the exact number of fields and
       // therefore can upper bound the number of fields that _might_ be computed.
       // We only want to pre-size if it yields a smaller initial map size than the default.
       if (numFields >= 12) {
-        scala.collection.mutable.HashMap.empty[Any, Val]
+        new util.HashMap[Any, Val]()
       } else {
-        Util.preSizedScalaMutableHashMap[Any, Val](numFields)
+        Util.preSizedJavaHashMap[Any, Val](numFields)
       }
     }
 
@@ -177,7 +177,7 @@ object Val{
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
-                  valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
+                  valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
                   private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
@@ -187,7 +187,7 @@ object Val{
       if(value0 == null) {
         val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
         allKeys.forEach { (k, _) =>
-          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
+          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
         }
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
         this.value0 = value0
@@ -277,18 +277,21 @@ object Val{
               self: Obj = this)
              (implicit evaluator: EvalScope): Val = {
       if(static) {
-        valueCache.getOrElse(k, null) match {
+        valueCache.get(k) match {
           case null => Error.fail("Field does not exist: " + k, pos)
           case x => x
         }
       } else {
         val cacheKey = if(self eq this) k else (k, self)
-        valueCache.getOrElse(cacheKey, {
+        val cachedValue = valueCache.get(cacheKey)
+        if (cachedValue != null) {
+          cachedValue
+        } else {
           valueRaw(k, self, pos, valueCache, cacheKey) match {
             case null => Error.fail("Field does not exist: " + k, pos)
             case x => x
           }
-        })
+        }
       }
     }
 
@@ -323,12 +326,12 @@ object Val{
     def valueRaw(k: String,
                  self: Obj,
                  pos: Position,
-                 addTo: mutable.HashMap[Any, Val] = null,
+                 addTo: util.HashMap[Any, Val] = null,
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
       if(static) {
-        val v = valueCache.getOrElse(k, null)
-        if(addTo != null && v != null) addTo(addKey) = v
+        val v = valueCache.get(k)
+        if(addTo != null && v != null) addTo.put(addKey, v)
         v
       } else {
         val s = this.`super`
@@ -343,7 +346,7 @@ object Val{
                 case supValue => mergeMember(supValue, vv, pos)
               }
             } else vv
-            if(addTo != null && m.cached) addTo(addKey) = v
+            if(addTo != null && m.cached) addTo.put(addKey, v)
             v
         }
       }
@@ -378,7 +381,7 @@ object Val{
       fields: Array[Expr.Member.Field],
       internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
-    val cache = Util.preSizedScalaMutableHashMap[Any, Val](fields.length)
+    val cache = Util.preSizedJavaHashMap[Any, Val](fields.length)
     val allKeys = Util.preSizedJavaLinkedHashMap[String, java.lang.Boolean](fields.length)
     val keys = new Array[String](fields.length)
     var idx = 0

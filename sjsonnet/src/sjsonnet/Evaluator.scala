@@ -609,7 +609,7 @@ class Evaluator(resolver: CachedResolver,
     val valueCache = if (sup == null) {
       Val.Obj.getEmptyValueCacheForObjWithoutSuper(fields.length)
     } else {
-      mutable.HashMap.empty[Any, Val]
+      new java.util.HashMap[Any, Val]()
     }
     cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup, valueCache)
     cachedObj
@@ -645,7 +645,7 @@ class Evaluator(resolver: CachedResolver,
       val valueCache = if (sup == null) {
         Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
       } else {
-        mutable.HashMap.empty[Any, Val]
+        new java.util.HashMap[Any, Val]()
       }
       new Val.Obj(e.pos, builder, false, null, sup, valueCache)
     }
