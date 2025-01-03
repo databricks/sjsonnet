@@ -336,13 +336,10 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         // collect the distinct fields and then will update it to either populate the members
         // or remove fields that were later determined to be unused.
         val outputFields = new util.LinkedHashMap[String, Val.Obj.Member]()
-        val targetObj = target match {
+        target match {
           case t: Val.Obj =>
             t.visibleKeyNames.foreach(k => outputFields.putIfAbsent(k, nullCanary))
-            t
           case _ =>
-            // Target isn't an object, so it will be overwritten by object or objects.
-            null
         }
         var idx = 0
         while (idx < objectsSize) {
