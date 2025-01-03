@@ -12,6 +12,7 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
+import scala.collection.compat._
 import scala.jdk.CollectionConverters._
 
 object Platform {
@@ -112,7 +113,19 @@ object Platform {
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
+  private val dashPattern = getPatternFromCache("-")
+
   def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
-  def regexQuote(s: String): String = Pattern.quote(s)
+  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = pat.namedGroups().asScala.view.mapValues(_.intValue()).toMap
+
+  def regexQuote(s: String): String = {
+    val quote = Pattern.quote(s)
+    val matcher = dashPattern.matcher(quote)
+    if (matcher.find()) {
+      matcher.replaceAll("\\\\-")
+    } else {
+      quote
+    }
+  }
 }
