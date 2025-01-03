@@ -12,7 +12,7 @@ class Settings(
   val strictSetOperations: Boolean = false,
   val throwErrorForInvalidSets: Boolean = false,
   val disableBuiltinSpecialization: Boolean = false,
-  val disableStaticApplyForBuiltInFunctions: Boolean = false
+  val disableStaticApplyForBuiltinFunctions: Boolean = false
 )
 
 object Settings {

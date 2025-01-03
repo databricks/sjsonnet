@@ -138,12 +138,12 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
     test("error handling") {
       assert(evalErr(
         """std.foldl(std.mergePatch, null, {})""",
-        disableStaticApplyForBuiltInFunctions = true,
+        disableStaticApplyForBuiltinFunctions = true,
         disableBuiltinSpecialization = true
       ).startsWith("sjsonnet.Error: Cannot call foldl on null"))
       assert(evalErr(
         """std.foldl(std.mergePatch, null, {})""",
-        disableStaticApplyForBuiltInFunctions = true,
+        disableStaticApplyForBuiltinFunctions = true,
         disableBuiltinSpecialization = false
       ).startsWith("sjsonnet.Error: Expected array, got null"))
     }

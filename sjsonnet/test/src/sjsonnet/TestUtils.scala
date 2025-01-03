@@ -10,7 +10,7 @@ object TestUtils {
             strictInheritedAssertions: Boolean = false,
             strictSetOperations: Boolean = true,
             disableBuiltinSpecialization: Boolean = false,
-            disableStaticApplyForBuiltInFunctions: Boolean = false): Either[String, Value] = {
+            disableStaticApplyForBuiltinFunctions: Boolean = false): Either[String, Value] = {
     new Interpreter(
       Map(),
       Map(),
@@ -24,7 +24,7 @@ object TestUtils {
         strictInheritedAssertions = strictInheritedAssertions,
         strictSetOperations = strictSetOperations,
         disableBuiltinSpecialization = disableBuiltinSpecialization,
-        disableStaticApplyForBuiltInFunctions = disableStaticApplyForBuiltInFunctions,
+        disableStaticApplyForBuiltinFunctions = disableStaticApplyForBuiltinFunctions,
         throwErrorForInvalidSets = true
       )
     ).interpret(s, DummyPath("(memory)"))
@@ -37,7 +37,7 @@ object TestUtils {
            strictInheritedAssertions: Boolean = false,
            strictSetOperations: Boolean = true,
            disableBuiltinSpecialization: Boolean = false,
-           disableStaticApplyForBuiltInFunctions: Boolean = false): Value = {
+           disableStaticApplyForBuiltinFunctions: Boolean = false): Value = {
     eval0(
         s,
         preserveOrder,
@@ -46,7 +46,7 @@ object TestUtils {
         strictInheritedAssertions,
         strictSetOperations,
         disableBuiltinSpecialization,
-        disableStaticApplyForBuiltInFunctions) match {
+        disableStaticApplyForBuiltinFunctions) match {
       case Right(x) => x
       case Left(e) => throw new Exception(e)
     }
@@ -59,7 +59,7 @@ object TestUtils {
               strictInheritedAssertions: Boolean = false,
               strictSetOperations: Boolean = true,
               disableBuiltinSpecialization: Boolean = false,
-              disableStaticApplyForBuiltInFunctions: Boolean = false): String = {
+              disableStaticApplyForBuiltinFunctions: Boolean = false): String = {
     eval0(
         s,
         preserveOrder,
@@ -68,7 +68,7 @@ object TestUtils {
         strictInheritedAssertions,
         strictSetOperations,
         disableBuiltinSpecialization,
-        disableStaticApplyForBuiltInFunctions) match {
+        disableStaticApplyForBuiltinFunctions) match {
       case Left(err) => err.split('\n').map(_.trim).mkString("\n")  // normalize inconsistent indenation on JVM vs JS
       case Right(r) => throw new Exception(s"Expected exception, got result: $r")
     }
@@ -81,12 +81,12 @@ object TestUtils {
     val noSpecialization = eval(
       s,
       preserveOrder = true,
-      disableStaticApplyForBuiltInFunctions = true,
+      disableStaticApplyForBuiltinFunctions = true,
       disableBuiltinSpecialization = true)
     val withSpecialization = eval(
       s,
       preserveOrder = true,
-      disableStaticApplyForBuiltInFunctions = true,
+      disableStaticApplyForBuiltinFunctions = true,
       disableBuiltinSpecialization = false)
     // For better error messages, convert to string representation first
     val specializedStr = noSpecialization.toString()

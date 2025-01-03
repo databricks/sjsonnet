@@ -122,7 +122,7 @@ class StaticOptimizer(
   }
 
   private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
-    if (ev.settings.disableStaticApplyForBuiltInFunctions) null
+    if (ev.settings.disableStaticApplyForBuiltinFunctions) null
     else if(f.staticSafe && args.forall(_.isInstanceOf[Val])) {
       val vargs = args.map(_.asInstanceOf[Val])
       try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => return null }
