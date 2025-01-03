@@ -26,8 +26,7 @@ object Settings {
       strictImportSyntax = config.strictImportSyntax.value,
       strictInheritedAssertions = config.strictInheritedAssertions.value,
       strictSetOperations = config.strictSetOperations.value,
-      throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
-      disableBuiltinSpecialization = config.disableBuiltinSpecialization.value
+      throwErrorForInvalidSets = config.throwErrorForInvalidSets.value
     )
   }
 }
