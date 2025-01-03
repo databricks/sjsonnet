@@ -54,9 +54,20 @@ object Platform {
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
-  // scala native is powered by RE2, per https://scala-native.org/en/latest/lib/javalib.html#regular-expressions-java-util-regexp
-  // It should perform similarly to the JVM implementation.
+  private val dashPattern = getPatternFromCache("-")
+
   def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
-  def regexQuote(s: String): String = Pattern.quote(s)
+  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = scala.jdk.javaapi.CollectionConverters.asScala(
+    pat.re2.namedGroups).view.mapValues(_.intValue()).toMap
+
+  def regexQuote(s: String): String = {
+    val quote = Pattern.quote(s)
+    val matcher = dashPattern.matcher(quote)
+    if (matcher.find()) {
+      matcher.replaceAll("\\\\-")
+    } else {
+      quote
+    }
+  }
 }
