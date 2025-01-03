@@ -74,6 +74,11 @@ object FoldlMergePatchSpecializationTests extends TestSuite {
       // Hidden fields should always be dropped
       check("""std.foldl(std.mergePatch, [{a:: 1}, {b: 2}], {})""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{a:: 1}, {b: 2}], {}))""")
+      check("""std.foldl(std.mergePatch, [{b: 2}], {a:: 1})""")
+      check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{b: 2}], {a:: 1}))""")
+
+      check("""std.foldl(std.mergePatch, [], {a:: 1})""")
+      check("""std.objectFieldsAll(std.foldl(std.mergePatch, [], {a:: 1}))""")
 
       check("""std.foldl(std.mergePatch, [{b: 2}], {a:: 1})""")
       check("""std.objectFieldsAll(std.foldl(std.mergePatch, [{b: 2}], {a:: 1}))""")
