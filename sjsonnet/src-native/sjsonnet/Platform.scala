@@ -4,7 +4,7 @@ import java.io.{ByteArrayOutputStream, File}
 import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
-import java.util.regex.Pattern
+import scala.scalanative.regex.Pattern
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
