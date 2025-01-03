@@ -91,5 +91,22 @@ object StdMergePatchTests extends TestSuite {
       // It's also lost in nested fields:
       eval("{a: {b: 1}} + std.mergePatch({a: {b +: 2}}, {})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 2))
     }
+
+    test("default visibility of resulting fields") {
+      // In v0.20.0 of google/jsonnet, the following returned `{a: 1}`, not `{}`:
+      eval("{a:: 0} + std.mergePatch({a: 1}, {})") ==> ujson.Obj()
+      eval("({a:: 0} + std.mergePatch({a: 1}, {})).a") ==> ujson.Num(1)
+      // However, go-jsonnet v0.20.0 returned `{}`. This difference arose because the pure-jsonnet
+      // implementation of `std.mergePatch` used object comprehensions in its implementation and
+      // the two implementations differed in the default visibility of fields in the reuslting
+      // object. See https://github.com/google/jsonnet/issues/1111
+      // google/jsonnet merged a change to match go-jsonnet's behavior in a future version:
+      // https://github.com/google/jsonnet/pull/1140
+      // Interestingly, sjsonnet already matched go-jsonnet's behavior for object comprehensions
+      // because the following already returned `{}`; our previous behavior difference was only
+      // for mergePatch results:
+      eval("""{a:: 0} + {[a]: 1 for a in ["a"]}""") ==> ujson.Obj()
+      eval("""({a:: 0} + {[a]: 1 for a in ["a"]}).a""") ==> ujson.Num(1)
+    }
   }
 }
