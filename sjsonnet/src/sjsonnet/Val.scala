@@ -74,13 +74,13 @@ sealed abstract class Val extends Lazy {
 
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
-  implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
-  implicit def numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
-  implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
-  implicit def boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
-  implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
-  implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
-  implicit def nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
+  implicit val strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
+  implicit val numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
+  implicit val arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
+  implicit val boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
+  implicit val objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
+  implicit val funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
+  implicit val nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
 }
 object Val{
 
