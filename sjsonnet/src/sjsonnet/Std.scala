@@ -381,7 +381,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       val func = _func.asFunc
       val obj = _obj.asObj
       val allKeys = obj.allKeyNames
-      val m = new util.LinkedHashMap[String, Val.Obj.Member]()
+      val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.length)
       var i = 0
       while(i < allKeys.length) {
         val k = allKeys(i)
@@ -392,7 +392,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         m.put(k, v)
         i += 1
       }
-      new Val.Obj(pos, m, false, null, null)
+      val valueCache = Val.Obj.getEmptyValueCacheForObjWithoutSuper(allKeys.length)
+      new Val.Obj(pos, m, false, null, null, valueCache)
     }
   }
 
@@ -927,33 +928,91 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
-          val kvs = for {
-            k <- (l.visibleKeyNames ++ r.visibleKeyNames).distinct
-            lValue = if (l.containsVisibleKey(k)) Option(l.valueRaw(k, l, pos)(ev)) else None
-            rValue = if (r.containsVisibleKey(k)) Option(r.valueRaw(k, r, pos)(ev)) else None
-            if !rValue.exists(_.isInstanceOf[Val.Null])
-          } yield (lValue, rValue) match{
-            case (Some(lChild), None) => k -> createMember{lChild}
-            case (Some(lChild: Val.Obj), Some(rChild: Val.Obj)) => k -> createMember{recPair(lChild, rChild)}
-            case (_, Some(rChild)) => k -> createMember{recSingle(rChild)}
-            case (None, None) => Error.fail("std.mergePatch: This should never happen")
+          val keys: Array[String] = distinctKeys(l.visibleKeyNames, r.visibleKeyNames)
+          val kvs: Array[(String, Val.Obj.Member)] = new Array[(String, Val.Obj.Member)](keys.length)
+          var kvsIdx = 0
+          var i = 0
+          while (i < keys.length) {
+            val key = keys(i)
+            val lValue = if (l.containsVisibleKey(key)) l.valueRaw(key, l, pos)(ev) else null
+            val rValue = if (r.containsVisibleKey(key)) r.valueRaw(key, r, pos)(ev) else null
+            if (rValue == null || !rValue.isInstanceOf[Val.Null]) {
+              if (lValue != null && rValue == null) {
+                kvs(kvsIdx) = (key, new Val.Obj.ConstMember(false, Visibility.Normal, lValue))
+              } else if (lValue.isInstanceOf[Val.Obj] && rValue.isInstanceOf[Val.Obj]) {
+                kvs(kvsIdx) = (key, createMember(recPair(lValue, rValue)))
+              } else if (rValue != null) {
+                kvs(kvsIdx) = (key, createMember(recSingle(rValue)))
+              } else {
+                Error.fail("std.mergePatch: This should never happen")
+              }
+              kvsIdx += 1
+            }
+            i += 1
           }
 
-          Val.Obj.mk(mergePosition, kvs:_*)
+          val trimmedKvs = if (kvsIdx == i) kvs else kvs.slice(0, kvsIdx)
+          Val.Obj.mk(mergePosition, trimmedKvs)
 
         case (_, _) => recSingle(r)
       }
       def recSingle(v: Val): Val  = v match{
         case obj: Val.Obj =>
-          val kvs = for{
-            k <- obj.visibleKeyNames
-            value = obj.value(k, pos, obj)(ev)
-            if !value.isInstanceOf[Val.Null]
-          } yield (k, createMember{recSingle(value)})
-
-          Val.Obj.mk(obj.pos, kvs:_*)
+          val keys: Array[String] = obj.visibleKeyNames
+          val kvs: Array[(String, Val.Obj.Member)] = new Array[(String, Val.Obj.Member)](keys.length)
+          var kvsIdx = 0
+          var i = 0
+          while (i < keys.length) {
+            val key = keys(i)
+            val value = obj.value(key, pos, obj)(ev)
+            if (!value.isInstanceOf[Val.Null]) {
+              kvs(kvsIdx) = (key, createMember(recSingle(value)))
+              kvsIdx += 1
+            }
+            i += 1
+          }
+          val trimmedKvs = if (kvsIdx == i) kvs else kvs.slice(0, kvsIdx)
+          Val.Obj.mk(obj.pos, trimmedKvs)
 
         case _ => v
+      }
+      def distinctKeys(lKeys: Array[String], rKeys: Array[String]): Array[String] = {
+        if (rKeys.length <= 8) {
+          val rKeysCopy = new Array[String](rKeys.length)
+          rKeys.copyToArray(rKeysCopy)
+          var i = 0
+          var numNewRKeys = rKeysCopy.length
+          while (i < lKeys.length) {
+            val lKey = lKeys(i)
+            var j = 0
+            while (j < rKeysCopy.length) {
+              if (lKey == rKeysCopy(j)) {
+                rKeysCopy(j) = null
+                numNewRKeys -= 1
+              }
+              j += 1
+            }
+            i += 1
+          }
+          if (numNewRKeys == 0) {
+            lKeys
+          } else {
+            val outArray = new Array[String](lKeys.length + numNewRKeys)
+            System.arraycopy(lKeys, 0, outArray, 0, lKeys.length)
+            var outIdx = lKeys.length
+            var j = 0
+            while (j < rKeysCopy.length) {
+              if (rKeysCopy(j) != null) {
+                outArray(outIdx) = rKeysCopy(j)
+                outIdx += 1
+              }
+              j += 1
+            }
+            outArray
+          }
+        } else {
+          (lKeys ++ rKeys).distinct
+        }
       }
       recPair(target, patch)
     },
@@ -1417,12 +1476,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       def rec(x: Val): Val = x match{
         case o: Val.Obj =>
-          val bindings = for{
+          val bindings: Array[(String, Val.Obj.Member)] = for{
             k <- o.visibleKeyNames
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-          Val.Obj.mk(pos, bindings: _*)
+          Val.Obj.mk(pos, bindings)
         case a: Val.Arr =>
           new Val.Arr(pos, a.asStrictArray.map(rec).filter(filter).map(identity))
         case _ => x
@@ -1513,12 +1572,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       )))
     },
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
-      val bindings = for{
+      val bindings: Array[(String, Val.Obj.Member)] = for{
         k <- o.visibleKeyNames
         v = o.value(k, pos.fileScope.noOffsetPos)(ev)
         if k != key
       }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-      Val.Obj.mk(pos, bindings: _*)
+      Val.Obj.mk(pos, bindings)
     },
     builtin(MinArray),
     builtin(MaxArray),

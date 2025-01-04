@@ -74,13 +74,13 @@ sealed abstract class Val extends Lazy {
 
 class PrettyNamed[T](val s: String)
 object PrettyNamed{
-  implicit def strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
-  implicit def numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
-  implicit def arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
-  implicit def boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
-  implicit def objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
-  implicit def funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
-  implicit def nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
+  implicit val strName: PrettyNamed[Val.Str] = new PrettyNamed("string")
+  implicit val numName: PrettyNamed[Val.Num] = new PrettyNamed("number")
+  implicit val arrName: PrettyNamed[Val.Arr] = new PrettyNamed("array")
+  implicit val boolName: PrettyNamed[Val.Bool] = new PrettyNamed("boolean")
+  implicit val objName: PrettyNamed[Val.Obj] = new PrettyNamed("object")
+  implicit val funName: PrettyNamed[Val.Func] = new PrettyNamed("function")
+  implicit val nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
 }
 object Val{
 
@@ -144,6 +144,18 @@ object Val{
 
   object Obj{
 
+    def getEmptyValueCacheForObjWithoutSuper(numFields: Int): util.HashMap[Any, Val] = {
+      // Helper for saving space in valueCache for objects without a super object.
+      // For objects with no super, we (cheaply) know the exact number of fields and
+      // therefore can upper bound the number of fields that _might_ be computed.
+      // We only want to pre-size if it yields a smaller initial map size than the default.
+      if (numFields >= 12) {
+        new util.HashMap[Any, Val]()
+      } else {
+        Util.preSizedJavaHashMap[Any, Val](numFields)
+      }
+    }
+
     abstract class Member(val add: Boolean, val visibility: Visibility, val cached: Boolean = true) {
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
     }
@@ -154,8 +166,19 @@ object Val{
     }
 
     def mk(pos: Position, members: (String, Obj.Member)*): Obj = {
-      val m = new util.LinkedHashMap[String, Obj.Member]()
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](members.length)
       for((k, v) <- members) m.put(k, v)
+      new Obj(pos, m, false, null, null)
+    }
+
+    def mk(pos: Position, members: Array[(String, Obj.Member)]): Obj = {
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](members.length)
+      var i = 0
+      while (i < members.length) {
+        val e = members(i)
+        m.put(e._1, e._2)
+        i += 1
+      }
       new Obj(pos, m, false, null, null)
     }
   }
@@ -165,7 +188,7 @@ object Val{
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
-                  valueCache: mutable.HashMap[Any, Val] = mutable.HashMap.empty[Any, Val],
+                  valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
                   private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
@@ -173,9 +196,9 @@ object Val{
 
     private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if(value0 == null) {
-        val value0 = new java.util.LinkedHashMap[String, Val.Obj.Member]
+        val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
         allKeys.forEach { (k, _) =>
-          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache(k)))
+          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
         }
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
         this.value0 = value0
@@ -221,18 +244,43 @@ object Val{
       allKeys
     }
 
-    @inline def hasKeys = !getAllKeys.isEmpty
+    @inline def hasKeys: Boolean = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      !m.isEmpty
+    }
 
-    @inline def containsKey(k: String): Boolean = getAllKeys.containsKey(k)
+    @inline def containsKey(k: String): Boolean = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      m.containsKey(k)
+    }
 
-    @inline def containsVisibleKey(k: String): Boolean = getAllKeys.get(k) == java.lang.Boolean.FALSE
+    @inline def containsVisibleKey(k: String): Boolean = {
+      if (static || `super` != null) {
+        getAllKeys.get(k) == java.lang.Boolean.FALSE
+      } else {
+        val m = value0.get(k)
+        m != null && (m.visibility != Visibility.Hidden)
+      }
+    }
 
-    lazy val allKeyNames: Array[String] = getAllKeys.keySet().toArray(new Array[String](getAllKeys.size()))
+    lazy val allKeyNames: Array[String] = {
+      val m = if (static || `super` != null) getAllKeys else value0
+      m.keySet().toArray(new Array[String](m.size()))
+    }
 
-    lazy val visibleKeyNames: Array[String] = if(static) allKeyNames else {
-      val buf = mutable.ArrayBuilder.make[String]
-      getAllKeys.forEach((k, b) => if(b == java.lang.Boolean.FALSE) buf += k)
-      buf.result()
+    lazy val visibleKeyNames: Array[String] = {
+      if (static) {
+        allKeyNames
+      } else {
+        val buf = new mutable.ArrayBuilder.ofRef[String]
+        if (`super` == null) {
+          buf.sizeHint(value0.size())
+          value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
+        } else {
+          getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
+        }
+        buf.result()
+      }
     }
 
     def value(k: String,
@@ -240,18 +288,21 @@ object Val{
               self: Obj = this)
              (implicit evaluator: EvalScope): Val = {
       if(static) {
-        valueCache.getOrElse(k, null) match {
+        valueCache.get(k) match {
           case null => Error.fail("Field does not exist: " + k, pos)
           case x => x
         }
       } else {
         val cacheKey = if(self eq this) k else (k, self)
-        valueCache.getOrElse(cacheKey, {
+        val cachedValue = valueCache.get(cacheKey)
+        if (cachedValue != null) {
+          cachedValue
+        } else {
           valueRaw(k, self, pos, valueCache, cacheKey) match {
             case null => Error.fail("Field does not exist: " + k, pos)
             case x => x
           }
-        })
+        }
       }
     }
 
@@ -286,12 +337,12 @@ object Val{
     def valueRaw(k: String,
                  self: Obj,
                  pos: Position,
-                 addTo: mutable.HashMap[Any, Val] = null,
+                 addTo: util.HashMap[Any, Val] = null,
                  addKey: Any = null)
                 (implicit evaluator: EvalScope): Val = {
       if(static) {
-        val v = valueCache.getOrElse(k, null)
-        if(addTo != null && v != null) addTo(addKey) = v
+        val v = valueCache.get(k)
+        if(addTo != null && v != null) addTo.put(addKey, v)
         v
       } else {
         val s = this.`super`
@@ -306,7 +357,7 @@ object Val{
                 case supValue => mergeMember(supValue, vv, pos)
               }
             } else vv
-            if(addTo != null && m.cached) addTo(addKey) = v
+            if(addTo != null && m.cached) addTo.put(addKey, v)
             v
         }
       }
@@ -341,13 +392,8 @@ object Val{
       fields: Array[Expr.Member.Field],
       internedKeyMaps: mutable.HashMap[StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]],
       internedStrings: mutable.HashMap[String, String]): Obj = {
-    // Set the initial capacity to the number of fields divided by the default load factor + 1 -
-    // this ensures that we can fill up the map to the total number of fields without resizing.
-    // From JavaDoc - true for both Scala & Java HashMaps
-    val hashMapDefaultLoadFactor = 0.75f
-    val capacity = (fields.length / hashMapDefaultLoadFactor).toInt + 1
-    val cache = mutable.HashMap.empty[Any, Val]
-    val allKeys = new util.LinkedHashMap[String, java.lang.Boolean](capacity, hashMapDefaultLoadFactor)
+    val cache = Util.preSizedJavaHashMap[Any, Val](fields.length)
+    val allKeys = Util.preSizedJavaLinkedHashMap[String, java.lang.Boolean](fields.length)
     val keys = new Array[String](fields.length)
     var idx = 0
     fields.foreach {
@@ -357,7 +403,8 @@ object Val{
         allKeys.put(uniqueKey, false)
         keys(idx) = uniqueKey
         idx += 1
-      case _ =>
+      case other =>
+        throw new Error(s"Unexpected non-literal field in static object: ${other} of class ${other.getClass}")
     }
     val fieldSet = new StaticObjectFieldSet(keys)
     new Val.Obj(pos, null, true, null, null, cache, internedKeyMaps.getOrElseUpdate(fieldSet, allKeys))

@@ -52,4 +52,19 @@ object Util{
       s"<$s>"
     }
   }
+
+  def preSizedJavaLinkedHashMap[K, V](expectedElems: Int): java.util.LinkedHashMap[K, V] = {
+    // Set the initial capacity to the number of elems divided by the default load factor + 1
+    // this ensures that we can fill up the map to the total number of fields without resizing.
+    // From JavaDoc - true for both Scala & Java HashMaps
+    val hashMapDefaultLoadFactor = 0.75f
+    val capacity = (expectedElems / hashMapDefaultLoadFactor).toInt + 1
+    new java.util.LinkedHashMap[K, V](capacity, hashMapDefaultLoadFactor)
+  }
+
+  def preSizedJavaHashMap[K, V](expectedElems: Int): java.util.HashMap[K, V] = {
+    val hashMapDefaultLoadFactor = 0.75f
+    val capacity = (expectedElems / hashMapDefaultLoadFactor).toInt + 1
+    new java.util.HashMap[K, V](capacity, hashMapDefaultLoadFactor)
+  }
 }

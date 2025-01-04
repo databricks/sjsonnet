@@ -579,7 +579,7 @@ class Evaluator(resolver: CachedResolver,
       newScope
     }
 
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    val builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -604,8 +604,14 @@ class Evaluator(resolver: CachedResolver,
           builder.put(k, v)
         }
       case _ =>
+        Error.fail("This case should never be hit", objPos)
     }
-    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup)
+    val valueCache = if (sup == null) {
+      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fields.length)
+    } else {
+      new java.util.HashMap[Any, Val]()
+    }
+    cachedObj = new Val.Obj(objPos, builder, false, if(asserts != null) assertions else null, sup, valueCache)
     cachedObj
   }
 
@@ -636,7 +642,12 @@ class Evaluator(resolver: CachedResolver,
           case _ =>
         }
       }
-      new Val.Obj(e.pos, builder, false, null, sup)
+      val valueCache = if (sup == null) {
+        Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
+      } else {
+        new java.util.HashMap[Any, Val]()
+      }
+      new Val.Obj(e.pos, builder, false, null, sup, valueCache)
     }
 
     newSelf

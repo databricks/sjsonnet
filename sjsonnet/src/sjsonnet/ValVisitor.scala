@@ -17,7 +17,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   }
 
   def visitObject(length: Int, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {
-    val cache = mutable.HashMap.empty[Any, Val]
+    val cache = new java.util.HashMap[Any, Val]()
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     var key: String = null
     def subVisitor: Visitor[_, _] = self
