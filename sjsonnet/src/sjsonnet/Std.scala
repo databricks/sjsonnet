@@ -952,7 +952,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           }
 
           val trimmedKvs = if (kvsIdx == i) kvs else kvs.slice(0, kvsIdx)
-          Val.Obj.mk(mergePosition, trimmedKvs:_*)
+          Val.Obj.mk(mergePosition, trimmedKvs)
 
         case (_, _) => recSingle(r)
       }
@@ -972,7 +972,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             i += 1
           }
           val trimmedKvs = if (kvsIdx == i) kvs else kvs.slice(0, kvsIdx)
-          Val.Obj.mk(obj.pos, trimmedKvs:_*)
+          Val.Obj.mk(obj.pos, trimmedKvs)
 
         case _ => v
       }
@@ -1476,12 +1476,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       def rec(x: Val): Val = x match{
         case o: Val.Obj =>
-          val bindings = for{
+          val bindings: Array[(String, Val.Obj.Member)] = for{
             k <- o.visibleKeyNames
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
           }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-          Val.Obj.mk(pos, bindings: _*)
+          Val.Obj.mk(pos, bindings)
         case a: Val.Arr =>
           new Val.Arr(pos, a.asStrictArray.map(rec).filter(filter).map(identity))
         case _ => x
@@ -1572,12 +1572,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       )))
     },
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
-      val bindings = for{
+      val bindings: Array[(String, Val.Obj.Member)] = for{
         k <- o.visibleKeyNames
         v = o.value(k, pos.fileScope.noOffsetPos)(ev)
         if k != key
       }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-      Val.Obj.mk(pos, bindings: _*)
+      Val.Obj.mk(pos, bindings)
     },
     builtin(MinArray),
     builtin(MaxArray),

@@ -170,6 +170,17 @@ object Val{
       for((k, v) <- members) m.put(k, v)
       new Obj(pos, m, false, null, null)
     }
+
+    def mk(pos: Position, members: Array[(String, Obj.Member)]): Obj = {
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](members.length)
+      var i = 0
+      while (i < members.length) {
+        val e = members(i)
+        m.put(e._1, e._2)
+        i += 1
+      }
+      new Obj(pos, m, false, null, null)
+    }
   }
 
   final class Obj(val pos: Position,
