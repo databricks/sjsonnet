@@ -928,7 +928,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       def recPair(l: Val, r: Val): Val = (l, r) match{
         case (l: Val.Obj, r: Val.Obj) =>
-          val keys: Array[String] = (l.visibleKeyNames ++ r.visibleKeyNames).distinct
+          val keys: Array[String] = distinctKeys(l.visibleKeyNames, r.visibleKeyNames)
           val kvs: Array[(String, Val.Obj.Member)] = new Array[(String, Val.Obj.Member)](keys.length)
           var kvsIdx = 0
           var i = 0
@@ -975,6 +975,44 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           Val.Obj.mk(obj.pos, trimmedKvs:_*)
 
         case _ => v
+      }
+      def distinctKeys(lKeys: Array[String], rKeys: Array[String]): Array[String] = {
+        if (rKeys.length <= 8) {
+          val rKeysCopy = new Array[String](rKeys.length)
+          rKeys.copyToArray(rKeysCopy)
+          var i = 0
+          var numNewRKeys = rKeysCopy.length
+          while (i < lKeys.length) {
+            val lKey = lKeys(i)
+            var j = 0
+            while (j < rKeysCopy.length) {
+              if (lKey == rKeysCopy(j)) {
+                rKeysCopy(j) = null
+                numNewRKeys -= 1
+              }
+              j += 1
+            }
+            i += 1
+          }
+          if (numNewRKeys == 0) {
+            lKeys
+          } else {
+            val outArray = new Array[String](lKeys.length + numNewRKeys)
+            System.arraycopy(lKeys, 0, outArray, 0, lKeys.length)
+            var outIdx = lKeys.length
+            var j = 0
+            while (j < rKeysCopy.length) {
+              if (rKeysCopy(j) != null) {
+                outArray(outIdx) = rKeysCopy(j)
+                outIdx += 1
+              }
+              j += 1
+            }
+            outArray
+          }
+        } else {
+          (lKeys ++ rKeys).distinct
+        }
       }
       recPair(target, patch)
     },
