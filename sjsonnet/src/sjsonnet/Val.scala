@@ -263,7 +263,7 @@ object Val{
       } else {
         val buf = new mutable.ArrayBuilder.ofRef[String]
         if (`super` == null) {
-          buf.sizeHint(Math.min(value0.size(), 16))
+          buf.sizeHint(value0.size())
           value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
         } else {
           getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
