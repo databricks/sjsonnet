@@ -114,7 +114,7 @@ object sjsonnet extends Module {
     def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**")
 
     object test extends ScalaTests with CrossTests {
-      def forkOptions = Seq("-Xss100m")
+      def forkArgs = Seq("-Xss100m")
       def sources = T.sources(
         this.millSourcePath / "src",
         this.millSourcePath / "src-jvm",

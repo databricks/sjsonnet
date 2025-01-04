@@ -53,7 +53,7 @@ object FileTests extends TestSuite{
     test("oop_extra") - check()
     test("parsing_edge_cases") - check()
     test("precedence") - check()
-//    test("recursive_function") - check()
+    test("recursive_function") - check()
     test("recursive_import_ok") - check()
     test("recursive_object") - check()
     test("regex") - check()
