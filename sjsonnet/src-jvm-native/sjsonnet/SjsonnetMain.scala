@@ -57,7 +57,7 @@ object SjsonnetMain {
     }
 
     val parser = mainargs.ParserForClass[Config]
-    val name = s"Sjsonnet ${sjsonnet.Version.version}"
+    val name = s"Sjsonnet 10"
     val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
     val result = for{
       config <- parser.constructEither(

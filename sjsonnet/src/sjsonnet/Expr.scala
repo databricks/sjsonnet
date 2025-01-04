@@ -128,11 +128,11 @@ object Expr{
   case class ImportStr(pos: Position, value: String) extends Expr
   case class ImportBin(pos: Position, value: String) extends Expr
   case class Error(pos: Position, value: Expr) extends Expr
-  case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String]) extends Expr
-  case class Apply0(pos: Position, value: Expr) extends Expr
-  case class Apply1(pos: Position, value: Expr, a1: Expr) extends Expr
-  case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr) extends Expr
-  case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr) extends Expr
+  case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String], tailstrict: Boolean) extends Expr
+  case class Apply0(pos: Position, value: Expr, tailstrict: Boolean) extends Expr
+  case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean) extends Expr
+  case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean) extends Expr
+  case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr, tailstrict: Boolean) extends Expr
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr]) extends Expr {
     override def exprErrorString: String = s"std.${func.functionName}"
   }
