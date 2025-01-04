@@ -4,47 +4,27 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Val.Obj
 
 object StdRegex {
-  def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {
+  private final def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {
     val compiledPattern = Platform.getPatternFromCache(pattern)
     val matcher = compiledPattern.matcher(str)
-    var returnStr: Val = null
-    val groupCount = matcher.groupCount()
-    val captures = Array.newBuilder[Val]
-    captures.sizeHint(groupCount)
 
-    while (matcher.find()) {
-      if (returnStr == null) {
-        val m = matcher.group(0)
-        if (m != null) {
-          returnStr = Val.Str(pos.noOffset, matcher.group(0))
-        } else {
-          returnStr = Val.Str(pos.noOffset, "")
-        }
-      }
-      for (i <- 1 to groupCount) {
-        val m = matcher.group(i)
-        if (m == null) {
-          captures += Val.Str(pos.noOffset, "")
-        } else {
-          captures += Val.Str(pos.noOffset, m)
-        }
-      }
+    if (matcher.find()) {
+      val captures = Range.Int.inclusive(1, matcher.groupCount(), 1)
+        .map(i => Val.Str(pos.noOffset, Option(matcher.group(i)).getOrElse("")))
+        .toArray
+      val namedCaptures = Platform.getNamedGroupsMap(compiledPattern).map {
+        case (k, v) =>
+          k -> new Obj.ConstMember(true, Visibility.Normal, captures(v - 1))
+      }.toSeq
+
+      Val.Obj.mk(pos.noOffset,
+        "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Str(pos.noOffset, str)),
+        "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, captures)),
+        "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures: _*))
+      )
+    } else {
+      Val.Null(pos.noOffset)
     }
-    if (returnStr == null) {
-      return Val.Null(pos.noOffset)
-    }
-
-    val result = captures.result()
-    val namedCaptures = Platform.getNamedGroupsMap(compiledPattern).map {
-      case (k, v) =>
-        k -> new Obj.ConstMember(true, Visibility.Normal, result(v - 1))
-    }.toSeq
-
-    Val.Obj.mk(pos.noOffset,
-      "string" -> new Obj.ConstMember(true, Visibility.Normal, returnStr),
-      "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, result)),
-      "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures: _*))
-    )
   }
 
   def functions: Map[String, Val.Builtin] = Map(

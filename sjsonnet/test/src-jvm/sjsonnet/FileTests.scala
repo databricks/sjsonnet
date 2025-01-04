@@ -56,6 +56,7 @@ object FileTests extends TestSuite{
 //    test("recursive_function") - check()
     test("recursive_import_ok") - check()
     test("recursive_object") - check()
+    test("regex") - check()
     test("sanity") - checkGolden()
     test("sanity2") - checkGolden()
     test("shebang") - check()
