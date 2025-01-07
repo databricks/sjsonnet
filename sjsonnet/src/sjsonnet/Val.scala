@@ -144,10 +144,12 @@ object Val{
 
   object Obj{
 
+    /**
+     * Helper for saving space in valueCache for objects without a super object.
+     * For objects with no super, we (cheaply) know the exact number of fields and
+     * therefore can upper bound the number of fields that _might_ be computed.
+     */
     def getEmptyValueCacheForObjWithoutSuper(numFields: Int): util.HashMap[Any, Val] = {
-      // Helper for saving space in valueCache for objects without a super object.
-      // For objects with no super, we (cheaply) know the exact number of fields and
-      // therefore can upper bound the number of fields that _might_ be computed.
       // We only want to pre-size if it yields a smaller initial map size than the default.
       if (numFields >= 12) {
         new util.HashMap[Any, Val]()
@@ -156,6 +158,11 @@ object Val{
       }
     }
 
+    /**
+     * @param add whether this field was defined the "+:", "+::" or "+:::" separators, corresponding
+     *            to the "nested field inheritance" language feature; see
+     *            https://jsonnet.org/ref/language.html#nested-field-inheritance
+     */
     abstract class Member(val add: Boolean, val visibility: Visibility, val cached: Boolean = true) {
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
     }
@@ -183,6 +190,27 @@ object Val{
     }
   }
 
+  /**
+   * Represents json/jsonnet objects.
+   *
+   * Obj implements special optimizations for "static objects", which are objects without
+   * `super` where all fields are visible and constant. Static objects can be created
+   * during parsing or in [[StaticOptimizer]].
+   *
+   * @param value0 maps fields to their Member definitions. This is initially null for
+   *               static objects and is non-null for non-static objects.
+   * @param static true if this object is static, false otherwise.
+   * @param triggerAsserts callback to evaluate assertions defined in the object.
+   * @param `super` the super object, or null if there is no super object.
+   * @param valueCache a cache for computed values. For static objects, this is pre-populated
+   *                   with all fields. For non-static objects, this is lazily populated as
+   *                   fields are accessed.
+   * @param allKeys a map of all keys in the object (including keys inherited from `super`),
+   *                where the boolean value is true if the key is hidden and false otherwise.
+   *                For static objects, this is pre-populated and the mapping may be interned
+   *                and shared across instances. For non-static objects, it is dynamically
+   *                computed only if the object has a `super`
+   */
   final class Obj(val pos: Position,
                   private[this] var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
@@ -195,6 +223,9 @@ object Val{
     def getSuper = `super`
 
     private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+      // value0 is always defined for non-static objects, so if we're computing it here
+      // then that implies that the object is static and therefore valueCache should be
+      // pre-populated and all members should be visible and constant.
       if(value0 == null) {
         val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
         allKeys.forEach { (k, _) =>
@@ -274,6 +305,8 @@ object Val{
       } else {
         val buf = new mutable.ArrayBuilder.ofRef[String]
         if (`super` == null) {
+          // This size hint is based on an optimistic assumption that most fields are visible,
+          // avoiding re-sizing or trimming the buffer in the common case:
           buf.sizeHint(value0.size())
           value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
         } else {
@@ -309,6 +342,10 @@ object Val{
     private def renderString(v: Val)(implicit evaluator: EvalScope): String =
       evaluator.materialize(v).transform(new Renderer()).toString
 
+    /**
+     * Merge two values for "nested field inheritance"; see
+     * https://jsonnet.org/ref/language.html#nested-field-inheritance for background.
+     */
     def mergeMember(l: Val,
                     r: Val,
                     pos: Position)

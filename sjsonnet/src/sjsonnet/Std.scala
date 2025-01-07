@@ -977,6 +977,13 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case _ => v
       }
       def distinctKeys(lKeys: Array[String], rKeys: Array[String]): Array[String] = {
+        // Fast path for small RHS size (the common case when merging a small
+        // patch into a large target object), avoiding the cost of constructing
+        // and probing a hash set: instead, perform a nested loop where the LHS
+        // is scanned and matching RHS entries are marked as null to be skipped.
+        // Via local microbenchmarks simulating a "worst-case" (RHS keys all new),
+        // the threshold of `8` was empirically determined to be a good tradeoff
+        // between allocation + hashing costs vs. nested loop array scans.
         if (rKeys.length <= 8) {
           val rKeysCopy = new Array[String](rKeys.length)
           rKeys.copyToArray(rKeysCopy)
@@ -986,6 +993,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             val lKey = lKeys(i)
             var j = 0
             while (j < rKeysCopy.length) {
+              // This LHS key is in the RHS, so mark it to be skipped in output:
               if (lKey == rKeysCopy(j)) {
                 rKeysCopy(j) = null
                 numNewRKeys -= 1
@@ -994,6 +1002,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             }
             i += 1
           }
+          // Combine lKeys with non-null elements of rKeysCopy:
           if (numNewRKeys == 0) {
             lKeys
           } else {
@@ -1011,6 +1020,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             outArray
           }
         } else {
+          // Fallback: Use hash-based deduplication for large RHS arrays:
           (lKeys ++ rKeys).distinct
         }
       }
