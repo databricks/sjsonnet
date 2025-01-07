@@ -194,8 +194,8 @@ object Val{
    * Represents json/jsonnet objects.
    *
    * Obj implements special optimizations for "static objects", which are objects without
-   * `super` where all fields are visible and constant. Static objects can be created
-   * during parsing or in [[StaticOptimizer]].
+   * `super` where all fields are constant and have default visibility. Static objects can
+   * be created during parsing or in [[StaticOptimizer]].
    *
    * @param value0 maps fields to their Member definitions. This is initially null for
    *               static objects and is non-null for non-static objects.
