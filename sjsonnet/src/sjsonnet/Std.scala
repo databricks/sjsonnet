@@ -923,7 +923,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     builtin(Range),
     builtin("mergePatch", "target", "patch"){ (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
-      def createMember(v: => Val) = new Val.Obj.Member(false, Visibility.Normal) {
+      def createLazyMember(v: => Val) = new Val.Obj.Member(false, Visibility.Normal) {
         def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
       }
       def recPair(l: Val, r: Val): Val = (l, r) match{
@@ -936,13 +936,16 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             val key = keys(i)
             val lValue = if (l.containsVisibleKey(key)) l.valueRaw(key, l, pos)(ev) else null
             val rValue = if (r.containsVisibleKey(key)) r.valueRaw(key, r, pos)(ev) else null
-            if (rValue == null || !rValue.isInstanceOf[Val.Null]) {
+            if (!rValue.isInstanceOf[Val.Null]) { // if we are not removing the key
               if (lValue != null && rValue == null) {
+                // Preserve the LHS/target value:
                 kvs(kvsIdx) = (key, new Val.Obj.ConstMember(false, Visibility.Normal, lValue))
               } else if (lValue.isInstanceOf[Val.Obj] && rValue.isInstanceOf[Val.Obj]) {
-                kvs(kvsIdx) = (key, createMember(recPair(lValue, rValue)))
+                // Recursively merge objects:
+                kvs(kvsIdx) = (key, createLazyMember(recPair(lValue, rValue)))
               } else if (rValue != null) {
-                kvs(kvsIdx) = (key, createMember(recSingle(rValue)))
+                // Use the RHS/patch value and recursively remove Null or hidden fields:
+                kvs(kvsIdx) = (key, createLazyMember(recSingle(rValue)))
               } else {
                 Error.fail("std.mergePatch: This should never happen")
               }
@@ -966,7 +969,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             val key = keys(i)
             val value = obj.value(key, pos, obj)(ev)
             if (!value.isInstanceOf[Val.Null]) {
-              kvs(kvsIdx) = (key, createMember(recSingle(value)))
+              kvs(kvsIdx) = (key, createLazyMember(recSingle(value)))
               kvsIdx += 1
             }
             i += 1
