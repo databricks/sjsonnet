@@ -41,10 +41,27 @@ object Platform {
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
+  private val namedGroupPattern = Pattern.compile("\\(\\?<(.+?)>.*?\\)")
+  private val namedGroupPatternReplace = Pattern.compile("(\\(\\?P<)(.+?>.*?\\))")
 
   // scala.js does not rely on re2. Per https://www.scala-js.org/doc/regular-expressions.html.
   // Expect to see some differences in behavior.
-  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+  def getPatternFromCache(pat: String) : Pattern = {
+    val fixedPattern = namedGroupPatternReplace.matcher(pat).replaceAll("(?<$2")
+    regexCache.computeIfAbsent(pat, _ => Pattern.compile(fixedPattern))
+  }
+
+
+  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = {
+    val namedGroups = Map.newBuilder[String, Int]
+    val matcher = namedGroupPattern.matcher(pat.pattern())
+    while (matcher.find()) {
+      for (i <- 1 to matcher.groupCount()) {
+        namedGroups += matcher.group(i) -> i
+      }
+    }
+    namedGroups.result()
+  }
 
   def regexQuote(s: String): String = Pattern.quote(s)
 }

@@ -4,66 +4,38 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Val.Obj
 
 object StdRegex {
+  private final def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {
+    val compiledPattern = Platform.getPatternFromCache(pattern)
+    val matcher = compiledPattern.matcher(str)
+
+    if (matcher.find()) {
+      val captures = Range.Int.inclusive(1, matcher.groupCount(), 1)
+        .map(i => Val.Str(pos.noOffset, Option(matcher.group(i)).getOrElse("")))
+        .toArray
+      val namedCaptures = Platform.getNamedGroupsMap(compiledPattern).map {
+        case (k, v) =>
+          k -> new Obj.ConstMember(true, Visibility.Normal, captures(v - 1))
+      }.toSeq
+
+      Val.Obj.mk(pos.noOffset,
+        "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Str(pos.noOffset, str)),
+        "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, captures)),
+        "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures: _*))
+      )
+    } else {
+      Val.Null(pos.noOffset)
+    }
+  }
+
   def functions: Map[String, Val.Builtin] = Map(
     "regexPartialMatch" -> new Val.Builtin2("regexPartialMatch", "pattern", "str") {
       override def evalRhs(pattern: Val, str: Val, ev: EvalScope, pos: Position): Val = {
-        val compiledPattern = Platform.getPatternFromCache(pattern.asString)
-        val matcher = compiledPattern.matcher(str.asString)
-        var returnStr: Val = null
-        val captures = Array.newBuilder[Val]
-        val groupCount = matcher.groupCount()
-        while (matcher.find()) {
-          if (returnStr == null) {
-            val m = matcher.group(0)
-            if (m != null) {
-              returnStr = Val.Str(pos.noOffset, matcher.group(0))
-            } else {
-              returnStr = Val.Null(pos.noOffset)
-            }
-          }
-          for (i <- 1 to groupCount) {
-            val m = matcher.group(i)
-            if (m == null) {
-              captures += Val.Null(pos.noOffset)
-            } else {
-              captures += Val.Str(pos.noOffset, m)
-            }
-          }
-        }
-        val result = captures.result()
-        Val.Obj.mk(pos.noOffset,
-          "string" -> new Obj.ConstMember(true, Visibility.Normal,
-            if (returnStr == null) Val.Null(pos.noOffset) else returnStr),
-          "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, result))
-        )
+        regexPartialMatch(pos, pattern.asString, str.asString)
       }
     },
     "regexFullMatch" -> new Val.Builtin2("regexFullMatch", "pattern", "str") {
       override def evalRhs(pattern: Val, str: Val, ev: EvalScope, pos: Position): Val = {
-        val compiledPattern = Platform.getPatternFromCache(pattern.asString)
-        val matcher = compiledPattern.matcher(str.asString)
-        if (!matcher.matches()) {
-          Val.Obj.mk(pos.noOffset,
-            "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Null(pos.noOffset)),
-            "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, Array.empty[Lazy]))
-          )
-        } else {
-          val captures = Array.newBuilder[Val]
-          val groupCount = matcher.groupCount()
-          for (i <- 0 to groupCount) {
-            val m = matcher.group(i)
-            if (m == null) {
-              captures += Val.Null(pos.noOffset)
-            } else {
-              captures += Val.Str(pos.noOffset, m)
-            }
-          }
-          val result = captures.result()
-          Val.Obj.mk(pos.noOffset,
-            "string" -> new Obj.ConstMember(true, Visibility.Normal, result.head),
-            "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, result.drop(1)))
-          )
-        }
+        regexPartialMatch(pos, s"^${pattern.asString}$$", str.asString)
       }
     },
     "regexGlobalReplace" -> new Val.Builtin3("regexGlobalReplace", "str", "pattern", "to") {
