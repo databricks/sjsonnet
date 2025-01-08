@@ -111,7 +111,7 @@ object sjsonnet extends Module {
       ivy"org.yaml:snakeyaml::1.33",
       ivy"com.google.re2j:re2j:1.7",
     )
-    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.**")
+    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**")
 
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss100m")
