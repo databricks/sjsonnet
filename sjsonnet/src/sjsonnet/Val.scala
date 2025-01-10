@@ -461,14 +461,14 @@ object Val{
 
     override def asFunc: Func = this
 
-    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope = defSiteValScope): Val = {
+    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
-      if (ev.tailstrict) {
-        System.arraycopy(argsL, 0, vs.bindings, defSiteValScope.length, argsL.length)
-        evalRhs(vs, ev, funDefFileScope, outerPos)
-      } else if(simple) {
+      if (simple || ev.tailstrict) {
+        if (ev.tailstrict) {
+          argsL.foreach(_.force)
+        }
         val newScope = defSiteValScope.extendSimple(argsL)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       } else {
@@ -521,7 +521,7 @@ object Val{
       }
     }
 
-    def apply0(outerPos: Position)(implicit ev: EvalScope, vs: ValScope = defSiteValScope): Val = {
+    def apply0(outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
@@ -529,48 +529,42 @@ object Val{
       }
     }
 
-    def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope = defSiteValScope): Val = {
+    def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
         if (ev.tailstrict) {
-          vs.bindings(defSiteValScope.length) = argVal
-          evalRhs(vs, ev, funDefFileScope, outerPos)
-        } else {
-          val newScope: ValScope = defSiteValScope.extendSimple(argVal)
-          evalRhs(newScope, ev, funDefFileScope, outerPos)
+          argVal.force
         }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
 
-    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope = defSiteValScope): Val = {
+    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
         if (ev.tailstrict) {
-          vs.bindings(defSiteValScope.length) = argVal1
-          vs.bindings(defSiteValScope.length+1) = argVal2
-          evalRhs(vs, ev, funDefFileScope, outerPos)
-        } else {
-          val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
-          evalRhs(newScope, ev, funDefFileScope, outerPos)
+          argVal1.force
+          argVal2.force
         }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
 
-    def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope = defSiteValScope): Val = {
+    def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
       if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
         if (ev.tailstrict) {
-          vs.bindings(defSiteValScope.length) = argVal1
-          vs.bindings(defSiteValScope.length+1) = argVal2
-          vs.bindings(defSiteValScope.length+2) = argVal3
-          evalRhs(vs, ev, funDefFileScope, outerPos)
-        } else {
-          val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
-          evalRhs(newScope, ev, funDefFileScope, outerPos)
+          argVal1.force
+          argVal2.force
+          argVal3.force
         }
+        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
+        evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
   }
@@ -588,16 +582,16 @@ object Val{
 
     def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val
 
-    override def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       evalRhs(argsL, ev, outerPos)
 
-    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       evalRhs(Array(argVal), ev, outerPos)
 
-    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       evalRhs(Array(argVal1, argVal2), ev, outerPos)
 
-    override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
 
     /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
@@ -617,11 +611,11 @@ object Val{
 
     def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
-    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length == 1) evalRhs(argVal.force, ev, outerPos)
       else super.apply(Array(argVal), null, outerPos)
   }
@@ -632,12 +626,12 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
-    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos)
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
@@ -648,7 +642,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -660,7 +654,7 @@ object Val{
 
     def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope, vs: ValScope): Val =
+    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 4)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, argVals(3).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)

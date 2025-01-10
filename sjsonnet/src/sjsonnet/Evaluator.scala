@@ -4,6 +4,7 @@ import Expr.{Error => _, _}
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 /**
@@ -27,11 +28,7 @@ class Evaluator(resolver: CachedResolver,
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.HashMap.empty[Path, Val]
-
-  var isInTailstrictMode = false
-
-  override def tailstrict: Boolean = isInTailstrictMode
-
+  var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     e match {
@@ -190,12 +187,12 @@ class Evaluator(resolver: CachedResolver,
   private def visitApply(e: Apply)(implicit scope: ValScope) = {
     val lhs = visitExpr(e.value)
 
-    if (isInTailstrictMode) {
+    if (tailstrict) {
       lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
     } else if (e.tailstrict) {
-      isInTailstrictMode = true
+      tailstrict = true
       val res = lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
-      isInTailstrictMode = false
+      tailstrict = false
       res
     } else {
       val args = e.args
@@ -211,17 +208,24 @@ class Evaluator(resolver: CachedResolver,
 
   private def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    lhs.cast[Val.Func].apply0(e.pos)
+    if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply0(e.pos)
+      tailstrict = false
+      res
+    } else {
+      lhs.cast[Val.Func].apply0(e.pos)
+    }
   }
 
   private def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (isInTailstrictMode) {
+    if (tailstrict) {
       lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
     } else if (e.tailstrict) {
-      isInTailstrictMode = true
+      tailstrict = true
       val res = lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
-      isInTailstrictMode = false
+      tailstrict = false
       res
     } else {
       val l1 = visitAsLazy(e.a1)
@@ -231,12 +235,12 @@ class Evaluator(resolver: CachedResolver,
 
   private def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (isInTailstrictMode) {
+    if (tailstrict) {
       lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
     } else if (e.tailstrict) {
-      isInTailstrictMode = true
+      tailstrict = true
       val res = lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
-      isInTailstrictMode = false
+      tailstrict = false
       res
     } else {
       val l1 = visitAsLazy(e.a1)
@@ -247,12 +251,12 @@ class Evaluator(resolver: CachedResolver,
 
   private def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (isInTailstrictMode) {
+    if (tailstrict) {
       lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
     } else if (e.tailstrict) {
-      isInTailstrictMode = true
+      tailstrict = true
       val res = lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
-      isInTailstrictMode = false
+      tailstrict = false
       res
     } else {
       val l1 = visitAsLazy(e.a1)
@@ -695,7 +699,7 @@ class Evaluator(resolver: CachedResolver,
     newSelf
   }
 
-  @inline
+  @tailrec
   private final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
     case (spec @ ForSpec(_, name, expr)) :: rest =>
       visitComp(

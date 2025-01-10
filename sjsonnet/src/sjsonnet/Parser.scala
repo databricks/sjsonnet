@@ -227,7 +227,7 @@ class Parser(val currentFile: Path,
             case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
             case (start, ins) => Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
           }
-          case '(' => Pass ~ (args ~ ")" ~ "tailstrict".?.!).map {
+          case '(' => Pass ~ (args ~ ")" ~ "tailstrict".!.?).map {
             case (args, namedNames, tailstrict) => Expr.Apply(i, _: Expr, args, if(namedNames.length == 0) null else namedNames, tailstrict.nonEmpty)
           }
           case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))

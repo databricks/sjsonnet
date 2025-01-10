@@ -107,7 +107,7 @@ class Interpreter(extVars: Map[String, String],
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = {
               evaluator.visitExpr(expr)(if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs)
             }
-          }.apply0(f.pos)(evaluator, f.defSiteValScope)
+          }.apply0(f.pos)(evaluator)
         case x => x
       }
     } yield res
