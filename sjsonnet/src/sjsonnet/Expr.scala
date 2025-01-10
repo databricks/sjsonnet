@@ -58,7 +58,7 @@ object Expr{
     }
     case class Field(pos: Position,
                      fieldName: FieldName,
-                     plus: Boolean,
+                     plus: Boolean, // see https://jsonnet.org/ref/language.html#nested-field-inheritance
                      args: Params,
                      sep: Visibility,
                      rhs: Expr) extends Member {
@@ -175,7 +175,7 @@ object Expr{
                        preLocals: Array[Bind],
                        key: Expr,
                        value: Expr,
-                       plus: Boolean,
+                       plus: Boolean, // see https://jsonnet.org/ref/language.html#nested-field-inheritance
                        postLocals: Array[Bind],
                        first: ForSpec,
                        rest: List[CompSpec]) extends ObjBody {
