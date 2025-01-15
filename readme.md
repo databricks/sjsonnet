@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.13</version>
+    <version>0.4.14</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.13" // SBT
-ivy"com.databricks::sjsonnet:0.4.13" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.14" // SBT
+ivy"com.databricks::sjsonnet:0.4.14" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.13/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.13/sjsonnet-0.4.13.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet-0.4.14.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.13/sjsonnet-0.4.13.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet-0.4.14.js > sjsonnet.js
 
 $ node
 
@@ -278,9 +278,18 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 
 ## Changelog
 
-### Pending Version
-- Fix a bug in new strict mode for set in std.setUnion [#242](https://github.com/databricks/sjsonnet/issues/242)
+### 0.4.14
+- Fix a bug in new strict mode for set in `std.setUnion` [#242](https://github.com/databricks/sjsonnet/issues/242).
 - Add support for Java 21 and dropped support for Java 11.
+- Add `std.native` support, and move `std.xz/std.gzip` to native. Enable support for `std.gzip` in scala native.
+- Optimization: `std.sort` should only evaluate keyF once per array element.
+- Fix corner case for YAML parsing with primitive types [google/jsonnet/issues/1109](https://github.com/google/jsonnet/issues/1109).
+- Add optional regex methods in `std.native` based on [google/jsonnet/pull/1039](https://github.com/google/jsonnet/pull/1039) and jrsonnet.
+- Multiple bug fixes regarding handling of hidden fields in `std.mergePatch`.
+- Add `importbin` support.
+- Updated mill to 0.11.13 to fix publishing to Sonatype.
+- Several performance optimizations, primarily aimed at reducing garbage object creation in common cases.
+
 
 ### 0.4.13
 - Implemented every missing methods in `std`.

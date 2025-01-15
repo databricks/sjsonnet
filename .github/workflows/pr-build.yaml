@@ -25,6 +25,8 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'zulu'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill _.${{ matrix.lang }}[_].test
       - name: Compile with sbt
