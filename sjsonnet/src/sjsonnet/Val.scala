@@ -582,17 +582,17 @@ object Val{
 
     def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val
 
-    override def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
-      evalRhs(argsL, ev, outerPos)
-
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
-      evalRhs(Array(argVal), ev, outerPos)
+      if(params.names.length != 1) apply(Array(argVal), null, outerPos)
+      else evalRhs(Array(argVal), ev, outerPos)
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
-      evalRhs(Array(argVal1, argVal2), ev, outerPos)
+      if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
+      else evalRhs(Array(argVal1, argVal2), ev, outerPos)
 
     override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
-      evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
+      if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      else evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
 
     /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
      * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
