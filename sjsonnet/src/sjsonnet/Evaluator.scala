@@ -4,6 +4,7 @@ import Expr.{Error => _, _}
 import sjsonnet.Expr.Member.Visibility
 import ujson.Value
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 /**
@@ -27,8 +28,9 @@ class Evaluator(resolver: CachedResolver,
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports = collection.mutable.HashMap.empty[Path, Val]
+  var tailstrict: Boolean = false
 
-  def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     e match {
       case e: ValidId => visitValidId(e)
       case e: BinaryOp => visitBinaryOp(e)
@@ -184,40 +186,84 @@ class Evaluator(resolver: CachedResolver,
 
   private def visitApply(e: Apply)(implicit scope: ValScope) = {
     val lhs = visitExpr(e.value)
-    val args = e.args
-    val argsL = new Array[Lazy](args.length)
-    var idx = 0
-    while (idx < args.length) {
-      argsL(idx) = visitAsLazy(args(idx))
-      idx += 1
+
+    if (tailstrict) {
+      lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
+      tailstrict = false
+      res
+    } else {
+      val args = e.args
+      val argsL = new Array[Lazy](args.length)
+      var idx = 0
+      while (idx < args.length) {
+        argsL(idx) = visitAsLazy(args(idx))
+        idx += 1
+      }
+      lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos)
     }
-    lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos)
   }
 
   private def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    lhs.cast[Val.Func].apply0(e.pos)
+    if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply0(e.pos)
+      tailstrict = false
+      res
+    } else {
+      lhs.cast[Val.Func].apply0(e.pos)
+    }
   }
 
   private def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1 = visitAsLazy(e.a1)
-    lhs.cast[Val.Func].apply1(l1, e.pos)
+    if (tailstrict) {
+      lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
+      tailstrict = false
+      res
+    } else {
+      val l1 = visitAsLazy(e.a1)
+      lhs.cast[Val.Func].apply1(l1, e.pos)
+    }
   }
 
   private def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1 = visitAsLazy(e.a1)
-    val l2 = visitAsLazy(e.a2)
-    lhs.cast[Val.Func].apply2(l1, l2, e.pos)
+    if (tailstrict) {
+      lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
+      tailstrict = false
+      res
+    } else {
+      val l1 = visitAsLazy(e.a1)
+      val l2 = visitAsLazy(e.a2)
+      lhs.cast[Val.Func].apply2(l1, l2, e.pos)
+    }
   }
 
   private def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    val l1 = visitAsLazy(e.a1)
-    val l2 = visitAsLazy(e.a2)
-    val l3 = visitAsLazy(e.a3)
-    lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
+    if (tailstrict) {
+      lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+      tailstrict = false
+      res
+    } else {
+      val l1 = visitAsLazy(e.a1)
+      val l2 = visitAsLazy(e.a2)
+      val l3 = visitAsLazy(e.a3)
+      lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
+    }
   }
 
   private def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) =
@@ -653,7 +699,8 @@ class Evaluator(resolver: CachedResolver,
     newSelf
   }
 
-  def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
+  @tailrec
+  private final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
     case (spec @ ForSpec(_, name, expr)) :: rest =>
       visitComp(
         rest,

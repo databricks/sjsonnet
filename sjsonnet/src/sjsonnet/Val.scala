@@ -465,7 +465,10 @@ object Val{
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
-      if(simple) {
+      if (simple || ev.tailstrict) {
+        if (ev.tailstrict) {
+          argsL.foreach(_.force)
+        }
         val newScope = defSiteValScope.extendSimple(argsL)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       } else {
@@ -530,6 +533,9 @@ object Val{
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        if (ev.tailstrict) {
+          argVal.force
+        }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
@@ -539,6 +545,10 @@ object Val{
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        if (ev.tailstrict) {
+          argVal1.force
+          argVal2.force
+        }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
@@ -548,6 +558,11 @@ object Val{
       if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
+        if (ev.tailstrict) {
+          argVal1.force
+          argVal2.force
+          argVal3.force
+        }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
@@ -574,6 +589,10 @@ object Val{
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else evalRhs(Array(argVal1, argVal2), ev, outerPos)
+
+    override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+      if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      else evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
 
     /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
      * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
@@ -647,6 +666,8 @@ object Val{
   * throughout the Jsonnet evaluation.
   */
 abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
+  def tailstrict: Boolean
+
   def visitExpr(expr: Expr)
                (implicit scope: ValScope): Val
 

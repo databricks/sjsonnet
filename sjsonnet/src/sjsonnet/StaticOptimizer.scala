@@ -111,7 +111,7 @@ class StaticOptimizer(
   }
 
   private def transformApply(a: Apply): Expr = {
-    val rebound = rebindApply(a.pos, a.value, a.args, a.namedNames) match {
+    val rebound = rebindApply(a.pos, a.value, a.args, a.namedNames, a.tailstrict) match {
       case null => a
       case a => a
     }
@@ -121,7 +121,7 @@ class StaticOptimizer(
     }
   }
 
-  private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr]): Expr = {
+  private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr], tailstrict: Boolean): Expr = {
     if(f.staticSafe && args.forall(_.isInstanceOf[Val])) {
       val vargs = args.map(_.asInstanceOf[Val])
       try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => return null }
@@ -131,20 +131,20 @@ class StaticOptimizer(
   private def specializeApplyArity(a: Apply): Expr = {
     if(a.namedNames != null) a
     else a.args.length match {
-      case 0 => Apply0(a.pos, a.value)
-      case 1 => Apply1(a.pos, a.value, a.args(0))
-      case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1))
-      case 3 => Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2))
+      case 0 => Apply0(a.pos, a.value, a.tailstrict)
+      case 1 => Apply1(a.pos, a.value, a.args(0), a.tailstrict)
+      case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1), a.tailstrict)
+      case 3 => Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2), a.tailstrict)
       case _ => a
     }
   }
 
-  private def rebindApply(pos: Position, lhs: Expr, args: Array[Expr], names: Array[String]): Expr = lhs match {
+  private def rebindApply(pos: Position, lhs: Expr, args: Array[Expr], names: Array[String], tailstrict: Boolean): Expr = lhs match {
     case f: Val.Builtin =>
       rebind(args, names, f.params) match {
         case null => null
         case newArgs =>
-          tryStaticApply(pos, f, newArgs) match {
+          tryStaticApply(pos, f, newArgs, tailstrict) match {
             case null =>
               val (f2, rargs) = f.specialize(newArgs) match {
                 case null => (f, newArgs)
@@ -166,12 +166,12 @@ class StaticOptimizer(
         case ScopedVal(Function(_, params, _), _, _) =>
           rebind(args, names, params) match {
             case null => null
-            case newArgs => Apply(pos, lhs, newArgs, null)
+            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict)
           }
         case ScopedVal(Bind(_, _, params, _), _, _) =>
           rebind(args, names, params) match {
             case null => null
-            case newArgs => Apply(pos, lhs, newArgs, null)
+            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict)
           }
         case _ => null
       }

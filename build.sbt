@@ -8,6 +8,7 @@ lazy val main = (project in file("sjsonnet"))
   .settings(
     Compile / scalacOptions ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**"),
     Test / fork := true,
+    Test / javaOptions += "-Xss100m",
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "2.3.3",

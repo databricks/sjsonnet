@@ -650,6 +650,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         q.removeFirst().force match {
           case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
           case s: Val.Str => out.write(s.value)
+          case _ => Error.fail("Cannot call deepJoin on " + value.prettyName)
         }
       }
       Val.Str(pos, out.toString)
