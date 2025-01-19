@@ -1,6 +1,8 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, scalajslib.api._
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
+import java.util.Base64
+import java.nio.charset.StandardCharsets
 
 val sjsonnetVersion = "0.4.14"
 
@@ -57,17 +59,58 @@ object sjsonnet extends Module {
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule{
     def millSourcePath = super.millSourcePath / os.up
     def scalaJSVersion = "1.17.0"
+    def esVersion = ESVersion.ES2018
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-js",
       this.millSourcePath / "src-jvm-js"
     )
     object test extends ScalaJSTests with CrossTests {
+      def jsEnvConfig = JsEnvConfig.NodeJs(args=List("--stack-size=" + 100 * 1024))
       def sources = T.sources(
         this.millSourcePath / "src",
         this.millSourcePath / "src-js",
         this.millSourcePath / "src-jvm-js"
       )
+      def generatedSources = T{
+        val files = os.walk(this.millSourcePath / "resources").filterNot(os.isDir).map(p => p.relativeTo(this.millSourcePath / "resources") -> os.read.bytes(p)).toMap
+        os.write(
+          T.ctx().dest / "TestResources.scala",
+          s"""package sjsonnet
+             |
+             |object TestResources{
+             |  val files = Map(
+             |""".stripMargin)
+        for((k, v) <- files) {
+          val name = k.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
+          val values = Base64.getEncoder().encodeToString(v).grouped(65535).toSeq
+          os.write(
+            T.ctx().dest / s"$name.scala",
+            s"""package sjsonnet
+               |
+               |import java.util.Base64
+               |
+               |object $name {
+               |  def contentArr = Seq(
+               |    ${values.map("\"" + _ + "\"").mkString(",\n    ")}
+               |  )
+               |  def content = Base64.getDecoder().decode(contentArr.mkString)
+               |}
+               |""".stripMargin)
+          os.write.append(
+            T.ctx().dest / "TestResources.scala",
+            s"""    "$k" -> $name.content,
+               |""".stripMargin
+          )
+        }
+        os.write.append(
+          T.ctx().dest / "TestResources.scala",
+          s"""  )
+             |}
+             |""".stripMargin
+        )
+        Seq(PathRef(T.ctx().dest / "TestResources.scala")) ++ files.keys.map(p => PathRef(T.ctx().dest / s"${p.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")}.scala"))
+      }
     }
   }
 

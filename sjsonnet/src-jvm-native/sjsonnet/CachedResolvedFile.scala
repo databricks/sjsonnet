@@ -26,11 +26,13 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
   // Assert that the file is less than limit
   assert(jFile.length() <= memoryLimitBytes, s"Resolved import path $resolvedImportPath is too large: ${jFile.length()} bytes > ${memoryLimitBytes} bytes")
 
-  private[this] val resolvedImportContent: StaticResolvedFile = {
+  private[this] val resolvedImportContent: ResolvedFile = {
     // TODO: Support caching binary data
-    if (jFile.length() > cacheThresholdBytes || binaryData) {
+    if (jFile.length() > cacheThresholdBytes) {
       // If the file is too large, then we will just read it from disk
       null
+    } else if (binaryData) {
+      StaticBinaryResolvedFile(readRawBytes(jFile))
     } else {
       StaticResolvedFile(readString(jFile))
     }

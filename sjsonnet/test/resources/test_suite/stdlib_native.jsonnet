@@ -483,8 +483,8 @@ std.assertEqual(std.setMember('a', []), false) &&
 std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
 
 (
-  if std.thisFile == '<stdin>' then
-    // This happens when testing the unparser.
+  if std.thisFile == '<stdin>' || std.thisFile == "(memory)" then
+    // This happens when testing the unparser or scala.js
     true
   else
     std.assertEqual(std.thisFile, 'stdlib_native.jsonnet')
