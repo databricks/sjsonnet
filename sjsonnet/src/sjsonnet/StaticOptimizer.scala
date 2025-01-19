@@ -44,6 +44,7 @@ class StaticOptimizer(
       scope.get(name) match {
         case ScopedVal(v: Val with Expr, _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
+        case null if name == "$std" => std
         case null if name == "std" => std
         case _ => failOrWarn("Unknown variable: "+name, e)
       }
