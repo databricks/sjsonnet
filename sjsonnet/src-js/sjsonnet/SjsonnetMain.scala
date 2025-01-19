@@ -12,7 +12,7 @@ object SjsonnetMain {
                 tlaVars: js.Any,
                 wd0: String,
                 importResolver: js.Function2[String, String, String],
-                importLoader: js.Function1[String, String],
+                importLoader: js.Function2[String, Boolean, Either[String, Array[Byte]]],
                 preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map{case (k, ujson.Str(v)) => (k, v)},
@@ -25,7 +25,10 @@ object SjsonnetMain {
             case s => Some(JsVirtualPath(s))
           }
         def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
-          Option(StaticResolvedFile(importLoader(path.asInstanceOf[JsVirtualPath].path)))
+          importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
+            case Left(s) => Some(StaticResolvedFile(s))
+            case Right(arr) => Some(StaticBinaryResolvedFile(arr))
+          }
       },
       parseCache = new DefaultParseCache,
       new Settings(preserveOrder = preserveOrder),

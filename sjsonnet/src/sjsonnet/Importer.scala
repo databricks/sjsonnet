@@ -164,6 +164,17 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
   override def readRawBytes(): Array[Byte] = content.getBytes(StandardCharsets.UTF_8)
 }
 
+case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
+  def getParserInput(): ParserInput = ??? // Not used for binary imports
+
+  def readString(): String = ??? // Not used for binary imports
+
+  // We just cheat, the content hash can be the content itself for static imports
+  lazy val contentHash: String = content.hashCode().toString
+
+  override def readRawBytes(): Array[Byte] = content
+}
+
 class CachedImporter(parent: Importer) extends Importer {
   val cache = mutable.HashMap.empty[Path, ResolvedFile]
 
