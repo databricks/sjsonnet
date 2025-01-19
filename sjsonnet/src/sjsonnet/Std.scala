@@ -1503,6 +1503,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     builtin("trim", "str") { (_, _, str: String) =>
       trailingWhiteSpacePattern.matcher(leadingWhiteSpacePattern.matcher(str).replaceAll("")).replaceAll("")
     },
+    builtin("equals", "a", "b") { (_, ev, a: Val, b: Val) =>
+      ev.equal(a, b)
+    },
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
       str1.equalsIgnoreCase(str2)
     },
