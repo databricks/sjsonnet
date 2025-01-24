@@ -287,7 +287,7 @@ object Format{
 
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
     val (leading, chunks) = fastparse.parse(fmt, format(_)).get.value
-    def evalRhs(values0: Val, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, format(leading, chunks, values0, pos)(ev))
+    def evalRhs(values0: Lazy, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, format(leading, chunks, values0.force, pos)(ev))
   }
 }

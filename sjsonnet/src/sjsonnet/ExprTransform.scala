@@ -46,21 +46,36 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
         else Apply3(pos, x2, y2, z2, a2, tailstrict)
 
-      case ApplyBuiltin(pos, func, x) =>
+      case ApplyBuiltin(pos, func, x, tailstrict) =>
         val x2 = transformArr(x)
         if(x2 eq x) expr
-        else ApplyBuiltin(pos, func, x2)
+        else ApplyBuiltin(pos, func, x2, tailstrict)
 
-      case ApplyBuiltin1(pos, func, x) =>
+      case ApplyBuiltin1(pos, func, x, tailstrict) =>
         val x2 = transform(x)
         if(x2 eq x) expr
-        else ApplyBuiltin1(pos, func, x2)
+        else ApplyBuiltin1(pos, func, x2, tailstrict)
 
-      case ApplyBuiltin2(pos, func, x, y) =>
+      case ApplyBuiltin2(pos, func, x, y, tailstrict) =>
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
-        else ApplyBuiltin2(pos, func, x2, y2)
+        else ApplyBuiltin2(pos, func, x2, y2, tailstrict)
+
+      case ApplyBuiltin3(pos, func, x, y, z, tailstrict) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        val z2 = transform(z)
+        if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
+        else ApplyBuiltin3(pos, func, x2, y2, z2, tailstrict)
+
+      case ApplyBuiltin4(pos, func, x, y, z, a, tailstrict) =>
+        val x2 = transform(x)
+        val y2 = transform(y)
+        val z2 = transform(z)
+        val a2 = transform(a)
+        if((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
+        else ApplyBuiltin4(pos, func, x2, y2, z2, a2, tailstrict)
 
       case UnaryOp(pos, op, x) =>
         val x2 = transform(x)

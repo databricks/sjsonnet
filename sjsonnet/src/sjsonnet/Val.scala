@@ -576,7 +576,7 @@ object Val{
 
     override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = expr.asInstanceOf[Val]
 
-    final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
+    override final def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = {
       evalRhs(scope.bindings, ev, pos)
     }
 
@@ -584,22 +584,40 @@ object Val{
 
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
-      else evalRhs(Array(argVal), ev, outerPos)
+      else {
+        if (ev.tailstrict) {
+          argVal.force
+        }
+        evalRhs(Array(argVal), ev, outerPos)
+      }
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
-      else evalRhs(Array(argVal1, argVal2), ev, outerPos)
+      else {
+        if (ev.tailstrict) {
+          argVal1.force
+          argVal2.force
+        }
+        evalRhs(Array(argVal1, argVal2), ev, outerPos)
+      }
 
     override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
-      else evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
+      else {
+        if (ev.tailstrict) {
+          argVal1.force
+          argVal2.force
+          argVal3.force
+        }
+        evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
+      }
 
     /** Specialize a call to this function in the optimizer. Must return either `null` to leave the
      * call-site as it is or a pair of a (possibly different) `Builtin` and the arguments to pass
      * to it (usually a subset of the supplied arguments).
      * @param args the positional arguments for this function call. Named arguments and defaults have
      *             already been resolved. */
-    def specialize(args: Array[Expr]): (Builtin, Array[Expr]) = null
+    def specialize(args: Array[Expr], tailstrict: Boolean): (Builtin, Array[Expr]) = null
 
     /** Is this builtin safe to use in static evaluation */
     def staticSafe: Boolean = true
@@ -609,22 +627,18 @@ object Val{
     final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, ev, pos)
 
-    def evalRhs(arg1: Val, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
-
-    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
-      if(params.names.length == 1) evalRhs(argVal.force, ev, outerPos)
-      else super.apply(Array(argVal), null, outerPos)
   }
 
   abstract class Builtin2(functionName: String, pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2), defs) {
     final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, ev, pos)
 
-    def evalRhs(arg1: Val, arg2: Val, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 2)
@@ -640,7 +654,7 @@ object Val{
     final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, args(2).force, ev, pos)
 
-    def evalRhs(arg1: Val, arg2: Val, arg3: Val, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
@@ -652,7 +666,7 @@ object Val{
     final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, args(2).force, args(3).force, ev, pos)
 
-    def evalRhs(arg1: Val, arg2: Val, arg3: Val, arg4: Val, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, arg4: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 4)
