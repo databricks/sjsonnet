@@ -21,7 +21,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   private val trailingWhiteSpacePattern = Platform.getPatternFromCache("[ \t\n\f\r\u0085\u00A0']+$")
   private val builtinNativeFunctions = Map(
     builtin("gzip", "v"){ (_, _, v: Val) =>
-      v match{
+      v match {
         case Val.Str(_, value) => Platform.gzipString(value)
         case arr: Val.Arr => Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
         case x => Error.fail("Cannot gzip encode " + x.prettyName)
@@ -58,9 +58,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   private object ToString extends Val.Builtin1("toString", "a") {
-    def evalRhs(v1: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(pos, v1 match {
+    def evalRhs(v1: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(pos, v1.force match {
       case Val.Str(_, s) => s
-      case v => Materializer.stringify(v.force)(ev)
+      case v => Materializer.stringify(v)(ev)
     })
   }
 
@@ -262,7 +262,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   private object Foldr extends Val.Builtin3("foldr", "func", "arr", "init") {
     def evalRhs(_func: Lazy, arr: Lazy, init: Lazy, ev: EvalScope, pos: Position): Val = {
       val func = _func.force.asFunc
-      arr match {
+      arr.force match {
         case arr: Val.Arr =>
           var current = init.force
           for (item <- arr.asLazyArray.reverse) {
@@ -277,7 +277,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
             current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(ev)
           }
           current
-        case _ => Error.fail("Cannot call foldr on " + arr.force.prettyName)
+        case arr => Error.fail("Cannot call foldr on " + arr.prettyName)
       }
     }
   }
@@ -365,7 +365,6 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         }
       }
       new Val.Arr(pos, a)
-      //new Val.Arr(pos, arr.force.asArr.asLazyArray.filter(v => func.apply1(v, pos.noOffset)(ev).isInstanceOf[Val.True]))
     }
   }
 
@@ -600,9 +599,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     def evalRhs(arr: Lazy, x: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.bool(pos, arr.force match {
         case str: Val.Str =>
-          val secondArg = x match {
+          val secondArg = x.force match {
             case Val.Str(_, value) => value
-            case n => Error.fail("std.member second argument must be a string, got " + x.force.prettyName)
+            case n => Error.fail("std.member second argument must be a string, got " + n.prettyName)
           }
           str.value.contains(secondArg)
         case a: Val.Arr =>
@@ -616,7 +615,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     def evalRhs(arrs: Lazy, ev: EvalScope, pos: Position): Val = {
       val out = new mutable.ArrayBuilder.ofRef[Lazy]
       for(x <- arrs.force.asArr) {
-        x match{
+        x.force match {
           case Val.Null(_) => // do nothing
           case v: Val.Arr => out ++= v.asLazyArray
           case x => Error.fail("Cannot call flattenArrays on " + x)
@@ -828,12 +827,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
-    private def isTableArray(v: Val) = v match {
+    private def isTableArray(v: Val) = v.force match {
       case s: Val.Arr => s.length > 0 && s.asLazyArray.forall(_.isInstanceOf[Val.Obj])
       case _ => false
     }
 
-    private def isSection(v: Val) = v.isInstanceOf[Val.Obj] || isTableArray(v)
+    private def isSection(v: Val) = v.force.isInstanceOf[Val.Obj] || isTableArray(v.force)
 
     private def renderTableInternal(out: StringWriter, v: Val.Obj, cumulatedIndent: String, indent: String, path: Seq[String], indexedPath: Seq[String])(implicit ev : EvalScope): StringWriter = {
       val (sections, nonSections) = v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
@@ -947,7 +946,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
         case (_, _) => recSingle(r)
       }
-      def recSingle(v: Val): Val  = v match{
+      def recSingle(v: Val): Val  = v match {
         case obj: Val.Obj =>
           val keys: Array[String] = obj.visibleKeyNames
           val kvs: Array[(String, Val.Obj.Member)] = new Array[(String, Val.Obj.Member)](keys.length)
@@ -1369,18 +1368,18 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       rec(Materializer(value)(ev)).render
     },
     builtin("base64", "v"){ (pos, ev, v: Val) =>
-      v match{
-        case Val.Str(_, value) => Base64.getEncoder().encodeToString(value.getBytes)
-        case arr: Val.Arr => Base64.getEncoder().encodeToString(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
-        case x => Error.fail("Cannot base64 encode " + x.force.prettyName)
+      v match {
+        case Val.Str(_, value) => Base64.getEncoder.encodeToString(value.getBytes)
+        case arr: Val.Arr => Base64.getEncoder.encodeToString(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
+        case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
     },
 
     builtin("base64Decode", "s"){ (pos, ev, s: String) =>
-      new String(Base64.getDecoder().decode(s))
+      new String(Base64.getDecoder.decode(s))
     },
     builtin("base64DecodeBytes", "s"){ (pos, ev, s: String) =>
-      new Val.Arr(pos, Base64.getDecoder().decode(s).map(i => Val.Num(pos, i)))
+      new Val.Arr(pos, Base64.getDecoder.decode(s).map(i => Val.Num(pos, i)))
     },
 
     builtin(EncodeUTF8),
@@ -1469,23 +1468,23 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     builtin(ParseYaml),
     builtin(MD5),
     builtin("prune", "x"){ (pos, ev, s: Val) =>
-      def filter(x: Val) = x match{
+      def filter(x: Val) = x match {
         case c: Val.Arr if c.length == 0 => false
         case c: Val.Obj if c.visibleKeyNames.length == 0 => false
         case Val.Null(_) => false
         case _ => true
       }
-      def rec(x: Val): Val = x match{
+      def rec(x: Lazy): Val = x.force match {
         case o: Val.Obj =>
-          val bindings: Array[(String, Val.Obj.Member)] = for{
+          val bindings: Array[(String, Val.Obj.Member)] = for {
             k <- o.visibleKeyNames
             v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
             if filter(v)
-          }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
+          } yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
           Val.Obj.mk(pos, bindings)
         case a: Val.Arr =>
-          new Val.Arr(pos, a.asStrictArray.map(rec).filter(filter).map(identity))
-        case _ => x
+          new Val.Arr(pos, a.asLazyArray.map(rec).filter(filter))
+        case x => x
       }
       rec(s)
     },
