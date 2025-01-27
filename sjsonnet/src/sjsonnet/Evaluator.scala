@@ -38,6 +38,8 @@ class Evaluator(resolver: CachedResolver,
       case e: Val => e
       case e: ApplyBuiltin1 => visitApplyBuiltin1(e)
       case e: ApplyBuiltin2 => visitApplyBuiltin2(e)
+      case e: ApplyBuiltin3 => visitApplyBuiltin3(e)
+      case e: ApplyBuiltin4 => visitApplyBuiltin4(e)
       case e: And => visitAnd(e)
       case e: Or => visitOr(e)
       case e: UnaryOp => visitUnaryOp(e)
@@ -266,21 +268,84 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) =
-    e.func.evalRhs(visitExpr(e.a1), this, e.pos)
+  private def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) = {
+    if (tailstrict) {
+      e.func.evalRhs(visitExpr(e.a1), this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = e.func.evalRhs(visitExpr(e.a1), this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
+    }
+  }
 
-  private def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) =
-    e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
+  private def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) = {
+    if (tailstrict) {
+      e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
+    }
+  }
+
+  private def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope) = {
+    if (tailstrict) {
+      e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
+    }
+  }
+
+  private def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope) = {
+    if (tailstrict) {
+      e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), visitExpr(e.a4), this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), visitExpr(e.a4), this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), visitAsLazy(e.a4), this, e.pos)
+    }
+  }
 
   private def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
-    val arr = new Array[Val](e.argExprs.length)
+    val arr = new Array[Lazy](e.argExprs.length)
     var idx = 0
-    while (idx < e.argExprs.length) {
-      val boundIdx = idx
-      arr(idx) = visitExpr(e.argExprs(boundIdx))
-      idx += 1
+    if (tailstrict) {
+      while (idx < e.argExprs.length) {
+        arr(idx) = visitExpr(e.argExprs(idx))
+        idx += 1
+      }
+      e.func.evalRhs(arr, this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      while (idx < e.argExprs.length) {
+        arr(idx) = visitExpr(e.argExprs(idx))
+        idx += 1
+      }
+      val res = e.func.evalRhs(arr, this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      while (idx < e.argExprs.length) {
+        val boundIdx = idx
+        arr(idx) = visitAsLazy(e.argExprs(boundIdx))
+        idx += 1
+      }
+      e.func.evalRhs(arr, this, e.pos)
     }
-    e.func.evalRhs(arr, this, e.pos)
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {

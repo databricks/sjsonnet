@@ -29,32 +29,32 @@ object StdRegex {
 
   def functions: Map[String, Val.Builtin] = Map(
     "regexPartialMatch" -> new Val.Builtin2("regexPartialMatch", "pattern", "str") {
-      override def evalRhs(pattern: Val, str: Val, ev: EvalScope, pos: Position): Val = {
-        regexPartialMatch(pos, pattern.asString, str.asString)
+      override def evalRhs(pattern: Lazy, str: Lazy, ev: EvalScope, pos: Position): Val = {
+        regexPartialMatch(pos, pattern.force.asString, str.force.asString)
       }
     },
     "regexFullMatch" -> new Val.Builtin2("regexFullMatch", "pattern", "str") {
-      override def evalRhs(pattern: Val, str: Val, ev: EvalScope, pos: Position): Val = {
-        regexPartialMatch(pos, s"^${pattern.asString}$$", str.asString)
+      override def evalRhs(pattern: Lazy, str: Lazy, ev: EvalScope, pos: Position): Val = {
+        regexPartialMatch(pos, s"^${pattern.force.asString}$$", str.force.asString)
       }
     },
     "regexGlobalReplace" -> new Val.Builtin3("regexGlobalReplace", "str", "pattern", "to") {
-      override def evalRhs(str: Val, pattern: Val, to: Val, ev: EvalScope, pos: Position): Val = {
-        val compiledPattern = Platform.getPatternFromCache(pattern.asString)
-        val matcher = compiledPattern.matcher(str.asString)
-        Val.Str(pos.noOffset, matcher.replaceAll(to.asString))
+      override def evalRhs(str: Lazy, pattern: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
+        val compiledPattern = Platform.getPatternFromCache(pattern.force.asString)
+        val matcher = compiledPattern.matcher(str.force.asString)
+        Val.Str(pos.noOffset, matcher.replaceAll(to.force.asString))
       }
     },
     "regexReplace" -> new Val.Builtin3("regexReplace", "str", "pattern", "to") {
-      override def evalRhs(str: Val, pattern: Val, to: Val, ev: EvalScope, pos: Position): Val = {
-        val compiledPattern = Platform.getPatternFromCache(pattern.asString)
-        val matcher = compiledPattern.matcher(str.asString)
-        Val.Str(pos.noOffset, matcher.replaceFirst(to.asString))
+      override def evalRhs(str: Lazy, pattern: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
+        val compiledPattern = Platform.getPatternFromCache(pattern.force.asString)
+        val matcher = compiledPattern.matcher(str.force.asString)
+        Val.Str(pos.noOffset, matcher.replaceFirst(to.force.asString))
       }
     },
     "regexQuoteMeta" -> new Val.Builtin1("regexQuoteMeta", "str") {
-      override def evalRhs(str: Val, ev: EvalScope, pos: Position): Val = {
-        Val.Str(pos.noOffset, Platform.regexQuote(str.asString))
+      override def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
+        Val.Str(pos.noOffset, Platform.regexQuote(str.force.asString))
       }
     }
   )
