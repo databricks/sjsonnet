@@ -30,6 +30,8 @@ class ProfilingEvaluator(resolver: CachedResolver,
         case a: Expr.ApplyBuiltin => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin1 => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin2 => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin3 => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin4 => Some(a.func.functionName)
         case u: Expr.UnaryOp => Some(Expr.UnaryOp.name(u.op))
         case b: Expr.BinaryOp => Some(Expr.BinaryOp.name(b.op))
         case _ => None
