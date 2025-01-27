@@ -221,5 +221,9 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.equalsIgnoreCase("hello", "HELLO")""") ==> ujson.True
       eval("""std.equalsIgnoreCase("hello", "world")""") ==> ujson.False
     }
+
+    test("get") {
+      eval("""std.get({a: 1}, "a", error "a")""") ==> ujson.Num(1)
+    }
   }
 }

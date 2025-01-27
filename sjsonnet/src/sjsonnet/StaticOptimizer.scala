@@ -37,7 +37,7 @@ class StaticOptimizer(
     case b2 @ BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
       InSuper(pos, lhs, selfIdx)
     case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
-      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs)
+      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs, tailstrict = false)
       catch { case _: Exception => b2 }
 
     case e @ Id(pos, name) =>
@@ -147,15 +147,17 @@ class StaticOptimizer(
         case newArgs =>
           tryStaticApply(pos, f, newArgs, tailstrict) match {
             case null =>
-              val (f2, rargs) = f.specialize(newArgs) match {
+              val (f2, rargs) = f.specialize(newArgs, tailstrict) match {
                 case null => (f, newArgs)
                 case (f2, a2) => (f2, a2)
               }
               val alen = rargs.length
               f2 match {
-                case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0))
-                case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1))
-                case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs)
+                case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0), tailstrict)
+                case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1), tailstrict)
+                case f2: Val.Builtin3 if alen == 3 => Expr.ApplyBuiltin3(pos, f2, rargs(0), rargs(1), rargs(2), tailstrict)
+                case f2: Val.Builtin4 if alen == 4 => Expr.ApplyBuiltin4(pos, f2, rargs(0), rargs(1), rargs(2), rargs(3), tailstrict)
+                case _ if f2.params.names.length == alen => Expr.ApplyBuiltin(pos, f2, rargs, tailstrict)
                 case _ => null
               }
             case e => e
