@@ -24,7 +24,20 @@ class ProfilingEvaluator(resolver: CachedResolver,
     var totalTime: Long = 0
     lazy val prettyOffset = prettyIndex(expr.pos).map { case (l,c) => s"$l:$c" }.getOrElse("?:?")
     lazy val prettyPos = s"${expr.pos.currentFile.asInstanceOf[OsPath].p}:$prettyOffset"
-    lazy val name = expr.getClass.getName.split('.').last.split('$').last
+    lazy val name: String = {
+      val exprName = expr.getClass.getName.split('.').last.split('$').last
+      val funcOrOptName: Option[String] = expr match {
+        case a: Expr.ApplyBuiltin => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin1 => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin2 => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin3 => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin4 => Some(a.func.functionName)
+        case u: Expr.UnaryOp => Some(Expr.UnaryOp.name(u.op))
+        case b: Expr.BinaryOp => Some(Expr.BinaryOp.name(b.op))
+        case _ => None
+      }
+      exprName + funcOrOptName.map(n => s" ($n)").getOrElse("")
+    }
   }
 
   class OpBox(val op: Int, val name: String) extends Box
