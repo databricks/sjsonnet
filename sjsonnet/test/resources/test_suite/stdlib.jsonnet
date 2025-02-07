@@ -76,6 +76,20 @@ assertClose(std.acos(1), 0) &&
 assertClose(std.asin(1), 0.5 * pi) &&
 assertClose(std.acos(0), 0.5 * pi) &&
 assertClose(std.atan(0), 0) &&
+assertClose(std.atan2(1.0, 2.0), 0.4636476090008061) &&
+assertClose(std.atan2(2.0, 0.4), 1.373400766945016) &&
+assertClose(std.atan2(1.2, 0.0), 1.5707963267948966) &&
+assertClose(std.hypot(1.0, 2.0), std.sqrt(5.0)) &&
+assertClose(std.hypot(2.0, 0.4), std.sqrt(4.16)) &&
+assertClose(std.hypot(1.2, 0.0), std.sqrt(1.44)) &&
+assertClose(std.deg2rad(180.0), pi) &&
+assertClose(std.deg2rad(45.0), pi / 4.0) &&
+assertClose(std.rad2deg(pi / 2.0), 90.0) &&
+assertClose(std.rad2deg(3.0 * pi), 540.0) &&
+assertClose(std.log2(32.0), 5.0) &&
+assertClose(std.log2(100.0), 6.643856189774724) &&
+assertClose(std.log10(32.0), 1.505149978319906) &&
+assertClose(std.log10(100.0), 2) &&
 assertClose(std.log(std.exp(5)), 5) &&
 assertClose(std.mantissa(1), 0.5) &&
 assertClose(std.exponent(1), 1) &&
@@ -489,6 +503,8 @@ std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
   else
     std.assertEqual(std.thisFile, 'stdlib.jsonnet')
 ) &&
+
+assertClose(std.pi, pi) &&
 
 std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
 std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
