@@ -1,6 +1,6 @@
 val sjsonnetVersion = "0.4.14"
 
-scalaVersion in Global := "2.13.12"
+scalaVersion in Global := "2.13.16"
 
 cancelable in Global := true
 
@@ -18,11 +18,11 @@ lazy val main = (project in file("sjsonnet"))
       "com.lihaoyi" %% "os-lib" % "0.7.8",
       "com.lihaoyi" %% "mainargs" % "0.2.5",
       "org.lz4" % "lz4-java" % "1.8.0",
-      "org.json" % "json" % "20240303",
+      "org.json" % "json" % "20250107",
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.11.0",
-      "org.tukaani" % "xz" % "1.8",
+      "org.tukaani" % "xz" % "1.10",
       "org.yaml" % "snakeyaml" % "1.33",
-      "com.google.re2j" % "re2j" % "1.7",
+      "com.google.re2j" % "re2j" % "1.8",
     ),
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "utest" % "0.8.2",
