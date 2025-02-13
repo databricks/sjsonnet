@@ -1102,8 +1102,27 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     builtin("atan", "x"){ (pos, ev, x: Double) =>
       math.atan(x)
     },
+    builtin("atan2", "x", "y"){ (pos, ev, x: Double, y: Double) =>
+      math.atan2(x, y)
+    },
+    builtin("hypot", "x", "y"){ (pos, ev, x: Double, y: Double) =>
+      math.hypot(x, y)
+    },
+    builtin("deg2rad", "x"){ (pos, ev, x: Double) =>
+      math.toRadians(x)
+    },
+    builtin("rad2deg", "x"){ (pos, ev, x: Double) =>
+      math.toDegrees(x)
+    },
     builtin("log", "x"){ (pos, ev, x: Double) =>
       math.log(x)
+    },
+    builtin("log2", "x"){ (pos, ev, x: Double) =>
+      // no scala log2, do our best without getting fancy with numerics
+      math.log(x) / math.log(2.0)
+    },
+    builtin("log10", "x"){ (pos, ev, x: Double) =>
+      math.log10(x)
     },
     builtin("exp", "x"){ (pos, ev, x: Double) =>
       math.exp(x)
@@ -1667,6 +1686,13 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         new Val.Obj.Member(false, Visibility.Hidden, cached = false) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
+        }
+      ),
+      (
+        "pi",
+        new Val.Obj.Member(false, Visibility.Hidden, cached = false) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev:EvalScope): Val = 
+            Val.Num(self.pos, math.Pi)
         }
       )
     ): _*
