@@ -4,7 +4,7 @@ import utest._
 import TestUtils.{eval, evalErr}
 object Std0150FunctionsTests extends TestSuite {
 
-  def tests = Tests {
+  def tests: Tests = Tests {
     test("stdClamp") {
       eval("std.clamp(-3, 0, 5)") ==> ujson.Num(0)
       eval("std.clamp(4, 0, 5)") ==> ujson.Num(4)

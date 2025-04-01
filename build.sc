@@ -12,10 +12,10 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def artifactName = "sjsonnet"
 
   def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse::2.3.3",
+    ivy"com.lihaoyi::fastparse::3.1.1",
     ivy"com.lihaoyi::pprint::0.6.6",
     ivy"com.lihaoyi::ujson::1.3.15",
-    ivy"com.lihaoyi::scalatags::0.9.4",
+    ivy"com.lihaoyi::scalatags::0.13.1",
     ivy"org.scala-lang.modules::scala-collection-compat::2.11.0"
   )
   def publishVersion = sjsonnetVersion

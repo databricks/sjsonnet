@@ -5,7 +5,7 @@ import TestUtils.{eval, eval0, evalErr}
 object EvaluatorTests extends TestSuite{
 
 
-  def tests = Tests{
+  def tests: Tests = Tests{
     test("arithmetic") {
       eval("1 + 2 + 3") ==> ujson.Num(6)
       eval("1 + 2 * 3") ==> ujson.Num(7)

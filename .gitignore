@@ -8,3 +8,7 @@ output/
 .vscode
 out/
 /.bsp/
+.bloop
+/project/.bloop
+/project/metals.sbt
+/project/project

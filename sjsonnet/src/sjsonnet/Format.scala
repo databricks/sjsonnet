@@ -22,13 +22,13 @@ object Format{
                         precision: Option[Int],
                         conversion: Char)
   import fastparse._, NoWhitespace._
-  def integer[_: P]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
-  def label[_: P] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
-  def flags[_: P] = P( CharsWhileIn("#0\\- +", 0).! )
-  def width[_: P] = P( (integer | "*").!.? )
-  def precision[_: P] = P( ("." ~/ integer.!).? )
-  def conversion[_: P] = P( CharIn("diouxXeEfFgGcrsa%").! )
-  def formatSpec[_: P] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
+  def integer(implicit p: P[?]): P[Unit]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
+  def label(implicit p: P[?]): P[Option[String]] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
+  def flags(implicit p: P[?]): P[String] = P( CharsWhileIn("#0\\- +", 0).! )
+  def width(implicit p: P[?]): P[Option[String]] = P( (integer | "*").!.? )
+  def precision(implicit p: P[?]): P[Option[String]] = P( ("." ~/ integer.!).? )
+  def conversion(implicit p: P[?]): P[String] = P( CharIn("diouxXeEfFgGcrsa%").! )
+  def formatSpec(implicit p: P[?]): P[FormatSpec] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
     case (label, flags, width, precision, conversion) =>
       FormatSpec(
         label,
@@ -44,18 +44,18 @@ object Format{
   }
 
 
-  def plain[_: P] = P( CharsWhile(_ != '%', 0).! )
-  def format[_: P] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
+  def plain(implicit p: P[?]): P[String] = P( CharsWhile(_ != '%', 0).! )
+  def format(implicit p: P[?]): P[(String, Seq[(FormatSpec, String)])] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
 
 
-  def widenRaw(formatted: FormatSpec, txt: String) = widen(formatted, "", "", txt, false, false)
+  def widenRaw(formatted: FormatSpec, txt: String): String = widen(formatted, "", "", txt, false, false)
   def widen(formatted: FormatSpec,
             lhs: String,
             mhs: String,
             rhs: String,
             numeric: Boolean,
-            signedConversion: Boolean) = {
+            signedConversion: Boolean): String = {
 
     val lhs2 =
       if(signedConversion && formatted.blankBeforePositive) " " + lhs
@@ -167,7 +167,7 @@ object Format{
     output.toString()
   }
 
-  def formatInteger(formatted: FormatSpec, s: Double) = {
+  def formatInteger(formatted: FormatSpec, s: Double): String = {
     val (lhs, rhs) = if (s < 0) {
       ("-", s.toLong.toString.substring(1))
     } else {
@@ -181,7 +181,7 @@ object Format{
     )
   }
 
-  def formatFloat(formatted: FormatSpec, s: Double) = {
+  def formatFloat(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
       if (s < 0) "-" else "", "",
@@ -197,7 +197,7 @@ object Format{
 
   }
 
-  def formatOctal(formatted: FormatSpec, s: Double) = {
+  def formatOctal(formatted: FormatSpec, s: Double): String = {
     val (lhs, rhs) = if (s < 0) {
       ("-", s.toLong.abs.toOctalString)
     } else {
@@ -211,7 +211,7 @@ object Format{
     )
   }
 
-  def formatHexadecimal(formatted: FormatSpec, s: Double) = {
+  def formatHexadecimal(formatted: FormatSpec, s: Double): String = {
     val (lhs, rhs) = if (s < 0) {
       ("-", s.toLong.abs.toHexString)
     } else {
@@ -225,7 +225,7 @@ object Format{
     )
   }
 
-  def precisionPad(lhs: String, rhs: String, precision: Option[Int]) = {
+  def precisionPad(lhs: String, rhs: String, precision: Option[Int]): String = {
     precision match{
       case None => rhs
       case Some(p) =>
@@ -234,7 +234,7 @@ object Format{
     }
   }
 
-  def formatGeneric(formatted: FormatSpec, s: Double) = {
+  def formatGeneric(formatted: FormatSpec, s: Double): String = {
     val precision = formatted.precision.getOrElse(6)
     val leadingPrecision = math.floor(math.log10(s)).toInt + 1
     val trailingPrecision = math.max(0, precision - leadingPrecision)
@@ -267,7 +267,7 @@ object Format{
 
   }
 
-  def formatExponent(formatted: FormatSpec, s: Double) = {
+  def formatExponent(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
       if (s < 0) "-" else "", "",
@@ -281,7 +281,7 @@ object Format{
     )
   }
 
-  def maybeDecimalPoint(formatted: FormatSpec, fracLengths: (Int, Int)) = {
+  def maybeDecimalPoint(formatted: FormatSpec, fracLengths: (Int, Int)): Option[(Int, Int)] = {
     if (formatted.precision.contains(0) && !formatted.alternate) None else Some(fracLengths)
   }
 

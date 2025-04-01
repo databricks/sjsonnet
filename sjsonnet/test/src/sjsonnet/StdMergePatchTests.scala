@@ -6,7 +6,7 @@ object StdMergePatchTests extends TestSuite {
 
   // These test cases' behavior matches v0.20.0 of google/jsonnet and google/go-jsonnet.
 
-  def tests = Tests {
+  def tests: Tests = Tests {
 
     test("top-level merging of non-objects") {
       // Both target and patch are non-objects, so patch wins:

@@ -48,7 +48,7 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
       visitNull(index)
     } else {
       val charBuilder = new CharBuilder()
-      upickle.core.RenderUtils.escapeChar(null, charBuilder, s, unicode = true)
+      upickle.core.RenderUtils.escapeChar(null, charBuilder, s, escapeUnicode = true, wrapQuotes = true)
       out.write(charBuilder.makeString())
       flush
     }
@@ -66,9 +66,9 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
   }
 
   override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] = new ArrVisitor[StringWriter, StringWriter] {
-    private val inline = length == 0 || depth > 0
-    private val newElementIndent = if (inline) "" else cumulatedIndent + indent
-    private val separator = if (inline && length > 0) " " else if (inline && length == 0) "" else "\n"
+    private val isInLine = length == 0 || depth > 0
+    private val newElementIndent = if (isInLine) "" else cumulatedIndent + indent
+    private val separator = if (isInLine && length > 0) " " else if (isInLine && length == 0) "" else "\n"
     private var addComma = false
 
     depth += 1
@@ -85,13 +85,13 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
       addComma = false
       depth -= 1
       out.write(separator)
-      if (!inline) out.write(cumulatedIndent)
+      if (!isInLine) out.write(cumulatedIndent)
       out.write("]")
       flush
     }
   }
 
-  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     private var addComma = false
     depth += 1
     out.write("{ ")

@@ -27,7 +27,7 @@ class Interpreter(extVars: Map[String, String],
 
   private val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
-  val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
+  val resolver: CachedResolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
       handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
   }
@@ -39,7 +39,7 @@ class Interpreter(extVars: Map[String, String],
     new Evaluator(resolver, extVars, wd, settings, warn)
 
 
-  def parseVar(k: String, v: String) = {
+  def parseVar(k: String, v: String): Expr = {
     resolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
 

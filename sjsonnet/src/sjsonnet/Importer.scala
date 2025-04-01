@@ -31,7 +31,7 @@ object Importer {
 
 case class FileParserInput(file: File) extends ParserInput {
 
-  private[this] val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 8)
+  private val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 8)
 
   private lazy val fileLength = file.length.toInt
 
@@ -53,7 +53,7 @@ case class FileParserInput(file: File) extends ParserInput {
 
   override def checkTraceable(): Unit = {}
 
-  private[this] lazy val lineNumberLookup: Array[Int] = {
+  private lazy val lineNumberLookup: Array[Int] = {
     val lines = mutable.ArrayBuffer[Int]()
     val bufferedStream = new BufferedInputStream(new FileInputStream(file))
     var byteRead: Int = 0
@@ -159,7 +159,7 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
   def readString(): String = content
 
   // We just cheat, the content hash can be the content itself for static imports
-  lazy val contentHash: String = content
+  def contentHash(): String = content
 
   override def readRawBytes(): Array[Byte] = content.getBytes(StandardCharsets.UTF_8)
 }
@@ -170,13 +170,13 @@ case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
   def readString(): String = ??? // Not used for binary imports
 
   // We just cheat, the content hash can be the content itself for static imports
-  lazy val contentHash: String = content.hashCode().toString
+  def contentHash(): String = content.hashCode().toString
 
   override def readRawBytes(): Array[Byte] = content
 }
 
 class CachedImporter(parent: Importer) extends Importer {
-  val cache = mutable.HashMap.empty[Path, ResolvedFile]
+  val cache: mutable.HashMap[Path,ResolvedFile] = mutable.HashMap.empty[Path, ResolvedFile]
 
   def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
 

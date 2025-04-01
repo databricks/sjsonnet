@@ -20,7 +20,7 @@ object StdRegex {
       Val.Obj.mk(pos.noOffset,
         "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Str(pos.noOffset, str)),
         "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, captures)),
-        "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures: _*))
+        "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures*))
       )
     } else {
       Val.Null(pos.noOffset)

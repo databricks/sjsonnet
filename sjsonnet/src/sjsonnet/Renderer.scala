@@ -15,7 +15,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 class Renderer(out: Writer = new java.io.StringWriter(),
                indent: Int = -1) extends BaseCharRenderer(out, indent){
   var newlineBuffered = false
-  override def visitFloat64(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int): Writer = {
     val s = RenderUtils.renderDouble(d)
     flushBuffer()
     var i = 0
@@ -28,7 +28,7 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     flushCharBuilder()
     out
   }
-  override def flushBuffer() = {
+  override def flushBuffer(): Unit = {
     if (commaBuffered) {
       elemBuilder.append(',')
       if (indent == -1) elemBuilder.append(' ')
@@ -46,14 +46,14 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
+  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.Renderer} = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     elemBuilder.append('[')
     newlineBuffered = true
 
     depth += 1
-    def subVisitor = Renderer.this
+    def subVisitor: sjsonnet.Renderer = Renderer.this
     def visitValue(v: Writer, index: Int): Unit = {
       empty = false
       flushBuffer()
@@ -72,14 +72,14 @@ class Renderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.Renderer; def visitKey(index: Int): sjsonnet.Renderer} = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     elemBuilder.append('{')
     newlineBuffered = true
     depth += 1
-    def subVisitor = Renderer.this
-    def visitKey(index: Int) = Renderer.this
+    def subVisitor: sjsonnet.Renderer= Renderer.this
+    def visitKey(index: Int): sjsonnet.Renderer = Renderer.this
     def visitKeyValue(v: Any): Unit = {
       empty = false
       //flushBuffer()
@@ -107,7 +107,7 @@ class Renderer(out: Writer = new java.io.StringWriter(),
 class PythonRenderer(out: Writer = new java.io.StringWriter(),
                      indent: Int = -1) extends BaseCharRenderer(out, indent){
 
-  override def visitNull(index: Int) = {
+  override def visitNull(index: Int): Writer = {
     flushBuffer()
     elemBuilder.ensureLength(4)
     elemBuilder.appendUnsafe('N')
@@ -118,7 +118,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override def visitFalse(index: Int) = {
+  override def visitFalse(index: Int): Writer = {
     flushBuffer()
     elemBuilder.ensureLength(5)
     elemBuilder.appendUnsafe('F')
@@ -130,7 +130,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override def visitTrue(index: Int) = {
+  override def visitTrue(index: Int): Writer = {
     flushBuffer()
     elemBuilder.ensureLength(4)
     elemBuilder.appendUnsafe('T')
@@ -141,13 +141,13 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     out
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.PythonRenderer; def visitKey(index: Int): sjsonnet.PythonRenderer} = new ObjVisitor[Writer, Writer] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = PythonRenderer.this
-    def visitKey(index: Int) = PythonRenderer.this
+    def subVisitor: sjsonnet.PythonRenderer = PythonRenderer.this
+    def visitKey(index: Int): sjsonnet.PythonRenderer = PythonRenderer.this
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.ensureLength(2)
       elemBuilder.append(':')
@@ -166,7 +166,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def flushBuffer() = {
+  override def flushBuffer(): Unit = {
     if (commaBuffered) {
       commaBuffered = false
       elemBuilder.ensureLength(2)
@@ -183,14 +183,14 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
 
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.MaterializeJsonRenderer} = new ArrVisitor[StringWriter, StringWriter] {
     flushBuffer()
     elemBuilder.append('[')
 
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
     if (length == 0 && indent != -1) elemBuilder.appendAll(newLineCharArray, newLineCharArray.length) else renderIndent()
-    def subVisitor = MaterializeJsonRenderer.this
+    def subVisitor: sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
     def visitValue(v: StringWriter, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
@@ -205,14 +205,14 @@ case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = fal
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.MaterializeJsonRenderer; def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer} = new ObjVisitor[StringWriter, StringWriter] {
     flushBuffer()
     elemBuilder.append('{')
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
     if (length == 0 && indent != -1) elemBuilder.appendAll(newLineCharArray, newLineCharArray.length) else renderIndent()
-    def subVisitor = MaterializeJsonRenderer.this
-    def visitKey(index: Int) = MaterializeJsonRenderer.this
+    def subVisitor: sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
+    def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
     def visitKeyValue(s: Any): Unit = {
       elemBuilder.appendAll(keyValueSeparatorCharArray, keyValueSeparatorCharArray.length)
     }
