@@ -48,7 +48,7 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
       visitNull(index)
     } else {
       val charBuilder = new CharBuilder()
-      upickle.core.RenderUtils.escapeChar(null, charBuilder, s, unicode = true)
+      upickle.core.RenderUtils.escapeChar(null, charBuilder, s, escapeUnicode = true, wrapQuotes = true)
       out.write(charBuilder.makeString())
       flush
     }
@@ -91,7 +91,7 @@ class TomlRenderer(out: StringWriter = new java.io.StringWriter(), cumulatedInde
     }
   }
 
-  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, jsonableKeys: Boolean, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
     private var addComma = false
     depth += 1
     out.write("{ ")
