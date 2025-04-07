@@ -97,8 +97,15 @@ class Parser(val currentFile: Path,
       tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
     }
   )
-  def tripleBarString[_: P]: P[Seq[String]] = P(
-    "||"./ ~~ CharsWhileIn(" \t", 0) ~~
+  def maybeChompedTripleBarString[_: P]: P[Seq[String]] = tripleBarString.map{
+    case (true, lines) =>
+      Seq(lines.mkString.stripLineEnd)
+    case (false, lines) =>
+      lines
+  }
+
+  def tripleBarString[_: P]: P[(Boolean, Seq[String])] = P(
+    ("||-" | "||").?.!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
     "\n" ~~ tripleBarStringLines ~~ "\n" ~~
     CharsWhileIn(" \t", 0) ~~ "|||"
   )
@@ -111,7 +118,7 @@ class Parser(val currentFile: Path,
         case '\'' => literalSingleString
         case _ => Fail
       }
-      case '|' => tripleBarString
+      case '|' => maybeChompedTripleBarString
       case _ => Fail
     }
   ).map(_.mkString)
@@ -285,7 +292,7 @@ class Parser(val currentFile: Path,
             case '\'' => literalSingleString.map(constructString(pos, _))
             case _ => Fail
           }
-          case '|' => tripleBarString.map(constructString(pos, _))
+          case '|' => maybeChompedTripleBarString.map(constructString(pos, _))
           case '$' => Pass(Expr.$(pos))
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             P.current.index = pos.offset; number
