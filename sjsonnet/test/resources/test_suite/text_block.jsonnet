@@ -16,7 +16,7 @@ limitations under the License.
 
 // Golden
 local bash_golden = std.lines([
-  "#!/bin/bash",
+  "#!/usr/bin/env bash",
   "if [ $# -lt 1 ] ; then",
   "    echo \"No arguments!\"",
   "else",
@@ -26,7 +26,7 @@ local bash_golden = std.lines([
 
 // Soft tabs
 local bash_soft = |||
-  #!/bin/bash
+  #!/usr/bin/env bash
   if [ $# -lt 1 ] ; then
       echo "No arguments!"
   else
@@ -37,7 +37,7 @@ std.assertEqual(bash_golden, bash_soft) &&
 
 // Hard tabs
 local bash_hard = |||
-	#!/bin/bash
+	#!/usr/bin/env bash
 	if [ $# -lt 1 ] ; then
 	    echo "No arguments!"
 	else
@@ -48,7 +48,7 @@ std.assertEqual(bash_golden, bash_hard) &&
 
 // Mixed tabs
 local bash_mixed = |||
-  #!/bin/bash
+  #!/usr/bin/env bash
   if [ $# -lt 1 ] ; then
       echo "No arguments!"
   else
@@ -56,6 +56,33 @@ local bash_mixed = |||
   fi
 |||;
 std.assertEqual(bash_golden, bash_mixed) &&
+
+
+// Chomp trailing newline
+local str1 = |||-
+  foo bar baz
+|||;
+
+std.assertEqual(str1, "foo bar baz") &&
+
+
+// Chomp just one trailing newline
+local str1 = |||-
+  foo bar baz
+
+|||;
+
+std.assertEqual(str1, "foo bar baz\n") &&
+
+
+// Concatenate chomped blocks
+local str1 = |||-
+    foo bar baz
+||| + " " + |||-
+    biz buzz
+|||;
+
+std.assertEqual(str1, "foo bar baz biz buzz") &&
 
 
 // More indent
@@ -77,7 +104,7 @@ std.assertEqual(str1, "\\n\n") &&
 // Blank line with trailing whitespace
 local blank_line1 = |||
         foo
-        
+
         bar
     |||;
 
@@ -116,7 +143,7 @@ local op2 = "foo"<|||
 std.assertEqual(op2, true) &&
 
 // whitespace after |||
-local whitespace_after = |||  
+local whitespace_after = |||
   foo
 |||;
 
