@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.14</version>
+    <version>0.4.15</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.14" // SBT
-ivy"com.databricks::sjsonnet:0.4.14" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.15" // SBT
+ivy"com.databricks::sjsonnet:0.4.15" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.15/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet-0.4.14.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15/sjsonnet-0.4.15.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.14/sjsonnet-0.4.14.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15/sjsonnet-0.4.15.js > sjsonnet.js
 
 $ node
 
@@ -247,13 +247,13 @@ mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
 down to 0.2-0.3s. For the simple non-client-server executable, you can use
 
 ```bash
-./mill -i show sjsonnet[2.13.15].jvm.assembly
+./mill -i show sjsonnet[2.13.16].jvm.assembly
 ```
 
 To create the executable. For the client-server executable, you can use
 
 ```bash
-./mill -i show sjsonnet[2.13.15].server.assembly
+./mill -i show sjsonnet[2.13.16].server.assembly
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
@@ -272,11 +272,18 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
     --sonatypeCreds $SONATYPE_USER:$SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts --release true \
     --gpgArgs --passphrase=$GPG_PASSPHRASE,--batch,--yes,-a,-b,--pinentry-mode=loopback
 
-./mill -i show "sjsonnet.js[2.13.15].fullOpt"
-./mill -i show "sjsonnet.jvm[2.13.15].assembly"
+./mill -i show "sjsonnet.js[2.13.16].fullOpt"
+./mill -i show "sjsonnet.jvm[2.13.16].assembly"
 ```
 
 ## Changelog
+
+### 0.4.15
+- Add support for `tailstrict` [#189](https://github.com/databricks/sjsonnet/issues/189).
+- Bind the standard library to a `$std` variable and use it in desugared expressions [#249](https://github.com/databricks/sjsonnet/issues/249).
+- Update re2j dependency.
+- Add new Math functions to keep up with go-jsonnet.
+- Implement |||- syntax.
 
 ### 0.4.14
 - Fix a bug in new strict mode for set in `std.setUnion` [#242](https://github.com/databricks/sjsonnet/issues/242).
