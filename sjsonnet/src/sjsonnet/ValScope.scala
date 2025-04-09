@@ -22,7 +22,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
   def length: Int = bindings.length
 
   def extend(newBindingsF: Array[(Val.Obj, Val.Obj) => Lazy] = null,
-             newSelf: Val.Obj, newSuper: Val.Obj) = {
+             newSelf: Val.Obj, newSuper: Val.Obj): ValScope = {
     val by = if(newBindingsF == null) 2 else newBindingsF.length + 2
     val b = Arrays.copyOf(bindings, bindings.length + by)
     b(bindings.length) = newSelf
@@ -35,12 +35,11 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
         i += 1
         j += 1
       }
-      b
     }
     new ValScope(b)
   }
 
-  def extendSimple(newBindingsV: Array[_ <: Lazy]) = {
+  def extendSimple(newBindingsV: Array[? <: Lazy]): ValScope = {
     if(newBindingsV == null || newBindingsV.length == 0) this
     else {
       val b = Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
@@ -49,24 +48,24 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
     }
   }
 
-  def extendBy(num: Int) =
+  def extendBy(num: Int): ValScope =
     if(num == 0) this
     else new ValScope(Arrays.copyOf(bindings, bindings.length + num))
 
-  def extendSimple(l1: Lazy) = {
+  def extendSimple(l1: Lazy): ValScope = {
     val b = Arrays.copyOf(bindings, bindings.length+1)
     b(bindings.length) = l1
     new ValScope(b)
   }
 
-  def extendSimple(l1: Lazy, l2: Lazy) = {
+  def extendSimple(l1: Lazy, l2: Lazy): ValScope = {
     val b = Arrays.copyOf(bindings, bindings.length+2)
     b(bindings.length) = l1
     b(bindings.length+1) = l2
     new ValScope(b)
   }
 
-  def extendSimple(l1: Lazy, l2: Lazy, l3: Lazy) = {
+  def extendSimple(l1: Lazy, l2: Lazy, l3: Lazy): ValScope = {
     val b = Arrays.copyOf(bindings, bindings.length+3)
     b(bindings.length) = l1
     b(bindings.length+1) = l2
@@ -76,6 +75,6 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
 }
 
 object ValScope{
-  private[this] val emptyArr = new Array[Lazy](0)
+  private val emptyArr = new Array[Lazy](0)
   def empty = new ValScope(emptyArr)
 }

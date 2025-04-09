@@ -25,7 +25,7 @@ abstract class Materializer {
       case obj: Val.Obj =>
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
-        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , -1)
+        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , jsonableKeys = true, -1)
         val sort = !evaluator.settings.preserveOrder
         var prevKey: String = null
         obj.foreachElement(sort, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
@@ -61,7 +61,7 @@ abstract class Materializer {
         Error.fail("Couldn't manifest function with params [" + s.params.names.mkString(",") + "]", v.pos)
       case vv: Val =>
         Error.fail("Unknown value type " + vv.prettyName, vv.pos)
-      case _ =>
+      case null =>
         Error.fail("Unknown value type " + v)
     }
   } catch {

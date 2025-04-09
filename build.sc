@@ -5,18 +5,18 @@ import java.util.Base64
 
 val sjsonnetVersion = "0.4.15"
 
-val scalaVersions = Seq("2.12.20", "2.13.16")
+val scalaVersions = Seq("2.12.20", "2.13.16", "3.6.4")
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
   def artifactName = "sjsonnet"
 
   def ivyDeps = Agg(
-    ivy"com.lihaoyi::fastparse::2.3.3",
-    ivy"com.lihaoyi::pprint::0.6.6",
-    ivy"com.lihaoyi::ujson::1.3.15",
-    ivy"com.lihaoyi::scalatags::0.9.4",
-    ivy"org.scala-lang.modules::scala-collection-compat::2.11.0"
+    ivy"com.lihaoyi::fastparse::3.1.1",
+    ivy"com.lihaoyi::pprint::0.9.0",
+    ivy"com.lihaoyi::ujson::4.1.0",
+    ivy"com.lihaoyi::scalatags::0.13.1",
+    ivy"org.scala-lang.modules::scala-collection-compat::2.12.0"
   )
   def publishVersion = sjsonnetVersion
 
@@ -42,14 +42,14 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
     )
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.2")
+    def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.5")
   }
 }
 
 trait SjsonnetJvmNative extends ScalaModule {
   def ivyDeps = super.ivyDeps() ++ Agg(
-    ivy"com.lihaoyi::os-lib::0.7.8",
-    ivy"com.lihaoyi::mainargs::0.2.5"
+    ivy"com.lihaoyi::os-lib::0.11.4",
+    ivy"com.lihaoyi::mainargs::0.7.6"
   )
 }
 
@@ -116,7 +116,7 @@ object sjsonnet extends Module {
   object native extends Cross[SjsonnetNativeModule](scalaVersions)
   trait SjsonnetNativeModule extends SjsonnetCrossModule with ScalaNativeModule with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
-    def scalaNativeVersion = "0.4.17"
+    def scalaNativeVersion = "0.5.7"
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-native",
@@ -150,10 +150,10 @@ object sjsonnet extends Module {
       ivy"org.json:json:20250107",
       ivy"org.tukaani:xz::1.10",
       ivy"org.lz4:lz4-java::1.8.0",
-      ivy"org.yaml:snakeyaml::1.33",
+      ivy"org.yaml:snakeyaml::2.0",
       ivy"com.google.re2j:re2j:1.8",
     )
-    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**")
+    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
 
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss100m")

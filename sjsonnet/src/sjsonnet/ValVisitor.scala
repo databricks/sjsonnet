@@ -9,9 +9,12 @@ import scala.collection.mutable
 
 /** Parse JSON directly into a literal `Val` */
 class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val,Val] = visitObject(length, index)
+
   def visitArray(length: Int, index: Int): ArrVisitor[Val, Val] = new ArrVisitor[Val, Val] {
     val a = new mutable.ArrayBuilder.ofRef[Lazy]
-    def subVisitor: Visitor[_, _] = self
+    def subVisitor: Visitor[?, ?] = self
     def visitValue(v: Val, index: Int): Unit = a.+=(v)
     def visitEnd(index: Int): Val = new Val.Arr(pos, a.result())
   }
@@ -20,8 +23,8 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     val cache = new java.util.HashMap[Any, Val]()
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     var key: String = null
-    def subVisitor: Visitor[_, _] = self
-    def visitKey(index: Int) = upickle.core.StringVisitor
+    def subVisitor: Visitor[?, ?] = self
+    def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
     def visitKeyValue(s: Any): Unit = key = s.toString
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)
@@ -39,7 +42,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): Val =
     Val.Num(pos,
       if (decIndex != -1 || expIndex != -1) s.toString.toDouble
-      else upickle.core.Util.parseIntegralNum(s, decIndex, expIndex, index)
+      else upickle.core.ParseUtils.parseIntegralNum(s, decIndex, expIndex, index)
     )
 
   def visitString(s: CharSequence, index: Int): Val = Val.Str(pos, s.toString)

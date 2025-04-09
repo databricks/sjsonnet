@@ -16,24 +16,27 @@ class BaseRenderer[T <: java.io.Writer]
                    indent: Int = -1,
                    escapeUnicode: Boolean = false) extends ujson.JsVisitor[T, T]{
   var depth: Int = 0
-  val colonSnippet = if (indent == -1) ":" else ": "
+  val colonSnippet: String = if (indent == -1) ":" else ": "
 
   var commaBuffered = false
 
-  def flushBuffer() = {
+  def flushBuffer(): Unit = {
     if (commaBuffered) {
       commaBuffered = false
       out.append(',')
       renderIndent()
     }
   }
-  def visitArray(length: Int, index: Int) = new ArrVisitor[T, T] {
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T,T] = visitObject(length, index)
+  
+  def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[T,T]{def subVisitor: sjsonnet.BaseRenderer[T]} = new ArrVisitor[T, T] {
     flushBuffer()
     out.append('[')
 
     depth += 1
     renderIndent()
-    def subVisitor = BaseRenderer.this
+    def subVisitor: sjsonnet.BaseRenderer[T] = BaseRenderer.this
     def visitValue(v: T, index: Int): Unit = {
       flushBuffer()
       commaBuffered = true
@@ -47,13 +50,13 @@ class BaseRenderer[T <: java.io.Writer]
     }
   }
 
-  def visitObject(length: Int, index: Int) = new ObjVisitor[T, T] {
+  def visitObject(length: Int, index: Int): ObjVisitor[T,T] = new ObjVisitor[T, T] {
     flushBuffer()
     out.append('{')
     depth += 1
     renderIndent()
-    def subVisitor = BaseRenderer.this
-    def visitKey(index: Int) = BaseRenderer.this
+    def subVisitor: sjsonnet.BaseRenderer[T] = BaseRenderer.this
+    def visitKey(index: Int): sjsonnet.BaseRenderer[T]= BaseRenderer.this
     def visitKeyValue(s: Any): Unit = out.append(colonSnippet)
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
@@ -67,31 +70,31 @@ class BaseRenderer[T <: java.io.Writer]
     }
   }
 
-  def visitNull(index: Int) = {
+  def visitNull(index: Int): T = {
     flushBuffer()
     out.append("null")
     out
   }
 
-  def visitFalse(index: Int) = {
+  def visitFalse(index: Int): T = {
     flushBuffer()
     out.append("false")
     out
   }
 
-  def visitTrue(index: Int) = {
+  def visitTrue(index: Int): T = {
     flushBuffer()
     out.append("true")
     out
   }
 
-  def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int) = {
+  def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): T = {
     flushBuffer()
     out.append(s)
     out
   }
 
-  override def visitFloat64(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int): T = {
     d match{
       case Double.PositiveInfinity => visitString("Infinity", -1)
       case Double.NegativeInfinity => visitString("-Infinity", -1)
@@ -106,7 +109,7 @@ class BaseRenderer[T <: java.io.Writer]
     out
   }
 
-  def visitString(s: CharSequence, index: Int) = {
+  def visitString(s: CharSequence, index: Int): T = {
     flushBuffer()
     if (s == null) out.append("null")
     else BaseRenderer.escape(out, s, escapeUnicode)
@@ -114,7 +117,7 @@ class BaseRenderer[T <: java.io.Writer]
     out
   }
 
-  final def renderIndent() = {
+  final def renderIndent(): Unit = {
     if (indent == -1) ()
     else {
       out.append('\n')
