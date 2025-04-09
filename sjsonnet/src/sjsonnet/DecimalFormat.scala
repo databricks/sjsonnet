@@ -8,7 +8,7 @@ package sjsonnet
   */
 object DecimalFormat {
 
-  def trailingZeroes(n: Long) = {
+  def trailingZeroes(n: Long): Int = {
     var count = 0
     var current = n
     var done = false
@@ -31,7 +31,7 @@ object DecimalFormat {
       val n = (n0 / Math.pow(10, trailingZeroes(n0))).toInt
       assert(n == math.abs(n))
       val nWidth = if (n == 0) 1 else Math.log10(n).toInt + 1
-      (n + "0" * (minWidth - nWidth)).take(maxWidth)
+      ("" + n + "0" * (minWidth - nWidth)).take(maxWidth)
     }
   }
   def format(fracLengthOpt: Option[(Int, Int)], expLengthOpt: Option[Int], number: Double): String = {

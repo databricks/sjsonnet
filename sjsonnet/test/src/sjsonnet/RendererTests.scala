@@ -4,7 +4,7 @@ import sjsonnet.Expr._
 import utest._
 
 object RendererTests extends TestSuite{
-  def tests = Tests {
+  def tests: Tests = Tests {
     test("hello") {
       ujson.transform(ujson.Arr(ujson.Num(1), ujson.Num(2)), new Renderer()).toString ==>
         "[1, 2]"

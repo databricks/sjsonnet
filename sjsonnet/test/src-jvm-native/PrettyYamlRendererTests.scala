@@ -2,8 +2,8 @@ import sjsonnet._
 import utest._
 
 object PrettyYamlRendererTests extends TestSuite{
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(path: os.Path, comments: Boolean) = {
+  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  def eval(path: os.Path, comments: Boolean): String = {
     var currentPos: Position = null
     val interp = new Interpreter(
       Map(),
@@ -23,8 +23,8 @@ object PrettyYamlRendererTests extends TestSuite{
     )
     res.right.get.toString
   }
-  val nontrivial = os.pwd / "sjsonnet" / "test" / "resources" / "nontrivial"
-  def tests = Tests{
+  val nontrivial: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "nontrivial"
+  def tests: Tests = Tests{
     test("nocomments"){
       eval(nontrivial / "mixins.jsonnet", comments = false) ==>
         os.read(nontrivial / "mixins.golden.yaml")
