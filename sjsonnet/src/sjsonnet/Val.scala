@@ -15,7 +15,7 @@ import scala.reflect.ClassTag
  * evaluated dictionary values, array contents, or function parameters
  * are all wrapped in [[Lazy]] and only truly evaluated on-demand
  */
-protected abstract class Lazy {
+abstract class Lazy {
   protected[this] var cached: Val = null
   def compute(): Val
   final def force: Val = {
