@@ -23,14 +23,27 @@ class Interpreter(extVars: Map[String, String],
                   std: Val.Obj = new Std().Std
                   ) { self =>
 
-  private val internedStrings = new mutable.HashMap[String, String]
+  protected val internedStrings = new mutable.HashMap[String, String]
 
-  private val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
+  protected val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
   val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
-    override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] =
+    override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
       handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
+    }
   }
+
+  /**
+   * A cache for parsing variables.
+   * */
+  def createVarParseCache: ParseCache = new DefaultParseCache()
+
+  val varResolver = new CachedResolver(importer, createVarParseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
+    override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
+      handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
+    }
+  }
+
 
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
@@ -38,9 +51,8 @@ class Interpreter(extVars: Map[String, String],
                       settings: Settings, warn: Error => Unit): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, warn)
 
-
-  def parseVar(k: String, v: String) = {
-    resolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
+  def parseVar(k: String, v: String): Expr = {
+    varResolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
 
   lazy val evaluator: Evaluator = createEvaluator(
