@@ -183,7 +183,9 @@ object Val{
       var i = 0
       while (i < members.length) {
         val e = members(i)
-        m.put(e._1, e._2)
+        if (e ne null) {
+          m.put(e._1, e._2)
+        }
         i += 1
       }
       new Obj(pos, m, false, null, null)
