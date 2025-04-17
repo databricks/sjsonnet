@@ -12,16 +12,27 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(extVars: Map[String, String],
-                  tlaVars: Map[String, String],
+class Interpreter(queryExtVar: String => Option[String],
+                  queryTlaVar: String => Option[String],
                   wd: Path,
                   importer: Importer,
-                  val parseCache: ParseCache,
-                  settings: Settings = Settings.default,
-                  storePos: Position => Unit = null,
-                  warnLogger: (String => Unit) = null,
-                  std: Val.Obj = new Std().Std
-                  ) { self =>
+                  parseCache: ParseCache,
+                  settings: Settings,
+                  storePos: Position => Unit,
+                  warnLogger: String => Unit,
+                  std: Val.Obj
+                 ) { self =>
+
+  def this(extVars: Map[String, String],
+           tlaVars: Map[String, String],
+           wd: Path,
+           importer: Importer,
+           parseCache: ParseCache,
+           settings: Settings = Settings.default,
+           storePos: Position => Unit = null,
+           warnLogger: (String => Unit) = null,
+           std: Val.Obj = new Std().Std) =
+    this(extVars.get(_), tlaVars.get(_), wd, importer, parseCache, settings, storePos, warnLogger, std)
 
   private val internedStrings = new mutable.HashMap[String, String]
 
@@ -46,7 +57,7 @@ class Interpreter(extVars: Map[String, String],
   lazy val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
-    k => extVars.get(k).map(v => parseVar(s"ext-var $k", v)),
+    k => queryExtVar(k).map(v => parseVar(s"ext-var $k", v)),
     wd,
     settings,
     warn
@@ -95,7 +106,7 @@ class Interpreter(extVars: Map[String, String],
           var i = 0
           while(i < defaults2.length) {
             val k = f.params.names(i)
-            for(v <- tlaVars.get(k)){
+            for(v <- queryTlaVar(k)){
               val parsed = parseVar(s"tla-var $k", v)
               defaults2(i) = parsed
               tlaExpressions.add(parsed)
