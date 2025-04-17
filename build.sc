@@ -3,7 +3,7 @@ import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 import java.util.Base64
 
-val sjsonnetVersion = "0.4.15"
+val sjsonnetVersion = "0.4.15.1"
 
 val scalaVersions = Seq("2.12.20", "2.13.16")
 
