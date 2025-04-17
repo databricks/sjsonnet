@@ -1595,9 +1595,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     },
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
       val bindings: Array[(String, Val.Obj.Member)] = for{
-        k <- o.visibleKeyNames
+        k <- o.visibleKeyNames if k != key
         v = o.value(k, pos.fileScope.noOffsetPos)(ev)
-        if k != key
       }yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
       Val.Obj.mk(pos, bindings)
     },
