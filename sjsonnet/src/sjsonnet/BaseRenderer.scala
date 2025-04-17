@@ -15,6 +15,9 @@ class BaseRenderer[T <: java.io.Writer]
                   (out: T,
                    indent: Int = -1,
                    escapeUnicode: Boolean = false) extends ujson.JsVisitor[T, T]{
+
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T,T] = visitObject(length, index)
+
   var depth: Int = 0
   val colonSnippet = if (indent == -1) ":" else ": "
 
