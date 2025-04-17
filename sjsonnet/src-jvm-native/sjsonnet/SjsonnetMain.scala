@@ -193,8 +193,8 @@ object SjsonnetMain {
 
     var currentPos: Position = null
     val interp = new Interpreter(
-      extBinding,
-      tlaBinding,
+      queryExtVar = extBinding.get(_),
+      queryTlaVar = extBinding.get(_),
       OsPath(wd),
       importer = importer match{
         case Some(i) => new Importer {
@@ -217,7 +217,7 @@ object SjsonnetMain {
         strictSetOperations = config.strictSetOperations.value,
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
       ),
-      storePos = if (config.yamlDebug.value) currentPos = _ else null,
+      storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else null,
       warnLogger = warnLogger,
       std = std
     )
