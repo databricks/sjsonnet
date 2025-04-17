@@ -3,7 +3,7 @@ import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 import java.util.Base64
 
-val sjsonnetVersion = "0.4.15.3"
+val sjsonnetVersion = "0.4.15.4"
 
 val scalaVersions = Seq("2.12.20", "2.13.16")
 
@@ -14,7 +14,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def ivyDeps = Agg(
     ivy"com.lihaoyi::fastparse::2.3.3",
     ivy"com.lihaoyi::pprint::0.6.6",
-    ivy"com.lihaoyi::ujson::1.3.15",
+    ivy"com.lihaoyi::ujson::4.2.1",
     ivy"com.lihaoyi::scalatags::0.9.4",
     ivy"org.scala-lang.modules::scala-collection-compat::2.11.0"
   )

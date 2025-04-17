@@ -1,4 +1,4 @@
-val sjsonnetVersion = "0.4.15.3"
+val sjsonnetVersion = "0.4.15.4"
 
 scalaVersion in Global := "2.13.16"
 
@@ -13,7 +13,7 @@ lazy val main = (project in file("sjsonnet"))
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "2.3.3",
       "com.lihaoyi" %% "pprint" % "0.6.6",
-      "com.lihaoyi" %% "ujson" % "1.3.15",
+      "com.lihaoyi" %% "ujson" % "4.2.1",
       "com.lihaoyi" %% "scalatags" % "0.9.4",
       "com.lihaoyi" %% "os-lib" % "0.7.8",
       "com.lihaoyi" %% "mainargs" % "0.2.5",

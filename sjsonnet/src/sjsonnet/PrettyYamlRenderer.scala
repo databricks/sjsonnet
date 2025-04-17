@@ -17,6 +17,9 @@ class PrettyYamlRenderer(out: Writer = new java.io.StringWriter(),
                          indent: Int,
                          idealWidth: Int = 80,
                          getCurrentPosition: () => Position) extends BaseRenderer[Writer](out, indent){
+
+  override def visitJsonableObject(length: Int, index: Int) = visitObject(length, index)
+
   var newlineBuffered = false
   var dashBuffered = false
   var afterColon = false
