@@ -1260,14 +1260,14 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case _ => x.transform(new sjsonnet.Renderer())
       }
       def sect(x: ujson.Obj) = {
-        x.value.flatMap{
+        x.value.toSeq.flatMap{
           case (k, ujson.Arr(vs)) => vs.map(x => k + " = " + render(x))
           case (k, v) => Seq(k + " = " + render(v))
         }
       }
       val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
         materialized.obj.get("sections").fold(Iterable[String]())(x =>
-          x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
+          x.obj.toSeq.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
         )
       lines.flatMap(Seq(_, "\n")).mkString
     },
@@ -1361,7 +1361,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
     },
     builtin("manifestPythonVars", "v"){ (pos, ev, v: Val.Obj) =>
-      Materializer(v)(ev).obj
+      Materializer(v)(ev).obj.toSeq
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
         .mkString
     },
@@ -1372,7 +1372,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           case ujson.Str(s) => s
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
-              attrs.value.map {
+              attrs.value.toSeq.map {
                 case (k, ujson.Str(v)) => attr(k) := v
 
                 // use ujson.write to make sure output number format is same as
