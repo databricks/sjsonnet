@@ -7,9 +7,9 @@ import java.util.Arrays
 
 object MainTests extends TestSuite {
 
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources"
+  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources"
   // stdout mode uses println so it has an extra platform-specific line separator at the end
-  val eol = System.getProperty("line.separator")
+  val eol: String = System.getProperty("line.separator")
 
   val tests = Tests {
     // Compare writing to stdout with writing to a file

@@ -5,7 +5,7 @@ import utest._
 
 object StdMd5Tests extends TestSuite {
 
-  def tests = Tests {
+  def tests: Tests = Tests {
     test {
       eval("std.md5('')") ==> ujson.Str("d41d8cd98f00b204e9800998ecf8427e")
     }

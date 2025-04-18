@@ -4,7 +4,7 @@ import utest._
 import TestUtils.eval
 
 object StdXzTests extends TestSuite {
-  val tests = Tests {
+  val tests: Tests = Tests {
     test("xz"){
       eval("""std.xz([1, 2])""") ==> ujson.Str("/Td6WFoAAATm1rRGAgAhARYAAAB0L+WjAQABAQIAAADRC9qlUgJ94gABGgLcLqV+H7bzfQEAAAAABFla")
       eval("""std.xz("hi")""") ==> ujson.Str("/Td6WFoAAATm1rRGAgAhARYAAAB0L+WjAQABaGkAAAD+qTgRvMqlSAABGgLcLqV+H7bzfQEAAAAABFla")

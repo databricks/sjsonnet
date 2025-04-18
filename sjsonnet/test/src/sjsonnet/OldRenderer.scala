@@ -14,13 +14,13 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 class OldRenderer(out: Writer = new java.io.StringWriter(),
                   indent: Int = -1) extends BaseRenderer(out, indent){
   var newlineBuffered = false
-  override def visitFloat64(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int): Writer = {
     flushBuffer()
     out.append(RenderUtils.renderDouble(d))
     out
   }
   override val colonSnippet = ": "
-  override def flushBuffer() = {
+  override def flushBuffer(): Unit = {
     if (commaBuffered) {
       if (indent == -1) out.append(", ")
       else out.append(',')
@@ -38,14 +38,14 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[Writer, Writer] {
+  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.OldRenderer} = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('[')
     newlineBuffered = true
 
     depth += 1
-    def subVisitor = OldRenderer.this
+    def subVisitor: sjsonnet.OldRenderer = OldRenderer.this
     def visitValue(v: Writer, index: Int): Unit = {
       empty = false
       flushBuffer()
@@ -63,14 +63,14 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[Writer, Writer] {
+  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.OldRenderer; def visitKey(index: Int): sjsonnet.OldRenderer} = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')
     newlineBuffered = true
     depth += 1
-    def subVisitor = OldRenderer.this
-    def visitKey(index: Int) = OldRenderer.this
+    def subVisitor: sjsonnet.OldRenderer = OldRenderer.this
+    def visitKey(index: Int): sjsonnet.OldRenderer= OldRenderer.this
     def visitKeyValue(v: Any): Unit = {
       empty = false
       flushBuffer()
@@ -96,26 +96,26 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
 class OldPythonRenderer(out: Writer = new java.io.StringWriter(),
                         indent: Int = -1) extends BaseRenderer(out, indent){
 
-  override def visitNull(index: Int) = {
+  override def visitNull(index: Int): Writer = {
     flushBuffer()
     out.append("None")
     out
   }
 
-  override def visitFalse(index: Int) = {
+  override def visitFalse(index: Int): Writer = {
     flushBuffer()
     out.append("False")
     out
   }
 
-  override def visitTrue(index: Int) = {
+  override def visitTrue(index: Int): Writer = {
     flushBuffer()
     out.append("True")
     out
   }
 
   override val colonSnippet = ": "
-  override def flushBuffer() = {
+  override def flushBuffer(): Unit = {
     if (commaBuffered) {
       commaBuffered = false
       out.append(", ")

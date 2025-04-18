@@ -1,12 +1,21 @@
 val sjsonnetVersion = "0.4.15.1"
 
-scalaVersion in Global := "2.13.16"
+val scala213 = "2.13.16"
+val scala3 = "3.6.4"
 
 cancelable in Global := true
 
+val scala3Options = Seq()
+val scala2Options = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
+
 lazy val main = (project in file("sjsonnet"))
   .settings(
-    Compile / scalacOptions ++= Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**"),
+    scalaVersion := scala3,
+    crossScalaVersions := Seq(scala213, scala3),
+    scalacOptions ++= {CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) => scala3Options
+        case _ => scala2Options
+      }},
     Test / fork := true,
     Test / javaOptions += "-Xss100m",
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
@@ -57,5 +66,11 @@ lazy val bench = (project in file("bench"))
   .dependsOn(main % "compile->test")
   .enablePlugins(JmhPlugin)
   .settings(
-    run / fork := true,
+    run / fork := true
+  )
+
+  lazy val root = (project in file("."))
+  .aggregate(main)
+  .settings(
+    publishArtifact := false
   )

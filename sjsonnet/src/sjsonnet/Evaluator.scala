@@ -27,7 +27,7 @@ class Evaluator(resolver: CachedResolver,
   def warn(e: Error): Unit = if(warnLogger != null) warnLogger(e)
 
   def materialize(v: Val): Value = Materializer.apply(v)
-  val cachedImports = collection.mutable.HashMap.empty[Path, Val]
+  val cachedImports: mutable.HashMap[Path,Val] = collection.mutable.HashMap.empty[Path, Val]
   var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
@@ -69,8 +69,9 @@ class Evaluator(resolver: CachedResolver,
       case e: Expr.Error => visitError(e)
       case e => visitInvalid(e)
     }
-  } catch Error.withStackFrame(e)
-
+  } catch {
+    Error.withStackFrame(e)
+  }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
   def visitInvalid(e: Expr): Nothing = e match {
     case Id(pos, name) =>
@@ -323,6 +324,7 @@ class Evaluator(resolver: CachedResolver,
   private def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
     val arr = new Array[Lazy](e.argExprs.length)
     var idx = 0
+
     if (tailstrict) {
       while (idx < e.argExprs.length) {
         arr(idx) = visitExpr(e.argExprs(idx))
@@ -339,6 +341,7 @@ class Evaluator(resolver: CachedResolver,
       tailstrict = false
       res
     } else {
+
       while (idx < e.argExprs.length) {
         val boundIdx = idx
         arr(idx) = visitAsLazy(e.argExprs(boundIdx))
@@ -433,21 +436,23 @@ class Evaluator(resolver: CachedResolver,
     )
   }
 
-  def visitAnd(e: And)(implicit scope: ValScope) = {
+  def visitAnd(e: And)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
       case _: Val.True =>
         visitExpr(e.rhs) match{
-          case b: Val.Bool => b
+          case b: Val.Bool =>
+             b
           case unknown =>
             Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
         }
-      case _: Val.False => Val.False(e.pos)
+      case _: Val.False => 
+        Val.False(e.pos)
       case unknown =>
         Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
     }
   }
 
-  def visitOr(e: Or)(implicit scope: ValScope) = {
+  def visitOr(e: Or)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
       case _: Val.True => Val.True(e.pos)
       case _: Val.False =>
@@ -461,7 +466,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitInSuper(e: InSuper)(implicit scope: ValScope) = {
+  def visitInSuper(e: InSuper)(implicit scope: ValScope): Val.Bool = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
     if(sup == null) Val.False(e.pos)
     else {
@@ -470,7 +475,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitBinaryOp(e: BinaryOp)(implicit scope: ValScope) = {
+  def visitBinaryOp(e: BinaryOp)(implicit scope: ValScope): Val.Literal = {
     val l = visitExpr(e.lhs)
     val r = visitExpr(e.rhs)
     val pos = e.pos
@@ -594,7 +599,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope) =
+  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val = visitExpr(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
@@ -619,14 +624,16 @@ class Evaluator(resolver: CachedResolver,
   def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
-    var cachedSimpleScope: ValScope = null.asInstanceOf[ValScope]
+    var cachedSimpleScope: Option[ValScope] = None
     var cachedObj: Val.Obj = null
     var asserting: Boolean = false
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       if((sup eq null) && (self eq cachedObj)) {
-        if(cachedSimpleScope == null.asInstanceOf[ValScope]) cachedSimpleScope = createNewScope(self, sup)
-        cachedSimpleScope
+        cachedSimpleScope.getOrElse{
+          cachedSimpleScope = Some(createNewScope(self, sup))
+          cachedSimpleScope.get
+        }
       } else createNewScope(self, sup)
     }
 

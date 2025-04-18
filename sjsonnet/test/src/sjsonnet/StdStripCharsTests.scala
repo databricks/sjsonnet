@@ -4,7 +4,7 @@ import sjsonnet.TestUtils.eval
 import utest._
 object StdStripCharsTests extends TestSuite {
 
-  def tests = Tests {
+  def tests: Tests = Tests {
     test("stdRStripChars") {
       eval("std.rstripChars(\" test test test \", \" \")").toString() ==> """" test test test""""
       eval("std.rstripChars(\"aaabbbbcccc\", \"ac\")").toString() ==> """"aaabbbb""""

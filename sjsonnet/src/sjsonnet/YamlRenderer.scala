@@ -30,7 +30,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
 
-  private[this] def appendString(s: String): Unit = {
+  private def appendString(s: String): Unit = {
     val len = s.length
     var i = 0
     elemBuilder.ensureLength(len)
@@ -175,10 +175,10 @@ object YamlRenderer{
   private val yamlReserved = Set("true", "false", "null", "yes", "no", "on", "off", "y", "n", ".nan",
     "+.inf", "-.inf", ".inf", "null", "-", "---", "''")
   private val yamlTimestampPattern = Platform.getPatternFromCache("^(?:[0-9]*-){2}[0-9]*$")
-  private val yamlBinaryPattern = Platform.getPatternFromCache("^[-+]?0b[0-1_]+$")
-  private val yamlHexPattern = Platform.getPatternFromCache("[-+]?0x[0-9a-fA-F_]+")
-  private val yamlFloatPattern = Platform.getPatternFromCache( "^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$" )
-  private val yamlIntPattern = Platform.getPatternFromCache("^[-+]?[0-9_]+$")
+  private val yamlBinaryPattern = Platform.getPatternFromCache("^[-+]?0b[0-1?]+$")
+  private val yamlHexPattern = Platform.getPatternFromCache("[-+]?0x[0-9a-fA-F?]+")
+  private val yamlFloatPattern = Platform.getPatternFromCache( "^-?([0-9?]*)*(\\.[0-9?]*)?(e[-+][0-9?]+)?$" )
+  private val yamlIntPattern = Platform.getPatternFromCache("^[-+]?[0-9?]+$")
 
   private def isSafeBareKey(k: String) = {
     val l = k.toLowerCase

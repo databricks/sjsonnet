@@ -14,7 +14,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
 
   def visitArray(length: Int, index: Int): ArrVisitor[Val, Val] = new ArrVisitor[Val, Val] {
     val a = new mutable.ArrayBuilder.ofRef[Lazy]
-    def subVisitor: Visitor[_, _] = self
+    def subVisitor: Visitor[?, ?] = self
     def visitValue(v: Val, index: Int): Unit = a.+=(v)
     def visitEnd(index: Int): Val = new Val.Arr(pos, a.result())
   }
@@ -23,8 +23,8 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     val cache = new java.util.HashMap[Any, Val]()
     val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
     var key: String = null
-    def subVisitor: Visitor[_, _] = self
-    def visitKey(index: Int) = upickle.core.StringVisitor
+    def subVisitor: Visitor[?, ?] = self
+    def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
     def visitKeyValue(s: Any): Unit = key = s.toString
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)

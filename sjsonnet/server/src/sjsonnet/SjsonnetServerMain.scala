@@ -151,8 +151,9 @@ class Server[T](lockBase: String,
 
     @volatile var done = false
     @volatile var idle = false
-    val t = new Thread(() =>
-      try {
+    val t = new Thread(new Runnable{
+      override def run(): Unit = {
+        try {
         val (result, newStateCache) = sm.main0(
           args,
           sm.stateCache,
@@ -173,6 +174,8 @@ class Server[T](lockBase: String,
       } finally{
         done = true
         idle = true
+      }
+      }
       },
       "SjsonnetServerActionRunner"
     )

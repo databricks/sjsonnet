@@ -15,7 +15,7 @@ import scala.collection.mutable
   */
 
 object Parser {
-  val precedenceTable = Seq(
+  val precedenceTable: Seq[Seq[String]] = Seq(
     Seq("*", "/", "%"),
     Seq("+", "-"),
     Seq("<<", ">>"),
@@ -28,18 +28,18 @@ object Parser {
     Seq("||")
   )
 
-  val precedence = precedenceTable
+  val precedence: Map[String,Int] = precedenceTable
     .reverse
     .zipWithIndex
     .flatMap{case (ops, idx) => ops.map(_ -> idx)}
     .toMap
 
-  val keywords = Set(
+  val keywords: Set[String] = Set(
     "assert", "else", "error", "false", "for", "function", "if", "import", "importstr",
     "in", "local", "null", "tailstrict", "then", "self", "super", "true", "importbin"
   )
 
-  def idStartChar(c: Char) = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+  def idStartChar(c: Char): Boolean = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
   private val emptyLazyArray = new Array[Lazy](0)
 }
@@ -52,15 +52,15 @@ class Parser(val currentFile: Path,
 
   private val fileScope = new FileScope(currentFile)
 
-  def Pos[_: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
+  def Pos(implicit p: P[?]): P[Position] = Index.map(offset => new Position(fileScope, offset))
 
-  def id[_: P] = P(
+  def id(implicit p: P[?]): P[String] = P(
     CharIn("_a-zA-Z") ~~
     CharsWhileIn("_a-zA-Z0-9", 0)
   ).!.filter(s => !keywords.contains(s))
 
-  def break[_: P] = P(!CharIn("_a-zA-Z0-9"))
-  def number[_: P]: P[Val.Num] = P(
+  def break(implicit p: P[?]): P[Unit] = P(!CharIn("_a-zA-Z0-9"))
+  def number(implicit p: P[?]): P[Val.Num] = P(
     Pos ~~ (
       CharsWhileIn("0-9") ~~
       ("." ~ CharsWhileIn("0-9")).? ~~
@@ -68,8 +68,8 @@ class Parser(val currentFile: Path,
     ).!
   ).map(s => Val.Num(s._1, s._2.toDouble))
 
-  def escape[_: P] = P( escape0 | escape1 )
-  def escape0[_: P] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
+  def escape(implicit p: P[?]): P[String] = P( escape0 | escape1 )
+  def escape0(implicit p: P[?]): P[String] = P("\\" ~~ !"u" ~~ AnyChar.!).map{
     case "\"" => "\""
     case "'" => "\'"
     case "\\" => "\\"
@@ -80,36 +80,29 @@ class Parser(val currentFile: Path,
     case "r" => "\r"
     case "t" => "\t"
   }
-  def escape1[_: P] = P( "\\u" ~~ CharIn("0-9a-fA-F").repX(min=4, max=4).! ).map{
+  def escape1(implicit p: P[?]): P[String] = P( "\\u" ~~ CharIn("0-9a-fA-F").repX(min=4, max=4).! ).map{
     s => Integer.parseInt(s, 16).toChar.toString
   }
-  def doubleString[_: P]: P[Seq[String]] =
+  def doubleString(implicit p: P[?]): P[Seq[String]] =
     P( (CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"" )
-  def singleString[_: P]: P[Seq[String]] =
+  def singleString(implicit p: P[?]): P[Seq[String]] =
     P( (CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'" )
-  def literalDoubleString[_: P]: P[Seq[String]] =
+  def literalDoubleString(implicit p: P[?]): P[Seq[String]] =
     P( (CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\""  )
-  def literalSingleString[_: P]: P[Seq[String]] =
+  def literalSingleString(implicit p: P[?]): P[Seq[String]] =
     P( (CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'" )
 
-  def tripleBarStringLines[_: P]: P[Seq[String]] = P(
+  def tripleBarStringLines(implicit p: P[?]): P[Seq[String]] = P(
     tripleBarStringHead.flatMapX { case (pre, w, head) =>
       tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
     }
   )
-  def maybeChompedTripleBarString[_: P]: P[Seq[String]] = tripleBarString.map{
-    case (true, lines) =>
-      Seq(lines.mkString.stripLineEnd)
-    case (false, lines) =>
-      lines
-  }
-
-  def tripleBarString[_: P]: P[(Boolean, Seq[String])] = P(
-    ("||-" | "||").?.!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
+  def tripleBarString(implicit p: P[?]): P[Seq[String]] = P(
+    "||"./ ~~ CharsWhileIn(" \t", 0) ~~
     "\n" ~~ tripleBarStringLines ~~ "\n" ~~
     CharsWhileIn(" \t", 0) ~~ "|||"
   )
-  def string[_: P]: P[String] = P(
+  def string(implicit p: P[?]): P[String] = P(
     SingleChar.flatMapX{
       case '\"' => doubleString
       case '\'' => singleString
@@ -123,24 +116,24 @@ class Parser(val currentFile: Path,
     }
   ).map(_.mkString)
 
-  def tripleBarStringHead[_: P] = P(
+  def tripleBarStringHead(implicit p: P[?]): P[(Seq[String], String, String)] = P(
     (CharsWhileIn(" \t", 0) ~~ "\n".!).repX ~~
       CharsWhileIn(" \t", 1).! ~~
       CharsWhile(_ != '\n').!
   )
-  def tripleBarBlankHead[_: P]: P[String] =
+  def tripleBarBlankHead(implicit p: P[?]): P[String] =
     P( CharsWhileIn(" \t", 0) ~~ &("\n").map(_ => "\n") )
 
-  def tripleBarBlank[_: P]: P[String] = P( "\n" ~~ tripleBarBlankHead )
+  def tripleBarBlank(implicit p: P[?]): P[String] = P( "\n" ~~ tripleBarBlankHead )
 
-  def tripleBarStringBody[_: P](w: String): P[Seq[String]] = P(
+  def tripleBarStringBody(w: String)(implicit p: P[?]): P[Seq[String]] = P(
     (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
 
 
-  def arr[_: P]: P[Expr] = P( (Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody )
-  def compSuffix[_: P] = P( forspec ~ compspec ).map(Left(_))
-  def arrBody[_: P]: P[Expr] = P(
+  def arr(implicit p: P[?]): P[Expr] = P( (Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody )
+  def compSuffix(implicit p: P[?]): P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]),Nothing]] = P( forspec ~ compspec ).map(Left(_))
+  def arrBody(implicit p: P[?]): P[Expr] = P(
     Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map{
@@ -159,19 +152,19 @@ class Parser(val currentFile: Path,
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 
-  def assertExpr[_: P](pos: Position): P[Expr] =
+  def assertExpr(pos: Position)(implicit p: P[?]): P[Expr] =
     P( assertStmt ~ ";" ~ expr ).map(t => Expr.AssertExpr(pos, t._1, t._2))
 
-  def function[_: P](pos: Position): P[Expr] =
+  def function(pos: Position)(implicit p: P[?]): P[Expr] =
     P( "(" ~/ params ~ ")" ~ expr ).map(t => Expr.Function(pos, t._1, t._2))
 
-  def ifElse[_: P](pos: Position): P[Expr] =
-    P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)) ).map(Expr.IfElse.tupled)
+  def ifElse(pos: Position)(implicit p: P[?]): P[Expr] =
+    P( Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)) ).map{case (pos, cond, t, e) =>  Expr.IfElse(pos, cond, t, e)}
 
-  def localExpr[_: P]: P[Expr] =
-    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map(Expr.LocalExpr.tupled)
+  def localExpr(implicit p: P[?]): P[Expr] =
+    P( Pos ~~ bind.rep(min=1, sep = ","./).map(s => if(s.isEmpty) null else s.toArray) ~ ";" ~ expr ).map{case (pos, bind, ret) => Expr.LocalExpr(pos, bind, ret)}
 
-  def expr[_: P]: P[Expr] =
+  def expr(implicit p: P[?]): P[Expr] =
     P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map{ case (pre, fs) =>
       var remaining = fs
       def climb(minPrec: Int, current: Expr): Expr = {
@@ -221,11 +214,11 @@ class Parser(val currentFile: Path,
       climb(0, pre)
     }
 
-  def expr1[_: P]: P[Expr] = P(expr2 ~ exprSuffix2.rep).map{
+  def expr1(implicit p: P[?]): P[Expr] = P(expr2 ~ exprSuffix2.rep).map{
     case (pre, fs) => fs.foldLeft(pre){case (p, f) => f(p) }
   }
 
-  def exprSuffix2[_: P]: P[Expr => Expr] = P(
+  def exprSuffix2(implicit p: P[?]): P[Expr => Expr] = P(
     Pos.flatMapX{i =>
       CharIn(".[({")./.!.map(_(0)).flatMapX{ c =>
         (c: @switch) match{
@@ -244,13 +237,13 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def local[_: P] = P( localExpr )
-  def importStr[_: P](pos: Position) = P( importExpr.map(Expr.ImportStr(pos, _)) )
-  def importBin[_: P](pos: Position) = P( importExpr.map(Expr.ImportBin(pos, _)) )
-  def `import`[_: P](pos: Position) = P( importExpr.map(Expr.Import(pos, _)) )
-  def error[_: P](pos: Position) = P(expr.map(Expr.Error(pos, _)) )
+  def local(implicit p: P[?]): P[Expr] = P( localExpr )
+  def importStr(pos: Position)(implicit p: P[?]): P[Expr.ImportStr] = P( importExpr.map(Expr.ImportStr(pos, _)) )
+  def importBin(pos: Position)(implicit p: P[?]): P[Expr.ImportBin] = P( importExpr.map(Expr.ImportBin(pos, _)) )
+  def `import`(pos: Position)(implicit p: P[?]): P[Expr.Import] = P( importExpr.map(Expr.Import(pos, _)) )
+  def error(pos: Position)(implicit p: P[?]): P[Expr.Error] = P(expr.map(Expr.Error(pos, _)) )
 
-  def importExpr[_: P]: P[String] = P(
+  def importExpr(implicit p: P[?]): P[String] = P(
     if (!strictImportSyntax) string
     else expr.flatMap {
       case Val.Str(_, s) => Pass(s)
@@ -258,7 +251,7 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def unaryOpExpr[_: P](pos: Position, op: Char) = P(
+  def unaryOpExpr(pos: Position, op: Char)(implicit p: P[?]): P[Expr.UnaryOp] = P(
     expr1.map{ e =>
       def k2 = op match{
         case '+' => Expr.UnaryOp.OP_+
@@ -270,17 +263,17 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def constructString(pos: Position, lines: Seq[String]) = {
+  def constructString(pos: Position, lines: Seq[String]): Val.Str = {
     val s = lines.mkString
     val unique = internedStrings.getOrElseUpdate(s, s)
     Val.Str(pos, unique)
   }
 
   // Any `expr` that isn't naively left-recursive
-  def expr2[_: P]: P[Expr] = P(
+  def expr2(implicit p: P[?]): P[Expr] = P(
     Pos.flatMapX{ pos =>
       SingleChar.flatMapX{ c =>
-        (c: @switch) match {
+        c match {
           case '{' => Pass ~ objinside ~ "}"
           case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
           case '[' => Pass ~ arr ~ "]"
@@ -297,7 +290,7 @@ class Parser(val currentFile: Path,
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             P.current.index = pos.offset; number
           case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
-            x + y match {
+            "" + x + y match {
               case "null"      => Pass(Val.Null(pos))
               case "true"      => Pass(Val.True(pos))
               case "false"     => Pass(Val.False(pos))
@@ -320,7 +313,7 @@ class Parser(val currentFile: Path,
     }
   )
 
-  def objinside[_: P]: P[Expr.ObjBody] = P(
+  def objinside(implicit p: P[?]): P[Expr.ObjBody] = P(
     Pos ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
   ).flatMap { case t @ (pos, exprs, _) =>
     val seen = collection.mutable.Set.empty[String]
@@ -343,7 +336,7 @@ class Parser(val currentFile: Path,
           case Expr.Bind(_, n, _, _) =>
             if (seen(n)) overlap = n
             else seen.add(n)
-          case _ =>
+          case null =>
         }
         if (overlap != null) Fail.opaque("no duplicate local: " + overlap)
         if(b.isEmpty) null else b
@@ -380,35 +373,35 @@ class Parser(val currentFile: Path,
       Expr.ObjBody.ObjComp(pos, preLocals.toArray, lhs, rhs, plus, postLocals.toArray, comps._1, comps._2.toList)
   }
 
-  def member[_: P]: P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
-  def field[_: P] = P(
+  def member(implicit p: P[?]): P[Expr.Member] = P( objlocal | "assert" ~~ break ~ assertStmt | field )
+  def field(implicit p: P[?]): P[Expr.Member.Field] = P(
     (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map{
       case (pos, name, plus, p, h2, e) =>
         Expr.Member.Field(pos, name, plus.nonEmpty, p.getOrElse(null), h2, e)
     }
   )
-  def fieldKeySep[_: P] = P( StringIn(":::", "::", ":") ).!.map{
+  def fieldKeySep(implicit p: P[?]): P[Visibility] = P( StringIn(":::", "::", ":") ).!.map{
     case ":" => Visibility.Normal
     case "::" => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
-  def objlocal[_: P] = P( "local" ~~ break ~/ bind )
-  def compspec[_: P]: P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
-  def forspec[_: P] =
-    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map(Expr.ForSpec.tupled)
-  def ifspec[_: P] = P( Pos ~~ "if" ~~ break  ~/ expr ).map(Expr.IfSpec.tupled)
-  def fieldname[_: P] = P(
-    id.map(Expr.FieldName.Fixed) |
-    string.map(Expr.FieldName.Fixed) |
-    "[" ~ expr.map(Expr.FieldName.Dyn) ~ "]"
+  def objlocal(implicit p: P[?]): P[Expr.Bind] = P( "local" ~~ break ~/ bind )
+  def compspec(implicit p: P[?]): P[Seq[Expr.CompSpec]] = P( (forspec | ifspec).rep )
+  def forspec(implicit p: P[?]): P[Expr.ForSpec] =
+    P( Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr ).map{case (pos, name, cond) => Expr.ForSpec(pos, name, cond) }
+  def ifspec(implicit p: P[?]): P[Expr.IfSpec] = P( Pos ~~ "if" ~~ break  ~/ expr ).map{case (pos, cond) => Expr.IfSpec(pos, cond) }
+  def fieldname(implicit p: P[?]): P[Expr.FieldName] = P(
+    id.map(Expr.FieldName.Fixed.apply) |
+    string.map(Expr.FieldName.Fixed.apply) |
+    "[" ~ expr.map(Expr.FieldName.Dyn.apply) ~ "]"
   )
-  def assertStmt[_: P] =
-    P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map(Expr.Member.AssertStmt.tupled)
+  def assertStmt(implicit p: P[?]): P[Expr.Member.AssertStmt] =
+    P( expr ~ (":" ~ expr).?.map(_.getOrElse(null)) ).map{case (value, msg) => Expr.Member.AssertStmt(value, msg) }
 
-  def bind[_: P] =
-    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map(Expr.Bind.tupled)
+  def bind(implicit p: P[?]): P[Expr.Bind] =
+    P( Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr ).map{case (pos, name, args, rhs )=> Expr.Bind(pos, name, args, rhs)}
 
-  def args[_: P] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def args(implicit p: P[?]): P[(Array[Expr], Array[String])] = P( ((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     if (x.sliding(2).exists{case Seq(l, r) => l._1.isDefined && r._1.isEmpty case _ => false}) {
       Fail.opaque("no positional params after named params")
     } else {
@@ -418,7 +411,7 @@ class Parser(val currentFile: Path,
     }
   }
 
-  def params[_: P]: P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
+  def params(implicit p: P[?]): P[Expr.Params] = P( (id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".? ).flatMapX{ x =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     for((k, v) <- x){
@@ -434,7 +427,7 @@ class Parser(val currentFile: Path,
 
   }
 
-  def binaryop[_: P] = P(
+  def binaryop(implicit p: P[?]): P[String] = P(
     StringIn(
       "<<", ">>", "<=", ">=", "in", "==", "!=", "&&", "||",
       "*", "/", "%", "+", "-", "<", ">", "&", "^", "|"
@@ -442,17 +435,17 @@ class Parser(val currentFile: Path,
 
   ).!
 
-  def document[_: P]: P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
+  def document(implicit p: P[?]): P[(Expr, FileScope)] = P( expr ~  Pass(fileScope) ~ End )
 }
 
 final class Position(val fileScope: FileScope, val offset: Int) {
   def currentFile = fileScope.currentFile
   def noOffset = fileScope.noOffsetPos
-  override def equals(o: Any) = o match {
+  override def equals(o: Any): Boolean = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _ => false
   }
-  override def toString = {
+  override def toString: String = {
     val name = if(fileScope == null) "null" else fileScope.currentFileLastPathElement
     s"Position($name, $offset)"
   }
@@ -463,6 +456,6 @@ final class Position(val fileScope: FileScope, val offset: Int) {
   * evaluation of a single Jsonnet file. Contains the current file path.
   */
 class FileScope(val currentFile: Path) {
-  lazy val currentFileLastPathElement = if(currentFile == null) null else currentFile.last
+  lazy val currentFileLastPathElement: String = if(currentFile == null) null else currentFile.last
   val noOffsetPos: Position = new Position(this, -1)
 }

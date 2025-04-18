@@ -59,8 +59,8 @@ object Platform {
       yaml.size match {
         case 0 => "{}"
         case 1 => yaml.head match {
-          case m: java.util.Map[_, _] => new JSONObject(m).toString()
-          case l: java.util.List[_] => new JSONArray(l).toString()
+          case m: java.util.Map[?, ?] => new JSONObject(m).toString()
+          case l: java.util.List[?] => new JSONArray(l).toString()
           case _ => new JSONArray(yaml.asJava).get(0).toString
         }
         case _ => new JSONArray(yaml.asJava).toString()
@@ -89,7 +89,7 @@ object Platform {
   // Same as go-jsonnet https://github.com/google/go-jsonnet/blob/2b4d7535f540f128e38830492e509a550eb86d57/builtins.go#L959
   def sha3(s: String): String = computeHash("SHA3-512", s)
 
-  private[this] val xxHashFactory = XXHashFactory.fastestInstance()
+  private val xxHashFactory = XXHashFactory.fastestInstance()
 
   def hashFile(file: File): String = {
     val buffer = new Array[Byte](8192)

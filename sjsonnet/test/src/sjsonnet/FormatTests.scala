@@ -6,12 +6,12 @@ import utest._
 object FormatTests extends TestSuite{
   val dummyPos = new Position(new FileScope(DummyPath("(unknown)")), -1)
 
-  def check(fmt: String, jsonStr: String, expected: String) = {
+  def check(fmt: String, jsonStr: String, expected: String): Unit = {
     val json = ujson.read(jsonStr)
     val formatted = Format.format(fmt, Materializer.reverse(null, json), dummyPos)(
       new EvalScope{
         def tailstrict: Boolean = false
-        def extVars = _ => None
+        def extVars: String => Option[sjsonnet.Expr] = _ => None
         def wd: Path = DummyPath()
         def visitExpr(expr: Expr)(implicit scope: ValScope): Val = ???
         def materialize(v: Val): Value = ???
@@ -25,7 +25,7 @@ object FormatTests extends TestSuite{
     assert(formatted == expected)
   }
 
-  def checkErr(fmt: String, jsonStr: String, expectedErr: String) = {
+  def checkErr(fmt: String, jsonStr: String, expectedErr: String): Unit = {
     try {
       check(fmt, jsonStr, "")
     } catch {
@@ -34,7 +34,7 @@ object FormatTests extends TestSuite{
     }
   }
 
-  def tests = Tests{
+  def tests: Tests = Tests{
     test("hash"){
       // #
       check("No format chars\n", """[]""", "No format chars\n")

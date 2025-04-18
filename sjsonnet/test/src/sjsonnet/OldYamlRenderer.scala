@@ -13,7 +13,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
   var topLevel = true
 
 
-  val outBuffer = out.getBuffer()
+  val outBuffer: StringBuffer = out.getBuffer()
 
   override def visitString(s: CharSequence, index: Int): StringWriter = {
     flushBuffer()
@@ -35,13 +35,13 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitFloat64(d: Double, index: Int) = {
+  override def visitFloat64(d: Double, index: Int): StringWriter = {
     flushBuffer()
     out.append(RenderUtils.renderDouble(d))
     out
   }
   override val colonSnippet = ": "
-  override def flushBuffer() = {
+  override def flushBuffer(): Unit = {
     if (newlineBuffered) {
       // drop space between colon and newline
       if (outBuffer.length() > 1 && outBuffer.charAt(outBuffer.length() - 1) == ' ') {
@@ -54,7 +54,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     newlineBuffered = false
     dashBuffered = false
   }
-  override def visitArray(length: Int, index: Int) = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.OldYamlRenderer} = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
 
@@ -69,7 +69,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     if (dedentInObject) depth -= 1
     dashBuffered = true
 
-    def subVisitor = OldYamlRenderer.this
+    def subVisitor: sjsonnet.OldYamlRenderer = OldYamlRenderer.this
     def visitValue(v: StringWriter, index: Int): Unit = {
       empty = false
       flushBuffer()
@@ -84,7 +84,7 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitObject(length: Int, index: Int) = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.OldYamlRenderer; def visitKey(index: Int): sjsonnet.OldYamlRenderer} = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1
@@ -92,8 +92,8 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
 
     if (afterKey) newlineBuffered = true
 
-    def subVisitor = OldYamlRenderer.this
-    def visitKey(index: Int) = OldYamlRenderer.this
+    def subVisitor: sjsonnet.OldYamlRenderer = OldYamlRenderer.this
+    def visitKey(index: Int): sjsonnet.OldYamlRenderer = OldYamlRenderer.this
     def visitKeyValue(s: Any): Unit = {
       empty = false
       flushBuffer()
