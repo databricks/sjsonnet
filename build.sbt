@@ -8,14 +8,18 @@ cancelable in Global := true
 val scala3Options = Seq()
 val scala2Options = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
 
+lazy val commonSettings = Seq(
+  scalaVersion := scala3,
+  crossScalaVersions := Seq(scala213, scala3),
+  scalacOptions ++= {CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) => scala3Options
+      case _ => scala2Options
+    }}
+)
+
 lazy val main = (project in file("sjsonnet"))
+  .settings(commonSettings: _*)
   .settings(
-    scalaVersion := scala3,
-    crossScalaVersions := Seq(scala213, scala3),
-    scalacOptions ++= {CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) => scala3Options
-        case _ => scala2Options
-      }},
     Test / fork := true,
     Test / javaOptions += "-Xss100m",
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
@@ -65,12 +69,7 @@ lazy val main = (project in file("sjsonnet"))
 lazy val bench = (project in file("bench"))
   .dependsOn(main % "compile->test")
   .enablePlugins(JmhPlugin)
+  .settings(commonSettings: _*)
   .settings(
-    run / fork := true
-  )
-
-  lazy val root = (project in file("."))
-  .aggregate(main)
-  .settings(
-    publishArtifact := false
+    run / fork := true,
   )
