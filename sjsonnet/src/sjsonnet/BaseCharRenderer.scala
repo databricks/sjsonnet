@@ -4,8 +4,6 @@ package sjsonnet
 // with some private definitions made accessible to subclasses
 
 import ujson._
-
-import scala.annotation.switch
 import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 (out: T,
@@ -172,6 +170,16 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
         elemBuilder.appendUnsafe(' ')
         i -= 1
       }
+    }
+  }
+
+  protected def appendString(s: String): Unit = {
+    val len = s.length
+    var i = 0
+    elemBuilder.ensureLength(len)
+    while (i < len) {
+      elemBuilder.appendUnsafeC(s.charAt(i))
+      i += 1
     }
   }
 }
