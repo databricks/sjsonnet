@@ -188,7 +188,10 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.min(ev)
       } else {
-        arr.asStrictArray.map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev)).min(ev)
+        val minTuple = arr.asStrictArray
+          .map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev))
+          .zipWithIndex.min((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
+        arr.force(minTuple._2)
       }
     }
   }
@@ -207,7 +210,10 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.max(ev)
       } else {
-        arr.asStrictArray.map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev)).max(ev)
+        val maxTuple = arr.asStrictArray
+          .map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev))
+          .zipWithIndex.max((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
+        arr.force(maxTuple._2)
       }
     }
   }
