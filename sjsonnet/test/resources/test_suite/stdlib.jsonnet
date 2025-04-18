@@ -1586,10 +1586,18 @@ std.assertEqual(std.avg([1, 1, 2.5]), 1.5) &&
 
 std.assertEqual(std.minArray([1, 2, 3]), 1) &&
 std.assertEqual(std.minArray(['1', '2', '3']), '1') &&
+std.assertEqual(std.minArray([3, 1, 2]), 1) &&
+std.assertEqual(std.minArray(['3', '1', '2']), '1') &&
+std.assertEqual(std.minArray(['a2', 'b1'], keyF=function(x) x[0]), 'a2') &&
+std.assertEqual(std.minArray(['a2', 'b1'], keyF=function(x) x[1]), 'b1') &&
+std.assertEqual(std.minArray([], onEmpty='default'), 'default') &&
 
 std.assertEqual(std.maxArray([1, 2, 3]), 3) &&
 std.assertEqual(std.maxArray(['1', '2', '3']), '3') &&
 std.assertEqual(std.maxArray(['a', 'x', 'z']), 'z') &&
+std.assertEqual(std.maxArray(['a2', 'b1'], keyF=function(x) x[0]), 'b1') &&
+std.assertEqual(std.maxArray(['a2', 'b1'], keyF=function(x) x[1]), 'a2') &&
+std.assertEqual(std.maxArray([], onEmpty='default'), 'default') &&
 
 std.assertEqual(std.xor(true, false), true) &&
 std.assertEqual(std.xor(true, true), false) &&
