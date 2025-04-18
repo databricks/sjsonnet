@@ -1,7 +1,7 @@
 val sjsonnetVersion = "0.4.15.1"
 
 val scala213 = "2.13.16"
-val scala3 = "3.6.4"
+val scala3 = "3.3.5"
 
 cancelable in Global := true
 

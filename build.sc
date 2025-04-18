@@ -5,7 +5,7 @@ import java.util.Base64
 
 val sjsonnetVersion = "0.4.15.1"
 
-val scalaVersions = Seq("2.12.20", "2.13.16", "3.6.4")
+val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.5")
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
