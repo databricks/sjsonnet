@@ -10,7 +10,7 @@ import utest._
 import TestUtils.eval
 
 object XxHash64Tests extends TestSuite {
-  val tests = Tests {
+  val tests: Tests = Tests {
 
     test("xxhash") {
       for (sizeInKb <- List(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024)) {
@@ -24,7 +24,7 @@ object XxHash64Tests extends TestSuite {
           memoryLimitBytes = Int.MaxValue,
           cacheThresholdBytes = 0)
         // They should agree
-        val hash = cachedFile.contentHash
+        val hash = cachedFile.contentHash()
         assert(xxHash64Result == hash)
       }
     }

@@ -22,7 +22,7 @@ trait Expr{
   override def toString: String = s"$exprErrorString@$pos"
 }
 object Expr{
-  private final def arrStr(a: Array[_]): String = {
+  private final def arrStr(a: Array[?]): String = {
     if(a == null) "null" else a.mkString("[", ", ", "]")
   }
 
@@ -37,7 +37,7 @@ object Expr{
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
-    override def toString = s"Arr($pos, ${arrStr(value)})"
+    override def toString: String = s"Arr($pos, ${arrStr(value)})"
   }
 
   sealed trait FieldName
@@ -62,14 +62,14 @@ object Expr{
                      args: Params,
                      sep: Visibility,
                      rhs: Expr) extends Member {
-      def isStatic = fieldName.isInstanceOf[FieldName.Fixed] && !plus && args == null && sep == Visibility.Normal && rhs.isInstanceOf[Val.Literal]
+      def isStatic: Boolean = fieldName.isInstanceOf[FieldName.Fixed] && !plus && args == null && sep == Visibility.Normal && rhs.isInstanceOf[Val.Literal]
     }
     case class AssertStmt(value: Expr, msg: Expr) extends Member
   }
 
   case class Params(names: Array[String], defaultExprs: Array[Expr]){
     val paramMap = names.zipWithIndex.toMap
-    override def toString = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
+    override def toString: String = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
 
   case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr {
@@ -115,7 +115,7 @@ object Expr{
   }
   case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
   case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr {
-    override def toString = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
+    override def toString: String = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
     override def equals(o: Any): Boolean = o match {
       case o: LocalExpr =>
         pos == o.pos && Arrays.equals(bindings.asInstanceOf[Array[AnyRef]], o.bindings.asInstanceOf[Array[AnyRef]]) && returned == o.returned
@@ -185,7 +185,7 @@ object Expr{
                        postLocals: Array[Bind],
                        first: ForSpec,
                        rest: List[CompSpec]) extends ObjBody {
-      override def toString = s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
+      override def toString: String = s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
     }
   }
 }

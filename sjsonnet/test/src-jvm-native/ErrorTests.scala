@@ -1,9 +1,10 @@
 import sjsonnet._
 import utest._
+import ujson.Value
 
 object ErrorTests extends TestSuite{
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources"
-  def eval(p: os.Path, noStaticErrors: Boolean) = {
+  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources"
+  def eval(p: os.Path, noStaticErrors: Boolean): Either[String,Value] = {
     val out = new StringBuffer()
     val interp = new Interpreter(
       Map(),
@@ -16,13 +17,13 @@ object ErrorTests extends TestSuite{
     )
     interp.interpret(os.read(p), OsPath(p)).left.map(s => out.toString + s)
   }
-  def check(expected: String, noStaticErrors: Boolean = false, suite: String = "test_suite")(implicit tp: utest.framework.TestPath) = {
+  def check(expected: String, noStaticErrors: Boolean = false, suite: String = "test_suite")(implicit tp: utest.framework.TestPath): Unit = {
     val res = eval(testSuiteRoot / suite / s"error.${tp.value.mkString(".")}.jsonnet", noStaticErrors)
 
     assert(res == Left(expected))
   }
 
-  val tests = Tests{
+  val tests: Tests = Tests{
     test("01") - check(
       """sjsonnet.Error: foo
         |    at [Error].(sjsonnet/test/resources/test_suite/error.01.jsonnet:17:29)

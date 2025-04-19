@@ -15,15 +15,15 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T,T] = visitObject(length, index)
 
-  protected[this] val elemBuilder = new upickle.core.CharBuilder
+  protected val elemBuilder = new upickle.core.CharBuilder
   def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
 
-  protected[this] var depth: Int = 0
+  protected var depth: Int = 0
 
 
-  protected[this] var commaBuffered = false
+  protected var commaBuffered = false
 
   def flushBuffer(): Unit = {
     if (commaBuffered) {

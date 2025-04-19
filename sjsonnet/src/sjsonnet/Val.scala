@@ -16,7 +16,7 @@ import scala.reflect.ClassTag
  * are all wrapped in [[Lazy]] and only truly evaluated on-demand
  */
 abstract class Lazy {
-  protected[this] var cached: Val = null
+  protected var cached: Val = null
   def compute(): Val
   final def force: Val = {
     if(cached == null)  cached = compute()
@@ -27,7 +27,7 @@ abstract class Lazy {
 /**
  * Thread-safe implementation that discards the compute function after initialization.
  */
-final class LazyWithComputeFunc(@volatile private[this] var computeFunc: () => Val) extends Lazy {
+final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) extends Lazy {
   def compute(): Val = {
     val f = computeFunc
     if (f != null) {  // we won the race to initialize
@@ -50,16 +50,16 @@ final class LazyWithComputeFunc(@volatile private[this] var computeFunc: () => V
   */
 sealed abstract class Val extends Lazy {
   cached = this // avoid a megamorphic call to compute() when forcing
-  final def compute() = this
+  final def compute(): Val = this
 
   def pos: Position
   def prettyName: String
 
-  def cast[T: ClassTag: PrettyNamed] =
+  def cast[T: ClassTag: PrettyNamed]: T =
     if (implicitly[ClassTag[T]].runtimeClass.isInstance(this)) this.asInstanceOf[T]
     else Error.fail("Expected " + implicitly[PrettyNamed[T]].s + ", found " + prettyName)
 
-  private[this] def failAs(err: String): Nothing =
+  private def failAs(err: String): Nothing =
     Error.fail("Wrong parameter type: expected " + err + ", got " + prettyName)
 
   def asString: String = failAs("String")
@@ -111,7 +111,7 @@ object Val{
     override def asDouble: Double = value
   }
 
-  class Arr(val pos: Position, private val value: Array[_ <: Lazy]) extends Literal {
+  class Arr(val pos: Position, private val value: Array[? <: Lazy]) extends Literal {
     def prettyName = "array"
 
     override def asArr: Arr = this
@@ -212,17 +212,17 @@ object Val{
    *                computed only if the object has a `super`
    */
   final class Obj(val pos: Position,
-                  private[this] var value0: util.LinkedHashMap[String, Obj.Member],
+                  private var value0: util.LinkedHashMap[String, Obj.Member],
                   static: Boolean,
                   triggerAsserts: Val.Obj => Unit,
                   `super`: Obj,
                   valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
-                  private[this] var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
+                  private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null) extends Literal with Expr.ObjBody {
     var asserting: Boolean = false
 
     def getSuper = `super`
 
-    private[this] def getValue0: util.LinkedHashMap[String, Obj.Member] = {
+    private def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       // value0 is always defined for non-static objects, so if we're computing it here
       // then that implies that the object is static and therefore valueCache should be
       // pre-populated and all members should be visible and constant.
@@ -349,7 +349,7 @@ object Val{
     def mergeMember(l: Val,
                     r: Val,
                     pos: Position)
-                   (implicit evaluator: EvalScope) = {
+                   (implicit evaluator: EvalScope): Literal = {
       val lStr = l.isInstanceOf[Val.Str]
       val rStr = r.isInstanceOf[Val.Str]
       if(lStr || rStr) {
@@ -461,7 +461,7 @@ object Val{
 
     override def asFunc: Func = this
 
-    def apply(argsL: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match { case null => outerPos.fileScope case p => p.fileScope }
       //println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
@@ -580,7 +580,7 @@ object Val{
       evalRhs(scope.bindings, ev, pos)
     }
 
-    def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val
+    def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val
 
     override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
       if(params.names.length != 1) apply(Array(argVal), null, outerPos)
@@ -624,23 +624,23 @@ object Val{
   }
 
   abstract class Builtin1(functionName: String, pn1: String, def1: Expr = null) extends Builtin(functionName: String, Array(pn1), if(def1 == null) null else Array(def1)) {
-    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, ev, pos)
 
     def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
   abstract class Builtin2(functionName: String, pn1: String, pn2: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2), defs) {
-    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, ev, pos)
 
     def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -651,24 +651,24 @@ object Val{
   }
 
   abstract class Builtin3(functionName: String, pn1: String, pn2: String, pn3: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2, pn3), defs) {
-    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, args(2).force, ev, pos)
 
     def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
   abstract class Builtin4(functionName: String, pn1: String, pn2: String, pn3: String, pn4: String, defs: Array[Expr] = null) extends Builtin(functionName: String, Array(pn1, pn2, pn3, pn4), defs) {
-    final def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, args(1).force, args(2).force, args(3).force, ev, pos)
 
     def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, arg4: Lazy, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[_ <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
       if(namedNames == null && argVals.length == 4)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, argVals(3).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)

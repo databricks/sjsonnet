@@ -1,10 +1,11 @@
 package sjsonnet
 
 import utest._
+import ujson.Value
 
 object FileTests extends TestSuite{
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path) = {
+  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  def eval(p: os.Path): Either[String,Value] = {
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
@@ -14,20 +15,20 @@ object FileTests extends TestSuite{
     )
     interp.interpret(os.read(p), OsPath(p))
   }
-  def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath) = {
+  def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath): Either[String,Value] = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
     assert(res == Right(expected))
     res
   }
-  def checkFail(expected: String)(implicit tp: utest.framework.TestPath) = {
+  def checkFail(expected: String)(implicit tp: utest.framework.TestPath): Either[String,Value] = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
     assert(res == Left(expected))
     res
   }
-  def checkGolden()(implicit tp: utest.framework.TestPath) = {
+  def checkGolden()(implicit tp: utest.framework.TestPath): Either[String,Value] = {
     check(ujson.read(os.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
   }
-  def tests = Tests{
+  def tests: Tests = Tests{
     test("arith_bool") - check()
     test("arith_float") - check()
     test("arith_string") - check()

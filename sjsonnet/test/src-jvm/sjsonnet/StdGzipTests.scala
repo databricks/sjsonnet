@@ -4,7 +4,7 @@ import sjsonnet.TestUtils.eval
 import utest._
 
 object StdGzipTests extends TestSuite {
-  val tests = Tests {
+  val tests: Tests = Tests {
     test("gzip"){
       eval("""std.gzip([1, 2])""") ==> ujson.Str(Runtime.version().feature() match {
         // https://bugs.openjdk.org/browse/JDK-8244706

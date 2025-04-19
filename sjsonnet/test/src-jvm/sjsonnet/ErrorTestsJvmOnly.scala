@@ -1,10 +1,11 @@
 package sjsonnet
 
 import utest._
+import ujson.Value
 
 object ErrorTestsJvmOnly extends TestSuite {
-  val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path) = {
+  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  def eval(p: os.Path): Either[String,Value] = {
     val interp = new Interpreter(
       Map(),
       Map(),
@@ -14,13 +15,13 @@ object ErrorTestsJvmOnly extends TestSuite {
     )
     interp.interpret(os.read(p), OsPath(p))
   }
-  def check(expected: String)(implicit tp: utest.framework.TestPath) = {
+  def check(expected: String)(implicit tp: utest.framework.TestPath): Unit = {
     val res = eval(testSuiteRoot / s"error.${tp.value.mkString(".")}.jsonnet")
 
     assert(res == Left(expected))
   }
 
-  val tests = Tests{
+  val tests: Tests = Tests{
     test("array_recursive_manifest") - check(
       """sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
         |    at .(sjsonnet/test/resources/test_suite/error.array_recursive_manifest.jsonnet:17:12)

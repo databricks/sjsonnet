@@ -3,7 +3,7 @@ package sjsonnet
 import utest._
 
 object YamlRendererTests extends TestSuite{
-  def tests = Tests {
+  def tests: Tests = Tests {
     test("empty") {
       ujson.transform(ujson.Arr(), new YamlRenderer()).toString ==> "[]"
       ujson.transform(ujson.Obj(), new YamlRenderer()).toString ==> "{}"

@@ -5,7 +5,7 @@ import java.util.Base64
 
 val sjsonnetVersion = "0.4.15.1"
 
-val scalaVersions = Seq("2.12.20", "2.13.16")
+val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.5")
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
@@ -153,7 +153,7 @@ object sjsonnet extends Module {
       ivy"org.yaml:snakeyaml::2.0",
       ivy"com.google.re2j:re2j:1.8",
     )
-    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**")
+    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
 
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss100m")
