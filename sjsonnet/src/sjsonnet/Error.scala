@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.IndexedParserInput
-
 import scala.util.control.NonFatal
 
 /**
