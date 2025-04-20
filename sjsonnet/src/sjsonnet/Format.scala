@@ -22,13 +22,13 @@ object Format{
                         precision: Option[Int],
                         conversion: Char)
   import fastparse._, NoWhitespace._
-  def integer(implicit p: P[?]): P[Unit]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
-  def label(implicit p: P[?]): P[Option[String]] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
-  def flags(implicit p: P[?]): P[String] = P( CharsWhileIn("#0\\- +", 0).! )
-  def width(implicit p: P[?]): P[Option[String]] = P( (integer | "*").!.? )
-  def precision(implicit p: P[?]): P[Option[String]] = P( ("." ~/ integer.!).? )
-  def conversion(implicit p: P[?]): P[String] = P( CharIn("diouxXeEfFgGcrsa%").! )
-  def formatSpec(implicit p: P[?]): P[FormatSpec] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
+  def integer[$: P]: P[Unit]           = P( CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0" )
+  def label[$: P]: P[Option[String]] = P( ("(" ~ CharsWhile(_ != ')').! ~ ")").? )
+  def flags[$: P]: P[String] = P( CharsWhileIn("#0\\- +", 0).! )
+  def width[$: P]: P[Option[String]] = P( (integer | "*").!.? )
+  def precision[$: P]: P[Option[String]] = P( ("." ~/ integer.!).? )
+  def conversion[$: P]: P[String] = P( CharIn("diouxXeEfFgGcrsa%").! )
+  def formatSpec[$: P]: P[FormatSpec] = P( label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion ).map{
     case (label, flags, width, precision, conversion) =>
       FormatSpec(
         label,
@@ -44,8 +44,8 @@ object Format{
   }
 
 
-  def plain(implicit p: P[?]): P[String] = P( CharsWhile(_ != '%', 0).! )
-  def format(implicit p: P[?]): P[(String, Seq[(FormatSpec, String)])] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
+  def plain[$: P]: P[String] = P( CharsWhile(_ != '%', 0).! )
+  def format[$: P]: P[(String, Seq[(FormatSpec, String)])] = P( plain ~ (("%" ~/ formatSpec) ~ plain).rep ~ End)
 
 
 

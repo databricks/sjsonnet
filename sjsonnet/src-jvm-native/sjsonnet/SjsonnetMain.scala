@@ -217,7 +217,7 @@ object SjsonnetMain {
         strictSetOperations = config.strictSetOperations.value,
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
       ),
-      storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else null,
+      storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       warnLogger = warnLogger,
       std = std
     )
