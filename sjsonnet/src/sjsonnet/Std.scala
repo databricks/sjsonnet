@@ -1362,6 +1362,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
     },
     builtin("manifestPythonVars", "v"){ (pos, ev, v: Val.Obj) =>
+      //TODO remove the `toSeq` once this is fixed in scala3
       Materializer(v)(ev).obj.toSeq
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
         .mkString
