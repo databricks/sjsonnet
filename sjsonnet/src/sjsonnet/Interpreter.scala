@@ -38,23 +38,27 @@ class Interpreter(queryExtVar: String => Option[String],
 
   protected val internedStaticFieldSets = new mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]
 
-  val resolver = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
+  val resolver = createResolver(parseCache)
+
+  val varResolver = createResolver(createVarParseCache)
+
+  private def createResolver(parseCache: ParseCache) = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
-      handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
+      handleException(createOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
     }
+  }
+
+  protected def createOptimizer(ev: EvalScope,
+                                std: Val.Obj,
+                                internedStrings: mutable.HashMap[String, String],
+                                internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]): StaticOptimizer = {
+    new StaticOptimizer(ev, std, internedStrings, internedStaticFieldSets)
   }
 
   /**
    * A cache for parsing variables.
    * */
   def createVarParseCache: ParseCache = new DefaultParseCache()
-
-  val varResolver = new CachedResolver(importer, createVarParseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
-    override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
-      handleException(new StaticOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
-    }
-  }
-
 
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
