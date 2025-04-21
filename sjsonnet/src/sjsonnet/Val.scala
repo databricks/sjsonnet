@@ -407,6 +407,8 @@ object Val{
         f(k, v)
       }
     }
+
+    def staticSafe:Boolean = static
   }
 
   final class StaticObjectFieldSet(protected val keys: Array[String]) {

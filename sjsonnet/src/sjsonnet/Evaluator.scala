@@ -1,11 +1,10 @@
 package sjsonnet
 
-import Expr.{Error => _, _}
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.Expr.{Error => _, _}
 import ujson.Value
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 /**
   * Recursively walks the [[Expr]] trees to convert them into into [[Val]]
