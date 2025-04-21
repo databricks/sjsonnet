@@ -28,6 +28,8 @@ jobs:
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      - name: Compile with mill
+        run: ./mill _.${{ matrix.lang }}[_].compile
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill _.${{ matrix.lang }}[_].test
       - name: Compile with sbt

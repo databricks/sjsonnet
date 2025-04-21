@@ -1,4 +1,4 @@
-val sjsonnetVersion = "0.4.15.1"
+val sjsonnetVersion = "0.5.0"
 
 val scala213 = "2.13.16"
 val scala3 = "3.3.5"

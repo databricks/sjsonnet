@@ -753,7 +753,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
   private object ExtVar extends Val.Builtin1("extVar", "x") {
     def evalRhs(_x: Lazy, ev: EvalScope, pos: Position): Val = {
-      val Val.Str(_, x) = _x
+      val x = _x.force.asString
       ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
     }
     override def staticSafe = false
