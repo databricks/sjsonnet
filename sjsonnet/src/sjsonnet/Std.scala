@@ -1260,6 +1260,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case _ => x.transform(new sjsonnet.Renderer())
       }
       def sect(x: ujson.Obj) = {
+       //TODO remove the `toSeq` once this is fixed in scala3
         x.value.toSeq.flatMap{
           case (k, ujson.Arr(vs)) => vs.map(x => k + " = " + render(x))
           case (k, v) => Seq(k + " = " + render(v))
