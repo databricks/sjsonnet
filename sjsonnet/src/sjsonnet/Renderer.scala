@@ -18,13 +18,7 @@ class Renderer(out: Writer = new java.io.StringWriter(),
   override def visitFloat64(d: Double, index: Int): Writer = {
     val s = RenderUtils.renderDouble(d)
     flushBuffer()
-    var i = 0
-    val sLength = s.length
-    elemBuilder.ensureLength(sLength)
-    while(i < sLength){
-      elemBuilder.appendUnsafeC(s.charAt(i))
-      i += 1
-    }
+    appendString(s)
     flushCharBuilder()
     out
   }
