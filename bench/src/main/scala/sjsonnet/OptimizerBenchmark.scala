@@ -1,14 +1,10 @@
 package sjsonnet
 
-import java.io.StringWriter
-import java.util.concurrent.TimeUnit
-
-import scala.collection.mutable
-
 import fastparse.Parsed.Success
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra._
+import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.*
 
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -30,6 +26,8 @@ class OptimizerBenchmark {
     this.inputs = allFiles.map { case (p, s) =>
       fastparse.parse(s, new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)) match {
         case Success(v, _) => v
+        case f: fastparse.Parsed.Failure =>
+          throw new Exception(s"Failed to parse ${p}: ${f.msg}")
       }
     }
     this.ev = ev

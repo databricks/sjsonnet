@@ -15,8 +15,14 @@ object SjsonnetMain {
                 importLoader: js.Function2[String, Boolean, Either[String, Array[Byte]]],
                 preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
-      ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map{case (k, ujson.Str(v)) => (k, v)},
-      ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap.map{case (k, ujson.Str(v)) => (k, v)},
+      ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map {
+        case (k, ujson.Str(v)) => (k, v)
+        case _ => throw new js.JavaScriptException("External variables must be strings")
+      },
+      ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap.map {
+        case (k, ujson.Str(v)) => (k, v)
+        case _ => throw new js.JavaScriptException("TLA variables must be strings")
+      },
       JsVirtualPath(wd0),
       new Importer {
         def resolve(docBase: Path, importName: String): Option[Path] =
