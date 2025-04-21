@@ -1268,6 +1268,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
       val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
         materialized.obj.get("sections").fold(Iterable[String]())(x =>
+         //TODO remove the `toSeq` once this is fixed in scala3
           x.obj.toSeq.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
         )
       lines.flatMap(Seq(_, "\n")).mkString
