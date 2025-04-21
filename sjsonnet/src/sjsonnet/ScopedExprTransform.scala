@@ -11,7 +11,7 @@ class ScopedExprTransform extends ExprTransform {
   var scope: Scope = emptyScope
 
   // Marker for Exprs in the scope that should not be used because they need to be evaluated in a different scope
-  val dynamicExpr = new Expr { def pos: Position = ???; override def toString = "dynamicExpr" }
+  val dynamicExpr: Expr = new Expr { def pos: Position = ???; override def toString = "dynamicExpr" }
 
   def transform(e: Expr): Expr = e match {
     case LocalExpr(pos, bindings, returned) =>
@@ -62,13 +62,13 @@ class ScopedExprTransform extends ExprTransform {
     }
   }
 
-  protected[this] def transformFieldNameOnly(f: Member.Field): Member.Field = {
+  protected def transformFieldNameOnly(f: Member.Field): Member.Field = {
     val x = f.fieldName
     val x2 = transformFieldName(x)
     if(x2 eq x) f else f.copy(fieldName = x2)
   }
 
-  protected[this] def transformFieldNoName(f: Member.Field): Member.Field = {
+  protected def transformFieldNoName(f: Member.Field): Member.Field = {
     def g = {
       val y = f.args
       val z = f.rhs
@@ -80,9 +80,9 @@ class ScopedExprTransform extends ExprTransform {
     else nestedNames(f.args.names)(g)
   }
 
-  override protected[this] def transformField(f: Member.Field): Member.Field = ???
+  override protected def transformField(f: Member.Field): Member.Field = ???
 
-  protected[this] def compSpecs[T](a: List[CompSpec], value: () => T): (List[CompSpec], T) = a match {
+  protected def compSpecs[T](a: List[CompSpec], value: () => T): (List[CompSpec], T) = a match {
     case (c @ ForSpec(pos, name, cond)) :: cs =>
       val c2 = rec(c).asInstanceOf[ForSpec]
       nestedWith(c2.name, dynamicExpr) {
@@ -97,19 +97,19 @@ class ScopedExprTransform extends ExprTransform {
       (Nil, value())
   }
 
-  protected[this] def nestedNew[T](sc: Scope)(f: => T): T = {
+  protected def nestedNew[T](sc: Scope)(f: => T): T = {
     val oldScope = scope
     scope = sc
     try f finally { scope = oldScope }
   }
 
-  protected[this] def nestedWith[T](n: String, e: Expr)(f: => T): T =
+  protected def nestedWith[T](n: String, e: Expr)(f: => T): T =
     nestedNew(new Scope(scope.mappings.updated(n, new ScopedVal(e, scope, scope.size)), scope.size+1))(f)
 
-  protected[this] def nestedFileScope[T](fs: FileScope)(f: => T): T =
+  protected def nestedFileScope[T](fs: FileScope)(f: => T): T =
     nestedNew(emptyScope)(f)
 
-  protected[this] def nestedConsecutiveBindings[T](a: Array[Bind])(f: => Bind => Bind)(g: => T): (Array[Bind], T) = {
+  protected def nestedConsecutiveBindings[T](a: Array[Bind])(f: => Bind => Bind)(g: => T): (Array[Bind], T) = {
     if(a == null || a.length == 0) (a, g)
     else {
       val oldScope = scope
@@ -131,7 +131,7 @@ class ScopedExprTransform extends ExprTransform {
     }
   }
 
-  protected[this] def nestedBindings[T](a: Array[Bind])(f: => T): T = {
+  protected def nestedBindings[T](a: Array[Bind])(f: => T): T = {
     if(a == null || a.length == 0) f
     else {
       val newm = a.zipWithIndex.map { case (b, idx) =>
@@ -142,7 +142,7 @@ class ScopedExprTransform extends ExprTransform {
     }
   }
 
-  protected[this] def nestedObject[T](self0: Expr, super0: Expr)(f: => T): T = {
+  protected def nestedObject[T](self0: Expr, super0: Expr)(f: => T): T = {
     val self = new ScopedVal(self0, scope, scope.size)
     val sup = new ScopedVal(super0, scope, scope.size+1)
     val newm = {
@@ -152,10 +152,10 @@ class ScopedExprTransform extends ExprTransform {
     nestedNew(new Scope(newm, scope.size + 2))(f)
   }
 
-  protected[this] def nestedBindings[T](self0: Expr, super0: Expr, a: Array[Bind])(f: => T): T =
+  protected def nestedBindings[T](self0: Expr, super0: Expr, a: Array[Bind])(f: => T): T =
     nestedObject(self0, super0)(nestedBindings(a)(f))
 
-  protected[this] def nestedNames[T](a: Array[String])(f: => T): T = {
+  protected def nestedNames[T](a: Array[String])(f: => T): T = {
     if(a == null || a.length == 0) f
     else {
       val newm = a.zipWithIndex.map { case (n, idx) => (n, new ScopedVal(dynamicExpr, scope, scope.size + idx)) }

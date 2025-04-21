@@ -26,7 +26,7 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
   // Assert that the file is less than limit
   assert(jFile.length() <= memoryLimitBytes, s"Resolved import path $resolvedImportPath is too large: ${jFile.length()} bytes > ${memoryLimitBytes} bytes")
 
-  private[this] val resolvedImportContent: ResolvedFile = {
+  private val resolvedImportContent: ResolvedFile = {
     // TODO: Support caching binary data
     if (jFile.length() > cacheThresholdBytes) {
       // If the file is too large, then we will just read it from disk
@@ -38,11 +38,11 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
     }
   }
 
-  private[this] def readString(jFile: File): String = {
+  private def readString(jFile: File): String = {
     new String(Files.readAllBytes(jFile.toPath), StandardCharsets.UTF_8);
   }
 
-  private[this] def readRawBytes(jFile: File): Array[Byte] = Files.readAllBytes(jFile.toPath)
+  private def readRawBytes(jFile: File): Array[Byte] = Files.readAllBytes(jFile.toPath)
 
   /**
    * A method that will return a reader for the resolved import. If the import is too large, then this will return
@@ -67,12 +67,12 @@ class CachedResolvedFile(val resolvedImportPath: OsPath, memoryLimitBytes: Long,
   }
 
 
-  override lazy val contentHash: String = {
+  override def contentHash(): String = {
     if (resolvedImportContent == null) {
       // If the file is too large, then we will just read it from disk
       Platform.hashFile(jFile)
     } else {
-      resolvedImportContent.contentHash
+      resolvedImportContent.contentHash()
     }
   }
 

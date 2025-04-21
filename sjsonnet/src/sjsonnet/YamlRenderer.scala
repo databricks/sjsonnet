@@ -30,7 +30,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
 
-  private[this] def appendString(s: String): Unit = {
+  private def appendString(s: String): Unit = {
     val len = s.length
     var i = 0
     elemBuilder.ensureLength(len)
