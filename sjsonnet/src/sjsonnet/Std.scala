@@ -1372,6 +1372,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           case ujson.Str(s) => s
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
+              //TODO remove the `toSeq` once this is fixed in scala3
               attrs.value.toSeq.map {
                 case (k, ujson.Str(v)) => attr(k) := v
 
