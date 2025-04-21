@@ -26,7 +26,7 @@ class Evaluator(resolver: CachedResolver,
   def warn(e: Error): Unit = if(warnLogger != null) warnLogger(e)
 
   def materialize(v: Val): Value = Materializer.apply(v)
-  val cachedImports: mutable.HashMap[Path,Val] = collection.mutable.HashMap.empty[Path, Val]
+  val cachedImports: collection.mutable.HashMap[Path,Val] = collection.mutable.HashMap.empty[Path, Val]
   var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {

@@ -57,8 +57,6 @@ class StaticOptimizer(
     case BinaryOp(pos, Val.Num(_, l), BinaryOp.OP_*, Val.Num(_, r)) => Val.Num(pos, l * r)
     case BinaryOp(pos, Val.Num(_, l), BinaryOp.OP_/, Val.Num(_, r)) if r != 0 => Val.Num(pos, l / r)
     case BinaryOp(pos, Val.Num(_, l), BinaryOp.OP_%, Val.Num(_, r)) if r != 0 => Val.Num(pos, l % r)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.False(_)) => Val.True(pos)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.True(_)) => Val.False(pos)
     case UnaryOp(pos, UnaryOp.OP_+, Val.Num(_, v)) => Val.Num(pos, v)
     case UnaryOp(pos, UnaryOp.OP_-, Val.Num(_, v)) => Val.Num(pos, -v)
     case UnaryOp(pos, UnaryOp.OP_~, Val.Num(_, v)) => Val.Num(pos, ~v.toLong)

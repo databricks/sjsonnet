@@ -1,9 +1,10 @@
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, scalajslib.api._
+import scalalib.api.ZincWorkerUtil
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 import java.util.Base64
 
-val sjsonnetVersion = "0.4.15.1"
+val sjsonnetVersion = "0.5.0"
 
 val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.5")
 
@@ -153,8 +154,11 @@ object sjsonnet extends Module {
       ivy"org.yaml:snakeyaml::2.0",
       ivy"com.google.re2j:re2j:1.8",
     )
-    def scalacOptions = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
-
+    def scalacOptions = super.scalacOptions() ++ (
+      if (!ZincWorkerUtil.isScala3(scalaVersion())) Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
+      else Seq[String]()
+    )
+    
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss100m")
       def sources = T.sources(
@@ -171,7 +175,7 @@ object sjsonnet extends Module {
           "net.java.dev.jna" -> "jna-platform"
         )
       )
-      object test extends JavaModuleTests with TestModule.Junit4
+      object test extends JavaTests with TestModule.Junit4
     }
 
     object server extends ScalaModule{
