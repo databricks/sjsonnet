@@ -21,11 +21,11 @@ object BufferedRandomAccessFileTests extends TestSuite {
 
   // Test content and large test content
   val testContent = "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
-  val largeTestContent = Random.alphanumeric.take(100000).mkString // 100k characters
-  val tempFile = createTempFile(testContent)
-  val largeTempFile = createTempFile(largeTestContent)
+  val largeTestContent: String = Random.alphanumeric.take(100000).mkString // 100k characters
+  val tempFile: File = createTempFile(testContent)
+  val largeTempFile: File = createTempFile(largeTestContent)
 
-  val tests = Tests {
+  val tests: Tests = Tests {
     test("readChar") {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 

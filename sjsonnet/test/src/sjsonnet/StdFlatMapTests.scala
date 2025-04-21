@@ -4,7 +4,7 @@ import utest._
 import TestUtils.{eval, evalErr}
 object StdFlatMapTests extends TestSuite {
 
-  def tests = Tests {
+  def tests: Tests = Tests {
     test("stdFlatMap") {
       eval("std.flatMap(function(x) [x, x], [1, 2, 3])") ==> ujson.Arr(1, 1, 2, 2, 3, 3)
       eval("std.flatMap(function(x) if x == 2 then [] else [x], [1, 2, 3])") ==> ujson.Arr(1, 3)

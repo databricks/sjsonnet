@@ -61,7 +61,7 @@ abstract class Materializer {
         Error.fail("Couldn't manifest function with params [" + s.params.names.mkString(",") + "]", v.pos)
       case vv: Val =>
         Error.fail("Unknown value type " + vv.prettyName, vv.pos)
-      case _ =>
+      case null =>
         Error.fail("Unknown value type " + v)
     }
   } catch {

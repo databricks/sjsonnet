@@ -160,7 +160,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
 
 
   private object Get extends Val.Builtin("get", Array("o", "f", "default", "inc_hidden"), Array(null, null, Val.Null(dummyPos), Val.True(dummyPos))) {
-    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
       val obj = args(0).force.asObj
       val k = args(1).force.asString
       val incHidden = args(3).force.asBoolean
@@ -175,7 +175,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   private object MinArray extends Val.Builtin("minArray", Array("arr", "keyF", "onEmpty"), Array(null, Val.False(dummyPos), Val.False(dummyPos))) {
-    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).force.asArr
       val keyF = args(1).force
       val onEmpty = args(2)
@@ -197,7 +197,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   }
 
   private object MaxArray extends Val.Builtin("maxArray", Array("arr", "keyF", "onEmpty"), Array(null, Val.False(dummyPos), Val.False(dummyPos))) {
-    override def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val = {
+    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).force.asArr
       val keyF = args(1).force
       val onEmpty = args(2)
@@ -482,7 +482,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       case _ => null
     }
     private class SpecFrom(from: String) extends Val.Builtin2("strReplaceAll", "str", "to") {
-      private[this] val pattern = Platform.getPatternFromCache(from)
+      private val pattern = Platform.getPatternFromCache(from)
       def evalRhs(str: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
         Val.Str(pos, pattern.matcher(str.force.asString).replaceAll(to.force.asString))
     }
@@ -506,8 +506,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       right: Boolean,
       functionName: String
     ) extends Val.Builtin1(functionName, "str") {
-      private[this] val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
-      private[this] val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
+      private val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
+      private val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
 
       def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
         var s = str.force.asString
@@ -1260,14 +1260,16 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
         case _ => x.transform(new sjsonnet.Renderer())
       }
       def sect(x: ujson.Obj) = {
-        x.value.flatMap{
+       //TODO remove the `toSeq` once this is fixed in scala3
+        x.value.toSeq.flatMap{
           case (k, ujson.Arr(vs)) => vs.map(x => k + " = " + render(x))
           case (k, v) => Seq(k + " = " + render(v))
         }
       }
       val lines = materialized.obj.get("main").fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
         materialized.obj.get("sections").fold(Iterable[String]())(x =>
-          x.obj.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
+         //TODO remove the `toSeq` once this is fixed in scala3
+          x.obj.toSeq.flatMap{case (k, v) => Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])}
         )
       lines.flatMap(Seq(_, "\n")).mkString
     },
@@ -1361,7 +1363,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
       }
     },
     builtin("manifestPythonVars", "v"){ (pos, ev, v: Val.Obj) =>
-      Materializer(v)(ev).obj
+      //TODO remove the `toSeq` once this is fixed in scala3
+      Materializer(v)(ev).obj.toSeq
         .map{case (k, v) => k + " = " + v.transform(new PythonRenderer()).toString + "\n"}
         .mkString
     },
@@ -1372,7 +1375,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
           case ujson.Str(s) => s
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
-              attrs.value.map {
+              //TODO remove the `toSeq` once this is fixed in scala3
+              attrs.value.toSeq.map {
                 case (k, ujson.Str(v)) => attr(k) := v
 
                 // use ujson.write to make sure output number format is same as
@@ -1652,7 +1656,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
     }
   }
 
-  private def existsInSet(ev: EvalScope, pos: Position, keyF: Val, arr: mutable.IndexedSeq[_ <: Lazy], toFind: Val): Boolean = {
+  private def existsInSet(ev: EvalScope, pos: Position, keyF: Val, arr: mutable.IndexedSeq[? <: Lazy], toFind: Val): Boolean = {
     val appliedX = keyF match {
       case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev)
       case _ => toFind
@@ -1764,7 +1768,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)
                                         (eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
     name -> new Val.Builtin(name, params.map(_._1).toArray, params.map(_._2).toArray) {
-      def evalRhs(args: Array[_ <: Lazy], ev: EvalScope, pos: Position): Val =
+      def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
         implicitly[ReadWriter[R]].write(pos, eval(args.map(_.force), pos, ev))
     }
   }
@@ -1860,7 +1864,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
     maybeSortKeys(ev, v1.allKeyNames)
 
-  @inline private[this] def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
+  @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
     if(ev.settings.preserveOrder) keys else keys.sorted
 
   def getObjValuesFromKeys(pos: Position, ev: EvalScope, v1: Val.Obj, keys: Array[String]): Val.Arr =

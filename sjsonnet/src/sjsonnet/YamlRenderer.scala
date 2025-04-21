@@ -29,7 +29,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
   override def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
-
+  
   override def visitString(s: CharSequence, index: Int): StringWriter = {
     flushBuffer()
     val len = s.length()

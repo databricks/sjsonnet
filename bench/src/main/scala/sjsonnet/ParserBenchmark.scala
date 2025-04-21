@@ -28,7 +28,7 @@ class ParserBenchmark {
   def main(bh: Blackhole): Unit = {
     bh.consume(allFiles.foreach { case (p, s) =>
       val res = fastparse.parse(s, new Parser(p, true, HashMap.empty, HashMap.empty).document(_))
-      bh.consume(res.asInstanceOf[Success[_]])
+      bh.consume(res.asInstanceOf[Success[?]])
     })
   }
 }
