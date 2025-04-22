@@ -12,8 +12,8 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(queryExtVar: String => Option[String],
-                  queryTlaVar: String => Option[String],
+class Interpreter(queryExtVar: String => Option[Any],
+                  queryTlaVar: String => Option[Any],
                   wd: Path,
                   importer: Importer,
                   parseCache: ParseCache,
@@ -66,6 +66,18 @@ class Interpreter(queryExtVar: String => Option[String],
                       settings: Settings, warn: Error => Unit): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, warn)
 
+  /**
+   * Evaluate a variable to an `Expr`.
+   * */
+  def evaluateVar(k: String, v: Any): Expr = v match {
+    case expr: Expr => expr
+    case s: String => parseVar(k, s)
+    case other => parseVar(k, other.toString)
+  }
+
+  /**
+   * Parse a variable to an `Expr`.
+   * */
   def parseVar(k: String, v: String): Expr = {
     varResolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
@@ -73,7 +85,7 @@ class Interpreter(queryExtVar: String => Option[String],
   val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
-    k => queryExtVar(k).map(v => parseVar(s"ext-var $k", v)),
+    k => queryExtVar(k).map(v => evaluateVar(s"ext-var $k", v)),
     wd,
     settings,
     warn
@@ -121,7 +133,7 @@ class Interpreter(queryExtVar: String => Option[String],
           while(i < defaults2.length) {
             val k = f.params.names(i)
             for(v <- queryTlaVar(k)){
-              val parsed = parseVar(s"tla-var $k", v)
+              val parsed = evaluateVar(s"tla-var $k", v)
               defaults2(i) = parsed
               tlaExpressions.add(parsed)
             }
