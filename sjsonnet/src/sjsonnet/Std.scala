@@ -14,7 +14,7 @@ import scala.collection.mutable
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
   * logic automatically
   */
-class Std(private val additionalNativeFunctions: Map[String, Val.Builtin] = Map.empty) extends FunctionBuilder {
+class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.empty) extends FunctionBuilder {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
   private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
