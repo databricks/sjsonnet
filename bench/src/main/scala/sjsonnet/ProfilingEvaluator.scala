@@ -1,10 +1,9 @@
 package sjsonnet
 
 import java.util
-
-import scala.collection.compat._
+import scala.collection.compat.*
 import scala.collection.mutable
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class ProfilingEvaluator(resolver: CachedResolver,
                          extVars: String => Option[Expr],
@@ -113,7 +112,7 @@ class ProfilingEvaluator(resolver: CachedResolver,
     case b: Expr.Bind => getChildren(b.args) :+ b.rhs
     case a: Expr.Member.AssertStmt => Seq(a.value, a.msg)
     case f: Expr.Member.Field => getChildren(f.fieldName) ++ getChildren(f.args) :+ f.rhs
-    case _ => Nil
+    case null => Nil
   }
 
   private def getChildren(f: Expr.FieldName): Seq[Expr] = f match {
