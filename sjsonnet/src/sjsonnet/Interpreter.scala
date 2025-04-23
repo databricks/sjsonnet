@@ -74,7 +74,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
    * Evaluate a variable to an `Expr`.
    * */
   def evaluateVar(ctx: String, k: String, externalVariable: ExternalVariable[_]): Expr = externalVariable match {
-    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(ctx + "-" + k, v)
+    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(s"$ctx-var $k", v)
     case ExternalVariable(ExternalVariableKind.Expr, v: Expr) => v
     case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
   }
