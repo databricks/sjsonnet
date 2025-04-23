@@ -14,7 +14,8 @@ import scala.collection.mutable
   * in Scala code. Uses `builtin` and other helpers to handle the common wrapper
   * logic automatically
   */
-class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.empty) extends FunctionBuilder {
+class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.empty,
+          private val additionalStdFunctions: Map[String, Val.Func] = Map.empty) extends FunctionBuilder {
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
   private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
@@ -1624,6 +1625,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
     },
   ) ++ builtinNativeFunctions
 
+  require(functions.forall(k => !additionalStdFunctions.contains(k._1)), "Conflicting std functions")
+
   private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
     args(idx) match {
       case arr: Val.Arr => arr.asLazyArray
@@ -1682,7 +1685,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
 
   val Std: Val.Obj = Val.Obj.mk(
     null,
-    functions.toSeq
+    (functions ++ additionalStdFunctions).toSeq
       .map{
         case (k, v) =>
           (
