@@ -73,8 +73,8 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
   /**
    * Evaluate a variable to an `Expr`.
    * */
-  def evaluateVar(k: String, externalVariable: ExternalVariable[_]): Expr = externalVariable match {
-    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(k, v)
+  def evaluateVar(ctx: String, k: String, externalVariable: ExternalVariable[_]): Expr = externalVariable match {
+    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(ctx + "-" + k, v)
     case ExternalVariable(ExternalVariableKind.Expr, v: Expr) => v
     case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
   }
@@ -89,7 +89,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
   val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
-    k => queryExtVar(k).map(v => evaluateVar(s"ext-var $k", v)),
+    k => queryExtVar(k).map(v => evaluateVar("ext", k, v)),
     wd,
     settings,
     warn
@@ -137,7 +137,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
           while(i < defaults2.length) {
             val k = f.params.names(i)
             for(v <- queryTlaVar(k)){
-              val parsed = evaluateVar(s"tla-var $k", v)
+              val parsed = evaluateVar("tla", k, v)
               defaults2(i) = parsed
               tlaExpressions.add(parsed)
             }
