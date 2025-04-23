@@ -16,6 +16,9 @@ import scala.collection.mutable
   */
 class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.empty,
           private val additionalStdFunctions: Map[String, Val.Func] = Map.empty) extends FunctionBuilder {
+  //keep for binary compatibility
+  def this(additionalNativeFunctions: Map[String, Val.Func]) = this(additionalNativeFunctions, Map.empty)
+
   private val dummyPos: Position = new Position(null, 0)
   private val emptyLazyArray = new Array[Lazy](0)
   private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
