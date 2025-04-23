@@ -12,8 +12,8 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(queryExtVar: String => Option[Any],
-                  queryTlaVar: String => Option[Any],
+class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
+                  queryTlaVar: String => Option[ExternalVariable[_]],
                   wd: Path,
                   importer: Importer,
                   parseCache: ParseCache,
@@ -32,7 +32,11 @@ class Interpreter(queryExtVar: String => Option[Any],
            storePos: Position => Unit = null,
            warnLogger: (String => Unit) = null,
            std: Val.Obj = new Std().Std) =
-    this(extVars.get(_), tlaVars.get(_), wd, importer, parseCache, settings, storePos, warnLogger, std)
+    this(key => extVars.get(key).map(ExternalVariable.code(_)),
+      key => tlaVars.get(key).map(ExternalVariable.code(_)),
+      wd, importer, parseCache, settings, storePos, warnLogger, std)
+
+  private val noOffsetPos = new Position(new FileScope(wd), -1)
 
   protected val internedStrings = new mutable.HashMap[String, String]
 
@@ -69,10 +73,10 @@ class Interpreter(queryExtVar: String => Option[Any],
   /**
    * Evaluate a variable to an `Expr`.
    * */
-  def evaluateVar(k: String, v: Any): Expr = v match {
-    case expr: Expr => expr
-    case s: String => parseVar(k, s)
-    case other => parseVar(k, other.toString)
+  def evaluateVar(k: String, externalVariable: ExternalVariable[_]): Expr = externalVariable match {
+    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(k, v)
+    case ExternalVariable(ExternalVariableKind.Expr, v: Expr) => v
+    case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
   }
 
   /**
