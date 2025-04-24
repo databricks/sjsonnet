@@ -11,7 +11,7 @@ Sjsonnet can be used from Java:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_2.13</artifactId>
-    <version>0.4.15.2</version>
+    <version>0.4.15.3</version>
 </dependency>
 ```
 
@@ -30,8 +30,8 @@ sjsonnet.SjsonnetMain.main0(
 From Scala:
 
 ```scala
-"com.databricks" %% "sjsonnet" % "0.4.15.2" // SBT
-ivy"com.databricks::sjsonnet:0.4.15.2" // Mill
+"com.databricks" %% "sjsonnet" % "0.4.15.3" // SBT
+ivy"com.databricks::sjsonnet:0.4.15.3" // Mill
 ```
 
 ```scala
@@ -48,10 +48,10 @@ sjsonnet.SjsonnetMain.main0(
 
 As a standalone executable assembly:
 
-- <https://github.com/databricks/sjsonnet/releases/download/0.4.15.2/sjsonnet.jar>
+- <https://github.com/databricks/sjsonnet/releases/download/0.4.15.3/sjsonnet.jar>
 
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15.2/sjsonnet-0.4.15.2.jar > sjsonnet.jar
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15.3/sjsonnet-0.4.15.3.jar > sjsonnet.jar
 
 $ chmod +x sjsonnet.jar
 
@@ -71,7 +71,7 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15.2/sjsonnet-0.4.15.2.js > sjsonnet.js
+$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.4.15.3/sjsonnet-0.4.15.3.js > sjsonnet.js
 
 $ node
 
@@ -277,6 +277,9 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 ```
 
 ## Changelog
+
+### 0.4.15.3
+- Fix bug where TLAs were ignored.
 
 ### 0.4.15.2
 - Fix implementation of std.minArray/std.maxArray and add tests.
