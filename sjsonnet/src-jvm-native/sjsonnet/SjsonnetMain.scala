@@ -193,8 +193,8 @@ object SjsonnetMain {
 
     var currentPos: Position = null
     val interp = new Interpreter(
-      queryExtVar = extBinding.get(_),
-      queryTlaVar = tlaBinding.get(_),
+      queryExtVar = key => extBinding.get(key).map(ExternalVariable.code(_)),
+      queryTlaVar = key => tlaBinding.get(key).map(ExternalVariable.code(_)),
       OsPath(wd),
       importer = importer match{
         case Some(i) => new Importer {

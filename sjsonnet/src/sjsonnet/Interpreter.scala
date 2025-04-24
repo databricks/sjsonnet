@@ -12,8 +12,8 @@ import scala.util.control.NonFatal
   * Wraps all the machinery of evaluating Jsonnet source code, from parsing to
   * evaluation to materialization, into a convenient wrapper class.
   */
-class Interpreter(queryExtVar: String => Option[String],
-                  queryTlaVar: String => Option[String],
+class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
+                  queryTlaVar: String => Option[ExternalVariable[_]],
                   wd: Path,
                   importer: Importer,
                   parseCache: ParseCache,
@@ -32,7 +32,11 @@ class Interpreter(queryExtVar: String => Option[String],
            storePos: Position => Unit = null,
            warnLogger: (String => Unit) = null,
            std: Val.Obj = new Std().Std) =
-    this(extVars.get(_), tlaVars.get(_), wd, importer, parseCache, settings, storePos, warnLogger, std)
+    this(key => extVars.get(key).map(ExternalVariable.code(_)),
+      key => tlaVars.get(key).map(ExternalVariable.code(_)),
+      wd, importer, parseCache, settings, storePos, warnLogger, std)
+
+  private val noOffsetPos = new Position(new FileScope(wd), -1)
 
   protected val internedStrings = new mutable.HashMap[String, String]
 
@@ -66,6 +70,18 @@ class Interpreter(queryExtVar: String => Option[String],
                       settings: Settings, warn: Error => Unit): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, warn)
 
+  /**
+   * Evaluate a variable to an `Expr`.
+   * */
+  def evaluateVar(ctx: String, k: String, externalVariable: ExternalVariable[_]): Expr = externalVariable match {
+    case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(s"$ctx-var $k", v)
+    case ExternalVariable(ExternalVariableKind.Expr, v: Expr) => v
+    case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
+  }
+
+  /**
+   * Parse a variable to an `Expr`.
+   * */
   def parseVar(k: String, v: String): Expr = {
     varResolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
@@ -73,7 +89,7 @@ class Interpreter(queryExtVar: String => Option[String],
   val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
-    k => queryExtVar(k).map(v => parseVar(s"ext-var $k", v)),
+    k => queryExtVar(k).map(v => evaluateVar("ext", k, v)),
     wd,
     settings,
     warn
@@ -121,7 +137,7 @@ class Interpreter(queryExtVar: String => Option[String],
           while(i < defaults2.length) {
             val k = f.params.names(i)
             for(v <- queryTlaVar(k)){
-              val parsed = parseVar(s"tla-var $k", v)
+              val parsed = evaluateVar("tla", k, v)
               defaults2(i) = parsed
               tlaExpressions.add(parsed)
             }
