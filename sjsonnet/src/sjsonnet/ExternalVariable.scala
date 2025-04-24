@@ -6,20 +6,38 @@ package sjsonnet
 sealed trait ExternalVariableKind[T]
 
 object ExternalVariableKind {
+  /**
+   * Get an instance of ExternalVariableKind for a code snippet.
+   * */
   def code: ExternalVariableKind[String] = Code
 
+  /**
+   * Get an instance of ExternalVariableKind for an expr.
+   * */
   def expr: ExternalVariableKind[sjsonnet.Expr] = Expr
 
+  /**
+   * Get an instance of ExternalVariableKind for a variable.
+   * */
   def variable: ExternalVariableKind[String] = Variable
 
+  /**
+   * Indicates that the external variable is a code snippet.
+   * */
   case object Variable extends ExternalVariableKind[String] {
     override def toString: String = "variable"
   }
 
+  /**
+   * Indicates that the external variable is a string literal.
+   * */
   case object Code extends ExternalVariableKind[String] {
     override def toString: String = "code"
   }
 
+  /**
+   * Indicates that the external variable is a parsed jsonnet expression.
+   * */
   case object Expr extends ExternalVariableKind[sjsonnet.Expr] {
     override def toString: String = "expr"
   }
