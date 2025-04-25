@@ -72,7 +72,7 @@ class Evaluator(resolver: CachedResolver,
     Error.withStackFrame(e)
   }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
-  def visitInvalid(e: Expr): Nothing = e match {
+  private def visitInvalid(e: Expr): Nothing = e match {
     case Id(pos, name) =>
       Error.fail("Unknown variable: " + name, pos)
     case Self(pos) =>
@@ -83,22 +83,22 @@ class Evaluator(resolver: CachedResolver,
       Error.fail("Can't use super outside of an object", pos)
   }
 
-  def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
+  private def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
     case v: Val => v
     case e => new LazyWithComputeFunc(() => visitExpr(e))
   }
 
-  def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
+  private def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
     ref.force
   }
 
-  def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
+  private def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
     case obj: Val.Obj => obj.value(e.name, e.pos)
     case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${e.name}", e.pos)
   }
 
-  def visitLocalExpr(e: LocalExpr)(implicit scope: ValScope): Val = {
+  private def visitLocalExpr(e: LocalExpr)(implicit scope: ValScope): Val = {
     val bindings = e.bindings
     val s =
       if(bindings == null) scope else {
@@ -118,19 +118,19 @@ class Evaluator(resolver: CachedResolver,
     visitExpr(e.returned)(s)
   }
 
-  def visitComp(e: Comp)(implicit scope: ValScope): Val =
+  private def visitComp(e: Comp)(implicit scope: ValScope): Val =
     new Val.Arr(e.pos, visitComp(e.first :: e.rest.toList, Array(scope)).map(s => visitAsLazy(e.value)(s)))
 
-  def visitArr(e: Arr)(implicit scope: ValScope): Val =
+  private def visitArr(e: Arr)(implicit scope: ValScope): Val =
     new Val.Arr(e.pos, e.value.map(visitAsLazy))
 
-  def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
+  private def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
     if(sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
     else sup.value(e.name, e.pos, scope.bindings(e.selfIdx).asInstanceOf[Val.Obj])
   }
 
-  def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {
+  private def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {
     val original = visitExpr(e.base).cast[Val.Obj]
     e.ext match {
       case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
@@ -139,7 +139,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitIfElse(e: IfElse)(implicit scope: ValScope): Val = {
+  private def visitIfElse(e: IfElse)(implicit scope: ValScope): Val = {
     visitExpr(e.cond) match {
       case Val.True(_) => visitExpr(e.`then`)
       case Val.False(_) =>
@@ -151,7 +151,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitError(e: Expr.Error)(implicit scope: ValScope): Nothing = {
+  private def visitError(e: Expr.Error)(implicit scope: ValScope): Nothing = {
     Error.fail(materializeError(visitExpr(e.value)), e.pos)
   }
 
@@ -160,7 +160,7 @@ class Evaluator(resolver: CachedResolver,
     case r => Materializer.stringify(r)
   }
 
-  def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
+  private def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
     val v = visitExpr(e.value)
     val pos = e.pos
     def fail() = Error.fail(s"Unknown unary operation: ${Expr.UnaryOp.name(e.op)} ${v.prettyName}", pos)
@@ -350,7 +350,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
+  private def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
     if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
@@ -390,7 +390,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitLookup(e: Lookup)(implicit scope: ValScope): Val = {
+  private def visitLookup(e: Lookup)(implicit scope: ValScope): Val = {
     val pos = e.pos
     (visitExpr(e.value), visitExpr(e.index)) match {
       case (v: Val.Arr, i: Val.Num) =>
@@ -407,21 +407,21 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
+  private def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
     var sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
     if(sup == null) sup = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
     sup.value(key.value, e.pos)
   }
 
-  def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
+  private def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
     Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)._2.readString())
 
-  def visitImportBin(e: ImportBin): Val.Arr =
+  private def visitImportBin(e: ImportBin): Val.Arr =
     new Val.Arr(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)._2.readRawBytes().map(
       x => Val.Num(e.pos, (x & 0xff).doubleValue)))
 
-  def visitImport(e: Import)(implicit scope: ValScope): Val = {
+  private def visitImport(e: Import)(implicit scope: ValScope): Val = {
     val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)
     cachedImports.getOrElseUpdate(
       p,
@@ -435,7 +435,7 @@ class Evaluator(resolver: CachedResolver,
     )
   }
 
-  def visitAnd(e: And)(implicit scope: ValScope): Val.Bool = {
+  private def visitAnd(e: And)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
       case _: Val.True =>
         visitExpr(e.rhs) match{
@@ -451,7 +451,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitOr(e: Or)(implicit scope: ValScope): Val.Bool = {
+  private def visitOr(e: Or)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
       case _: Val.True => Val.True(e.pos)
       case _: Val.False =>
@@ -465,7 +465,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitInSuper(e: InSuper)(implicit scope: ValScope): Val.Bool = {
+  private def visitInSuper(e: InSuper)(implicit scope: ValScope): Val.Bool = {
     val sup = scope.bindings(e.selfIdx+1).asInstanceOf[Val.Obj]
     if(sup == null) Val.False(e.pos)
     else {
@@ -474,7 +474,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitBinaryOp(e: BinaryOp)(implicit scope: ValScope): Val.Literal = {
+  private def visitBinaryOp(e: BinaryOp)(implicit scope: ValScope): Val.Literal = {
     val l = visitExpr(e.lhs)
     val r = visitExpr(e.rhs)
     val pos = e.pos
@@ -584,7 +584,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope): String = {
+  private def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope): String = {
     fieldName match {
       case FieldName.Fixed(s) => s
       case FieldName.Dyn(k) => visitExpr(k) match{
@@ -598,13 +598,13 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope): Val.Func =
+  private def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val = visitExpr(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
     }
 
-  def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Lazy] = {
+  private def visitBindings(bindings: Array[Bind], scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Lazy] = {
     val arrF = new Array[(Val.Obj, Val.Obj) => Lazy](bindings.length)
     var i = 0
     while(i < bindings.length) {
@@ -620,7 +620,7 @@ class Evaluator(resolver: CachedResolver,
     arrF
   }
 
-  def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
+  private def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
     var cachedSimpleScope: Option[ValScope] = None
@@ -732,7 +732,7 @@ class Evaluator(resolver: CachedResolver,
     cachedObj
   }
 
-  def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
+  private def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope //.clearSuper
 
@@ -753,7 +753,7 @@ class Evaluator(resolver: CachedResolver,
                 )
             })
             if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
-              Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
+              Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos)
             }
           case Val.Null(_) => // do nothing
           case _ =>
