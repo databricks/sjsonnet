@@ -77,6 +77,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
     case ExternalVariable(ExternalVariableKind.Code, v: String) => parseVar(s"$ctx-var $k", v)
     case ExternalVariable(ExternalVariableKind.Expr, v: Expr) => v
     case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
+    case _ => throw new Error(s"Unsupported external variable kind: ${externalVariable.kind}", Nil, None)
   }
 
   /**
