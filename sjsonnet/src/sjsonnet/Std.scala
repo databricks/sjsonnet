@@ -448,12 +448,12 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
       new Val.Str(pos, new String(arr.force.asArr.iterator.map(_.cast[Val.Num].value.toByte).toArray, UTF_8))
   }
 
-  private object Substr extends Val.Builtin3("substr", "s", "from", "len") {
+  private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
     def evalRhs(_s: Lazy, from: Lazy, len: Lazy, ev: EvalScope, pos: Position): Val = {
-      val s = _s.force.asString
-      val safeOffset = math.min(from.force.asInt, s.length)
-      val safeLength = math.min(len.force.asInt, s.length - safeOffset)
-      Val.Str(pos, s.substring(safeOffset, safeOffset + safeLength))
+      val str = _s.force.asString
+      val safeOffset = math.min(from.force.asInt, str.length)
+      val safeLength = math.min(len.force.asInt, str.length - safeOffset)
+      Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
     }
   }
 
