@@ -12,6 +12,7 @@ import java.util.Arrays
   */
 trait Expr{
   def pos: Position
+  private[sjsonnet] val _tag :Int = ExprTags.UNTAGGED
 
   /** The name of this expression type to be shown in error messages */
   def exprErrorString: String = {
@@ -26,17 +27,27 @@ object Expr{
     if(a == null) "null" else a.mkString("[", ", ", "]")
   }
 
-  case class Self(pos: Position) extends Expr
-  case class Super(pos: Position) extends Expr
-  case class $(pos: Position) extends Expr
+  case class Self(pos: Position) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Self
+  }
+  case class Super(pos: Position) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Super
+  }
+  case class $(pos: Position) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.`$`
+  }
 
   case class Id(pos: Position, name: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Id
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
+
   case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ValidId
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
   case class Arr(pos: Position, value: Array[Expr]) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Arr
     override def toString: String = s"Arr($pos, ${arrStr(value)})"
   }
 
@@ -73,6 +84,7 @@ object Expr{
   }
 
   case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.UnaryOp
     override def exprErrorString: String = s"${super.exprErrorString} ${UnaryOp.name(op)}"
   }
   object UnaryOp{
@@ -83,9 +95,14 @@ object Expr{
     private val names = Map(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
-  case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr
-  case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr
+  case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.And
+  }
+  case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Or
+  }
   case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.BinaryOp
     override def exprErrorString: String = s"${super.exprErrorString} ${BinaryOp.name(op)}"
   }
   object BinaryOp{
@@ -113,8 +130,11 @@ object Expr{
       OP_!= -> "!=", OP_& -> "&", OP_^ -> "^", OP_| -> "|", OP_&& -> "&&", OP_|| -> "||" )
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
-  case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr
+  case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.AssertExpr
+  }
   case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.LocalExpr
     override def toString: String = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
     override def equals(o: Any): Boolean = o match {
       case o: LocalExpr =>
@@ -124,57 +144,99 @@ object Expr{
   }
 
   case class Bind(pos: Position, name: String, args: Params, rhs: Expr) extends Member
-  case class Import(pos: Position, value: String) extends Expr
-  case class ImportStr(pos: Position, value: String) extends Expr
-  case class ImportBin(pos: Position, value: String) extends Expr
-  case class Error(pos: Position, value: Expr) extends Expr
-  case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String], tailstrict: Boolean) extends Expr
-  case class Apply0(pos: Position, value: Expr, tailstrict: Boolean) extends Expr
-  case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean) extends Expr
-  case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean) extends Expr
-  case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr, tailstrict: Boolean) extends Expr
+  case class Import(pos: Position, value: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Import
+  }
+  case class ImportStr(pos: Position, value: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ImportStr
+  }
+  case class ImportBin(pos: Position, value: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ImportBin
+  }
+  case class Error(pos: Position, value: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Error
+  }
+  case class Apply(pos: Position, value: Expr, args: Array[Expr], namedNames: Array[String], tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Apply
+  }
+  case class Apply0(pos: Position, value: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Apply0
+  }
+  case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Apply1
+  }
+  case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Apply2
+  }
+  case class Apply3(pos: Position, value: Expr, a1: Expr, a2: Expr, a3: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Apply3
+  }
   case class ApplyBuiltin(pos: Position, func: Val.Builtin, argExprs: Array[Expr], tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ApplyBuiltin
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ApplyBuiltin1
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   case class ApplyBuiltin2(pos: Position, func: Val.Builtin2, a1: Expr, a2: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ApplyBuiltin2
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   case class ApplyBuiltin3(pos: Position, func: Val.Builtin3, a1: Expr, a2: Expr, a3: Expr, tailstrict: Boolean) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ApplyBuiltin3
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   case class ApplyBuiltin4(pos: Position, func: Val.Builtin4, a1: Expr, a2: Expr, a3: Expr, a4: Expr, tailstrict: Boolean) extends Expr {
+    override private[sjsonnet] val _tag = ExprTags.ApplyBuiltin4
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   case class Select(pos: Position, value: Expr, name: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Select
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
   case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.SelectSuper
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
-  case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr
-  case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr
-  case class LookupSuper(pos: Position, selfIdx: Int, index: Expr) extends Expr
+  case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.InSuper
+  }
+  case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Lookup
+  }
+  case class LookupSuper(pos: Position, selfIdx: Int, index: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.LookupSuper
+  }
   case class Slice(pos: Position,
                    value: Expr,
                    start: Option[Expr],
                    end: Option[Expr],
-                   stride: Option[Expr]) extends Expr
-  case class Function(pos: Position, params: Params, body: Expr) extends Expr
-  case class IfElse(pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr
+                   stride: Option[Expr]) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Slice
+  }
+  case class Function(pos: Position, params: Params, body: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Function
+  }
+  case class IfElse(pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.IfElse
+  }
 
   sealed trait CompSpec extends Expr
   case class IfSpec(pos: Position, cond: Expr) extends CompSpec
   case class ForSpec(pos: Position, name: String, cond: Expr) extends CompSpec
 
-  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr
-  case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr
+  case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.Comp
+  }
+  case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr {
+    final override private[sjsonnet] val _tag = ExprTags.ObjExtend
+  }
 
   trait ObjBody extends Expr
   object ObjBody{
     case class MemberList(pos: Position, binds: Array[Bind], fields: Array[Member.Field], asserts: Array[Member.AssertStmt]) extends ObjBody {
+      final override private[sjsonnet] val _tag = ExprTags.`ObjBody.MemberList`
       override def toString: String = s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
     }
     case class ObjComp(pos: Position,
@@ -185,7 +247,56 @@ object Expr{
                        postLocals: Array[Bind],
                        first: ForSpec,
                        rest: List[CompSpec]) extends ObjBody {
+      final override private[sjsonnet] val _tag = ExprTags.`ObjBody.ObjComp`
       override def toString: String = s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
     }
   }
+}
+
+private[sjsonnet] object ExprTags {
+  //used for optimization only, used in Evaluator#visitExpr
+  //the order is the same as the origin order in Evaluator#visitExpr
+  final val UNTAGGED = 0 //A special value used to indicate that the expression is not tagged for optimization
+  final val ValidId = 1
+  final val BinaryOp = 2
+  final val Select = 3
+  final val `Val.Literal` = 4
+  final val `Val.Func` = 5
+  final val ApplyBuiltin1 = 6
+  final val ApplyBuiltin2 = 7
+  final val ApplyBuiltin3 = 8
+  final val ApplyBuiltin4 = 9
+  final val And = 10
+  final val Or = 11
+  final val UnaryOp = 12
+  final val Apply1 = 13
+  final val Lookup = 14
+  final val Function = 15
+  final val LocalExpr = 16
+  final val Apply = 17
+  final val IfElse = 18
+  final val Apply3 = 19
+  final val `ObjBody.MemberList` = 20
+  final val Apply2 = 21
+  final val AssertExpr = 22
+  final val ApplyBuiltin = 23
+  final val Comp = 24
+  final val Arr = 25
+  final val SelectSuper = 26
+  final val LookupSuper = 27
+  final val InSuper = 28
+  final val ObjExtend = 29
+  final val `ObjBody.ObjComp` = 30
+  final val Slice = 31
+  final val Import = 32
+  final val Apply0 = 33
+  final val ImportStr = 34
+  final val ImportBin = 35
+  final val Error = 36
+  //used in Evaluator#visitInvalid
+  final val Id = 0
+  final val Self = 1
+  final val `$` = 2
+  final val Super = 3
+  //other
 }
