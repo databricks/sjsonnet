@@ -108,5 +108,15 @@ object StdMergePatchTests extends TestSuite {
       eval("""{a:: 0} + {[a]: 1 for a in ["a"]}""") ==> ujson.Obj()
       eval("""({a:: 0} + {[a]: 1 for a in ["a"]}).a""") ==> ujson.Num(1)
     }
+
+    test("lazy evaluation of LHS members") {
+      // An erroring target field which doesn't merge with any patch fields.
+      // This shouldn't error because we should avoid eager evaluation of unmerged target fields:
+      eval("(std.mergePatch({ boom: error \"should not error\" }, {}) + { flag: 42 }).flag") ==> ujson.Num(42)
+
+      // An erroring target field which is removed by the patch:
+      // This should not error because we shouldn't evaluate the removed field:
+      eval("(std.mergePatch({ boom: error \"should not error\" }, { boom: null }) + { flag: 42 }).flag") ==> ujson.Num(42)
+    }
   }
 }
