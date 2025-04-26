@@ -927,20 +927,25 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
           var i = 0
           while (i < keys.length) {
             val key = keys(i)
-            val lValue = if (l.containsVisibleKey(key)) l.valueRaw(key, l, pos)(ev) else null
             val rValue = if (r.containsVisibleKey(key)) r.valueRaw(key, r, pos)(ev) else null
             if (!rValue.isInstanceOf[Val.Null]) { // if we are not removing the key
-              if (lValue != null && rValue == null) {
-                // Preserve the LHS/target value:
-                kvs(kvsIdx) = (key, new Val.Obj.ConstMember(false, Visibility.Normal, lValue))
-              } else if (lValue.isInstanceOf[Val.Obj] && rValue.isInstanceOf[Val.Obj]) {
-                // Recursively merge objects:
-                kvs(kvsIdx) = (key, createLazyMember(recPair(lValue, rValue)))
-              } else if (rValue != null) {
+              if (l.containsVisibleKey(key)) {
+                if (rValue == null) {
+                  // Preserve the LHS/target value:
+                  kvs(kvsIdx) = (key, createLazyMember(l.valueRaw(key, l, pos)(ev)))
+                } else {
+                  val lValue = l.valueRaw(key, l, pos)(ev)
+                  if (lValue.isInstanceOf[Val.Obj] && rValue.isInstanceOf[Val.Obj]) {
+                    // Recursively merge objects:
+                    kvs(kvsIdx) = (key, createLazyMember(recPair(lValue, rValue)))
+                  } else {
+                    // Use the RHS/patch value and recursively remove Null or hidden fields:
+                    kvs(kvsIdx) = (key, createLazyMember(recSingle(rValue)))
+                  }
+                }
+              } else {
                 // Use the RHS/patch value and recursively remove Null or hidden fields:
                 kvs(kvsIdx) = (key, createLazyMember(recSingle(rValue)))
-              } else {
-                Error.fail("std.mergePatch: This should never happen")
               }
               kvsIdx += 1
             }
