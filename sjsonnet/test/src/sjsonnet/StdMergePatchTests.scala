@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 object StdMergePatchTests extends TestSuite {
 
   // These test cases' behavior matches v0.20.0 of google/jsonnet and google/go-jsonnet.
@@ -114,9 +114,16 @@ object StdMergePatchTests extends TestSuite {
       // This shouldn't error because we should avoid eager evaluation of unmerged target fields:
       eval("(std.mergePatch({ boom: error \"should not error\" }, {}) + { flag: 42 }).flag") ==> ujson.Num(42)
 
-      // An erroring target field which is removed by the patch:
+      // An erroring target field which is removed by the patch.
       // This should not error because we shouldn't evaluate the removed field:
       eval("(std.mergePatch({ boom: error \"should not error\" }, { boom: null }) + { flag: 42 }).flag") ==> ujson.Num(42)
+
+      // An overwritten target field which doesn't merge with any patch fields.
+      // This should not error because it doesn't require evaluation of the replaced target field:
+      eval("(std.mergePatch({ boom: error \"should error\" }, { boom: 1 }) + { flag: 42 }).flag") ==> ujson.Num(42)
+
+      // Patch fields are always eagerly evaluated, even if they don't merge with anything:
+      assert(evalErr("(std.mergePatch({a: 1}, {b: error \"should error\"})).a").startsWith("sjsonnet.Error: should error"))
     }
   }
 }
