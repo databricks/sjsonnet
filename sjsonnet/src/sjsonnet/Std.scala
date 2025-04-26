@@ -934,8 +934,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
                   // Preserve the LHS/target value:
                   kvs(kvsIdx) = (key, createLazyMember(l.valueRaw(key, l, pos)(ev)))
                 } else {
-                  val lValue = l.valueRaw(key, l, pos)(ev)
-                  if (lValue.isInstanceOf[Val.Obj] && rValue.isInstanceOf[Val.Obj]) {
+                  lazy val lValue = l.valueRaw(key, l, pos)(ev)
+                  if (rValue.isInstanceOf[Val.Obj] && lValue.isInstanceOf[Val.Obj]) {
                     // Recursively merge objects:
                     kvs(kvsIdx) = (key, createLazyMember(recPair(lValue, rValue)))
                   } else {
