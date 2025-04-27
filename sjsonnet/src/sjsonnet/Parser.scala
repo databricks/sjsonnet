@@ -284,7 +284,7 @@ class Parser(val currentFile: Path,
 
   def unaryOpExpr[$: P](pos: Position, op: Char): P[Expr.UnaryOp] = P(
     expr1.map{ e =>
-      def k2 = op match{
+      def k2 = (op: @switch) match {
         case '+' => Expr.UnaryOp.OP_+
         case '-' => Expr.UnaryOp.OP_-
         case '~' => Expr.UnaryOp.OP_~
@@ -304,7 +304,7 @@ class Parser(val currentFile: Path,
   def expr2[$: P]: P[Expr] = P(
     Pos.flatMapX{ pos =>
       SingleChar.flatMapX{ c =>
-        c match {
+        (c: @switch) match {
           case '{' => Pass ~ objinside ~ "}"
           case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
           case '[' => Pass ~ arr ~ "]"
@@ -320,7 +320,7 @@ class Parser(val currentFile: Path,
           case '$' => Pass(Expr.$(pos))
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             P.current.index = pos.offset; number
-          case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
+          case x => if(idStartChar(x)) CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
             "" + x + y match {
               case "null"      => Pass(Val.Null(pos))
               case "true"      => Pass(Val.True(pos))
@@ -337,8 +337,7 @@ class Parser(val currentFile: Path,
               case "local"     => Pass ~ local
               case x           => Pass(Expr.Id(pos, x))
             }
-          }
-          case _ => Fail
+          } else Fail
         }
       }
     }
@@ -387,10 +386,10 @@ class Parser(val currentFile: Path,
         exprs(preLocals.length): @unchecked
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      
-      /* 
+
+      /*
        * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
-       * 
+       *
        * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
        * Otherwise the field value will be overriden by the multiple iterations of forspec
        */
