@@ -15,24 +15,32 @@ import scala.collection.mutable
   */
 
 object Parser {
-  val precedenceTable: Seq[Seq[String]] = Seq(
-    Seq("*", "/", "%"),
-    Seq("+", "-"),
-    Seq("<<", ">>"),
-    Seq("<", ">", "<=", ">=", "in"),
-    Seq("==", "!="),
-    Seq("&"),
-    Seq("^"),
-    Seq("|"),
-    Seq("&&"),
-    Seq("||")
-  )
-
-  val precedence: Map[String,Int] = precedenceTable
-    .reverse
-    .zipWithIndex
-    .flatMap{case (ops, idx) => ops.map(_ -> idx)}
-    .toMap
+  private def precedence(op: String): Int = {
+    if (op.length == 1) {
+      (op.charAt(0): @switch) match {
+        case '|' => 2
+        case '^' => 3
+        case '&' => 4
+        case '<' | '>' => 6
+        case '+' | '-' => 8
+        case '*' | '/' | '%' => 9
+        case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+      }
+      //here we keep all the origin precedences
+    } else op match {
+      case "||" => 0
+      case "&&" => 1
+      case "|" => 2
+      case "^" => 3
+      case "&" => 4
+      case "==" | "!=" => 5
+      case "<" | ">" | "<=" | ">=" | "in" => 6
+      case "<<" | ">>" => 7
+      case "+" | "-" => 8
+      case "*" | "/" | "%" => 9
+      case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+    }
+  }
 
   val keywords: Set[String] = Set(
     "assert", "else", "error", "false", "for", "function", "if", "import", "importstr",
