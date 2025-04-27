@@ -20,6 +20,11 @@ trait Expr{
     if(n.startsWith("sjsonnet.Expr$")) n.substring(14) else n
   }
 
+  /**
+   * Test for equality of this expression with another expression, ignore the position.
+   * */
+  def ===(other: Expr): Boolean = this == other
+
   override def toString: String = s"$exprErrorString@$pos"
 }
 object Expr{

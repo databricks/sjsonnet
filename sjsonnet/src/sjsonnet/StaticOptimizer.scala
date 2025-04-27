@@ -92,6 +92,8 @@ class StaticOptimizer(
       case null => Val.Null(pos)
       case _ => transform(elseExpr)
     }
+    case IfElse(_ , _, thenExpr, elseExpr) if thenExpr === elseExpr =>
+      transform(thenExpr)
     //optimize for obj
     case b3@BinaryOp(_, lhs: Val.Obj, BinaryOp.OP_+, rhs: Val.Obj) if lhs.staticSafe && rhs.staticSafe =>
       if (lhs.allKeyNames.isEmpty) {
