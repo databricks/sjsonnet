@@ -195,7 +195,21 @@ class Parser(val currentFile: Path,
               else{
                 remaining = remaining.tail
                 val rhs = climb(prec + 1, next)
-                val op1 = op match{
+                val op1 = if (op.length == 1) {
+                  (op.charAt(0): @switch) match {
+                    case '|' => Expr.BinaryOp.OP_|
+                    case '^' => Expr.BinaryOp.OP_^
+                    case '&' => Expr.BinaryOp.OP_&
+                    case '<' => Expr.BinaryOp.OP_<
+                    case '>' => Expr.BinaryOp.OP_>
+                    case '+' => Expr.BinaryOp.OP_+
+                    case '-' => Expr.BinaryOp.OP_-
+                    case '*' => Expr.BinaryOp.OP_*
+                    case '/' => Expr.BinaryOp.OP_/
+                    case '%' => Expr.BinaryOp.OP_%
+                    case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+                  }
+                } else op match {
                   case "*" => Expr.BinaryOp.OP_*
                   case "/" => Expr.BinaryOp.OP_/
                   case "%" => Expr.BinaryOp.OP_%
