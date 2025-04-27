@@ -47,7 +47,7 @@ object SjsonnetMain {
 }
 
 
-case class JsVirtualPath(path: String) extends Path{
+final case class JsVirtualPath(path: String) extends Path{
   def relativeToString(p: Path): String = p match{
     case other: JsVirtualPath if path.startsWith(other.path) => path.drop(other.path.length)
     case _ => path

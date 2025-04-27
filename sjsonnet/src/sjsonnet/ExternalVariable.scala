@@ -43,7 +43,7 @@ object ExternalVariableKind {
   }
 }
 
-case class ExternalVariable[T](kind: ExternalVariableKind[T], value: T) {
+final case class ExternalVariable[T](kind: ExternalVariableKind[T], value: T) {
   override def toString: String = s"ExternalVariable($kind, $value)"
 }
 

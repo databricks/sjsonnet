@@ -3,7 +3,7 @@ package sjsonnet
 import mainargs.{main, arg, Flag}
 
 @main
-case class Config(
+final case class Config(
   @arg(
     name = "jpath", short = 'J',
     doc = "Specify an additional library search dir (left-most wins)"

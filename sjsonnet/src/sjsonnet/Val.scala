@@ -93,20 +93,20 @@ object Val{
 
   def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
 
-  case class True(pos: Position) extends Bool {
+  final case class True(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class False(pos: Position) extends Bool {
+  final case class False(pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  case class Null(pos: Position) extends Literal {
+  final case class Null(pos: Position) extends Literal {
     def prettyName = "null"
   }
-  case class Str(pos: Position, value: String) extends Literal {
+  final case class Str(pos: Position, value: String) extends Literal {
     def prettyName = "string"
     override def asString: String = value
   }
-  case class Num(pos: Position, value: Double) extends Literal {
+  final case class Num(pos: Position, value: Double) extends Literal {
     def prettyName = "number"
     override def asInt: Int = value.toInt
     override def asLong: Long = value.toLong
