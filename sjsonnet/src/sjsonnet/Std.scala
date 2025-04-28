@@ -1048,7 +1048,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
     builtin("clamp", "x", "minVal", "maxVal"){ (pos, ev, x: Double, minVal: Double, maxVal: Double) =>
       math.max(minVal, math.min(x, maxVal))
     },
-    builtin("slice", "indexable", "index", "end", "step"){ (pos, ev, indexable: Val, index: Int, end: Int, step: Int) =>
+    builtin("slice", "indexable", "index", "end", "step"){ (pos, ev, indexable: Val, index: Option[Int], end: Option[Int], step: Option[Int]) =>
       val res = indexable match {
         case Val.Str(pos0, s) => Val.Str(pos, Util.sliceStr(s, index, end, step))
         case arr: Val.Arr => new Val.Arr(pos, Util.sliceArr(arr.asLazyArray, index, end, step))

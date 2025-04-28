@@ -8,6 +8,17 @@ sealed abstract class ReadWriter[T] {
   def write(pos: Position, t: T): Val
 }
 object ReadWriter{
+  implicit def OptionReadWriter[T](implicit r: ReadWriter[T]): ReadWriter[Option[T]] = new ReadWriter[Option[T]] {
+    def apply(t: Val): Option[T] = t match {
+      case Val.Null(_) => None
+      case other => Some(r(other))
+    }
+
+    def write(pos: Position, t: Option[T]): Val = t match {
+      case None => Val.Null(pos)
+      case Some(v) => r.write(pos, v)
+    }
+  }
   implicit object StringRead extends ReadWriter[String]{
     def apply(t: Val): String = t.asString
     def write(pos: Position, t: String): sjsonnet.Val.Str = Val.Str(pos, t)

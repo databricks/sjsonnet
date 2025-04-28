@@ -25,6 +25,9 @@ object Util{
         range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
     }
   }
+  def sliceArr[T: scala.reflect.ClassTag](arr: Array[T], start: Option[Int], end: Option[Int], step: Option[Int]): Array[T] = {
+    sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
+  }
   def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
     step match{
       case 1 => s.slice(start, end)
@@ -32,6 +35,9 @@ object Util{
         val range = start until end by step
         new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
     }
+  }
+  def sliceStr(s: String, start: Option[Int], end: Option[Int], step: Option[Int]): String = {
+    sliceStr(s, start.getOrElse(0), end.getOrElse(s.length), step.getOrElse(1))
   }
 
   val isWindows: Boolean = {

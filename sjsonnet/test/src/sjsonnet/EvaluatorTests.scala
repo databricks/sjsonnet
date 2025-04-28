@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.{eval, eval0, evalErr}
+import TestUtils.{eval, evalErr}
 object EvaluatorTests extends TestSuite{
 
 
@@ -21,6 +21,14 @@ object EvaluatorTests extends TestSuite{
       evalErr("[][0]") ==>
       """sjsonnet.Error: array bounds error: array is empty
         |at [Lookup].(:1:3)""".stripMargin
+      eval("std.slice(std.range(1,4), 0, null, 2)") ==> ujson.Arr(1, 3)
+      eval("std.slice(std.range(1,4), null, null, 2)") ==> ujson.Arr(1, 3)
+      eval("std.slice(std.range(1,4), null, null, null)") ==> ujson.Arr(1, 2, 3, 4)
+      eval("std.range(1,4)[0::2]") ==> ujson.Arr(1, 3)
+      eval("std.range(1,4)[0:null:2]") ==> ujson.Arr(1, 3)
+      eval("std.range(1,4)[null:null:2]") ==> ujson.Arr(1, 3)
+      eval("std.range(1,4)[null:null:null]") ==> ujson.Arr(1, 2, 3, 4)
+      eval("std.range(1,4)[::2]") ==> ujson.Arr(1, 3)
     }
     test("functions") {
       eval("(function(x) x)(1)") ==> ujson.Num(1)
