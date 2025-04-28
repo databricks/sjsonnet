@@ -17,7 +17,6 @@ jobs:
     env:
       # Set LANG=C to simulate least-common-denominator target deployment environments:
       LANG: C
-      SCALANATIVE_THREAD_STACK_SIZE: 10m
     name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v4

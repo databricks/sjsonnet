@@ -7,6 +7,8 @@ import java.util.Base64
 val sjsonnetVersion = "0.5.0"
 
 val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.5")
+val stackSize = "100m"
+val stackSizekBytes = 100 * 1024
 
 trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
   def crossValue: String
@@ -66,7 +68,7 @@ object sjsonnet extends Module {
       this.millSourcePath / "src-jvm-js"
     )
     object test extends ScalaJSTests with CrossTests {
-      def jsEnvConfig = JsEnvConfig.NodeJs(args=List("--stack-size=" + 100 * 1024))
+      def jsEnvConfig = JsEnvConfig.NodeJs(args=List("--stack-size=" + stackSizekBytes))
       def sources = T.sources(
         this.millSourcePath / "src",
         this.millSourcePath / "src-js",
@@ -128,6 +130,9 @@ object sjsonnet extends Module {
 
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
+      def forkEnv = Map(
+        "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize,
+      )
       def scalaNativeVersion = SjsonnetNativeModule.this.scalaNativeVersion
       def nativeLTO = LTO.None
       def sources = T.sources(
@@ -160,7 +165,7 @@ object sjsonnet extends Module {
     )
     
     object test extends ScalaTests with CrossTests {
-      def forkArgs = Seq("-Xss100m")
+      def forkArgs = Seq("-Xss" + stackSize)
       def sources = T.sources(
         this.millSourcePath / "src",
         this.millSourcePath / "src-jvm",
