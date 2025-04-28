@@ -48,4 +48,12 @@ object ReadWriter{
     def apply(t: Val): Val.Builtin = t.asInstanceOf[Val.Builtin]
     def write(pos: Position, t: Val.Builtin): sjsonnet.Val.Builtin= t
   }
+  implicit object LiteralRead extends ReadWriter[Val.Literal] {
+    def apply(t: Val): Val.Literal = t match {
+      case literal: Val.Literal => literal
+      case other => Error.fail("Wrong parameter type: expected Val.Literal" + ", got " + other.prettyName)
+    }
+
+    def write(pos: Position, t: Val.Literal): sjsonnet.Val.Literal = t
+  }
 }
