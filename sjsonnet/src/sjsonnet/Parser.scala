@@ -382,7 +382,7 @@ class Parser(val currentFile: Path,
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), plus, null, Visibility.Normal, rhs) =
+      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), plus, args, Visibility.Normal, rhs) =
         exprs(preLocals.length): @unchecked
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
