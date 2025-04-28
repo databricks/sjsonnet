@@ -15,24 +15,32 @@ import scala.collection.mutable
   */
 
 object Parser {
-  val precedenceTable: Seq[Seq[String]] = Seq(
-    Seq("*", "/", "%"),
-    Seq("+", "-"),
-    Seq("<<", ">>"),
-    Seq("<", ">", "<=", ">=", "in"),
-    Seq("==", "!="),
-    Seq("&"),
-    Seq("^"),
-    Seq("|"),
-    Seq("&&"),
-    Seq("||")
-  )
-
-  val precedence: Map[String,Int] = precedenceTable
-    .reverse
-    .zipWithIndex
-    .flatMap{case (ops, idx) => ops.map(_ -> idx)}
-    .toMap
+  private def precedence(op: String): Int = {
+    if (op.length == 1) {
+      (op.charAt(0): @switch) match {
+        case '|' => 2
+        case '^' => 3
+        case '&' => 4
+        case '<' | '>' => 6
+        case '+' | '-' => 8
+        case '*' | '/' | '%' => 9
+        case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+      }
+      //here we keep all the origin precedences
+    } else op match {
+      case "||" => 0
+      case "&&" => 1
+      case "|" => 2
+      case "^" => 3
+      case "&" => 4
+      case "==" | "!=" => 5
+      case "<" | ">" | "<=" | ">=" | "in" => 6
+      case "<<" | ">>" => 7
+      case "+" | "-" => 8
+      case "*" | "/" | "%" => 9
+      case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+    }
+  }
 
   val keywords: Set[String] = Set(
     "assert", "else", "error", "false", "for", "function", "if", "import", "importstr",
@@ -187,7 +195,21 @@ class Parser(val currentFile: Path,
               else{
                 remaining = remaining.tail
                 val rhs = climb(prec + 1, next)
-                val op1 = op match{
+                val op1 = if (op.length == 1) {
+                  (op.charAt(0): @switch) match {
+                    case '|' => Expr.BinaryOp.OP_|
+                    case '^' => Expr.BinaryOp.OP_^
+                    case '&' => Expr.BinaryOp.OP_&
+                    case '<' => Expr.BinaryOp.OP_<
+                    case '>' => Expr.BinaryOp.OP_>
+                    case '+' => Expr.BinaryOp.OP_+
+                    case '-' => Expr.BinaryOp.OP_-
+                    case '*' => Expr.BinaryOp.OP_*
+                    case '/' => Expr.BinaryOp.OP_/
+                    case '%' => Expr.BinaryOp.OP_%
+                    case _ => throw new IllegalArgumentException("Unknown operator: " + op)
+                  }
+                } else op match {
                   case "*" => Expr.BinaryOp.OP_*
                   case "/" => Expr.BinaryOp.OP_/
                   case "%" => Expr.BinaryOp.OP_%
@@ -262,7 +284,7 @@ class Parser(val currentFile: Path,
 
   def unaryOpExpr[$: P](pos: Position, op: Char): P[Expr.UnaryOp] = P(
     expr1.map{ e =>
-      def k2 = op match{
+      def k2 = (op: @switch) match {
         case '+' => Expr.UnaryOp.OP_+
         case '-' => Expr.UnaryOp.OP_-
         case '~' => Expr.UnaryOp.OP_~
@@ -282,7 +304,7 @@ class Parser(val currentFile: Path,
   def expr2[$: P]: P[Expr] = P(
     Pos.flatMapX{ pos =>
       SingleChar.flatMapX{ c =>
-        c match {
+        (c: @switch) match {
           case '{' => Pass ~ objinside ~ "}"
           case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
           case '[' => Pass ~ arr ~ "]"
@@ -298,7 +320,7 @@ class Parser(val currentFile: Path,
           case '$' => Pass(Expr.$(pos))
           case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
             P.current.index = pos.offset; number
-          case x if idStartChar(x) => CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
+          case x => if(idStartChar(x)) CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
             "" + x + y match {
               case "null"      => Pass(Val.Null(pos))
               case "true"      => Pass(Val.True(pos))
@@ -315,8 +337,7 @@ class Parser(val currentFile: Path,
               case "local"     => Pass ~ local
               case x           => Pass(Expr.Id(pos, x))
             }
-          }
-          case _ => Fail
+          } else Fail
         }
       }
     }
@@ -365,10 +386,10 @@ class Parser(val currentFile: Path,
         exprs(preLocals.length): @unchecked
       val postLocals = exprs.drop(preLocals.length+1).takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      
-      /* 
+
+      /*
        * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
-       * 
+       *
        * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
        * Otherwise the field value will be overriden by the multiple iterations of forspec
        */
