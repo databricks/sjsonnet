@@ -172,7 +172,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(),
 }
 
 /** Renderer used by std.manifestJson, std.manifestJsonMinified, and std.manifestJsonEx */
-case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter(), newline: String = "\n", keyValueSeparator: String = ": ")
+final case class MaterializeJsonRenderer(indent: Int = 4, escapeUnicode: Boolean = false, out: StringWriter = new StringWriter(), newline: String = "\n", keyValueSeparator: String = ": ")
   extends BaseCharRenderer(out, indent, escapeUnicode, newline.toCharArray) {
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray

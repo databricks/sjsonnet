@@ -12,7 +12,7 @@ package sjsonnet
   * the final string.
   */
 object Format{
-  case class FormatSpec(label: Option[String],
+  final case class FormatSpec(label: Option[String],
                         alternate: Boolean,
                         zeroPadded: Boolean,
                         leftAdjusted: Boolean,

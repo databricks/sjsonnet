@@ -4,7 +4,7 @@ import fastparse.IndexedParserInput
 
 import scala.collection.mutable
 
-case class DummyPath(segments: String*) extends Path{
+final case class DummyPath(segments: String*) extends Path{
   def relativeToString(p: Path): String = ""
 
   def debugRead(): Option[String] = None

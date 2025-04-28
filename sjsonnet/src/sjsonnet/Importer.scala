@@ -29,7 +29,7 @@ object Importer {
   }
 }
 
-case class FileParserInput(file: File) extends ParserInput {
+final case class FileParserInput(file: File) extends ParserInput {
 
   private val bufferedFile = new BufferedRandomAccessFile(file.getAbsolutePath, 1024 * 8)
 
@@ -153,7 +153,7 @@ trait ResolvedFile {
   def readRawBytes(): Array[Byte]
 }
 
-case class StaticResolvedFile(content: String) extends ResolvedFile {
+final case class StaticResolvedFile(content: String) extends ResolvedFile {
   def getParserInput(): ParserInput = IndexedParserInput(content)
 
   def readString(): String = content
@@ -164,7 +164,7 @@ case class StaticResolvedFile(content: String) extends ResolvedFile {
   override def readRawBytes(): Array[Byte] = content.getBytes(StandardCharsets.UTF_8)
 }
 
-case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
+final case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
   def getParserInput(): ParserInput = ??? // Not used for binary imports
 
   def readString(): String = ??? // Not used for binary imports
