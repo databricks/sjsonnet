@@ -9,6 +9,16 @@ trait FunctionBuilder {
 
   def builtin(obj : Val.Builtin): (String, Val.Builtin) = (obj.functionName, obj)
 
+  def builtin[R: ReadWriter](name: String)
+                            (eval: (Position, EvalScope) => R): (String, Val.Func) = {
+    (name, new Val.Builtin0(name) {
+      def evalRhs(ev: EvalScope, outerPos: Position): Val = {
+        //println("--- calling builtin: "+name)
+        implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev))
+      }
+    })
+  }
+
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)
                                             (eval: (Position, EvalScope, T1) => R): (String, Val.Func) = {
     (name, new Val.Builtin1(name, p1) {

@@ -628,6 +628,18 @@ object Val{
     def staticSafe: Boolean = true
   }
 
+  abstract class Builtin0(functionName: String, def1: Expr = null) extends Builtin(functionName: String, Array.empty, if (def1 == null) null else Array(def1)) {
+    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
+      evalRhs(ev, pos)
+
+    def evalRhs(ev: EvalScope, pos: Position): Val
+
+    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit ev: EvalScope): Val =
+      if (namedNames == null && argVals.length == 0)
+        evalRhs(ev, outerPos)
+      else super.apply(argVals, namedNames, outerPos)
+  }
+
   abstract class Builtin1(functionName: String, pn1: String, def1: Expr = null) extends Builtin(functionName: String, Array(pn1), if(def1 == null) null else Array(def1)) {
     final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, ev, pos)
