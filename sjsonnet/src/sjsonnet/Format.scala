@@ -112,12 +112,14 @@ object Format{
                 case v: Val.Obj => v.value(key, pos)
               }
           }
-          val value = raw match {
+          val value = raw.force match {
             case f: Val.Func => Error.fail("Cannot format function value", f)
+            case r: Val.Arr => Materializer.apply0(r, new Renderer(indent = -1))
+            case r: Val.Obj => Materializer.apply0(r, new Renderer(indent = -1))
             case raw => Materializer(raw)
           }
           i += 1
-          value match{
+          value match {
             case ujson.Str(s) =>
               if (formatted.conversion != 's' && formatted.conversion != 'c')
                 Error.fail("Format required a number at %d, got string".format(i))

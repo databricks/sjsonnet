@@ -1,28 +1,59 @@
 package sjsonnet
 
-import sjsonnet._
+import java.util.Base64
+import java.nio.charset.StandardCharsets
+import scala.scalajs.js
 import utest._
 import ujson.Value
 
-object ErrorTests extends TestSuite{
-  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources"
-  def eval(p: os.Path, noStaticErrors: Boolean): Either[String,Value] = {
-    val out = new StringBuffer()
-    val interp = new Interpreter(
-      Map(),
-      Map(),
-      OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
-      parseCache = new DefaultParseCache,
-      warnLogger = (msg: String) => out.append(msg).append('\n'),
-      settings = new Settings(noStaticErrors = noStaticErrors),
-    )
-    interp.interpret(os.read(p), OsPath(p)).left.map(s => out.toString + s)
+object ErrorTests extends TestSuite {
+  def joinPath(a: String, b: String) = {
+    val aStripped = if (a.endsWith("/")) a.substring(0, a.length - 1) else a
+    val bStripped = if (b.startsWith("/")) b.substring(1) else b
+    if (aStripped.isEmpty)
+      bStripped
+    else if (bStripped.isEmpty)
+      aStripped
+    else
+      aStripped + "/" + bStripped
   }
-  def check(expected: String, noStaticErrors: Boolean = false, suite: String = "test_suite")(implicit tp: utest.framework.TestPath): Unit = {
-    val res = eval(testSuiteRoot / suite / s"error.${tp.value.mkString(".")}.jsonnet", noStaticErrors)
 
-    assert(res == Left(expected))
+  def eval(fileName: String, suite: String) = {
+    SjsonnetMain.interpret(
+      new String(TestResources.files(joinPath(suite, fileName)), StandardCharsets.UTF_8),
+      js.Dictionary(),
+      js.Dictionary(),
+      "",
+      (wd: String, path: String) => {
+        val p = joinPath(suite, joinPath(wd, path))
+        if (TestResources.files.contains(p)) {
+          p
+        } else {
+          null
+        }
+      },
+      (path: String, binaryData: Boolean) => if (binaryData) {
+        Right(TestResources.files(path))
+      } else {
+        Left(new String(TestResources.files(path), StandardCharsets.UTF_8))
+      },
+    )
+  }
+
+  def check(expected: String, suite: String = "test_suite")(implicit tp: utest.framework.TestPath): Unit = {
+    val fileName = s"error.${tp.value.mkString(".")}.jsonnet"
+    try {
+      val res = ujson.WebJson.transform(eval(fileName, suite), ujson.Value)
+      assert(false)
+    } catch {
+      case e: js.JavaScriptException =>
+        System.err.println(e.getMessage)
+        val msg = e.getMessage
+          .replaceAll("\\(memory\\)", joinPath("sjsonnet/test/resources", joinPath(suite, fileName)))
+          .replaceAll("\\(test_suite", "(sjsonnet/test/resources/test_suite")
+          .replaceAll("  ", "    ")
+        assert(msg == expected)
+    }
   }
 
   val tests: Tests = Tests{
@@ -88,7 +119,7 @@ object ErrorTests extends TestSuite{
         |""".stripMargin
     )
     test("array_large_index") - check(
-      """sjsonnet.Error: array index was not integer: 1.8446744073709552E19
+      """sjsonnet.Error: array index was not integer: 18446744073709552000
         |    at [Lookup].(sjsonnet/test/resources/test_suite/error.array_large_index.jsonnet:17:10)
         |""".stripMargin
     )
@@ -118,15 +149,6 @@ object ErrorTests extends TestSuite{
         """sjsonnet.StaticError: Unknown variable: x
           |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
           |""".stripMargin
-      )
-      check(
-        """[warning] sjsonnet.StaticError: Unknown variable: x
-          |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
-          |
-          |sjsonnet.Error: Unknown variable: x
-          |    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
-          |""".stripMargin,
-        noStaticErrors = true
       )
     }
     test("divide_zero") - check(
@@ -185,17 +207,7 @@ object ErrorTests extends TestSuite{
         """sjsonnet.StaticError: Unknown variable: x
           |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
           |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
-          |""".stripMargin
-      )
-      check(
-        """[warning] sjsonnet.StaticError: Unknown variable: x
-          |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
-          |
-          |sjsonnet.Error: Unknown variable: x
-          |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
-          |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
           |""".stripMargin,
-        noStaticErrors = true
       )
     }
     "import_syntax-error" - check(
