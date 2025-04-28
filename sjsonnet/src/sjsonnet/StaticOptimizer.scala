@@ -6,9 +6,13 @@ import Expr._
 import ScopedExprTransform._
 
 /** StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope
- * indices) plus additional optimizations (post-order) and static checking (pre-order). */
+ * indices) plus additional optimizations (post-order) and static checking (pre-order).
+ *
+ * @param variableResolver a function that resolves variable names to expressions, only called if the variable is not found in the scope.
+ * */
 class StaticOptimizer(
     ev: EvalScope,
+    variableResolver: String => Option[Expr],
     std: Val.Obj,
     internedStrings: mutable.HashMap[String, String],
     internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends ScopedExprTransform {
@@ -113,7 +117,10 @@ class StaticOptimizer(
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
         case null if name == "$std" => std
         case null if name == "std" => std
-        case null => failOrWarn("Unknown variable: "+name, e)
+        case null => variableResolver(name) match {
+          case Some(v) => v //additional variable resolution
+          case None => failOrWarn("Unknown variable: "+name, e)
+        }
       }
 
     case e @ Self(pos) =>
