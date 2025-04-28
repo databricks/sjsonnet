@@ -8,6 +8,8 @@ object SjsonnetTestMain {
       "arith_float",
       "arith_string",
       "array",
+      "array_comparison",
+      "array_comparison2",
       "assert",
       "binary",
       "comments",

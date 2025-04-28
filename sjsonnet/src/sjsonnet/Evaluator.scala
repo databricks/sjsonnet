@@ -542,24 +542,28 @@ class Evaluator(resolver: CachedResolver,
       case Expr.BinaryOp.OP_< => (l, r) match {
         case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l < r)
         case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
+        case (x: Val.Arr, y: Val.Arr) => Val.bool(pos, compare(x, y) < 0)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_> => (l, r) match {
         case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l > r)
         case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
+        case (x: Val.Arr, y: Val.Arr) => Val.bool(pos, compare(x, y) > 0)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_<= => (l, r) match {
         case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l <= r)
         case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
+        case (x: Val.Arr, y: Val.Arr) => Val.bool(pos, compare(x, y) <= 0)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_>= => (l, r) match {
         case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l >= r)
         case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
+        case (x: Val.Arr, y: Val.Arr) => Val.bool(pos, compare(x, y) >= 0)
         case _ => fail()
       }
 
@@ -816,6 +820,15 @@ class Evaluator(resolver: CachedResolver,
     case (x: Val.Num, y: Val.Num) => x.value.compareTo(y.value)
     case (x: Val.Str, y: Val.Str) => x.value.compareTo(y.value)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
+    case (x: Val.Arr, y: Val.Arr) =>
+      val len = math.min(x.length, y.length)
+      var i = 0
+      while (i < len) {
+        val cmp = compare(x.force(i), y.force(i))
+        if (cmp != 0) return cmp
+        i += 1
+      }
+      Ordering[Int].compare(x.length, y.length)
     case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
   }
 

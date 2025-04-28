@@ -32,6 +32,8 @@ object FileTests extends TestSuite{
     test("arith_float") - check()
     test("arith_string") - check()
     test("array") - check()
+    test("array_comparison") - checkGolden()
+    test("array_comparison2") - checkGolden()
     test("assert") - check()
     test("binary") - check()
     test("comments") - check()
