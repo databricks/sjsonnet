@@ -36,15 +36,17 @@ object FileTests extends TestSuite {
     assert(res == expected)
     res
   }
+
   def checkFail(expected: String)(implicit tp: utest.framework.TestPath) = {
     try {
-      eval(s"test_suite/${tp.value.last}.jsonnet").asInstanceOf[String]
+      val res = ujson.WebJson.transform(eval(s"${tp.value.last}.jsonnet"), ujson.Value)
       assert(false)
     } catch {
       case e: js.JavaScriptException =>
         assert(e.getMessage == expected)
     }
   }
+
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
     check(ujson.read(new String(TestResources.files(joinPath("test_suite", s"${tp.value.last}.jsonnet.golden")), StandardCharsets.UTF_8)))
   }
@@ -68,6 +70,12 @@ object FileTests extends TestSuite {
     test("invariant") - check()
     test("invariant_manifest") - checkGolden()
     test("local") - check()
+    test("lazy") - check(42)
+    test("lazy_operator1") - check(ujson.False)
+    test("lazy_operator2") - checkFail(
+      """sjsonnet.Error: should happen
+        |  at [Error].((memory):1:9)
+        |""".stripMargin)
     test("merge") - check()
     test("null") - check()
     test("object") - check()
