@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import java.util
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.functions.FunctionBuilder
 
 import scala.collection.Searching._
 import scala.collection.mutable
