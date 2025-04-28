@@ -1,10 +1,14 @@
 package sjsonnet
 
-import utest._
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.functions.FunctionModule
+import utest._
 
-object ExtFunctionNamespaceTest extends TestSuite with FunctionBuilder {
-  private val extFunctions: Map[String, Val.Func] = Map(
+object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
+  override final val name: String = "ext"
+  override final lazy val module: Val.Obj =  moduleFromFunctions(extFunctions :_*)
+
+  private val extFunctions: Seq[(String, Val.Func)] = Seq(
     builtin("objectReplaceKey", "obj", "key", "newKey") {
       (pos, ev, o: Val.Obj, key: String, newKey: String) =>
         val bindings: Array[(String, Val.Obj.Member)] = for {
@@ -17,16 +21,9 @@ object ExtFunctionNamespaceTest extends TestSuite with FunctionBuilder {
         Val.Obj.mk(pos, bindings)
     })
 
-  private val ext = Val.Obj.mk(
-    null,
-    extFunctions.toSeq.map {
-      case (k, v) => (k, new Val.Obj.ConstMember(false, Visibility.Hidden, v))
-    }: _*
-  )
-
   private def variableResolve(name: String): Option[Expr] = {
     if (name == "$ext" || name == "ext") {
-      Some(ext)
+      Some(module)
     } else {
       None
     }

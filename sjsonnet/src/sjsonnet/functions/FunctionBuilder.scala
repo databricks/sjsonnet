@@ -1,4 +1,6 @@
-package sjsonnet
+package sjsonnet.functions
+
+import sjsonnet._
 
 /**
  * Function building helpers for building functions of the Jsonnet language.

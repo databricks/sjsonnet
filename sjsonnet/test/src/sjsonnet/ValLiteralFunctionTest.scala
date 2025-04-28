@@ -1,6 +1,7 @@
 package sjsonnet
 
 import sjsonnet.Expr.Member.Visibility
+import sjsonnet.functions.FunctionBuilder
 import utest._
 
 object ValLiteralFunctionTest extends TestSuite with FunctionBuilder {
