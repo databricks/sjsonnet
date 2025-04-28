@@ -368,15 +368,22 @@ class Evaluator(resolver: CachedResolver,
   }
 
   private def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
+    def extractParam(e: Option[Expr], default:Int): Int = e match {
+      case Some(expr) => visitExpr(expr) match {
+        case _:Val.Null => default
+        case v: Val.Num => v.cast[Val.Num].value.toInt
+      }
+      case None => default
+    }
     visitExpr(e.value) match {
       case a: Val.Arr =>
         new Val.Arr(
           e.pos,
           Util.sliceArr(
             a.asLazyArray,
-            e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.end.fold(a.length)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
+            extractParam(e.start, 0),
+            extractParam(e.end, a.length),
+            extractParam(e.stride, 1)
           )
         )
 
