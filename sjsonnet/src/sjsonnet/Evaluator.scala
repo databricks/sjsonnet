@@ -371,7 +371,8 @@ class Evaluator(resolver: CachedResolver,
     def extractParam(e: Option[Expr], default:Int): Int = e match {
       case Some(expr) => visitExpr(expr) match {
         case _:Val.Null => default
-        case v: Val.Num => v.cast[Val.Num].value.toInt
+        case v: Val.Num => v.value.toInt
+        case v: Val => v.cast[Val.Num].value.toInt
       }
       case None => default
     }
