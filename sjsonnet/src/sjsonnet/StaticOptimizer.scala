@@ -199,7 +199,7 @@ class StaticOptimizer(
   private def tryStaticApply(pos: Position, f: Val.Builtin, args: Array[Expr], tailstrict: Boolean): Expr = {
     if(f.staticSafe && args.forall(_.isInstanceOf[Val])) {
       val vargs = args.map(_.asInstanceOf[Val])
-      try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => return null }
+      try f.apply(vargs, null, pos)(ev).asInstanceOf[Expr] catch { case _: Exception => null }
     } else null
   }
 
@@ -227,6 +227,7 @@ class StaticOptimizer(
               }
               val alen = rargs.length
               f2 match {
+                case f2: Val.Builtin0 if alen == 0 => Expr.ApplyBuiltin0(pos, f2, tailstrict)
                 case f2: Val.Builtin1 if alen == 1 => Expr.ApplyBuiltin1(pos, f2, rargs(0), tailstrict)
                 case f2: Val.Builtin2 if alen == 2 => Expr.ApplyBuiltin2(pos, f2, rargs(0), rargs(1), tailstrict)
                 case f2: Val.Builtin3 if alen == 3 => Expr.ApplyBuiltin3(pos, f2, rargs(0), rargs(1), rargs(2), tailstrict)
