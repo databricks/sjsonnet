@@ -36,6 +36,7 @@ class Evaluator(resolver: CachedResolver,
       case ExprTags.Select => visitSelect(e.asInstanceOf[Select])
       case ExprTags.`Val.Func` => e.asInstanceOf[Val.Func]
       case ExprTags.`Val.Literal` => e.asInstanceOf[Val.Literal]
+      case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
       case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
       case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
       case ExprTags.ApplyBuiltin3 => visitApplyBuiltin3(e.asInstanceOf[ApplyBuiltin3])
@@ -271,6 +272,19 @@ class Evaluator(resolver: CachedResolver,
       val l2 = visitAsLazy(e.a2)
       val l3 = visitAsLazy(e.a3)
       lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
+    }
+  }
+
+  private def visitApplyBuiltin0(e: ApplyBuiltin0)(implicit scope: ValScope) = {
+    if (tailstrict) {
+      e.func.evalRhs(this, e.pos)
+    } else if (e.tailstrict) {
+      tailstrict = true
+      val res = e.func.evalRhs(this, e.pos)
+      tailstrict = false
+      res
+    } else {
+      e.func.evalRhs(this, e.pos)
     }
   }
 
