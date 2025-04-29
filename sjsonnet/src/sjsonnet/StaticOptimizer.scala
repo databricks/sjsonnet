@@ -37,23 +37,12 @@ class StaticOptimizer(
 
     case Lookup(pos, ValidSuper(_, selfIdx), index) =>
       LookupSuper(pos, selfIdx, index)
-
-    case BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
-      InSuper(pos, lhs, selfIdx)
-    case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
-      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs, tailstrict = false)
-      catch { case _: Exception => b2 }
-    case Or(_, Val.False(_), rhs) => transform(rhs)
-    case Or(pos, Val.True(_), _) => Val.True(pos)
-    case Or(pos, _, Val.True(_)) => Val.True(pos)
-    case And(_, Val.True(_), rhs) => transform(rhs)
-    case And(pos, Val.False(_), _) => Val.False(pos)
-    case And(pos, _, Val.False(_)) => Val.False(pos)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.True(_)) => Val.False(pos)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.False(_)) => Val.True(pos)
-    case UnaryOp(_, UnaryOp.OP_!, UnaryOp(_, UnaryOp.OP_!, expr)) => expr
-
-    case e @ Id(pos, name) =>
+    case binary: BinaryOp => transformBinary(binary)
+    case or: Or => transformOr(or)
+    case and: And => transformAnd(and)
+    case unary: UnaryOp => transformUnary(unary)
+    case ifElse: IfElse => transformIfElse(ifElse)
+    case e@Id(pos, name) =>
       scope.get(name) match {
         case ScopedVal(v: (Val with Expr), _, _) => v
         case ScopedVal(_, _, idx) => ValidId(pos, name, idx)
@@ -88,6 +77,139 @@ class StaticOptimizer(
       else m
 
     case e => e
+  }
+
+  private def transformBinary(binary: BinaryOp): Expr = binary.op match {
+    case BinaryOp.OP_in => binary match {
+      case BinaryOp(pos, lhs, _, ValidSuper(_, selfIdx)) =>
+        InSuper(pos, lhs, selfIdx)
+      case BinaryOp(pos, Val.Str(_, key), _, obj: Val.Obj) if obj.staticSafe =>
+        Val.bool(pos, obj.containsKey(key))
+      case _ => binary
+    }
+    case BinaryOp.OP_% => binary match {
+      case BinaryOp(pos, lhs: Val.Str, _, rhs) =>
+        try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs, tailstrict = false)
+        catch {
+          case _: Exception => binary
+        }
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) if r != 0 => Val.Num(pos, l % r)
+      case _ => binary
+    }
+    case BinaryOp.OP_+ => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l + r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.Str(pos, l + r)
+      case _ => binary
+    }
+    case BinaryOp.OP_- => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l - r)
+      case _ => binary
+    }
+    case BinaryOp.OP_* => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l * r)
+      case _ => binary
+    }
+    case BinaryOp.OP_/ => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) if r != 0 => Val.Num(pos, l / r)
+      case _ => binary
+    }
+    case BinaryOp.OP_& => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+      case _ => binary
+    }
+    case BinaryOp.OP_^ => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+      case _ => binary
+    }
+    case BinaryOp.OP_| => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+      case _ => binary
+    }
+    case BinaryOp.OP_<< => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) if r.isValidInt =>
+        Val.Num(pos, l.toLong << r.toInt)
+      case _ => binary
+    }
+    case BinaryOp.OP_>> => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) if r.isValidInt =>
+        Val.Num(pos, l.toLong >> r.toInt)
+      case _ => binary
+    }
+    case BinaryOp.OP_== => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l == r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l == r)
+      case _ => binary
+    }
+    case BinaryOp.OP_!= => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l != r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l != r)
+      case _ => binary
+    }
+    case BinaryOp.OP_< => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l < r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l < r)
+      case _ => binary
+    }
+    case BinaryOp.OP_> => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l > r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l > r)
+      case _ => binary
+    }
+    case BinaryOp.OP_<= => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l <= r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l <= r)
+      case _ => binary
+    }
+    case BinaryOp.OP_>= => binary match {
+      case BinaryOp(pos, Val.Num(_, l), _, Val.Num(_, r)) => Val.bool(pos, l >= r)
+      case BinaryOp(pos, Val.Str(_, l), _, Val.Str(_, r)) => Val.bool(pos, l >= r)
+      case _ => binary
+    }
+    case _ => binary
+  }
+
+  private def transformIfElse(ifElse: IfElse): Expr = ifElse match {
+    case IfElse(_, Val.True(_), thenExpr, _) => transform(thenExpr)
+    case IfElse(pos, Val.False(_), _, elseExpr) => `elseExpr` match {
+      case null => Val.Null(pos)
+      case _ => transform(elseExpr)
+    }
+    case _ => ifElse
+  }
+
+  private def transformUnary(unary: UnaryOp): Expr = unary.op match {
+    case UnaryOp.OP_! => unary.value match {
+      case Val.True(_) => Val.False(unary.pos)
+      case Val.False(_) => Val.True(unary.pos)
+      case UnaryOp(_, UnaryOp.OP_!, expr) => expr
+      case _ => unary
+    }
+    case Expr.UnaryOp.OP_- => unary.value match {
+      case Val.Num(_, v) => Val.Num(unary.pos, -v)
+      case _ => unary
+    }
+    case Expr.UnaryOp.OP_~ => unary.value match {
+      case Val.Num(_, v) => Val.Num(unary.pos, ~v.toLong)
+      case _ => unary
+    }
+    case Expr.UnaryOp.OP_+ => unary.value match {
+      case Val.Num(_, v) => Val.Num(unary.pos, v)
+      case _ => unary
+    }
+  }
+
+  private def transformAnd(and: And): Expr = and match {
+    case And(_, Val.True(_), rhs) => transform(rhs)
+    case And(pos, Val.False(_), _) => Val.False(pos)
+    case And(pos, _, Val.False(_)) => Val.False(pos)
+    case _ => and
+  }
+
+  private def transformOr(or: Or): Expr = or match {
+    case Or(_, Val.False(_), rhs) => transform(rhs)
+    case Or(pos, Val.True(_), _) => Val.True(pos)
+    case Or(pos, _, Val.True(_)) => Val.True(pos)
+    case _ => or
   }
 
   object ValidSuper {
