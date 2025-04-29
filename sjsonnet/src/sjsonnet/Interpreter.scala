@@ -69,7 +69,9 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
   private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
 
   def createEvaluator(resolver: CachedResolver, extVars: String => Option[Expr], wd: Path,
-                      settings: Settings, warn: Error => Unit): Evaluator =
+                      settings: Settings, warn: Error => Unit): Evaluator = if (settings.useNewEvaluator)
+    new NewEvaluator(resolver, extVars, wd, settings, warn)
+  else
     new Evaluator(resolver, extVars, wd, settings, warn)
 
   /**

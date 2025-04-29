@@ -11,6 +11,7 @@ class Settings(
   val strictInheritedAssertions: Boolean = false,
   val strictSetOperations: Boolean = false,
   val throwErrorForInvalidSets: Boolean = false,
+  val useNewEvaluator: Boolean = false,
 )
 
 object Settings {

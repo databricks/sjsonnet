@@ -30,64 +30,58 @@ class Evaluator(resolver: CachedResolver,
   var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
-    (e._tag: @switch) match {
-      case ExprTags.ValidId => visitValidId(e.asInstanceOf[ValidId])
-      case ExprTags.BinaryOp => visitBinaryOp(e.asInstanceOf[BinaryOp])
-      case ExprTags.Select => visitSelect(e.asInstanceOf[Select])
-      case ExprTags.`Val.Func` => e.asInstanceOf[Val.Func]
-      case ExprTags.`Val.Literal` => e.asInstanceOf[Val.Literal]
-      case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
-      case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
-      case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
-      case ExprTags.ApplyBuiltin3 => visitApplyBuiltin3(e.asInstanceOf[ApplyBuiltin3])
-      case ExprTags.ApplyBuiltin4 => visitApplyBuiltin4(e.asInstanceOf[ApplyBuiltin4])
-      case ExprTags.And => visitAnd(e.asInstanceOf[And])
-      case ExprTags.Or => visitOr(e.asInstanceOf[Or])
-      case ExprTags.UnaryOp => visitUnaryOp(e.asInstanceOf[UnaryOp])
-      case ExprTags.Apply1 => visitApply1(e.asInstanceOf[Apply1])
-      case ExprTags.Lookup => visitLookup(e.asInstanceOf[Lookup])
-      case ExprTags.Function =>
-        val f = e.asInstanceOf[Function]
-        visitMethod(f.body, f.params, f.pos)
-      case ExprTags.LocalExpr => visitLocalExpr(e.asInstanceOf[LocalExpr])
-      case ExprTags.Apply => visitApply(e.asInstanceOf[Apply])
-      case ExprTags.IfElse => visitIfElse(e.asInstanceOf[IfElse])
-      case ExprTags.Apply3 => visitApply3(e.asInstanceOf[Apply3])
-      case ExprTags.`ObjBody.MemberList` =>
-        val oml = e.asInstanceOf[ObjBody.MemberList]
-        visitMemberList(oml.pos, oml, null)
-      case ExprTags.Apply2 => visitApply2(e.asInstanceOf[Apply2])
-      case ExprTags.AssertExpr => visitAssert(e.asInstanceOf[AssertExpr])
-      case ExprTags.ApplyBuiltin => visitApplyBuiltin(e.asInstanceOf[ApplyBuiltin])
-      case ExprTags.Comp => visitComp(e.asInstanceOf[Comp])
-      case ExprTags.Arr => visitArr(e.asInstanceOf[Arr])
-      case ExprTags.SelectSuper => visitSelectSuper(e.asInstanceOf[SelectSuper])
-      case ExprTags.LookupSuper => visitLookupSuper(e.asInstanceOf[LookupSuper])
-      case ExprTags.InSuper => visitInSuper(e.asInstanceOf[InSuper])
-      case ExprTags.ObjExtend => visitObjExtend(e.asInstanceOf[ObjExtend])
-      case ExprTags.`ObjBody.ObjComp` => visitObjComp(e.asInstanceOf[ObjBody.ObjComp], null)
-      case ExprTags.Slice => visitSlice(e.asInstanceOf[Slice])
-      case ExprTags.Import => visitImport(e.asInstanceOf[Import])
-      case ExprTags.Apply0 => visitApply0(e.asInstanceOf[Apply0])
-      case ExprTags.ImportStr => visitImportStr(e.asInstanceOf[ImportStr])
-      case ExprTags.ImportBin => visitImportBin(e.asInstanceOf[ImportBin])
-      case ExprTags.Error => visitError(e.asInstanceOf[Expr.Error])
-      case _ => visitInvalid(e)
+    e match {
+      case e: ValidId => visitValidId(e)
+      case e: BinaryOp => visitBinaryOp(e)
+      case e: Select => visitSelect(e)
+      case e: Val => e
+      case e: ApplyBuiltin0 => visitApplyBuiltin0(e)
+      case e: ApplyBuiltin1 => visitApplyBuiltin1(e)
+      case e: ApplyBuiltin2 => visitApplyBuiltin2(e)
+      case e: ApplyBuiltin3 => visitApplyBuiltin3(e)
+      case e: ApplyBuiltin4 => visitApplyBuiltin4(e)
+      case e: And => visitAnd(e)
+      case e: Or => visitOr(e)
+      case e: UnaryOp => visitUnaryOp(e)
+      case e: Apply1 => visitApply1(e)
+      case e: Lookup => visitLookup(e)
+      case e: Function => visitMethod(e.body, e.params, e.pos)
+      case e: LocalExpr => visitLocalExpr(e)
+      case e: Apply => visitApply(e)
+      case e: IfElse => visitIfElse(e)
+      case e: Apply3 => visitApply3(e)
+      case e: ObjBody.MemberList => visitMemberList(e.pos, e, null)
+      case e: Apply2 => visitApply2(e)
+      case e: AssertExpr => visitAssert(e)
+      case e: ApplyBuiltin => visitApplyBuiltin(e)
+      case e: Comp => visitComp(e)
+      case e: Arr => visitArr(e)
+      case e: SelectSuper => visitSelectSuper(e)
+      case e: LookupSuper => visitLookupSuper(e)
+      case e: InSuper => visitInSuper(e)
+      case e: ObjExtend => visitObjExtend(e)
+      case e: ObjBody.ObjComp => visitObjComp(e, null)
+      case e: Slice => visitSlice(e)
+      case e: Import => visitImport(e)
+      case e: Apply0 => visitApply0(e)
+      case e: ImportStr => visitImportStr(e)
+      case e: ImportBin => visitImportBin(e)
+      case e: Expr.Error => visitError(e)
+      case e => visitInvalid(e)
     }
   } catch {
     Error.withStackFrame(e)
   }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
-  private def visitInvalid(e: Expr): Nothing = (e._tag : @switch) match {
-    case ExprTags.Id =>
-      val id = e.asInstanceOf[Id]
-      Error.fail("Unknown variable: " + id.name, id.pos)
-    case ExprTags.Self =>
-      Error.fail("Can't use self outside of an object", e.pos)
-    case ExprTags.`$` =>
-      Error.fail("Can't use $ outside of an object", e.pos)
-    case ExprTags.Super =>
-      Error.fail("Can't use super outside of an object", e.pos)
+  def visitInvalid(e: Expr): Nothing = e match {
+    case Id(pos, name) =>
+      Error.fail("Unknown variable: " + name, pos)
+    case Self(pos) =>
+      Error.fail("Can't use self outside of an object", pos)
+    case $(pos) =>
+      Error.fail("Can't use $ outside of an object", pos)
+    case Super(pos) =>
+      Error.fail("Can't use super outside of an object", pos)
   }
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
@@ -162,7 +156,7 @@ class Evaluator(resolver: CachedResolver,
     Error.fail(materializeError(visitExpr(e.value)), e.pos)
   }
 
-  private def materializeError(value: Val) = value match {
+  protected def materializeError(value: Val) = value match {
     case Val.Str(_, s) => s
     case r => Materializer.stringify(r)
   }
@@ -193,7 +187,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply(e: Apply)(implicit scope: ValScope) = {
+  protected def visitApply(e: Apply)(implicit scope: ValScope) = {
     val lhs = visitExpr(e.value)
 
     if (tailstrict) {
@@ -215,7 +209,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
+  protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     if (e.tailstrict) {
       tailstrict = true
@@ -227,7 +221,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
+  protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     if (tailstrict) {
       lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
@@ -242,7 +236,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
+  protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     if (tailstrict) {
       lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
@@ -258,7 +252,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
+  protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     if (tailstrict) {
       lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
@@ -275,7 +269,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin0(e: ApplyBuiltin0)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin0(e: ApplyBuiltin0)(implicit scope: ValScope) = {
     if (tailstrict) {
       e.func.evalRhs(this, e.pos)
     } else if (e.tailstrict) {
@@ -288,7 +282,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) = {
     if (tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), this, e.pos)
     } else if (e.tailstrict) {
@@ -301,7 +295,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) = {
     if (tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
     } else if (e.tailstrict) {
@@ -314,7 +308,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope) = {
     if (tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
     } else if (e.tailstrict) {
@@ -327,7 +321,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope) = {
     if (tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), visitExpr(e.a4), this, e.pos)
     } else if (e.tailstrict) {
@@ -340,7 +334,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  private def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
     val arr = new Array[Lazy](e.argExprs.length)
     var idx = 0
 
@@ -381,7 +375,7 @@ class Evaluator(resolver: CachedResolver,
     visitExpr(e.returned)
   }
 
-  private def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
+  protected def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
     def extractParam(e: Option[Expr], default:Int): Int = e match {
       case Some(expr) => visitExpr(expr) match {
         case _:Val.Null => default
@@ -803,7 +797,7 @@ class Evaluator(resolver: CachedResolver,
   }
 
   @tailrec
-  private final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
+  final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match{
     case (spec @ ForSpec(_, name, expr)) :: rest =>
       visitComp(
         rest,
@@ -893,6 +887,75 @@ class Evaluator(resolver: CachedResolver,
     }
     case _ => false
   })
+}
+
+class NewEvaluator(
+  resolver: CachedResolver,
+  extVars: String => Option[Expr],
+  wd: Path,
+  settings: Settings,
+  warnLogger: Error => Unit = null) extends Evaluator(resolver, extVars, wd, settings, warnLogger) {
+
+  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+    (e._tag: @switch) match {
+      case ExprTags.ValidId => visitValidId(e.asInstanceOf[ValidId])
+      case ExprTags.BinaryOp => visitBinaryOp(e.asInstanceOf[BinaryOp])
+      case ExprTags.Select => visitSelect(e.asInstanceOf[Select])
+      case ExprTags.`Val.Func` => e.asInstanceOf[Val.Func]
+      case ExprTags.`Val.Literal` => e.asInstanceOf[Val.Literal]
+      case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
+      case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
+      case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
+      case ExprTags.ApplyBuiltin3 => visitApplyBuiltin3(e.asInstanceOf[ApplyBuiltin3])
+      case ExprTags.ApplyBuiltin4 => visitApplyBuiltin4(e.asInstanceOf[ApplyBuiltin4])
+      case ExprTags.And => visitAnd(e.asInstanceOf[And])
+      case ExprTags.Or => visitOr(e.asInstanceOf[Or])
+      case ExprTags.UnaryOp => visitUnaryOp(e.asInstanceOf[UnaryOp])
+      case ExprTags.Apply1 => visitApply1(e.asInstanceOf[Apply1])
+      case ExprTags.Lookup => visitLookup(e.asInstanceOf[Lookup])
+      case ExprTags.Function =>
+        val f = e.asInstanceOf[Function]
+        visitMethod(f.body, f.params, f.pos)
+      case ExprTags.LocalExpr => visitLocalExpr(e.asInstanceOf[LocalExpr])
+      case ExprTags.Apply => visitApply(e.asInstanceOf[Apply])
+      case ExprTags.IfElse => visitIfElse(e.asInstanceOf[IfElse])
+      case ExprTags.Apply3 => visitApply3(e.asInstanceOf[Apply3])
+      case ExprTags.`ObjBody.MemberList` =>
+        val oml = e.asInstanceOf[ObjBody.MemberList]
+        visitMemberList(oml.pos, oml, null)
+      case ExprTags.Apply2 => visitApply2(e.asInstanceOf[Apply2])
+      case ExprTags.AssertExpr => visitAssert(e.asInstanceOf[AssertExpr])
+      case ExprTags.ApplyBuiltin => visitApplyBuiltin(e.asInstanceOf[ApplyBuiltin])
+      case ExprTags.Comp => visitComp(e.asInstanceOf[Comp])
+      case ExprTags.Arr => visitArr(e.asInstanceOf[Arr])
+      case ExprTags.SelectSuper => visitSelectSuper(e.asInstanceOf[SelectSuper])
+      case ExprTags.LookupSuper => visitLookupSuper(e.asInstanceOf[LookupSuper])
+      case ExprTags.InSuper => visitInSuper(e.asInstanceOf[InSuper])
+      case ExprTags.ObjExtend => visitObjExtend(e.asInstanceOf[ObjExtend])
+      case ExprTags.`ObjBody.ObjComp` => visitObjComp(e.asInstanceOf[ObjBody.ObjComp], null)
+      case ExprTags.Slice => visitSlice(e.asInstanceOf[Slice])
+      case ExprTags.Import => visitImport(e.asInstanceOf[Import])
+      case ExprTags.Apply0 => visitApply0(e.asInstanceOf[Apply0])
+      case ExprTags.ImportStr => visitImportStr(e.asInstanceOf[ImportStr])
+      case ExprTags.ImportBin => visitImportBin(e.asInstanceOf[ImportBin])
+      case ExprTags.Error => visitError(e.asInstanceOf[Expr.Error])
+      case _ => visitInvalid(e)
+    }
+  } catch {
+    Error.withStackFrame(e)
+  }
+  // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
+  override def visitInvalid(e: Expr): Nothing = (e._tag : @switch) match {
+    case ExprTags.Id =>
+      val id = e.asInstanceOf[Id]
+      Error.fail("Unknown variable: " + id.name, id.pos)
+    case ExprTags.Self =>
+      Error.fail("Can't use self outside of an object", e.pos)
+    case ExprTags.`$` =>
+      Error.fail("Can't use $ outside of an object", e.pos)
+    case ExprTags.Super =>
+      Error.fail("Can't use super outside of an object", e.pos)
+  }
 }
 
 object Evaluator {
