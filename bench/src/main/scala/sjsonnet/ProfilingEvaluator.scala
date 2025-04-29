@@ -5,12 +5,12 @@ import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-class ProfilingEvaluator(resolver: CachedResolver,
-                         extVars: String => Option[Expr],
-                         wd: Path,
-                         settings: Settings,
-                         warn: Error => Unit)
-  extends Evaluator(resolver, extVars, wd, settings, warn) {
+class ProfilingEvaluator(r: CachedResolver,
+                         e: String => Option[Expr],
+                         w: Path,
+                         s: Settings,
+                         wa: Error => Unit)
+  extends Evaluator(r, e, w, s, wa) {
 
   trait Box {
     def name: String

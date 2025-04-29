@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.IndexedParserInput
-
 import scala.collection.mutable
 
 final case class DummyPath(segments: String*) extends Path{

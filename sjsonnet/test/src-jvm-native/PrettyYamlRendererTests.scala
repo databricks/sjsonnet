@@ -9,7 +9,7 @@ object PrettyYamlRendererTests extends TestSuite{
       Map(),
       Map(),
       OsPath(testSuiteRoot),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot))),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array(OsPath(testSuiteRoot)).toIndexedSeq),
       parseCache = new DefaultParseCache,
       storePos = if (comments) currentPos = _ else null
     )
@@ -21,7 +21,7 @@ object PrettyYamlRendererTests extends TestSuite{
         getCurrentPosition = () => currentPos
       )
     )
-    res.right.get.toString
+    res.toOption.get.toString
   }
   val nontrivial: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "nontrivial"
   def tests: Tests = Tests{

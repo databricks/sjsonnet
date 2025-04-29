@@ -45,6 +45,7 @@ object ExtFunction0Test extends TestSuite with FunctionModule {
            |sayHello()
            |""".stripMargin) {
         case ujson.Str(v) => v == "Hello, world!"
+        case _ => false
       }
     }
   }

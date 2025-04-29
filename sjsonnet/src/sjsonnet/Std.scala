@@ -99,7 +99,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
       } else {
         // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
         // the function, there's no risk of the scope leaking (and being invalid at a later point)
-        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case p => p.fileScope }
+        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case pp => pp.fileScope }
         val newScope: ValScope = func.defSiteValScope.extendBy(1)
         val scopeIdx = newScope.length-1
         while(i < a.length) {
@@ -114,7 +114,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.force.asString.charAt(0).toLong)
+      Val.Num(pos, str.force.asString.charAt(0).toDouble)
   }
 
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
@@ -352,7 +352,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
       } else {
         // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
         // the function, there's no risk of the scope leaking (and being invalid at a later point)
-        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case p => p.fileScope }
+        val funDefFileScope: FileScope = func.pos match { case null => p.fileScope case pp => pp.fileScope }
         val newScope: ValScope = func.defSiteValScope.extendBy(1)
         val scopeIdx = newScope.length-1
         while(i < a.length) {
@@ -509,8 +509,8 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
       chars: String,
       left: Boolean,
       right: Boolean,
-      functionName: String
-    ) extends Val.Builtin1(functionName, "str") {
+      fn: String
+    ) extends Val.Builtin1(fn, "str") {
       private val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
       private val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
 
@@ -721,17 +721,17 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
 
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.force.asString.toLong)
+      Val.Num(pos, str.force.asString.toLong.toDouble)
   }
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 8))
+      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 8).toDouble)
   }
 
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 16))
+      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 16).toDouble)
   }
 
   private object MD5 extends Val.Builtin1("md5", "s") {
@@ -1148,7 +1148,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
     builtin("mantissa", "x"){ (pos, ev, x: Double) =>
       val value = x
       val exponent = (Math.log(value) / Math.log(2)).toLong + 1
-      val mantissa = value * Math.pow(2.0, -exponent)
+      val mantissa = value * Math.pow(2.0, (-exponent).toDouble)
       mantissa
     },
     builtin("exponent", "x"){ (pos, ev, x: Double) =>
@@ -1265,9 +1265,9 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
     builtin("manifestIni", "v"){ (pos, ev, v: Val) =>
       val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match{
-        case ujson.Str(v) => v
-        case ujson.Num(v) => RenderUtils.renderDouble(v)
-        case ujson.Bool(v) => v.toString
+        case ujson.Str(vv) => vv
+        case ujson.Num(vv) => RenderUtils.renderDouble(vv)
+        case ujson.Bool(vv) => vv.toString
         case ujson.Null => "null"
         case _ => x.transform(new sjsonnet.Renderer())
       }
@@ -1384,7 +1384,7 @@ class Std(private val additionalNativeFunctions: Map[String, Val.Func] = Map.emp
       import scalatags.Text.all.{value => _, _}
       def rec(v: ujson.Value): Frag = {
         v match {
-          case ujson.Str(s) => s
+          case ujson.Str(ss) => ss
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children@_*)) =>
             tag(t)(
               //TODO remove the `toSeq` once this is fixed in scala3

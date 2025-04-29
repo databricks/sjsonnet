@@ -50,7 +50,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
 
   private def createResolver(parseCache: ParseCache) = new CachedResolver(importer, parseCache, settings.strictImportSyntax, internedStrings, internedStaticFieldSets) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
-      handleException(createOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs)
+      handleException((createOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr), fs))
     }
   }
 

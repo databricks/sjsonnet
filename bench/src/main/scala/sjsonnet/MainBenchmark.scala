@@ -18,7 +18,7 @@ object MainBenchmark {
 
   def findFiles(): (IndexedSeq[(Path, String)], EvalScope) = {
     val parser = mainargs.ParserForClass[Config]
-    val config = parser.constructEither(MainBenchmark.mainArgs, autoPrintHelpAndExit = None).getOrElse(???)
+    val config = parser.constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None).getOrElse(???)
     val file = config.file
     val wd = os.pwd
     val path = OsPath(os.Path(file, wd))

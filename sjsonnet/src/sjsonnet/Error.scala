@@ -100,9 +100,12 @@ trait EvalErrorScope {
 
   def prettyIndex(pos: Position): Option[(Int, Int)] = {
     importer.read(pos.currentFile, binaryData = false).map { s =>
-      val Array(line, col) =
+      val splitted =
         s.getParserInput().prettyIndex(pos.offset).split(':')
-      (line.toInt, col.toInt)
+      if (splitted.length != 2) {
+        throw new Error("Invalid pretty index format")
+      }
+      (splitted(0).toInt, splitted(1).toInt)
     }
   }
 }

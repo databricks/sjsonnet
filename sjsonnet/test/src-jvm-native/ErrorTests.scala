@@ -12,7 +12,7 @@ object ErrorTests extends TestSuite{
       Map(),
       Map(),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path].toIndexedSeq),
       parseCache = new DefaultParseCache,
       warnLogger = (msg: String) => out.append(msg).append('\n'),
       settings = new Settings(noStaticErrors = noStaticErrors),

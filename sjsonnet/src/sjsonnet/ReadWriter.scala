@@ -29,11 +29,11 @@ object ReadWriter{
   }
   implicit object IntRead extends ReadWriter[Int]{
     def apply(t: Val): Int = t.asInt
-    def write(pos: Position, t: Int): sjsonnet.Val.Num = Val.Num(pos, t)
+    def write(pos: Position, t: Int): sjsonnet.Val.Num = Val.Num(pos, t.toDouble)
   }
   implicit object LongRead extends ReadWriter[Long]{
     def apply(t: Val): Long = t.asLong
-    def write(pos: Position, t: Long): sjsonnet.Val.Num= Val.Num(pos, t)
+    def write(pos: Position, t: Long): sjsonnet.Val.Num= Val.Num(pos, t.toDouble)
   }
   implicit object DoubleRead extends ReadWriter[Double]{
     def apply(t: Val): Double = t.asDouble

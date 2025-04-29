@@ -110,6 +110,7 @@ object Format{
               values match{
                 case v: Val.Arr => v.force(i)
                 case v: Val.Obj => v.value(key, pos)
+                case _ => Error.fail("Invalid format values")
               }
           }
           val value = raw.force match {

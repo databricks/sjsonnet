@@ -1,10 +1,8 @@
 package sjsonnet
 
 import java.io.{StringWriter, Writer}
-import java.util.regex.Pattern
 
 import upickle.core.{ArrVisitor, ObjVisitor}
-import fastparse.IndexedParserInput
 
 import scala.collection.mutable
 /**

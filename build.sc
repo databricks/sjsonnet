@@ -44,6 +44,16 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
       Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
     )
   )
+  def scalacOptions = Seq("-deprecation", "-Werror") ++ (
+    if (!ZincWorkerUtil.isScala3(scalaVersion())) Seq(
+      "-opt:l:inline",
+      "-opt-inline-from:sjsonnet.*,sjsonnet.**",
+      "-Xsource:3",
+      "-Xlint:_") ++ (
+        if (scalaVersion() startsWith "2.13") Seq("-Wconf:origin=scala.collection.compat.*:s")
+        else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
+    else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
+  )
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.5")
   }
@@ -69,11 +79,6 @@ object sjsonnet extends Module {
     )
     object test extends ScalaJSTests with CrossTests {
       def jsEnvConfig = JsEnvConfig.NodeJs(args=List("--stack-size=" + stackSizekBytes))
-      def sources = T.sources(
-        this.millSourcePath / "src",
-        this.millSourcePath / "src-js",
-        this.millSourcePath / "src-jvm-js"
-      )
       def generatedSources = T{
         val files = os.walk(this.millSourcePath / "resources").filterNot(os.isDir).map(p => p.relativeTo(this.millSourcePath / "resources") -> os.read.bytes(p)).toMap
         os.write(
@@ -133,13 +138,7 @@ object sjsonnet extends Module {
       def forkEnv = Map(
         "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize,
       )
-      def scalaNativeVersion = SjsonnetNativeModule.this.scalaNativeVersion
       def nativeLTO = LTO.None
-      def sources = T.sources(
-        this.millSourcePath / "src",
-        this.millSourcePath / "src-native",
-        this.millSourcePath / "src-jvm-native"
-      )
     }
   }
 
@@ -159,18 +158,9 @@ object sjsonnet extends Module {
       ivy"org.yaml:snakeyaml::2.0",
       ivy"com.google.re2j:re2j:1.8",
     )
-    def scalacOptions = super.scalacOptions() ++ (
-      if (!ZincWorkerUtil.isScala3(scalaVersion())) Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
-      else Seq[String]()
-    )
     
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss" + stackSize)
-      def sources = T.sources(
-        this.millSourcePath / "src",
-        this.millSourcePath / "src-jvm",
-        this.millSourcePath / "src-jvm-native"
-      )
     }
 
     object client extends JavaModule {

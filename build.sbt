@@ -5,15 +5,21 @@ val scala3 = "3.3.5"
 
 cancelable in Global := true
 
-val scala3Options = Seq()
-val scala2Options = Seq("-opt:l:inline", "-opt-inline-from:sjsonnet.*,sjsonnet.**", "-Xsource:3")
+val commonOptions = Seq("-deprecation", "-Werror")
+val scala3Options = Seq("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
+val scala213Options = Seq(
+  "-opt:l:inline",
+  "-opt-inline-from:sjsonnet.*,sjsonnet.**",
+  "-Xsource:3",
+  "-Xlint:_",
+  "-Wconf:origin=scala.collection.compat.*:s")
 
 lazy val commonSettings = Seq(
   scalaVersion := scala3,
   crossScalaVersions := Seq(scala213, scala3),
-  scalacOptions ++= {CrossVersion.partialVersion(scalaVersion.value) match {
+  scalacOptions ++= commonOptions ++ {CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((3, _)) => scala3Options
-      case _ => scala2Options
+      case _ => scala213Options
     }}
 )
 
