@@ -22,7 +22,9 @@ class MaterializerBenchmark {
   @Setup
   def setup(): Unit = {
     val parser = mainargs.ParserForClass[Config]
-    val config = parser.constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None).getOrElse(???)
+    val config = parser
+      .constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None)
+      .getOrElse(???)
     val file = config.file
     val wd = os.pwd
     val path = os.Path(file, wd)
@@ -31,14 +33,15 @@ class MaterializerBenchmark {
       Map.empty[String, String],
       Map.empty[String, String],
       OsPath(wd),
-      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
+      importer = SjsonnetMain
+        .resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
       parseCache = new DefaultParseCache
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)
     assert(renderYaml() == oldRenderYaml())
     val r1 = render()
     assert(r1 == oldRender())
-    System.err.println("JSON length: "+r1.length)
+    System.err.println("JSON length: " + r1.length)
     assert(renderPython() == oldRenderPython())
   }
 
@@ -51,14 +54,16 @@ class MaterializerBenchmark {
 
   @Benchmark def renderPrettyYamlB(bh: Blackhole): Unit = bh.consume(renderPrettyYaml())
 
-  private def render() = renderWith(new Renderer(_, indent=3))
-  private def renderPython() = renderWith(new PythonRenderer(_, indent=3))
-  private def renderYaml() = renderWith(new YamlRenderer(_, indent=3))
-  private def oldRender() = renderWith(new OldRenderer(_, indent=3))
-  private def oldRenderPython() = renderWith(new OldPythonRenderer(_, indent=3))
-  private def oldRenderYaml() = renderWith(new OldYamlRenderer(_, indent=3))
+  private def render() = renderWith(new Renderer(_, indent = 3))
+  private def renderPython() = renderWith(new PythonRenderer(_, indent = 3))
+  private def renderYaml() = renderWith(new YamlRenderer(_, indent = 3))
+  private def oldRender() = renderWith(new OldRenderer(_, indent = 3))
+  private def oldRenderPython() = renderWith(new OldPythonRenderer(_, indent = 3))
+  private def oldRenderYaml() = renderWith(new OldYamlRenderer(_, indent = 3))
 
-  private def renderPrettyYaml() = renderWith(new PrettyYamlRenderer(_, indent=3, getCurrentPosition = () => null))
+  private def renderPrettyYaml() = renderWith(
+    new PrettyYamlRenderer(_, indent = 3, getCurrentPosition = () => null)
+  )
 
   private def renderWith[T <: Writer](r: StringWriter => JsVisitor[T, T]): String = {
     val writer = new StringWriter

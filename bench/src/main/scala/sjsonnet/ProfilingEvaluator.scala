@@ -5,12 +5,13 @@ import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-class ProfilingEvaluator(r: CachedResolver,
-                         e: String => Option[Expr],
-                         w: Path,
-                         s: Settings,
-                         wa: Error => Unit)
-  extends Evaluator(r, e, w, s, wa) {
+class ProfilingEvaluator(
+    r: CachedResolver,
+    e: String => Option[Expr],
+    w: Path,
+    s: Settings,
+    wa: Error => Unit)
+    extends Evaluator(r, e, w, s, wa) {
 
   trait Box {
     def name: String
@@ -21,19 +22,19 @@ class ProfilingEvaluator(r: CachedResolver,
   class ExprBox(val expr: Expr) extends Box {
     var children: Seq[Expr] = Nil
     var totalTime: Long = 0
-    lazy val prettyOffset = prettyIndex(expr.pos).map { case (l,c) => s"$l:$c" }.getOrElse("?:?")
+    lazy val prettyOffset = prettyIndex(expr.pos).map { case (l, c) => s"$l:$c" }.getOrElse("?:?")
     lazy val prettyPos = s"${expr.pos.currentFile.asInstanceOf[OsPath].p}:$prettyOffset"
     lazy val name: String = {
       val exprName = expr.getClass.getName.split('.').last.split('$').last
       val funcOrOptName: Option[String] = expr match {
-        case a: Expr.ApplyBuiltin => Some(a.func.functionName)
+        case a: Expr.ApplyBuiltin  => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin1 => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin2 => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin3 => Some(a.func.functionName)
         case a: Expr.ApplyBuiltin4 => Some(a.func.functionName)
-        case u: Expr.UnaryOp => Some(Expr.UnaryOp.name(u.op))
-        case b: Expr.BinaryOp => Some(Expr.BinaryOp.name(b.op))
-        case _ => None
+        case u: Expr.UnaryOp       => Some(Expr.UnaryOp.name(u.op))
+        case b: Expr.BinaryOp      => Some(Expr.BinaryOp.name(b.op))
+        case _                     => None
       }
       exprName + funcOrOptName.map(n => s" ($n)").getOrElse("")
     }
@@ -50,7 +51,7 @@ class ProfilingEvaluator(r: CachedResolver,
 
   private def getOrCreate(e: Expr): ExprBox = {
     var box = data.get(e)
-    if(box == null) {
+    if (box == null) {
       box = new ExprBox(e)
       data.put(e, box)
     }
@@ -63,11 +64,12 @@ class ProfilingEvaluator(r: CachedResolver,
     val prevParent = parent
     parent = box
     val t0 = System.nanoTime()
-    try super.visitExpr(e) finally {
+    try super.visitExpr(e)
+    finally {
       box.time += (System.nanoTime() - t0)
       box.count += 1
       parent = prevParent
-      if(parent != null) {
+      if (parent != null) {
         parent.time -= (System.nanoTime() - pt0)
       }
     }
@@ -86,38 +88,42 @@ class ProfilingEvaluator(r: CachedResolver,
 
   private def getChildren(e: Expr): Seq[Expr] = e match {
     case p: Product =>
-      (0 until p.productArity).iterator.map(p.productElement).flatMap {
-        case e: Expr => Seq(e)
-        case a: Array[Expr] => a.toSeq
-        case a: Array[Expr.CompSpec] => a.toSeq
-        case p: Expr.Params => getChildren(p)
-        case a: Expr.Member.AssertStmt => Seq(a.value, a.msg)
-        case a: Array[Expr.Bind] => a.iterator.flatMap(getChildren).toSeq
-        case a: Array[Expr.Member.Field] => a.iterator.flatMap(getChildren).toSeq
-        case a: Array[Expr.Member.AssertStmt] => a.iterator.flatMap(getChildren).toSeq
-        case s: Seq[?] => s.collect { case e: Expr => e }
-        case s: Some[?] => s.collect { case e: Expr => e }
-        case _ => Nil
-      }.filter(_ != null).toSeq
+      (0 until p.productArity).iterator
+        .map(p.productElement)
+        .flatMap {
+          case e: Expr                          => Seq(e)
+          case a: Array[Expr]                   => a.toSeq
+          case a: Array[Expr.CompSpec]          => a.toSeq
+          case p: Expr.Params                   => getChildren(p)
+          case a: Expr.Member.AssertStmt        => Seq(a.value, a.msg)
+          case a: Array[Expr.Bind]              => a.iterator.flatMap(getChildren).toSeq
+          case a: Array[Expr.Member.Field]      => a.iterator.flatMap(getChildren).toSeq
+          case a: Array[Expr.Member.AssertStmt] => a.iterator.flatMap(getChildren).toSeq
+          case s: Seq[?]                        => s.collect { case e: Expr => e }
+          case s: Some[?]                       => s.collect { case e: Expr => e }
+          case _                                => Nil
+        }
+        .filter(_ != null)
+        .toSeq
     case _ => Nil
   }
 
   private def getChildren(p: Expr.Params): Seq[Expr] =
-    if(p == null || p.defaultExprs == null) Nil else p.defaultExprs.toSeq
+    if (p == null || p.defaultExprs == null) Nil else p.defaultExprs.toSeq
 
   private def getChildren(b: Expr.Bind): Seq[Expr] =
     getChildren(b.args) :+ b.rhs
 
   private def getChildren(m: Expr.Member): Seq[Expr] = m match {
-    case b: Expr.Bind => getChildren(b.args) :+ b.rhs
+    case b: Expr.Bind              => getChildren(b.args) :+ b.rhs
     case a: Expr.Member.AssertStmt => Seq(a.value, a.msg)
-    case f: Expr.Member.Field => getChildren(f.fieldName) ++ getChildren(f.args) :+ f.rhs
-    case null => Nil
+    case f: Expr.Member.Field      => getChildren(f.fieldName) ++ getChildren(f.args) :+ f.rhs
+    case null                      => Nil
   }
 
   private def getChildren(f: Expr.FieldName): Seq[Expr] = f match {
     case f: Expr.FieldName.Dyn => Seq(f.expr)
-    case _ => Nil
+    case _                     => Nil
   }
 
   def all: Seq[ExprBox] = data.values().asScala.toSeq
@@ -155,7 +161,7 @@ class ProfilingEvaluator(r: CachedResolver,
     all.foreach { b =>
       val cl = b.expr match {
         case _: Val => classOf[Val]
-        case e => e.getClass
+        case e      => e.getClass
       }
       val n = cl.getName.replaceAll("^sjsonnet\\.", "").replace('$', '.')
       val eb = m.getOrElseUpdate(n, new ExprTypeBox(n))
@@ -179,8 +185,8 @@ class ProfilingEvaluator(r: CachedResolver,
       b.expr match {
         case a: Expr.ApplyBuiltin1 => add(b, a.func)
         case a: Expr.ApplyBuiltin2 => add(b, a.func)
-        case a: Expr.ApplyBuiltin => add(b, a.func)
-        case _ =>
+        case a: Expr.ApplyBuiltin  => add(b, a.func)
+        case _                     =>
       }
     }
     m.valuesIterator.toSeq

@@ -6,7 +6,7 @@ import utest._
 
 object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
   override final val name: String = "ext"
-  override final lazy val module: Val.Obj =  moduleFromFunctions(extFunctions :_*)
+  override final lazy val module: Val.Obj = moduleFromFunctions(extFunctions: _*)
 
   private val extFunctions: Seq[(String, Val.Func)] = Seq(
     builtin("objectReplaceKey", "obj", "key", "newKey") {
@@ -19,7 +19,8 @@ object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
           (newKeyName, new Val.Obj.ConstMember(false, Visibility.Normal, v))
         }
         Val.Obj.mk(pos, bindings)
-    })
+    }
+  )
 
   private def variableResolve(name: String): Option[Expr] = {
     if (name == "$ext" || name == "ext") {
@@ -35,7 +36,7 @@ object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
     DummyPath(),
     Importer.empty,
     parseCache = new DefaultParseCache,
-    variableResolver = variableResolve,
+    variableResolver = variableResolve
   )
 
   def check(s: String, expected: ujson.Value): Unit =
@@ -48,7 +49,9 @@ object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
            |local obj = {"a": 1, "b": 2};
            |
            |ext.objectReplaceKey(obj, "a", "c")
-           |""".stripMargin, ujson.Obj("c" -> 1, "b" -> 2))
+           |""".stripMargin,
+        ujson.Obj("c" -> 1, "b" -> 2)
+      )
     }
   }
 }

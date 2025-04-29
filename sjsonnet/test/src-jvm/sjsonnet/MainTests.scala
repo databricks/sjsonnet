@@ -18,14 +18,30 @@ object MainTests extends TestSuite {
       val outF = File.createTempFile("sjsonnet", ".json")
       val out = new ByteArrayOutputStream()
       val pout = new PrintStream(out)
-      SjsonnetMain.main0(Array(source.toString), new DefaultParseCache, System.in, pout, System.err, os.pwd, None)
+      SjsonnetMain.main0(
+        Array(source.toString),
+        new DefaultParseCache,
+        System.in,
+        pout,
+        System.err,
+        os.pwd,
+        None
+      )
       pout.flush()
-      SjsonnetMain.main0(Array("-o", outF.getAbsolutePath, source.toString), new DefaultParseCache, System.in, System.out, System.err, os.pwd, None)
+      SjsonnetMain.main0(
+        Array("-o", outF.getAbsolutePath, source.toString),
+        new DefaultParseCache,
+        System.in,
+        System.out,
+        System.err,
+        os.pwd,
+        None
+      )
       val stdoutBytes = out.toByteArray
       val fileBytes = os.read(os.Path(outF)).getBytes
 
-      //println(stdoutBytes.map(_.toInt).mkString(","))
-      //println(fileBytes.map(_.toInt).mkString(","))
+      // println(stdoutBytes.map(_.toInt).mkString(","))
+      // println(fileBytes.map(_.toInt).mkString(","))
       assert(Arrays.equals(fileBytes ++ eol.getBytes, stdoutBytes))
     }
 
@@ -136,9 +152,9 @@ object MainTests extends TestSuite {
       val worldDestStr = os.read(multiDest / "world")
       assert(
         worldDestStr ==
-          """- 2
-            |- three
-            |- true""".stripMargin
+        """- 2
+          |- three
+          |- true""".stripMargin
       )
     }
   }
@@ -148,7 +164,15 @@ object MainTests extends TestSuite {
     val perr = new PrintStream(err, true, "UTF-8")
     val out = new ByteArrayOutputStream()
     val pout = new PrintStream(out, true, "UTF-8")
-    val res = SjsonnetMain.main0(args.toArray.flatMap(_.value), new DefaultParseCache, System.in, pout, perr, os.pwd, None)
+    val res = SjsonnetMain.main0(
+      args.toArray.flatMap(_.value),
+      new DefaultParseCache,
+      System.in,
+      pout,
+      perr,
+      os.pwd,
+      None
+    )
     (res, new String(out.toByteArray, "UTF-8"), new String(err.toByteArray, "UTF-8"))
   }
 }

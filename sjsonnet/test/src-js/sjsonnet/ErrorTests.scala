@@ -30,15 +30,17 @@ object ErrorTests extends TestSuite {
           null
         }
       },
-      (path: String, binaryData: Boolean) => if (binaryData) {
-        Right(TestResources.files(path))
-      } else {
-        Left(new String(TestResources.files(path), StandardCharsets.UTF_8))
-      },
+      (path: String, binaryData: Boolean) =>
+        if (binaryData) {
+          Right(TestResources.files(path))
+        } else {
+          Left(new String(TestResources.files(path), StandardCharsets.UTF_8))
+        }
     )
   }
 
-  def check(expected: String, suite: String = "test_suite")(implicit tp: utest.framework.TestPath): Unit = {
+  def check(expected: String, suite: String = "test_suite")(implicit
+      tp: utest.framework.TestPath): Unit = {
     val fileName = s"error.${tp.value.mkString(".")}.jsonnet"
     try {
       ujson.WebJson.transform(eval(fileName, suite), ujson.Value)
@@ -47,14 +49,17 @@ object ErrorTests extends TestSuite {
       case e: js.JavaScriptException =>
         System.err.println(e.getMessage)
         val msg = e.getMessage
-          .replaceAll("\\(memory\\)", joinPath("sjsonnet/test/resources", joinPath(suite, fileName)))
+          .replaceAll(
+            "\\(memory\\)",
+            joinPath("sjsonnet/test/resources", joinPath(suite, fileName))
+          )
           .replaceAll("\\(test_suite", "(sjsonnet/test/resources/test_suite")
           .replaceAll("  ", "    ")
         assert(msg == expected)
     }
   }
 
-  val tests: Tests = Tests{
+  val tests: Tests = Tests {
     test("01") - check(
       """sjsonnet.Error: foo
         |    at [Error].(sjsonnet/test/resources/test_suite/error.01.jsonnet:17:29)
@@ -205,7 +210,7 @@ object ErrorTests extends TestSuite {
         """sjsonnet.StaticError: Unknown variable: x
           |    at [Id x].(sjsonnet/test/resources/test_suite/lib/static_check_failure.jsonnet:2:1)
           |    at [Import].(sjsonnet/test/resources/test_suite/error.import_static-check-failure.jsonnet:1:1)
-          |""".stripMargin,
+          |""".stripMargin
       )
     }
     "import_syntax-error" - check(
@@ -242,33 +247,33 @@ object ErrorTests extends TestSuite {
       test("avoid_output_change") - check(
         """sjsonnet.Error: Assertion failed
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.avoid_output_change.jsonnet:18:15)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("equality") - check(
         """sjsonnet.Error: Assertion failed
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:10)
           |    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:24)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("option") - check(
         """sjsonnet.Error: Assertion failed: Option "d" not in ["a", "b", "c"].
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.option.jsonnet:19:57)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("simple") - check(
         """sjsonnet.Error: Assertion failed
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.simple.jsonnet:18:10)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("simple2") - check(
         """sjsonnet.Error: Assertion failed: my error message
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.simple2.jsonnet:18:12)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("simple3") - check(
         """sjsonnet.Error: my error message
           |    at [Error].(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
-        |""".stripMargin
+          |""".stripMargin
       )
     }
     test("native_not_found") - check(
@@ -282,14 +287,14 @@ object ErrorTests extends TestSuite {
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:25)
           |    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:38)
           |    at [And].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:50)
-        |""".stripMargin
+          |""".stripMargin
       )
       test("fail2") - check(
         """sjsonnet.Error: Assertion failed: foo was not equal to bar
           |    at [Assert].(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:25)
           |    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:74)
           |    at [And].(sjsonnet/test/resources/test_suite/error.obj_assert.fail2.jsonnet:20:86)
-        |""".stripMargin
+          |""".stripMargin
       )
     }
 

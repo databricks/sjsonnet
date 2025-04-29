@@ -1,4 +1,4 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, scalajslib.api._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, scalajslib.api._, scalafmt._
 import scalalib.api.ZincWorkerUtil
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
@@ -10,7 +10,7 @@ val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.5")
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
 
-trait SjsonnetCrossModule extends CrossScalaModule with PublishModule {
+trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with ScalafmtModule {
   def crossValue: String
   def artifactName = "sjsonnet"
 

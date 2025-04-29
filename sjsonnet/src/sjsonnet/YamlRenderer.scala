@@ -3,9 +3,12 @@ package sjsonnet
 import java.io.StringWriter
 import upickle.core.{ArrVisitor, ObjVisitor, SimpleVisitor, Visitor}
 
-
-class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                   quoteKeys: Boolean = true, indent: Int = 2) extends BaseCharRenderer(_out, indent){
+class YamlRenderer(
+    _out: StringWriter = new java.io.StringWriter(),
+    indentArrayInObject: Boolean = false,
+    quoteKeys: Boolean = true,
+    indent: Int = 2)
+    extends BaseCharRenderer(_out, indent) {
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
@@ -17,7 +20,13 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     override def visitString(s: CharSequence, index: Int): StringWriter = {
       YamlRenderer.this.flushBuffer()
       if (quoteKeys || !YamlRenderer.isSafeBareKey(s.toString)) {
-        upickle.core.RenderUtils.escapeChar(null, YamlRenderer.this.elemBuilder, s, escapeUnicode = true, wrapQuotes = true)
+        upickle.core.RenderUtils.escapeChar(
+          null,
+          YamlRenderer.this.elemBuilder,
+          s,
+          escapeUnicode = true,
+          wrapQuotes = true
+        )
       } else {
         YamlRenderer.this.appendString(s.toString)
       }
@@ -29,7 +38,7 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
   override def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
-  
+
   override def visitString(s: CharSequence, index: Int): StringWriter = {
     flushBuffer()
     val len = s.length()
@@ -48,7 +57,13 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
       }
       depth -= 1
     } else {
-      upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode=true, wrapQuotes = true)
+      upickle.core.RenderUtils.escapeChar(
+        null,
+        elemBuilder,
+        s,
+        escapeUnicode = true,
+        wrapQuotes = true
+      )
     }
     flushCharBuilder()
     _out
@@ -81,111 +96,131 @@ class YamlRenderer(_out: StringWriter = new java.io.StringWriter(), indentArrayI
     dashBuffered = false
   }
 
-  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] = new ArrVisitor[StringWriter, StringWriter] {
-    var empty = true
-    flushBuffer()
-
-    if (!topLevel) {
-      depth += 1
-      newlineBuffered = true
-    }
-    topLevel = false
-
-    private val dedentInObject = afterKey && !indentArrayInObject
-    afterKey = false
-    if (dedentInObject) depth -= 1
-    dashBuffered = true
-
-    def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
-    def visitValue(v: StringWriter, index: Int): Unit = {
-      empty = false
+  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] =
+    new ArrVisitor[StringWriter, StringWriter] {
+      var empty = true
       flushBuffer()
-      newlineBuffered = true
-      dashBuffered = true
-    }
-    def visitEnd(index: Int): StringWriter = {
-      if (!dedentInObject) depth -= 1
-      if (empty) {
-        elemBuilder.ensureLength(2)
-        elemBuilder.append('[')
-        elemBuilder.append(']')
+
+      if (!topLevel) {
+        depth += 1
+        newlineBuffered = true
       }
-      newlineBuffered = false
-      dashBuffered = false
-      flushCharBuilder()
-      _out
-    }
-  }
+      topLevel = false
 
-  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] = new ObjVisitor[StringWriter, StringWriter] {
-    var empty = true
-    flushBuffer()
-    if (!topLevel) depth += 1
-    topLevel = false
-
-    if (afterKey) newlineBuffered = true
-
-    def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
-
-    def visitKey(index: Int): Visitor[StringWriter, StringWriter] = yamlKeyVisitor
-
-    def visitKeyValue(s: Any): Unit = {
-      empty = false
-      flushBuffer()
-      elemBuilder.ensureLength(2)
-      elemBuilder.append(':')
-      elemBuilder.append(' ')
-      flushCharBuilder()
-      afterKey = true
-      newlineBuffered = false
-    }
-
-    def visitValue(v: StringWriter, index: Int): Unit = {
-      newlineBuffered = true
+      private val dedentInObject = afterKey && !indentArrayInObject
       afterKey = false
+      if (dedentInObject) depth -= 1
+      dashBuffered = true
+
+      def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
+      def visitValue(v: StringWriter, index: Int): Unit = {
+        empty = false
+        flushBuffer()
+        newlineBuffered = true
+        dashBuffered = true
+      }
+      def visitEnd(index: Int): StringWriter = {
+        if (!dedentInObject) depth -= 1
+        if (empty) {
+          elemBuilder.ensureLength(2)
+          elemBuilder.append('[')
+          elemBuilder.append(']')
+        }
+        newlineBuffered = false
+        dashBuffered = false
+        flushCharBuilder()
+        _out
+      }
     }
 
-    def visitEnd(index: Int): StringWriter = {
-      if (empty) {
-        elemBuilder.ensureLength(2)
-        elemBuilder.append('{')
-        elemBuilder.append('}')
-      }
-      newlineBuffered = false
-      depth -= 1
-      flushCharBuilder()
+  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] =
+    new ObjVisitor[StringWriter, StringWriter] {
+      var empty = true
       flushBuffer()
-      _out
+      if (!topLevel) depth += 1
+      topLevel = false
+
+      if (afterKey) newlineBuffered = true
+
+      def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
+
+      def visitKey(index: Int): Visitor[StringWriter, StringWriter] = yamlKeyVisitor
+
+      def visitKeyValue(s: Any): Unit = {
+        empty = false
+        flushBuffer()
+        elemBuilder.ensureLength(2)
+        elemBuilder.append(':')
+        elemBuilder.append(' ')
+        flushCharBuilder()
+        afterKey = true
+        newlineBuffered = false
+      }
+
+      def visitValue(v: StringWriter, index: Int): Unit = {
+        newlineBuffered = true
+        afterKey = false
+      }
+
+      def visitEnd(index: Int): StringWriter = {
+        if (empty) {
+          elemBuilder.ensureLength(2)
+          elemBuilder.append('{')
+          elemBuilder.append('}')
+        }
+        newlineBuffered = false
+        depth -= 1
+        flushCharBuilder()
+        flushBuffer()
+        _out
+      }
     }
-  }
 }
-object YamlRenderer{
+object YamlRenderer {
   private[sjsonnet] val newlinePattern = Platform.getPatternFromCache("\n")
   private val safeYamlKeyPattern = Platform.getPatternFromCache("^[a-zA-Z0-9/._-]+$")
-  private val yamlReserved = Set("true", "false", "null", "yes", "no", "on", "off", "y", "n", ".nan",
-    "+.inf", "-.inf", ".inf", "null", "-", "---", "''")
+  private val yamlReserved = Set(
+    "true",
+    "false",
+    "null",
+    "yes",
+    "no",
+    "on",
+    "off",
+    "y",
+    "n",
+    ".nan",
+    "+.inf",
+    "-.inf",
+    ".inf",
+    "null",
+    "-",
+    "---",
+    "''"
+  )
   private val yamlTimestampPattern = Platform.getPatternFromCache("^(?:[0-9]*-){2}[0-9]*$")
   private val yamlBinaryPattern = Platform.getPatternFromCache("^[-+]?0b[0-1_]+$")
   private val yamlHexPattern = Platform.getPatternFromCache("[-+]?0x[0-9a-fA-F_]+")
-  private val yamlFloatPattern = Platform.getPatternFromCache( "^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$" )
+  private val yamlFloatPattern =
+    Platform.getPatternFromCache("^-?([0-9_]*)*(\\.[0-9_]*)?(e[-+][0-9_]+)?$")
   private val yamlIntPattern = Platform.getPatternFromCache("^[-+]?[0-9_]+$")
 
   private def isSafeBareKey(k: String) = {
     val l = k.toLowerCase
     !yamlReserved.contains(l) &&
-      safeYamlKeyPattern.matcher(k).matches() &&
-      !yamlTimestampPattern.matcher(l).matches() &&
-      !yamlBinaryPattern.matcher(k).matches() &&
-      !yamlHexPattern.matcher(k).matches() &&
-      !yamlFloatPattern.matcher(l).matches() &&
-      !yamlIntPattern.matcher(l).matches()
+    safeYamlKeyPattern.matcher(k).matches() &&
+    !yamlTimestampPattern.matcher(l).matches() &&
+    !yamlBinaryPattern.matcher(k).matches() &&
+    !yamlHexPattern.matcher(k).matches() &&
+    !yamlFloatPattern.matcher(l).matches() &&
+    !yamlIntPattern.matcher(l).matches()
   }
 
   def writeIndentation(out: upickle.core.CharBuilder, n: Int): Unit = {
-    out.ensureLength(n+1)
+    out.ensureLength(n + 1)
     out.append('\n')
     var i = n
-    while(i > 0) {
+    while (i > 0) {
       out.append(' ')
       i -= 1
     }

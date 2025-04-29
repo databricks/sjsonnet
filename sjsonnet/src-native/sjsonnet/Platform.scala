@@ -58,10 +58,14 @@ object Platform {
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
   private val dashPattern = getPatternFromCache("-")
 
-  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+  def getPatternFromCache(pat: String): Pattern =
+    regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
-  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = scala.jdk.javaapi.CollectionConverters.asScala(
-    pat.re2.namedGroups).view.mapValues(_.intValue()).toMap
+  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = scala.jdk.javaapi.CollectionConverters
+    .asScala(pat.re2.namedGroups)
+    .view
+    .mapValues(_.intValue())
+    .toMap
 
   def regexQuote(s: String): String = {
     val quote = Pattern.quote(s)

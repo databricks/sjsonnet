@@ -3,7 +3,6 @@ package sjsonnet
 import java.io._
 import java.net.Socket
 
-
 import scala.collection.JavaConverters._
 import org.scalasbt.ipcsocket._
 import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util => ClientUtil}
@@ -11,20 +10,21 @@ import sun.misc.{Signal, SignalHandler}
 
 import scala.util.control.NonFatal
 
-trait SjsonnetServerMain[T]{
+trait SjsonnetServerMain[T] {
   var stateCache = Option.empty[T]
-  def main0(args: Array[String],
-            stateCache: Option[T],
-            mainInteractive: Boolean,
-            stdin: InputStream,
-            stdout: PrintStream,
-            stderr: PrintStream,
-            env : Map[String, String],
-            setIdle: Boolean => Unit,
-            wd: os.Path): (Boolean, Option[T])
+  def main0(
+      args: Array[String],
+      stateCache: Option[T],
+      mainInteractive: Boolean,
+      stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      env: Map[String, String],
+      setIdle: Boolean => Unit,
+      wd: os.Path): (Boolean, Option[T])
 }
 
-object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
+object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
   def main(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
@@ -33,9 +33,12 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
     // of running a background server. Furthermore, the background server already
     // can detect when the Mill client goes away, which is necessary to handle
     // the case when a Mill client that did *not* spawn the server gets `CTRL-C`ed
-    Signal.handle(new Signal("INT"), new SignalHandler () {
-      def handle(sig: Signal) = {} // do nothing
-    })
+    Signal.handle(
+      new Signal("INT"),
+      new SignalHandler() {
+        def handle(sig: Signal) = {} // do nothing
+      }
+    )
     new Server(
       args0(0),
       this,
@@ -44,17 +47,18 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
       sjsonnet.client.Locks.files(args0(0))
     ).run()
   }
-  def main0(args: Array[String],
-            stateCache: Option[DefaultParseCache],
-            mainInteractive: Boolean,
-            stdin: InputStream,
-            stdout: PrintStream,
-            stderr: PrintStream,
-            env : Map[String, String],
-            setIdle: Boolean => Unit,
-            wd: os.Path) = {
+  def main0(
+      args: Array[String],
+      stateCache: Option[DefaultParseCache],
+      mainInteractive: Boolean,
+      stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      env: Map[String, String],
+      setIdle: Boolean => Unit,
+      wd: os.Path) = {
 
-    val stateCache2 = stateCache.getOrElse{
+    val stateCache2 = stateCache.getOrElse {
       val p = new DefaultParseCache
       this.stateCache = Some(p)
       p
@@ -63,18 +67,18 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
     val in = System.in
     val err = System.err
     (
-      try{
+      try {
         System.setIn(stdin)
         System.setErr(stderr)
         System.setOut(stdout)
-        scala.Console.withIn(stdin){
-          scala.Console.withOut(stdout){
-            scala.Console.withErr(stderr){
+        scala.Console.withIn(stdin) {
+          scala.Console.withOut(stdout) {
+            scala.Console.withErr(stderr) {
               sjsonnet.SjsonnetMain.main0(args, stateCache2, stdin, stdout, stderr, wd) == 0
             }
           }
         }
-      }finally{
+      } finally {
         System.setErr(err)
         System.setOut(out)
         System.setIn(in)
@@ -84,50 +88,57 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache]{
   }
 }
 
-
-class Server[T](lockBase: String,
-                sm: SjsonnetServerMain[T],
-                interruptServer: () => Unit,
-                acceptTimeout: Int,
-                locks: Locks) {
+class Server[T](
+    lockBase: String,
+    sm: SjsonnetServerMain[T],
+    interruptServer: () => Unit,
+    acceptTimeout: Int,
+    locks: Locks) {
 
   val originalStdout = System.out
   def run() = {
-    Server.tryLockBlock(locks.processLock){
-      var running = true
-      while (running) {
-        Server.lockBlock(locks.serverLock){
-          val (serverSocket, socketClose) = if (ClientUtil.isWindows) {
-            val socketName = ClientUtil.WIN32_PIPE_PREFIX + new File(lockBase).getName
-            (new Win32NamedPipeServerSocket(socketName), () => new Win32NamedPipeSocket(socketName).close())
-          } else {
-            val socketName = lockBase + "/io"
-            new File(socketName).delete()
-            (new UnixDomainServerSocket(socketName), () => new UnixDomainSocket(socketName).close())
-          }
+    Server
+      .tryLockBlock(locks.processLock) {
+        var running = true
+        while (running) {
+          Server.lockBlock(locks.serverLock) {
+            val (serverSocket, socketClose) = if (ClientUtil.isWindows) {
+              val socketName = ClientUtil.WIN32_PIPE_PREFIX + new File(lockBase).getName
+              (
+                new Win32NamedPipeServerSocket(socketName),
+                () => new Win32NamedPipeSocket(socketName).close()
+              )
+            } else {
+              val socketName = lockBase + "/io"
+              new File(socketName).delete()
+              (
+                new UnixDomainServerSocket(socketName),
+                () => new UnixDomainSocket(socketName).close()
+              )
+            }
 
-          val sockOpt = Server.interruptWith(
-            "SjsonnetSocketTimeoutInterruptThread",
-            acceptTimeout,
-            socketClose(),
-            serverSocket.accept()
-          )
+            val sockOpt = Server.interruptWith(
+              "SjsonnetSocketTimeoutInterruptThread",
+              acceptTimeout,
+              socketClose(),
+              serverSocket.accept()
+            )
 
-          sockOpt match{
-            case None => running = false
-            case Some(sock) =>
-              try {
-                handleRun(sock)
-                serverSocket.close()
-              }
-              catch{case NonFatal(e) => e.printStackTrace(originalStdout) }
+            sockOpt match {
+              case None => running = false
+              case Some(sock) =>
+                try {
+                  handleRun(sock)
+                  serverSocket.close()
+                } catch { case NonFatal(e) => e.printStackTrace(originalStdout) }
+            }
           }
+          // Make sure you give an opportunity for the client to probe the lock
+          // and realize the server has released it to signal completion
+          Thread.sleep(10)
         }
-        // Make sure you give an opportunity for the client to probe the lock
-        // and realize the server has released it to signal completion
-        Thread.sleep(10)
       }
-    }.getOrElse(throw new Exception("PID already present"))
+      .getOrElse(throw new Exception("PID already present"))
   }
 
   def handleRun(clientSocket: Socket) = {
@@ -141,7 +152,9 @@ class Server[T](lockBase: String,
     val clientSjsonnetVersion = ClientUtil.readString(argStream)
     val serverSjsonnetVersion = sys.props("SJSONNET_VERSION")
     if (clientSjsonnetVersion != serverSjsonnetVersion) {
-      stdout.println(s"Sjsonnet version changed ($serverSjsonnetVersion -> $clientSjsonnetVersion), re-starting server")
+      stdout.println(
+        s"Sjsonnet version changed ($serverSjsonnetVersion -> $clientSjsonnetVersion), re-starting server"
+      )
       System.exit(0)
     }
     val wd = ClientUtil.readString(argStream)
@@ -151,31 +164,32 @@ class Server[T](lockBase: String,
 
     @volatile var done = false
     @volatile var idle = false
-    val t = new Thread(new Runnable{
-      override def run(): Unit = {
-        try {
-        val (result, newStateCache) = sm.main0(
-          args,
-          sm.stateCache,
-          interactive,
-          socketIn,
-          stdout,
-          stderr,
-          env.asScala.toMap,
-          idle = _,
-          os.Path(wd)
-        )
+    val t = new Thread(
+      new Runnable {
+        override def run(): Unit = {
+          try {
+            val (result, newStateCache) = sm.main0(
+              args,
+              sm.stateCache,
+              interactive,
+              socketIn,
+              stdout,
+              stderr,
+              env.asScala.toMap,
+              idle = _,
+              os.Path(wd)
+            )
 
-        sm.stateCache = newStateCache
-        java.nio.file.Files.write(
-          java.nio.file.Paths.get(lockBase + "/exitCode"),
-          (if (result) 0 else 1).toString.getBytes
-        )
-      } finally{
-        done = true
-        idle = true
-      }
-      }
+            sm.stateCache = newStateCache
+            java.nio.file.Files.write(
+              java.nio.file.Paths.get(lockBase + "/exitCode"),
+              (if (result) 0 else 1).toString.getBytes
+            )
+          } finally {
+            done = true
+            idle = true
+          }
+        }
       },
       "SjsonnetServerActionRunner"
     )
@@ -183,10 +197,9 @@ class Server[T](lockBase: String,
     // We cannot simply use Lock#await here, because the filesystem doesn't
     // realize the clientLock/serverLock are held by different threads in the
     // two processes and gives a spurious deadlock error
-    while(!done && !locks.clientLock.probe()) Thread.sleep(3)
+    while (!done && !locks.clientLock.probe()) Thread.sleep(3)
 
     if (!idle) interruptServer()
-
 
     t.interrupt()
     t.stop()
@@ -202,14 +215,14 @@ class Server[T](lockBase: String,
     } else clientSocket.close()
   }
 }
-object Server{
+object Server {
   def lockBlock[T](lock: Lock)(t: => T): T = {
     val l = lock.lock()
     try t
     finally l.release()
   }
   def tryLockBlock[T](lock: Lock)(t: => T): Option[T] = {
-    lock.tryLock() match{
+    lock.tryLock() match {
       case null => None
       case l =>
         try Some(t)
@@ -223,7 +236,9 @@ object Server{
     val thread = new Thread(
       () => {
         try Thread.sleep(millis)
-        catch{ case t: InterruptedException => /* Do Nothing */ }
+        catch {
+          case t: InterruptedException => /* Do Nothing */
+        }
         if (interrupt) {
           interrupted = true
           close
@@ -236,7 +251,7 @@ object Server{
     try {
       val res =
         try Some(t)
-        catch {case NonFatal(e) => None}
+        catch { case NonFatal(e) => None }
 
       if (interrupted) None
       else res
@@ -247,5 +262,3 @@ object Server{
     }
   }
 }
-
-

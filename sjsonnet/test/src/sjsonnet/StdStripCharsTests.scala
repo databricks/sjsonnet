@@ -12,7 +12,8 @@ object StdStripCharsTests extends TestSuite {
       eval("std.rstripChars(\"cacabbcacabbaacc\", \"ac\")").toString() ==> """"cacabbcacabb""""
       eval("std.rstripChars(\"cacabbcacabb-aacc\", \"a-c\")").toString() ==> """"cacabbcacabb""""
 
-      eval("""std.rstripChars("cacabbcacabb[aacc]", "ac[]$%^&*(")""").toString() ==> """"cacabbcacabb""""
+      eval("""std.rstripChars("cacabbcacabb[aacc]", "ac[]$%^&*(")""")
+        .toString() ==> """"cacabbcacabb""""
     }
     test("stdLStripChars") {
       eval("std.lstripChars(\" test test test \", \" \")").toString() ==> """"test test test """"

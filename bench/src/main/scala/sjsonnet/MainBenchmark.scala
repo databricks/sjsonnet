@@ -10,15 +10,21 @@ object MainBenchmark {
   val mainArgs = Array[String](
     "../../universe/rulemanager/deploy/rulemanager.jsonnet",
     // "../../universe/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
-    "-J", "../../universe",
-    "-J", "../../universe/mt-shards/dev/az-westus-c2",
-    "-J", "../../universe/bazel-bin",
-    "--ext-code", "isKubecfg=false"
+    "-J",
+    "../../universe",
+    "-J",
+    "../../universe/mt-shards/dev/az-westus-c2",
+    "-J",
+    "../../universe/bazel-bin",
+    "--ext-code",
+    "isKubecfg=false"
   )
 
   def findFiles(): (IndexedSeq[(Path, String)], EvalScope) = {
     val parser = mainargs.ParserForClass[Config]
-    val config = parser.constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None).getOrElse(???)
+    val config = parser
+      .constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None)
+      .getOrElse(???)
     val file = config.file
     val wd = os.pwd
     val path = OsPath(os.Path(file, wd))
@@ -31,7 +37,9 @@ object MainBenchmark {
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
-    interp.interpret0(interp.resolver.read(path, binaryData = false).get.readString(), path, renderer).getOrElse(???)
+    interp
+      .interpret0(interp.resolver.read(path, binaryData = false).get.readString(), path, renderer)
+      .getOrElse(???)
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 
@@ -55,15 +63,17 @@ class MainBenchmark {
 
   @Benchmark
   def main(bh: Blackhole): Unit = {
-    bh.consume(SjsonnetMain.main0(
-      MainBenchmark.mainArgs,
-      new DefaultParseCache,
-      System.in,
-      dummyOut,
-      System.err,
-      os.pwd,
-      None
-    ))
+    bh.consume(
+      SjsonnetMain.main0(
+        MainBenchmark.mainArgs,
+        new DefaultParseCache,
+        System.in,
+        dummyOut,
+        System.err,
+        os.pwd,
+        None
+      )
+    )
   }
 }
 

@@ -2,7 +2,7 @@ package sjsonnet
 
 import utest._
 
-object FileTests extends TestSuite{
+object FileTests extends TestSuite {
   val testSuiteRoot = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path) = {
     val interp = new Interpreter(
@@ -27,7 +27,7 @@ object FileTests extends TestSuite{
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
     check(ujson.read(os.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
   }
-  def tests = Tests{
+  def tests = Tests {
     test("arith_bool") - check()
     test("arith_float") - check()
     test("arith_string") - check()
@@ -50,11 +50,10 @@ object FileTests extends TestSuite{
     test("local") - check()
     test("lazy") - checkGolden()
     test("lazy_operator1") - checkGolden()
-    test("lazy_operator2") - checkFail(
-      """sjsonnet.Error: should happen
-        |    at [Error].(lazy_operator2.jsonnet:1:9)
-        |    at [And].(lazy_operator2.jsonnet:1:6)
-        |""".stripMargin)
+    test("lazy_operator2") - checkFail("""sjsonnet.Error: should happen
+                                         |    at [Error].(lazy_operator2.jsonnet:1:9)
+                                         |    at [And].(lazy_operator2.jsonnet:1:6)
+                                         |""".stripMargin)
     test("merge") - check()
     test("null") - check()
     test("object") - check()
@@ -74,7 +73,7 @@ object FileTests extends TestSuite{
     test("std_all_hidden") - check()
     test("stdlib_native") - check()
     test("text_block") - check()
-    "tla.simple"- check()
+    "tla.simple" - check()
     test("unicode") - check()
     test("unix_line_endings") - checkGolden()
     test("unparse") - checkGolden()
@@ -82,4 +81,3 @@ object FileTests extends TestSuite{
     test("issue_127") - check()
   }
 }
-

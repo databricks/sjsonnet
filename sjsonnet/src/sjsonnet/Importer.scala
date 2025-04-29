@@ -6,18 +6,21 @@ import java.io.{BufferedInputStream, File, FileInputStream, RandomAccessFile}
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 
-
 /** Resolve and read imported files */
 abstract class Importer {
   def resolve(docBase: Path, importName: String): Option[Path]
   def read(path: Path, binaryData: Boolean): Option[ResolvedFile]
 
-  private def resolveAndRead(docBase: Path, importName: String, binaryData: Boolean): Option[(Path, ResolvedFile)] = for {
+  private def resolveAndRead(
+      docBase: Path,
+      importName: String,
+      binaryData: Boolean): Option[(Path, ResolvedFile)] = for {
     path <- resolve(docBase, importName)
     txt <- read(path, binaryData)
   } yield (path, txt)
 
-  def resolveAndReadOrFail(value: String, pos: Position, binaryData: Boolean)(implicit ev: EvalErrorScope): (Path, ResolvedFile) =
+  def resolveAndReadOrFail(value: String, pos: Position, binaryData: Boolean)(implicit
+      ev: EvalErrorScope): (Path, ResolvedFile) =
     resolveAndRead(pos.fileScope.currentFile.parent(), value, binaryData = binaryData)
       .getOrElse(Error.fail("Couldn't import file: " + pprint.Util.literalize(value), pos))
 }
@@ -74,7 +77,7 @@ final case class FileParserInput(file: File) extends ParserInput {
   def prettyIndex(index: Int): String = {
     val line = lineNumberLookup.indexWhere(_ > index) match {
       case -1 => lineNumberLookup.length - 1
-      case n => math.max(0, n - 1)
+      case n  => math.max(0, n - 1)
     }
     val col = index - lineNumberLookup(line)
     s"${line + 1}:${col + 1}"
@@ -105,7 +108,9 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
 
   def readChar(index: Long): Char = {
     if (index >= fileLength) {
-      throw new IndexOutOfBoundsException(s"Index $index is out of bounds for file of length $fileLength")
+      throw new IndexOutOfBoundsException(
+        s"Index $index is out of bounds for file of length $fileLength"
+      )
     }
     if (index < bufferStart || index >= bufferEnd) {
       fillBuffer(index)
@@ -115,7 +120,9 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
 
   def readString(from: Long, until: Long): String = {
     if (!(from < fileLength && until <= fileLength && from <= until)) {
-      throw new IndexOutOfBoundsException(s"Invalid range: $from-$until for file of length $fileLength")
+      throw new IndexOutOfBoundsException(
+        s"Invalid range: $from-$until for file of length $fileLength"
+      )
     }
     val length = (until - from).toInt
 
@@ -137,6 +144,7 @@ class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
 }
 
 trait ResolvedFile {
+
   /**
    * Get an efficient parser input for this resolved file. Large files will be read from disk
    * (buffered reads), while small files will be served from memory.
@@ -176,13 +184,13 @@ final case class StaticBinaryResolvedFile(content: Array[Byte]) extends Resolved
 }
 
 class CachedImporter(parent: Importer) extends Importer {
-  val cache: mutable.HashMap[Path,ResolvedFile] = mutable.HashMap.empty[Path, ResolvedFile]
+  val cache: mutable.HashMap[Path, ResolvedFile] = mutable.HashMap.empty[Path, ResolvedFile]
 
   def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
 
   def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = cache.get(path) match {
     case s @ Some(x) =>
-      if(x == null) None else s
+      if (x == null) None else s
     case None =>
       val x = parent.read(path, binaryData)
       cache.put(path, x.orNull)
@@ -191,23 +199,33 @@ class CachedImporter(parent: Importer) extends Importer {
 }
 
 class CachedResolver(
-  parentImporter: Importer,
-  val parseCache: ParseCache,
-  strictImportSyntax: Boolean,
-  internedStrings: mutable.HashMap[String, String],
-  internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]) extends CachedImporter(parentImporter) {
+    parentImporter: Importer,
+    val parseCache: ParseCache,
+    strictImportSyntax: Boolean,
+    internedStrings: mutable.HashMap[String, String],
+    internedStaticFieldSets: mutable.HashMap[
+      Val.StaticObjectFieldSet,
+      java.util.LinkedHashMap[String, java.lang.Boolean]
+    ])
+    extends CachedImporter(parentImporter) {
 
-  def parse(path: Path, content: ResolvedFile)(implicit ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate((path, content.contentHash()), {
-      val parsed = fastparse.parse(content.getParserInput(), new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)) match {
-        case f @ Parsed.Failure(_, _, _) =>
-          val traced = f.trace()
-          val pos = new Position(new FileScope(path), traced.index)
-          Left(new ParseError(traced.msg).addFrame(pos))
-        case Parsed.Success(r, _) => Right(r)
+  def parse(path: Path, content: ResolvedFile)(implicit
+      ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
+    parseCache.getOrElseUpdate(
+      (path, content.contentHash()), {
+        val parsed = fastparse.parse(
+          content.getParserInput(),
+          new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)
+        ) match {
+          case f @ Parsed.Failure(_, _, _) =>
+            val traced = f.trace()
+            val pos = new Position(new FileScope(path), traced.index)
+            Left(new ParseError(traced.msg).addFrame(pos))
+          case Parsed.Success(r, _) => Right(r)
+        }
+        parsed.flatMap { case (e, fs) => process(e, fs) }
       }
-      parsed.flatMap { case (e, fs) => process(e, fs) }
-    })
+    )
   }
 
   def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))

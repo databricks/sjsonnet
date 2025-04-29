@@ -4,15 +4,13 @@ import java.io.Writer
 import upickle.core.{ArrVisitor, ObjVisitor}
 
 /**
-  * Custom JSON renderer to try and match the behavior of google/jsonnet's
-  * render:
-  *
-  * - Custom printing of Doubles
-  * - Custom printing of empty dictionaries and arrays
-  *
-  */
-class OldRenderer(out: Writer = new java.io.StringWriter(),
-                  indent: Int = -1) extends BaseRenderer(out, indent){
+ * Custom JSON renderer to try and match the behavior of google/jsonnet's render:
+ *
+ *   - Custom printing of Doubles
+ *   - Custom printing of empty dictionaries and arrays
+ */
+class OldRenderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
+    extends BaseRenderer(out, indent) {
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
     flushBuffer()
@@ -30,7 +28,7 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
       out.append('\n')
 
       var i = indent * depth
-      while(i > 0) {
+      while (i > 0) {
         out.append(' ')
         i -= 1
       }
@@ -38,7 +36,11 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     newlineBuffered = false
     commaBuffered = false
   }
-  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.OldRenderer} = new ArrVisitor[Writer, Writer] {
+  override def visitArray(
+      length: Int,
+      index: Int): upickle.core.ArrVisitor[java.io.Writer, java.io.Writer] {
+    def subVisitor: sjsonnet.OldRenderer
+  } = new ArrVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('[')
@@ -63,14 +65,18 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
     }
   }
 
-  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.Writer,java.io.Writer]{def subVisitor: sjsonnet.OldRenderer; def visitKey(index: Int): sjsonnet.OldRenderer} = new ObjVisitor[Writer, Writer] {
+  override def visitObject(
+      length: Int,
+      index: Int): upickle.core.ObjVisitor[java.io.Writer, java.io.Writer] {
+    def subVisitor: sjsonnet.OldRenderer; def visitKey(index: Int): sjsonnet.OldRenderer
+  } = new ObjVisitor[Writer, Writer] {
     var empty = true
     flushBuffer()
     out.append('{')
     newlineBuffered = true
     depth += 1
     def subVisitor: sjsonnet.OldRenderer = OldRenderer.this
-    def visitKey(index: Int): sjsonnet.OldRenderer= OldRenderer.this
+    def visitKey(index: Int): sjsonnet.OldRenderer = OldRenderer.this
     def visitKeyValue(v: Any): Unit = {
       empty = false
       flushBuffer()
@@ -92,9 +98,8 @@ class OldRenderer(out: Writer = new java.io.StringWriter(),
   }
 }
 
-
-class OldPythonRenderer(out: Writer = new java.io.StringWriter(),
-                        indent: Int = -1) extends BaseRenderer(out, indent){
+class OldPythonRenderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
+    extends BaseRenderer(out, indent) {
 
   override def visitNull(index: Int): Writer = {
     flushBuffer()

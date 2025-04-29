@@ -12,3 +12,6 @@ out/
 /project/.bloop
 /project/project/
 /project/metals.sbt
+*.orig
+*.rej
+*.bak

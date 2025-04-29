@@ -10,7 +10,8 @@ import scala.collection.mutable
 /** Parse JSON directly into a literal `Val` */
 class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
 
-  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val,Val] = visitObject(length, index)
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val, Val] =
+    visitObject(length, index)
 
   def visitArray(length: Int, index: Int): ArrVisitor[Val, Val] = new ArrVisitor[Val, Val] {
     val a = new mutable.ArrayBuilder.ofRef[Lazy]
@@ -40,7 +41,8 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
   def visitTrue(index: Int): Val = Val.True(pos)
 
   def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): Val =
-    Val.Num(pos,
+    Val.Num(
+      pos,
       if (decIndex != -1 || expIndex != -1) s.toString.toDouble
       else upickle.core.ParseUtils.parseIntegralNum(s, decIndex, expIndex, index).toDouble
     )

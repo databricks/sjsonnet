@@ -5,13 +5,15 @@ package sjsonnet
 
 import ujson._
 import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
-class BaseCharRenderer[T <: upickle.core.CharOps.Output]
-(out: T,
- indent: Int = -1,
- escapeUnicode: Boolean = false,
- newline: Array[Char] = Array('\n')) extends JsVisitor[T, T]{
+class BaseCharRenderer[T <: upickle.core.CharOps.Output](
+    out: T,
+    indent: Int = -1,
+    escapeUnicode: Boolean = false,
+    newline: Array[Char] = Array('\n'))
+    extends JsVisitor[T, T] {
 
- override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T,T] = visitObject(length, index)
+  override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] =
+    visitObject(length, index)
 
   protected val elemBuilder = new upickle.core.CharBuilder
   def flushCharBuilder(): Unit = {
@@ -19,7 +21,6 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
   }
 
   protected var depth: Int = 0
-
 
   protected var commaBuffered = false
 
@@ -123,7 +124,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     elemBuilder.ensureLength(s.length())
     var i = 0
     val sLength = s.length
-    while(i < sLength){
+    while (i < sLength) {
       elemBuilder.appendUnsafeC(s.charAt(i))
       i += 1
     }
@@ -132,9 +133,9 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
   }
 
   override def visitFloat64(d: Double, index: Int): T = {
-    d match{
-      case Double.PositiveInfinity => visitNonNullString("Infinity", -1)
-      case Double.NegativeInfinity => visitNonNullString("-Infinity", -1)
+    d match {
+      case Double.PositiveInfinity        => visitNonNullString("Infinity", -1)
+      case Double.NegativeInfinity        => visitNonNullString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d =>
         val i = d.toLong
@@ -146,7 +147,6 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
     out
   }
 
-
   def visitString(s: CharSequence, index: Int): T = {
 
     if (s eq null) visitNull(index)
@@ -155,7 +155,13 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
 
   private def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(null, elemBuilder, s, escapeUnicode = escapeUnicode, wrapQuotes = true)
+    upickle.core.RenderUtils.escapeChar(
+      null,
+      elemBuilder,
+      s,
+      escapeUnicode = escapeUnicode,
+      wrapQuotes = true
+    )
     flushCharBuilder()
     out
   }
@@ -166,7 +172,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output]
       var i = indent * depth
       elemBuilder.ensureLength(i + 1)
       elemBuilder.appendAll(newline, newline.length)
-      while(i > 0) {
+      while (i > 0) {
         elemBuilder.appendUnsafe(' ')
         i -= 1
       }

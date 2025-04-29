@@ -9,18 +9,30 @@ object StdRegex {
     val matcher = compiledPattern.matcher(str)
 
     if (matcher.find()) {
-      val captures = Range.Int.inclusive(1, matcher.groupCount(), 1)
+      val captures = Range.Int
+        .inclusive(1, matcher.groupCount(), 1)
         .map(i => Val.Str(pos.noOffset, Option(matcher.group(i)).getOrElse("")))
         .toArray
-      val namedCaptures = Platform.getNamedGroupsMap(compiledPattern).map {
-        case (k, v) =>
+      val namedCaptures = Platform
+        .getNamedGroupsMap(compiledPattern)
+        .map { case (k, v) =>
           k -> new Obj.ConstMember(true, Visibility.Normal, captures(v - 1))
-      }.toSeq
+        }
+        .toSeq
 
-      Val.Obj.mk(pos.noOffset,
+      Val.Obj.mk(
+        pos.noOffset,
         "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Str(pos.noOffset, str)),
-        "captures" -> new Obj.ConstMember(true, Visibility.Normal, new Val.Arr(pos.noOffset, captures)),
-        "namedCaptures" -> new Obj.ConstMember(true, Visibility.Normal, Val.Obj.mk(pos.noOffset, namedCaptures: _*))
+        "captures" -> new Obj.ConstMember(
+          true,
+          Visibility.Normal,
+          new Val.Arr(pos.noOffset, captures)
+        ),
+        "namedCaptures" -> new Obj.ConstMember(
+          true,
+          Visibility.Normal,
+          Val.Obj.mk(pos.noOffset, namedCaptures: _*)
+        )
       )
     } else {
       Val.Null(pos.noOffset)
@@ -39,14 +51,24 @@ object StdRegex {
       }
     },
     "regexGlobalReplace" -> new Val.Builtin3("regexGlobalReplace", "str", "pattern", "to") {
-      override def evalRhs(str: Lazy, pattern: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
+      override def evalRhs(
+          str: Lazy,
+          pattern: Lazy,
+          to: Lazy,
+          ev: EvalScope,
+          pos: Position): Val = {
         val compiledPattern = Platform.getPatternFromCache(pattern.force.asString)
         val matcher = compiledPattern.matcher(str.force.asString)
         Val.Str(pos.noOffset, matcher.replaceAll(to.force.asString))
       }
     },
     "regexReplace" -> new Val.Builtin3("regexReplace", "str", "pattern", "to") {
-      override def evalRhs(str: Lazy, pattern: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
+      override def evalRhs(
+          str: Lazy,
+          pattern: Lazy,
+          to: Lazy,
+          ev: EvalScope,
+          pos: Position): Val = {
         val compiledPattern = Platform.getPatternFromCache(pattern.force.asString)
         val matcher = compiledPattern.matcher(str.force.asString)
         Val.Str(pos.noOffset, matcher.replaceFirst(to.force.asString))
