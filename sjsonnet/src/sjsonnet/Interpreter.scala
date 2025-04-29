@@ -91,7 +91,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
     varResolver.parse(wd / Util.wrapInLessThanGreaterThan(k), StaticResolvedFile(v))(evaluator).fold(throw _, _._1)
   }
 
-  val evaluator: Evaluator = createEvaluator(
+  lazy val evaluator: Evaluator = createEvaluator(
     resolver,
     // parse extVars lazily, because they can refer to each other and be recursive
     k => queryExtVar(k).map(v => evaluateVar("ext", k, v)),
@@ -99,6 +99,8 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
     settings,
     warn
   )
+
+  evaluator // force the lazy val
 
   def formatError(e: Error): String = {
     val s = new StringWriter()

@@ -43,15 +43,6 @@ class StaticOptimizer(
     case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
       try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs, tailstrict = false)
       catch { case _: Exception => b2 }
-    case Or(_, Val.False(_), rhs) => transform(rhs)
-    case Or(pos, Val.True(_), _) => Val.True(pos)
-    case Or(pos, _, Val.True(_)) => Val.True(pos)
-    case And(_, Val.True(_), rhs) => transform(rhs)
-    case And(pos, Val.False(_), _) => Val.False(pos)
-    case And(pos, _, Val.False(_)) => Val.False(pos)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.True(_)) => Val.False(pos)
-    case UnaryOp(pos, UnaryOp.OP_!, Val.False(_)) => Val.True(pos)
-    case UnaryOp(_, UnaryOp.OP_!, UnaryOp(_, UnaryOp.OP_!, expr)) => expr
 
     case e @ Id(pos, name) =>
       scope.get(name) match {
