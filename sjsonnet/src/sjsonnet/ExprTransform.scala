@@ -2,43 +2,51 @@ package sjsonnet
 
 import Expr._
 
+import scala.annotation.switch
+
 /** Simple tree transformer for the AST. */
 abstract class ExprTransform {
 
   def transform(expr: Expr): Expr
 
   def rec(expr: Expr): Expr = {
-    expr match {
-      case Select(pos, x, name) =>
+    if (expr == null) null else (expr._tag: @switch) match {
+      case ExprTags.Select =>
+        val Select(pos, x, name) = expr.asInstanceOf[Select]
         val x2 = transform(x)
         if(x2 eq x) expr
         else Select(pos, x2, name)
 
-      case Apply(pos, x, y, namedNames, tailstrict) =>
+      case ExprTags.Apply =>
+        val Apply(pos, x, y, namedNames, tailstrict) = expr.asInstanceOf[Apply]
         val x2 = transform(x)
         val y2 = transformArr(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Apply(pos, x2, y2, namedNames, tailstrict)
 
-      case Apply0(pos, x, tailstrict) =>
+      case ExprTags.Apply0 =>
+        val Apply0(pos, x, tailstrict) = expr.asInstanceOf[Apply0]
         val x2 = transform(x)
         if((x2 eq x)) expr
         else Apply0(pos, x2, tailstrict)
 
-      case Apply1(pos, x, y, tailstrict) =>
+      case ExprTags.Apply1 =>
+        val Apply1(pos, x, y, tailstrict) = expr.asInstanceOf[Apply1]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Apply1(pos, x2, y2, tailstrict)
 
-      case Apply2(pos, x, y, z, tailstrict) =>
+      case ExprTags.Apply2 =>
+        val Apply2(pos, x, y, z, tailstrict) = expr.asInstanceOf[Apply2]
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
         if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else Apply2(pos, x2, y2, z2, tailstrict)
 
-      case Apply3(pos, x, y, z, a, tailstrict) =>
+      case ExprTags.Apply3 =>
+        val Apply3(pos, x, y, z, a, tailstrict) = expr.asInstanceOf[Apply3]
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
@@ -46,30 +54,35 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
         else Apply3(pos, x2, y2, z2, a2, tailstrict)
 
-      case ApplyBuiltin(pos, func, x, tailstrict) =>
+      case ExprTags.ApplyBuiltin =>
+        val ApplyBuiltin(pos, func, x, tailstrict) = expr.asInstanceOf[ApplyBuiltin]
         val x2 = transformArr(x)
         if(x2 eq x) expr
         else ApplyBuiltin(pos, func, x2, tailstrict)
 
-      case ApplyBuiltin1(pos, func, x, tailstrict) =>
+      case ExprTags.ApplyBuiltin1 =>
+        val ApplyBuiltin1(pos, func, x, tailstrict) = expr.asInstanceOf[ApplyBuiltin1]
         val x2 = transform(x)
         if(x2 eq x) expr
         else ApplyBuiltin1(pos, func, x2, tailstrict)
 
-      case ApplyBuiltin2(pos, func, x, y, tailstrict) =>
+      case ExprTags.ApplyBuiltin2 =>
+        val ApplyBuiltin2(pos, func, x, y, tailstrict) = expr.asInstanceOf[ApplyBuiltin2]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else ApplyBuiltin2(pos, func, x2, y2, tailstrict)
 
-      case ApplyBuiltin3(pos, func, x, y, z, tailstrict) =>
+      case ExprTags.ApplyBuiltin3 =>
+        val ApplyBuiltin3(pos, func, x, y, z, tailstrict) = expr.asInstanceOf[ApplyBuiltin3]
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
         if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else ApplyBuiltin3(pos, func, x2, y2, z2, tailstrict)
 
-      case ApplyBuiltin4(pos, func, x, y, z, a, tailstrict) =>
+      case ExprTags.ApplyBuiltin4 =>
+        val ApplyBuiltin4(pos, func, x, y, z, a, tailstrict) = expr.asInstanceOf[ApplyBuiltin4]
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
@@ -77,96 +90,112 @@ abstract class ExprTransform {
         if((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
         else ApplyBuiltin4(pos, func, x2, y2, z2, a2, tailstrict)
 
-      case UnaryOp(pos, op, x) =>
+      case ExprTags.UnaryOp =>
+        val UnaryOp(pos, op, x) = expr.asInstanceOf[UnaryOp]
         val x2 = transform(x)
         if(x2 eq x) expr
         else UnaryOp(pos, op, x2)
 
-      case BinaryOp(pos, x, op, y) =>
+      case ExprTags.BinaryOp =>
+        val BinaryOp(pos, x, op, y) = expr.asInstanceOf[BinaryOp]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else BinaryOp(pos, x2, op, y2)
 
-      case And(pos, x, y) =>
+      case ExprTags.And =>
+        val And(pos, x, y) = expr.asInstanceOf[And]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else And(pos, x2, y2)
 
-      case Or(pos, x, y) =>
+      case ExprTags.Or =>
+        val Or(pos, x, y) = expr.asInstanceOf[Or]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Or(pos, x2, y2)
 
-      case InSuper(pos, x, selfIdx) =>
+      case ExprTags.InSuper =>
+        val InSuper(pos, x, selfIdx) = expr.asInstanceOf[InSuper]
         val x2 = transform(x)
         if(x2 eq x) expr
         else InSuper(pos, x2, selfIdx)
 
-      case Lookup(pos, x, y) =>
+      case ExprTags.Lookup =>
+        val Lookup(pos, x, y) = expr.asInstanceOf[Lookup]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Lookup(pos, x2, y2)
 
-      case LookupSuper(pos, selfIdx, x) =>
+      case ExprTags.LookupSuper =>
+        val LookupSuper(pos, selfIdx, x) = expr.asInstanceOf[LookupSuper]
         val x2 = transform(x)
         if(x2 eq x) expr
         else LookupSuper(pos, selfIdx, x2)
 
-      case Function(pos, x, y) =>
+      case ExprTags.Function =>
+        val Function(pos, x, y) = expr.asInstanceOf[Function]
         val x2 = transformParams(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else Function(pos, x2, y2)
 
-      case LocalExpr(pos, x, y) =>
+      case ExprTags.LocalExpr =>
+        val LocalExpr(pos, x, y) = expr.asInstanceOf[LocalExpr]
         val x2 = transformBinds(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else LocalExpr(pos, x2, y2)
 
-      case IfElse(pos, x, y, z) =>
+      case ExprTags.IfElse =>
+        val IfElse(pos, x, y, z) = expr.asInstanceOf[IfElse]
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
         if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else IfElse(pos, x2, y2, z2)
 
-      case ObjBody.MemberList(pos, x, y, z) =>
+      case ExprTags.`ObjBody.MemberList` =>
+        val ObjBody.MemberList(pos, x, y, z) = expr.asInstanceOf[ObjBody.MemberList]
         val x2 = transformBinds(x)
         val y2 = transformFields(y)
         val z2 = transformAsserts(z)
         if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else ObjBody.MemberList(pos, x2, y2, z2)
 
-      case AssertExpr(pos, x, y) =>
+      case ExprTags.AssertExpr =>
+        val AssertExpr(pos, x, y) = expr.asInstanceOf[AssertExpr]
         val x2 = transformAssert(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else AssertExpr(pos, x2, y2)
 
-      case Comp(pos, x, y, z) =>
+      case ExprTags.Comp =>
+        val Comp(pos, x, y, z) = expr.asInstanceOf[Comp]
         val x2 = transform(x)
         val y2 = transform(y).asInstanceOf[ForSpec]
         val z2 = transformArr(z)
         if((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else Comp(pos, x2, y2, z2)
 
-      case Arr(pos, x) =>
+      case ExprTags.Arr =>
+        val Arr(pos, x) = expr.asInstanceOf[Arr]
         val x2 = transformArr(x)
         if(x2 eq x) expr
         else Arr(pos, x2)
 
-      case ObjExtend(superPos, x, y) =>
+      case ExprTags.ObjExtend =>
+        val ObjExtend(superPos, x, y) = expr.asInstanceOf[ObjExtend]
         val x2 = transform(x)
         val y2 = transform(y)
         if((x2 eq x) && (y2 eq y)) expr
         else ObjExtend(superPos, x2, y2.asInstanceOf[ObjBody])
 
-      case ObjBody.ObjComp(pos, p, k, v, pl, o, f, r) =>
+      case ExprTags.`ObjBody.ObjComp` =>
+        val ObjBody.ObjComp(pos, p, k, v, pl, o, f, r) = expr.asInstanceOf[ObjBody.ObjComp]
         val p2 = transformBinds(p)
         val k2 = transform(k)
         val v2 = transform(v)
@@ -176,7 +205,8 @@ abstract class ExprTransform {
         if((p2 eq p) && (k2 eq k) && (v2 eq v) && (o2 eq o) && (f2 eq f) && (r2 eq r)) expr
         else ObjBody.ObjComp(pos, p2, k2, v2, pl, o2, f2, r2)
 
-      case Slice(pos, v, x, y, z) =>
+      case ExprTags.Slice =>
+        val Slice(pos, v, x, y, z) = expr.asInstanceOf[Slice]
         val v2 = transform(v)
         val x2 = transformOption(x)
         val y2 = transformOption(y)
@@ -184,22 +214,25 @@ abstract class ExprTransform {
         if((v2 eq v) && (x2 eq x) && (y2 eq y) && (z2 eq z)) expr
         else Slice(pos, v2, x2, y2, z2)
 
-      case IfSpec(pos, x) =>
+      case ExprTags.IfSpec =>
+        val IfSpec(pos, x) = expr.asInstanceOf[IfSpec]
         val x2 = transform(x)
         if(x2 eq x) expr
         else IfSpec(pos,  x2)
 
-      case ForSpec(pos, name, x) =>
+      case ExprTags.ForSpec =>
+        val ForSpec(pos, name, x) = expr.asInstanceOf[ForSpec]
         val x2 = transform(x)
         if(x2 eq x) expr
         else ForSpec(pos, name, x2)
 
-      case Expr.Error(pos, x) =>
+      case ExprTags.Error =>
+        val Expr.Error(pos, x) = expr.asInstanceOf[Expr.Error]
         val x2 = transform(x)
         if(x2 eq x) expr
         else Expr.Error(pos, x2)
 
-      case other => other
+      case _ => expr
     }
   }
 

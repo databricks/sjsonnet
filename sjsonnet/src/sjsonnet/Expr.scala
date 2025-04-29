@@ -227,8 +227,12 @@ object Expr{
   }
 
   sealed trait CompSpec extends Expr
-  final case class IfSpec(pos: Position, cond: Expr) extends CompSpec
-  final case class ForSpec(pos: Position, name: String, cond: Expr) extends CompSpec
+  final case class IfSpec(pos: Position, cond: Expr) extends CompSpec {
+    final override private[sjsonnet] val _tag = ExprTags.IfSpec
+  }
+  final case class ForSpec(pos: Position, name: String, cond: Expr) extends CompSpec {
+    final override private[sjsonnet] val _tag = ExprTags.ForSpec
+  }
 
   final case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec]) extends Expr {
     final override private[sjsonnet] val _tag = ExprTags.Comp
@@ -298,10 +302,12 @@ private[sjsonnet] object ExprTags {
   final val ImportStr = 35
   final val ImportBin = 36
   final val Error = 37
+  final val IfSpec = 38
+  final val ForSpec = 39
   //used in Evaluator#visitInvalid
-  final val Id = 0
-  final val Self = 1
-  final val `$` = 2
-  final val Super = 3
+  final val Id = 40
+  final val Self = 41
+  final val `$` = 42
+  final val Super = 43
   //other
 }
