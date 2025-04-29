@@ -30,6 +30,26 @@ class Evaluator(resolver: CachedResolver,
   var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+    e match {
+      case e: ValidId => visitValidId(e)
+      case e: BinaryOp => visitBinaryOp(e)
+      case e: Select => visitSelect(e)
+      case e: Val => e
+      case e: ApplyBuiltin1 => visitApplyBuiltin1(e)
+      case e: ApplyBuiltin2 => visitApplyBuiltin2(e)
+      case e: ApplyBuiltin3 => visitApplyBuiltin3(e)
+      case e: ApplyBuiltin4 => visitApplyBuiltin4(e)
+      case e: And => visitAnd(e)
+      case e: Or => visitOr(e)
+      case e: UnaryOp => visitUnaryOp(e)
+      case e: Lookup => visitLookup(e)
+      case e => visitExpr0(e)
+    }
+  } catch {
+    Error.withStackFrame(e)
+  }
+
+  @inline private def visitExpr0(e: Expr)(implicit scope: ValScope): Val = try {
     (e._tag: @switch) match {
       case ExprTags.ValidId => visitValidId(e.asInstanceOf[ValidId])
       case ExprTags.BinaryOp => visitBinaryOp(e.asInstanceOf[BinaryOp])
