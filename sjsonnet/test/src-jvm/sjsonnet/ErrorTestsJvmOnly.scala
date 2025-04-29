@@ -5,7 +5,7 @@ import ujson.Value
 
 object ErrorTestsJvmOnly extends TestSuite {
   val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path): Either[String,Value] = {
+  def eval(p: os.Path): Either[String, Value] = {
     val interp = new Interpreter(
       Map(),
       Map(),
@@ -21,7 +21,7 @@ object ErrorTestsJvmOnly extends TestSuite {
     assert(res == Left(expected))
   }
 
-  val tests: Tests = Tests{
+  val tests: Tests = Tests {
     test("array_recursive_manifest") - check(
       """sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
         |    at .(sjsonnet/test/resources/test_suite/error.array_recursive_manifest.jsonnet:17:12)

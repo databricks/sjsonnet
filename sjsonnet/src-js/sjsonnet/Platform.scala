@@ -4,7 +4,6 @@ import java.io.File
 import java.util
 import java.util.regex.Pattern
 
-
 object Platform {
   def gzipBytes(s: Array[Byte]): String = {
     throw new Exception("GZip not implemented in Scala.js")
@@ -46,11 +45,10 @@ object Platform {
 
   // scala.js does not rely on re2. Per https://www.scala-js.org/doc/regular-expressions.html.
   // Expect to see some differences in behavior.
-  def getPatternFromCache(pat: String) : Pattern = {
+  def getPatternFromCache(pat: String): Pattern = {
     val fixedPattern = namedGroupPatternReplace.matcher(pat).replaceAll("(?<$2")
     regexCache.computeIfAbsent(pat, _ => Pattern.compile(fixedPattern))
   }
-
 
   def getNamedGroupsMap(pat: Pattern): Map[String, Int] = {
     val namedGroups = Map.newBuilder[String, Int]

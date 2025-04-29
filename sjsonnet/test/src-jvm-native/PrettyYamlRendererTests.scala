@@ -1,7 +1,7 @@
 import sjsonnet._
 import utest._
 
-object PrettyYamlRendererTests extends TestSuite{
+object PrettyYamlRendererTests extends TestSuite {
   val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(path: os.Path, comments: Boolean): String = {
     var currentPos: Position = null
@@ -24,21 +24,20 @@ object PrettyYamlRendererTests extends TestSuite{
     res.toOption.get.toString
   }
   val nontrivial: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "nontrivial"
-  def tests: Tests = Tests{
-    test("nocomments"){
+  def tests: Tests = Tests {
+    test("nocomments") {
       eval(nontrivial / "mixins.jsonnet", comments = false) ==>
-        os.read(nontrivial / "mixins.golden.yaml")
+      os.read(nontrivial / "mixins.golden.yaml")
     }
-    test("comments"){
+    test("comments") {
       eval(nontrivial / "mixins.jsonnet", comments = true) ==>
-        os.read(nontrivial / "mixins.golden.comments.yaml")
+      os.read(nontrivial / "mixins.golden.comments.yaml")
     }
-    test("nounquoted"){
+    test("nounquoted") {
       // Ensure weird octal-number-like strings are quoted, to avoid
       // edge cases that may cause problems for non-compliant parsers
       eval(nontrivial / "quotingNumberLikeStrings.jsonnet", comments = false) ==>
-        os.read(nontrivial / "quotingNumberLikeStrings.yaml")
+      os.read(nontrivial / "quotingNumberLikeStrings.yaml")
     }
   }
 }
-

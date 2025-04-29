@@ -30,18 +30,27 @@ object StdMergePatchTests extends TestSuite {
       // Basic conflicting merge of top-level fields (patch wins)
       eval("std.mergePatch({a: 1}, {a: 2})") ==> ujson.Obj("a" -> 2)
       // Basic recursive non-conflicting merging:
-      eval("std.mergePatch({a: {b: 1}}, {a: {c: 2}})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 1, "c" -> 2))
+      eval("std.mergePatch({a: {b: 1}}, {a: {c: 2}})") ==> ujson.Obj(
+        "a" -> ujson.Obj("b" -> 1, "c" -> 2)
+      )
       // Basic recursive conflicting merging (patch wins):
-      eval("std.mergePatch({a: {b: 1, c: 1}}, {a: {b: 2}})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 2, "c" -> 1))
+      eval("std.mergePatch({a: {b: 1, c: 1}}, {a: {b: 2}})") ==> ujson.Obj(
+        "a" -> ujson.Obj("b" -> 2, "c" -> 1)
+      )
     }
 
     test("target field order preservation") {
-      eval("std.mergePatch({b: 1, a: 1}, {a: 2, b: 2})", preserveOrder = true).toString ==> """{"b":2,"a":2}"""
+      eval(
+        "std.mergePatch({b: 1, a: 1}, {a: 2, b: 2})",
+        preserveOrder = true
+      ).toString ==> """{"b":2,"a":2}"""
     }
 
     test("null fields") {
       // Nested nulls in patch can remove nested fields from target
-      eval("std.mergePatch({a: {b: 1, c: 1}}, {a: {b: null}})") ==> ujson.Obj("a" -> ujson.Obj("c" -> 1))
+      eval("std.mergePatch({a: {b: 1, c: 1}}, {a: {b: null}})") ==> ujson.Obj(
+        "a" -> ujson.Obj("c" -> 1)
+      )
       // Nested nulls in the target are preserved:
       eval("std.mergePatch({a: null}, {b: 2})") ==> ujson.Obj("a" -> ujson.Null, "b" -> 2)
     }
@@ -53,8 +62,11 @@ object StdMergePatchTests extends TestSuite {
     test("hidden target fields") {
       // Hidden target fields are dropped in the output, even if nothing merges with them:
       eval("std.objectFieldsAll({hidden:: 1, visible: 1})") ==> ujson.Arr("hidden", "visible")
-      eval("std.objectFieldsAll(std.mergePatch({hidden:: 1, visible: 1}, {}))") ==> ujson.Arr("visible")
-      eval("std.objectFieldsAll(std.mergePatch({hidden:: 1, visible: 1}, {added: 1}))") ==> ujson.Arr("added", "visible")
+      eval("std.objectFieldsAll(std.mergePatch({hidden:: 1, visible: 1}, {}))") ==> ujson.Arr(
+        "visible"
+      )
+      eval("std.objectFieldsAll(std.mergePatch({hidden:: 1, visible: 1}, {added: 1}))") ==> ujson
+        .Arr("added", "visible")
       // But hidden nested target fields are preserved as hidden if nothing merges with them:
       eval("std.objectFields(std.mergePatch({a: {h:: 1, v: 1}}, {}).a)") ==> ujson.Arr("v")
       eval("std.objectFieldsAll(std.mergePatch({a: {h:: 1, v: 1}}, {}).a)") ==> ujson.Arr("h", "v")
@@ -63,19 +75,28 @@ object StdMergePatchTests extends TestSuite {
       eval("std.objectFieldsAll(std.mergePatch({a: {h:: 1, v: 1}}, {a: {}}).a)") ==> ujson.Arr("v")
       // Hidden target fields are ineligible to merge with visible patch fields;
       // it should be as if the hidden target field doesn't exist:
-      eval("std.mergePatch({ a:: { a: 1 } , visible: 1 }, { a: { b: 2 }})") ==> ujson.Obj("visible" -> 1, "a" -> ujson.Obj("b" -> 2))
+      eval("std.mergePatch({ a:: { a: 1 } , visible: 1 }, { a: { b: 2 }})") ==> ujson.Obj(
+        "visible" -> 1,
+        "a" -> ujson.Obj("b" -> 2)
+      )
     }
 
     test("hidden patch fields") {
       // Hidden patch fields are dropped in the output, even if nothing merges with them:
-      eval("std.objectFieldsAll(std.mergePatch({visible: 1}, {hidden:: 2}))") ==> ujson.Arr("visible")
+      eval("std.objectFieldsAll(std.mergePatch({visible: 1}, {hidden:: 2}))") ==> ujson.Arr(
+        "visible"
+      )
       // Hidden patch fields are ineligible to merge with visible target fields;
       // it should be as if the hidden patch field doesn't exist:
       eval("std.mergePatch({ a: 1 }, { a:: 2})") ==> ujson.Obj("a" -> 1)
       // Nesting:
-      eval("std.mergePatch({ a: { b: 1 } }, { a:: { c: 1 }})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 1))
+      eval("std.mergePatch({ a: { b: 1 } }, { a:: { c: 1 }})") ==> ujson.Obj(
+        "a" -> ujson.Obj("b" -> 1)
+      )
       // Make sure the nested hidden patch field is indeed absent, not just hidden:
-      eval("std.objectFieldsAll(std.mergePatch({ a: { b: 1 } }, { a:: { c: 1 }}).a)") ==> ujson.Arr("b")
+      eval("std.objectFieldsAll(std.mergePatch({ a: { b: 1 } }, { a:: { c: 1 }}).a)") ==> ujson.Arr(
+        "b"
+      )
     }
 
     test("plus is ignored during merge") {
@@ -89,7 +110,9 @@ object StdMergePatchTests extends TestSuite {
       // The `+:` behavior is lost even if it is from the target:
       eval("{a: 1} + std.mergePatch({a+: 2}, {})") ==> ujson.Obj("a" -> 2)
       // It's also lost in nested fields:
-      eval("{a: {b: 1}} + std.mergePatch({a: {b +: 2}}, {})") ==> ujson.Obj("a" -> ujson.Obj("b" -> 2))
+      eval("{a: {b: 1}} + std.mergePatch({a: {b +: 2}}, {})") ==> ujson.Obj(
+        "a" -> ujson.Obj("b" -> 2)
+      )
     }
 
     test("default visibility of resulting fields") {
@@ -112,18 +135,28 @@ object StdMergePatchTests extends TestSuite {
     test("lazy evaluation of LHS members") {
       // An erroring target field which doesn't merge with any patch fields.
       // This shouldn't error because we should avoid eager evaluation of unmerged target fields:
-      eval("""(std.mergePatch({ boom: error "should not error" }, {}) + { flag: 42 }).flag""") ==> ujson.Num(42)
+      eval(
+        """(std.mergePatch({ boom: error "should not error" }, {}) + { flag: 42 }).flag"""
+      ) ==> ujson.Num(42)
 
       // An erroring target field which is removed by the patch.
       // This should not error because we shouldn't evaluate the removed field:
-      eval("""(std.mergePatch({ boom: error "should not error" }, { boom: null }) + { flag: 42 }).flag""") ==> ujson.Num(42)
+      eval(
+        """(std.mergePatch({ boom: error "should not error" }, { boom: null }) + { flag: 42 }).flag"""
+      ) ==> ujson.Num(42)
 
       // An overwritten target field which doesn't merge with any patch fields.
       // This should not error because it doesn't require evaluation of the replaced target field:
-      eval("""(std.mergePatch({ boom: error "should error" }, { boom: 1 }) + { flag: 42 }).flag""") ==> ujson.Num(42)
+      eval(
+        """(std.mergePatch({ boom: error "should error" }, { boom: 1 }) + { flag: 42 }).flag"""
+      ) ==> ujson.Num(42)
 
       // Patch fields are always eagerly evaluated, even if they don't merge with anything:
-      assert(evalErr("""(std.mergePatch({a: 1}, {b: error "should error"})).a""").startsWith("sjsonnet.Error: should error"))
+      assert(
+        evalErr("""(std.mergePatch({a: 1}, {b: error "should error"})).a""").startsWith(
+          "sjsonnet.Error: should error"
+        )
+      )
     }
   }
 }

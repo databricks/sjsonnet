@@ -1,7 +1,6 @@
 package sjsonnet
 
-
-object Util{
+object Util {
   def prettyIndex(lineStarts: Array[Int], index: Int): String = {
     // Returns (-insertionPoint - 1) when the value is not found, where
     // insertionPoint is the index where the element would have been inserted.
@@ -14,22 +13,30 @@ object Util{
     val searchResult = java.util.Arrays.binarySearch(lineStarts, index)
     val line = if (searchResult >= 0) searchResult else -searchResult - 2
     val col = index - lineStarts(line)
-    s"${line+1}:${col+1}"
+    s"${line + 1}:${col + 1}"
   }
 
-  def sliceArr[T: scala.reflect.ClassTag](arr: Array[T], start: Int, end: Int, step: Int): Array[T] = {
-    step match{
+  def sliceArr[T: scala.reflect.ClassTag](
+      arr: Array[T],
+      start: Int,
+      end: Int,
+      step: Int): Array[T] = {
+    step match {
       case 1 => arr.slice(start, end)
       case _ =>
         val range = start until end by step
         range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
     }
   }
-  def sliceArr[T: scala.reflect.ClassTag](arr: Array[T], start: Option[Int], end: Option[Int], step: Option[Int]): Array[T] = {
+  def sliceArr[T: scala.reflect.ClassTag](
+      arr: Array[T],
+      start: Option[Int],
+      end: Option[Int],
+      step: Option[Int]): Array[T] = {
     sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
   }
   def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
-    step match{
+    step match {
       case 1 => s.slice(start, end)
       case _ =>
         val range = start until end by step
@@ -46,10 +53,9 @@ object Util{
   }
 
   /**
-   * Wrap the given string in '<' and '>' brackets for pretty printing.
-   * On Windows, this uses Unicode less-than and greater-than characters, while on
-   * other platforms it uses ASCII '<' and '>;
-   * see https://github.com/databricks/sjsonnet/pull/208 for motivation and context.
+   * Wrap the given string in '<' and '>' brackets for pretty printing. On Windows, this uses
+   * Unicode less-than and greater-than characters, while on other platforms it uses ASCII '<' and
+   * '>; see https://github.com/databricks/sjsonnet/pull/208 for motivation and context.
    */
   def wrapInLessThanGreaterThan(s: String): String = {
     if (isWindows) {

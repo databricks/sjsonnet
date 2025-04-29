@@ -5,10 +5,9 @@ import sjsonnet.Expr.Member.Visibility
 import upickle.core.Visitor
 
 /**
-  * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]],
-  * which can transform it into [[ujson.Value]]s or directly serialize it
-  * to `String`s
-  */
+ * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]], which can transform it
+ * into [[ujson.Value]]s or directly serialize it to `String`s
+ */
 abstract class Materializer {
   def storePos(pos: Position): Unit
   def storePos(v: Val): Unit
@@ -18,14 +17,13 @@ abstract class Materializer {
     apply0(v, new sjsonnet.Renderer()).toString
   }
 
-  def apply0[T](v: Val, visitor: Visitor[T, T])
-               (implicit evaluator: EvalScope): T = try {
+  def apply0[T](v: Val, visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = try {
     v match {
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
       case obj: Val.Obj =>
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
-        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length , jsonableKeys = true, -1)
+        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length, jsonableKeys = true, -1)
         val sort = !evaluator.settings.preserveOrder
         var prevKey: String = null
         obj.foreachElement(sort, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
@@ -35,10 +33,12 @@ abstract class Materializer {
             apply0(v, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
             -1
           )
-          if(sort) {
-            if(prevKey != null && k.compareTo(prevKey) <= 0)
+          if (sort) {
+            if (prevKey != null && k.compareTo(prevKey) <= 0)
               Error.fail(
-                s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""", v.pos)
+                s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""",
+                v.pos
+              )
             prevKey = k
           }
         }
@@ -48,17 +48,20 @@ abstract class Materializer {
         storePos(xs.pos);
         val arrVisitor = visitor.visitArray(xs.length, -1)
         var i = 0
-        while(i < xs.length) {
+        while (i < xs.length) {
           val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
           arrVisitor.visitValue(apply0(xs.force(i), sub), -1)
           i += 1
         }
         arrVisitor.visitEnd(-1)
-      case Val.True(pos) => storePos(pos); visitor.visitTrue(-1)
+      case Val.True(pos)  => storePos(pos); visitor.visitTrue(-1)
       case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
-      case Val.Null(pos) => storePos(pos); visitor.visitNull(-1)
+      case Val.Null(pos)  => storePos(pos); visitor.visitNull(-1)
       case s: Val.Func =>
-        Error.fail("Couldn't manifest function with params [" + s.params.names.mkString(",") + "]", v.pos)
+        Error.fail(
+          "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
+          v.pos
+        )
       case vv: Val =>
         Error.fail("Unknown value type " + vv.prettyName, vv.pos)
       case null =>
@@ -69,37 +72,46 @@ abstract class Materializer {
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
   }
 
-  def reverse(pos: Position, v: ujson.Value): Val = v match{
-    case ujson.True => Val.True(pos)
-    case ujson.False => Val.False(pos)
-    case ujson.Null => Val.Null(pos)
+  def reverse(pos: Position, v: ujson.Value): Val = v match {
+    case ujson.True   => Val.True(pos)
+    case ujson.False  => Val.False(pos)
+    case ujson.Null   => Val.Null(pos)
     case ujson.Num(n) => Val.Num(pos, n)
     case ujson.Str(s) => Val.Str(pos, s)
-    case ujson.Arr(xs) => new Val.Arr(pos, xs.map(x => new LazyWithComputeFunc(() => reverse(pos, x))).toArray[Lazy])
+    case ujson.Arr(xs) =>
+      new Val.Arr(pos, xs.map(x => new LazyWithComputeFunc(() => reverse(pos, x))).toArray[Lazy])
     case ujson.Obj(xs) =>
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-      for(x <- xs) {
+      for (x <- xs) {
         val v = new Val.Obj.Member(false, Visibility.Normal) {
-          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = reverse(pos, x._2)
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+            reverse(pos, x._2)
         }
         builder.put(x._1, v)
       }
       new Val.Obj(pos, builder, false, null, null)
   }
 
-  def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match{
-    case ujson.True => Val.True(ev.emptyMaterializeFileScopePos)
-    case ujson.False => Val.False(ev.emptyMaterializeFileScopePos)
-    case ujson.Null => Val.Null(ev.emptyMaterializeFileScopePos)
-    case ujson.Num(n) => Val.Num(ev.emptyMaterializeFileScopePos, n)
-    case ujson.Str(s) => Val.Str(ev.emptyMaterializeFileScopePos, s)
+  def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match {
+    case ujson.True    => Val.True(ev.emptyMaterializeFileScopePos)
+    case ujson.False   => Val.False(ev.emptyMaterializeFileScopePos)
+    case ujson.Null    => Val.Null(ev.emptyMaterializeFileScopePos)
+    case ujson.Num(n)  => Val.Num(ev.emptyMaterializeFileScopePos, n)
+    case ujson.Str(s)  => Val.Str(ev.emptyMaterializeFileScopePos, s)
     case ujson.Arr(xs) => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
       ObjBody.MemberList(
         ev.emptyMaterializeFileScopePos,
         null,
-        for((k, v) <- kvs.toArray)
-          yield Member.Field(ev.emptyMaterializeFileScopePos, FieldName.Fixed(k), false, null, Visibility.Normal, toExpr(v)),
+        for ((k, v) <- kvs.toArray)
+          yield Member.Field(
+            ev.emptyMaterializeFileScopePos,
+            FieldName.Fixed(k),
+            false,
+            null,
+            Visibility.Normal,
+            toExpr(v)
+          ),
         null
       )
   }

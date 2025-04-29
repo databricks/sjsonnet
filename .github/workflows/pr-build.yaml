@@ -27,6 +27,8 @@ jobs:
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      - name: Check Formating
+        run: ./mill _.${{ matrix.lang }}[_].checkFormat
       - name: Compile with mill
         run: ./mill _.${{ matrix.lang }}[_].compile
       - name: Run mill tests for ${{ matrix.lang }}

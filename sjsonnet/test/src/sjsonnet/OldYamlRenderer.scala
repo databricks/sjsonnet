@@ -4,14 +4,15 @@ import java.io.StringWriter
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
-
-class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArrayInObject: Boolean = false,
-                      indent: Int = 2) extends BaseRenderer(out, indent){
+class OldYamlRenderer(
+    out: StringWriter = new java.io.StringWriter(),
+    indentArrayInObject: Boolean = false,
+    indent: Int = 2)
+    extends BaseRenderer(out, indent) {
   var newlineBuffered = false
   var dashBuffered = false
   var afterKey = false
   var topLevel = true
-
 
   val outBuffer: StringBuffer = out.getBuffer()
 
@@ -54,7 +55,11 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
     newlineBuffered = false
     dashBuffered = false
   }
-  override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.OldYamlRenderer} = new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(
+      length: Int,
+      index: Int): upickle.core.ArrVisitor[java.io.StringWriter, java.io.StringWriter] {
+    def subVisitor: sjsonnet.OldYamlRenderer
+  } = new ArrVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
 
@@ -84,7 +89,11 @@ class OldYamlRenderer(out: StringWriter = new java.io.StringWriter(), indentArra
       out
     }
   }
-  override def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[java.io.StringWriter,java.io.StringWriter]{def subVisitor: sjsonnet.OldYamlRenderer; def visitKey(index: Int): sjsonnet.OldYamlRenderer} = new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(
+      length: Int,
+      index: Int): upickle.core.ObjVisitor[java.io.StringWriter, java.io.StringWriter] {
+    def subVisitor: sjsonnet.OldYamlRenderer; def visitKey(index: Int): sjsonnet.OldYamlRenderer
+  } = new ObjVisitor[StringWriter, StringWriter] {
     var empty = true
     flushBuffer()
     if (!topLevel) depth += 1

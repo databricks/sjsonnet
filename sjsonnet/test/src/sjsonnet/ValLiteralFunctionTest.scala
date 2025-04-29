@@ -6,15 +6,15 @@ import utest._
 
 object ValLiteralFunctionTest extends TestSuite with FunctionBuilder {
   private val extFunctions: Map[String, Val.Func] = Map(
-    builtin("identity", "obj") {
-      (_, _, o: Val.Literal) =>
-        o
-    })
+    builtin("identity", "obj") { (_, _, o: Val.Literal) =>
+      o
+    }
+  )
 
   private val ext = Val.Obj.mk(
     null,
-    extFunctions.toSeq.map {
-      case (k, v) => (k, new Val.Obj.ConstMember(false, Visibility.Hidden, v))
+    extFunctions.toSeq.map { case (k, v) =>
+      (k, new Val.Obj.ConstMember(false, Visibility.Hidden, v))
     }: _*
   )
 
@@ -32,7 +32,7 @@ object ValLiteralFunctionTest extends TestSuite with FunctionBuilder {
     DummyPath(),
     Importer.empty,
     parseCache = new DefaultParseCache,
-    variableResolver = variableResolve,
+    variableResolver = variableResolve
   )
 
   def check(s: String, expected: ujson.Value): Unit =
@@ -45,7 +45,9 @@ object ValLiteralFunctionTest extends TestSuite with FunctionBuilder {
            |local obj = {"a": 1, "b": 2};
            |
            |ext.identity(obj)
-           |""".stripMargin, ujson.Obj("a" -> 1, "b" -> 2))
+           |""".stripMargin,
+        ujson.Obj("a" -> 1, "b" -> 2)
+      )
     }
   }
 }

@@ -21,7 +21,8 @@ object XxHash64Tests extends TestSuite {
         val cachedFile = new CachedResolvedFile(
           OsPath(os.Path(tempFilePath)),
           memoryLimitBytes = Int.MaxValue,
-          cacheThresholdBytes = 0)
+          cacheThresholdBytes = 0
+        )
         // They should agree
         val hash = cachedFile.contentHash()
         assert(xxHash64Result == hash)
@@ -41,4 +42,3 @@ object XxHash64Tests extends TestSuite {
     (randomContent, tempFilePath)
   }
 }
-

@@ -3,13 +3,13 @@ package sjsonnet
 import ujson.Value
 import utest._
 
-object FormatTests extends TestSuite{
+object FormatTests extends TestSuite {
   val dummyPos = new Position(new FileScope(DummyPath("(unknown)")), -1)
 
   def check(fmt: String, jsonStr: String, expected: String): Unit = {
     val json = ujson.read(jsonStr)
     val formatted = Format.format(fmt, Materializer.reverse(null, json), dummyPos)(
-      new EvalScope{
+      new EvalScope {
         def tailstrict: Boolean = false
         def extVars: String => Option[sjsonnet.Expr] = _ => None
         def wd: Path = DummyPath()
@@ -34,8 +34,8 @@ object FormatTests extends TestSuite{
     }
   }
 
-  def tests: Tests = Tests{
-    test("hash"){
+  def tests: Tests = Tests {
+    test("hash") {
       // #
       check("No format chars\n", """[]""", "No format chars\n")
       check("", """[]""", "")
@@ -45,7 +45,7 @@ object FormatTests extends TestSuite{
       check("%##--#      +05.3%", """[]""", "%    ")
     }
 
-    test("percent"){
+    test("percent") {
       // %
       check("%%", """[]""", "%")
       check("%%%%", """[]""", "%%")

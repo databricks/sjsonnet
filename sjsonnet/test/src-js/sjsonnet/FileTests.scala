@@ -19,15 +19,21 @@ object FileTests extends TestSuite {
   def eval(fileName: String) = {
     SjsonnetMain.interpret(
       new String(TestResources.files(joinPath("test_suite", fileName)), StandardCharsets.UTF_8),
-      js.Dictionary("var1" -> """"test"""", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
+      js.Dictionary(
+        "var1" -> """"test"""",
+        "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""
+      ),
       js.Dictionary("var1" -> """"test"""", "var2" -> """{"x": 1, "y": 2}"""),
       "test_suite",
       (wd: String, path: String) => joinPath(wd, path),
-      (path: String, binaryData: Boolean) => if (binaryData) {
-        Right(TestResources.files(joinPath("test_suite", path)))
-      } else {
-        Left(new String(TestResources.files(joinPath("test_suite", path)), StandardCharsets.UTF_8))
-      }
+      (path: String, binaryData: Boolean) =>
+        if (binaryData) {
+          Right(TestResources.files(joinPath("test_suite", path)))
+        } else {
+          Left(
+            new String(TestResources.files(joinPath("test_suite", path)), StandardCharsets.UTF_8)
+          )
+        }
     )
   }
   def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath) = {
@@ -47,10 +53,17 @@ object FileTests extends TestSuite {
   }
 
   def checkGolden()(implicit tp: utest.framework.TestPath) = {
-    check(ujson.read(new String(TestResources.files(joinPath("test_suite", s"${tp.value.last}.jsonnet.golden")), StandardCharsets.UTF_8)))
+    check(
+      ujson.read(
+        new String(
+          TestResources.files(joinPath("test_suite", s"${tp.value.last}.jsonnet.golden")),
+          StandardCharsets.UTF_8
+        )
+      )
+    )
   }
 
-  def tests = Tests{
+  def tests = Tests {
     test("arith_bool") - check()
     test("arith_float") - check()
     test("arith_string") - check()
@@ -73,11 +86,10 @@ object FileTests extends TestSuite {
     test("local") - check()
     test("lazy") - check(42)
     test("lazy_operator1") - check(ujson.False)
-    test("lazy_operator2") - checkFail(
-      """sjsonnet.Error: should happen
-        |  at [Error].((memory):1:9)
-        |  at [And].((memory):1:6)
-        |""".stripMargin)
+    test("lazy_operator2") - checkFail("""sjsonnet.Error: should happen
+                                         |  at [Error].((memory):1:9)
+                                         |  at [And].((memory):1:6)
+                                         |""".stripMargin)
     test("merge") - check()
     test("null") - check()
     test("object") - check()
@@ -96,7 +108,7 @@ object FileTests extends TestSuite {
     test("std_all_hidden") - check()
     test("stdlib_native") - check()
     test("text_block") - check()
-    test("tla.simple")- check()
+    test("tla.simple") - check()
     test("unicode") - check()
     test("unix_line_endings") - checkGolden()
     test("unparse") - checkGolden()
@@ -104,4 +116,3 @@ object FileTests extends TestSuite {
     test("issue_127") - check()
   }
 }
-

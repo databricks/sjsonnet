@@ -3,9 +3,9 @@ package sjsonnet
 import utest._
 import ujson.Value
 
-object FileTests extends TestSuite{
+object FileTests extends TestSuite {
   val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
-  def eval(p: os.Path): Either[String,Value] = {
+  def eval(p: os.Path): Either[String, Value] = {
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
@@ -15,20 +15,21 @@ object FileTests extends TestSuite{
     )
     interp.interpret(os.read(p), OsPath(p))
   }
-  def check(expected: ujson.Value = ujson.True)(implicit tp: utest.framework.TestPath): Either[String,Value] = {
+  def check(expected: ujson.Value = ujson.True)(implicit
+      tp: utest.framework.TestPath): Either[String, Value] = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
     assert(res == Right(expected))
     res
   }
-  def checkFail(expected: String)(implicit tp: utest.framework.TestPath): Either[String,Value] = {
+  def checkFail(expected: String)(implicit tp: utest.framework.TestPath): Either[String, Value] = {
     val res = eval(testSuiteRoot / s"${tp.value.last}.jsonnet")
     assert(res == Left(expected))
     res
   }
-  def checkGolden()(implicit tp: utest.framework.TestPath): Either[String,Value] = {
+  def checkGolden()(implicit tp: utest.framework.TestPath): Either[String, Value] = {
     check(ujson.read(os.read(testSuiteRoot / s"${tp.value.last}.jsonnet.golden")))
   }
-  def tests: Tests = Tests{
+  def tests: Tests = Tests {
     test("arith_bool") - check()
     test("arith_float") - check()
     test("arith_string") - check()
@@ -51,11 +52,10 @@ object FileTests extends TestSuite{
     test("local") - check()
     test("lazy") - checkGolden()
     test("lazy_operator1") - checkGolden()
-    test("lazy_operator2") - checkFail(
-      """sjsonnet.Error: should happen
-        |    at [Error].(lazy_operator2.jsonnet:1:9)
-        |    at [And].(lazy_operator2.jsonnet:1:6)
-        |""".stripMargin)
+    test("lazy_operator2") - checkFail("""sjsonnet.Error: should happen
+                                         |    at [Error].(lazy_operator2.jsonnet:1:9)
+                                         |    at [And].(lazy_operator2.jsonnet:1:6)
+                                         |""".stripMargin)
     test("merge") - check()
     test("null") - check()
     test("object") - check()
@@ -75,7 +75,7 @@ object FileTests extends TestSuite{
     test("std_all_hidden") - check()
     test("stdlib") - check()
     test("text_block") - check()
-    "tla.simple"- check()
+    "tla.simple" - check()
     test("unicode") - check()
     test("unix_line_endings") - checkGolden()
     test("unparse") - checkGolden()
@@ -83,4 +83,3 @@ object FileTests extends TestSuite{
     test("issue_127") - check()
   }
 }
-

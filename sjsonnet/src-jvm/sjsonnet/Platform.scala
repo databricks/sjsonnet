@@ -55,14 +55,16 @@ object Platform {
 
   def yamlToJson(yamlString: String): String = {
     try {
-      val yaml = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
+      val yaml =
+        new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
       yaml.size match {
         case 0 => "{}"
-        case 1 => yaml.head match {
-          case m: java.util.Map[?, ?] => new JSONObject(m).toString()
-          case l: java.util.List[?] => new JSONArray(l).toString()
-          case _ => new JSONArray(yaml.asJava).get(0).toString
-        }
+        case 1 =>
+          yaml.head match {
+            case m: java.util.Map[?, ?] => new JSONObject(m).toString()
+            case l: java.util.List[?]   => new JSONArray(l).toString()
+            case _                      => new JSONArray(yaml.asJava).get(0).toString
+          }
         case _ => new JSONArray(yaml.asJava).toString()
       }
     } catch {
@@ -72,7 +74,8 @@ object Platform {
   }
 
   private def computeHash(algorithm: String, s: String) = {
-    java.security.MessageDigest.getInstance(algorithm)
+    java.security.MessageDigest
+      .getInstance(algorithm)
       .digest(s.getBytes("UTF-8"))
       .map { b => String.format("%02x", (b & 0xff).asInstanceOf[Integer]) }
       .mkString
@@ -115,9 +118,11 @@ object Platform {
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
   private val dashPattern = getPatternFromCache("-")
 
-  def getPatternFromCache(pat: String) : Pattern = regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
+  def getPatternFromCache(pat: String): Pattern =
+    regexCache.computeIfAbsent(pat, _ => Pattern.compile(pat))
 
-  def getNamedGroupsMap(pat: Pattern): Map[String, Int] = pat.namedGroups().asScala.view.mapValues(_.intValue()).toMap
+  def getNamedGroupsMap(pat: Pattern): Map[String, Int] =
+    pat.namedGroups().asScala.view.mapValues(_.intValue()).toMap
 
   def regexQuote(s: String): String = {
     val quote = Pattern.quote(s)

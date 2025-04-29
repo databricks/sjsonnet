@@ -42,18 +42,22 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.join(' ', [null, 'foo'])") ==> ujson.Str("foo")
     }
 
-    test("slice"){
+    test("slice") {
       eval("std.slice([1, 2, 3, 4, 5, 6], 0, 4, 1)") ==> ujson.read("[ 1, 2, 3, 4 ]")
       eval("std.slice([1, 2, 3, 4, 5, 6], 1, 6, 2)") ==> ujson.read("[ 2, 4, 6 ]")
       eval("""std.slice("jsonnet", 0, 4, 1)""") ==> ujson.Str("json")
     }
 
-    test("manifestJsonMinified"){
-      eval("""std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring", []], y: { a: 1, b: 2, c: [1, 2], d: {} }, })""") ==>
-        ujson.Str("{\"x\":[1,2,3,true,false,null,\"string\\nstring\",[]],\"y\":{\"a\":1,\"b\":2,\"c\":[1,2],\"d\":{}}}")
+    test("manifestJsonMinified") {
+      eval(
+        """std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring", []], y: { a: 1, b: 2, c: [1, 2], d: {} }, })"""
+      ) ==>
+      ujson.Str(
+        "{\"x\":[1,2,3,true,false,null,\"string\\nstring\",[]],\"y\":{\"a\":1,\"b\":2,\"c\":[1,2],\"d\":{}}}"
+      )
     }
 
-    test("manifestXmlJsonml"){
+    test("manifestXmlJsonml") {
       eval(
         """std.manifestXmlJsonml([
           |  'svg', { height: 100, width: 100 },
@@ -67,10 +71,12 @@ object Std0150FunctionsTests extends TestSuite {
           |])
           |""".stripMargin
       ) ==>
-        ujson.Str("""<svg height="100" width="100"><circle cx="50" cy="50" fill="red" r="40" stroke="black" stroke-width="3"></circle></svg>""".stripMargin)
+      ujson.Str(
+        """<svg height="100" width="100"><circle cx="50" cy="50" fill="red" r="40" stroke="black" stroke-width="3"></circle></svg>""".stripMargin
+      )
     }
 
-    test("extVars"){
+    test("extVars") {
       val interpreter = new Interpreter(
         Map(
           "num" -> "1",
@@ -81,12 +87,12 @@ object Std0150FunctionsTests extends TestSuite {
           "code" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)""",
           "std" -> """std.length("hello")""",
           "stdExtVar" -> """std.extVar("std") + 10""",
-          "stdExtVarRecursive" -> """std.extVar("stdExtVar") + 100""",
+          "stdExtVarRecursive" -> """std.extVar("stdExtVar") + 100"""
         ),
         Map(),
         DummyPath(),
         Importer.empty,
-        parseCache = new DefaultParseCache,
+        parseCache = new DefaultParseCache
       )
 
       def check(s: String, expected: ujson.Value): Unit =
@@ -103,8 +109,7 @@ object Std0150FunctionsTests extends TestSuite {
       check("""std.extVar("stdExtVarRecursive")""", 115)
     }
 
-
-    test("tlaVars"){
+    test("tlaVars") {
       val interpreter = new Interpreter(
         Map(),
         Map(
@@ -114,20 +119,20 @@ object Std0150FunctionsTests extends TestSuite {
           "jsonArrNums" -> """[1, 2, 3]""",
           "jsonObjBools" -> """{"hello": false}""",
           "code" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)""",
-          "std" -> """std.length("hello")""",
+          "std" -> """std.length("hello")"""
         ),
         DummyPath(),
         new Importer {
-          override def resolve(docBase: Path, importName: String): Option[Path] = importName match{
+          override def resolve(docBase: Path, importName: String): Option[Path] = importName match {
             case "bar.json" => Some(DummyPath("bar"))
-            case _ => None
+            case _          => None
           }
-          override def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = path match{
+          override def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = path match {
             case DummyPath("bar") => Some(StaticResolvedFile("""{"x": "y"}"""))
-            case _ => None
+            case _                => None
           }
         },
-        parseCache = new DefaultParseCache,
+        parseCache = new DefaultParseCache
       )
 
       def check(s: String, expected: ujson.Value): Unit =
@@ -148,20 +153,20 @@ object Std0150FunctionsTests extends TestSuite {
       check("""local foo = import "bar.json"; function(qux = foo) qux""", ujson.Obj("x" -> "y"))
     }
 
-    test("fold"){
+    test("fold") {
       eval("""std.foldr(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
-        ujson.Str("t e n n o s j this is")
+      ujson.Str("t e n n o s j this is")
 
       eval("""std.foldl(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
-        ujson.Str("this is j s o n n e t")
+      ujson.Str("this is j s o n n e t")
     }
-    test("reverse"){
+    test("reverse") {
       eval("""std.reverse([])""") ==> ujson.Arr()
       eval("""std.reverse([1])""") ==> ujson.Arr(1)
       eval("""std.reverse(["1", true, null])""") ==> ujson.Arr(ujson.Null, true, "1")
     }
 
-    test("get"){
+    test("get") {
       eval("""std.get({a: 1}, "a")""") ==> ujson.Num(1)
       eval("""std.get({a:: 1}, "a")""") ==> ujson.Num(1)
       eval("""std.get({a: 1}, "b")""") ==> ujson.Null
@@ -194,11 +199,18 @@ object Std0150FunctionsTests extends TestSuite {
 
     test("trim") {
       eval("""std.trim("already trimmed string")""") ==> ujson.Str("already trimmed string")
-      eval("""std.trim("    string with spaces on both ends     ")""") ==> ujson.Str("string with spaces on both ends")
-      eval("""std.trim("string with newline character at end\n")""") ==> ujson.Str("string with newline character at end")
+      eval("""std.trim("    string with spaces on both ends     ")""") ==> ujson.Str(
+        "string with spaces on both ends"
+      )
+      eval("""std.trim("string with newline character at end\n")""") ==> ujson.Str(
+        "string with newline character at end"
+      )
       eval("""std.trim("string with tabs at end\t\t")""") ==> ujson.Str("string with tabs at end")
       assert(
-        evalErr("""std.trim(10)""").startsWith("sjsonnet.Error: Wrong parameter type: expected String, got number"))
+        evalErr("""std.trim(10)""").startsWith(
+          "sjsonnet.Error: Wrong parameter type: expected String, got number"
+        )
+      )
     }
 
     test("xnor") {

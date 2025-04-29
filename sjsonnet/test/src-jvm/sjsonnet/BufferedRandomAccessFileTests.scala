@@ -20,7 +20,8 @@ object BufferedRandomAccessFileTests extends TestSuite {
   }
 
   // Test content and large test content
-  val testContent = "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
+  val testContent =
+    "Hello, World! This is a test file with various content to thoroughly test the BufferedRandomAccessFile."
   val largeTestContent: String = Random.alphanumeric.take(100000).mkString // 100k characters
   val tempFile: File = createTempFile(testContent)
   val largeTempFile: File = createTempFile(largeTestContent)

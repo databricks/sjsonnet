@@ -10,7 +10,9 @@ object PreserveOrderTests extends TestSuite {
         """{
              "z": "z",
              "a": "a",
-           }""", true).toString() ==> """{"z":"z","a":"a"}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z","a":"a"}"""
 
       eval(
         """[
@@ -21,7 +23,9 @@ object PreserveOrderTests extends TestSuite {
                "z": "z",
                "a": "a"
              }
-           ][1]""", true).toString() ==> """{"z":"z","a":"a"}"""
+           ][1]""",
+        true
+      ).toString() ==> """{"z":"z","a":"a"}"""
 
       eval(
         """[{b: null},
@@ -31,7 +35,9 @@ object PreserveOrderTests extends TestSuite {
              "d": {},
              "b": "3"
            },
-           []]""", true).toString() ==> """[{"b":null},{"z":null,"a":"2","d":{},"b":"3"},[]]"""
+           []]""",
+        true
+      ).toString() ==> """[{"b":null},{"z":null,"a":"2","d":{},"b":"3"},[]]"""
 
       eval(
         """{
@@ -40,13 +46,17 @@ object PreserveOrderTests extends TestSuite {
                "s": "s",
                c: "c"
              }],
-           }""", true).toString() ==> """{"z":"z","a":[5,{"s":"s","c":"c"}]}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z","a":[5,{"s":"s","c":"c"}]}"""
 
       eval(
         """{
              "z": "z",
              "a": "a",
-           }""", false).toString() ==> """{"a":"a","z":"z"}"""
+           }""",
+        false
+      ).toString() ==> """{"a":"a","z":"z"}"""
 
     }
 
@@ -59,7 +69,9 @@ object PreserveOrderTests extends TestSuite {
              "a": "a1",
              "z": "z1",
              "b": "b"
-           }""", true).toString() ==> """{"z":"z1","a":"a1","b":"b"}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z1","a":"a1","b":"b"}"""
 
       eval(
         """{
@@ -71,7 +83,9 @@ object PreserveOrderTests extends TestSuite {
              "z": "z1",
              "b": "b", // new, should be after c
              "q": "q" // new, should be after b
-           }""", true).toString() ==> """{"z":"z1","a":"a1","c":"c","b":"b","q":"q"}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z1","a":"a1","c":"c","b":"b","q":"q"}"""
     }
 
     test("preserveOrderHidden") {
@@ -83,7 +97,9 @@ object PreserveOrderTests extends TestSuite {
            } + {
              "b": "b2",
              "a":: "hidden"
-           }""", true).toString() ==> """{"z":"z","b":"b2"}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z","b":"b2"}"""
     }
 
     test("preserveOrderUnhidden") {
@@ -98,7 +114,9 @@ object PreserveOrderTests extends TestSuite {
            } + {
              "a"::: "unhidden",
              "b": "b3"
-           }""", true).toString() ==> """{"z":"z","a":"unhidden","b":"b3"}"""
+           }""",
+        true
+      ).toString() ==> """{"z":"z","a":"unhidden","b":"b3"}"""
     }
 
     test("preserveOrderMergePatch") {
@@ -109,7 +127,9 @@ object PreserveOrderTests extends TestSuite {
              "b": "b"
            }, {
              "a": null
-           })""", true).toString() ==> """{"z":"z","b":"b"}"""
+           })""",
+        true
+      ).toString() ==> """{"z":"z","b":"b"}"""
 
       eval(
         """std.mergePatch({
@@ -119,7 +139,9 @@ object PreserveOrderTests extends TestSuite {
            }, {
              "b": "b2",
              "a": null
-           })""", true).toString() ==> """{"z":"z","b":"b2"}"""
+           })""",
+        true
+      ).toString() ==> """{"z":"z","b":"b2"}"""
 
       eval(
         """std.mergePatch({
@@ -129,7 +151,9 @@ object PreserveOrderTests extends TestSuite {
            }, {
              "b": "b2",
              "z": "z2"
-           })""", true).toString() ==> """{"z":"z2","a":"a","b":"b2"}"""
+           })""",
+        true
+      ).toString() ==> """{"z":"z2","a":"a","b":"b2"}"""
     }
 
     test("preserveOrderObjectFields") {
@@ -138,7 +162,9 @@ object PreserveOrderTests extends TestSuite {
              "z": "z",
              "a": "a",
              "b": "b"
-           })""", true).toString() ==> """["z","a","b"]"""
+           })""",
+        true
+      ).toString() ==> """["z","a","b"]"""
     }
 
     test("preserveOrderObjectFieldsAll") {
@@ -151,7 +177,9 @@ object PreserveOrderTests extends TestSuite {
              "c": "c",
              "b": "b2",
              "a":: "hidden",
-           })""", true).toString() ==> """["z","a","b","c"]"""
+           })""",
+        true
+      ).toString() ==> """["z","a","b","c"]"""
     }
 
     test("preserveOrderMapWithKey") {
@@ -161,7 +189,9 @@ object PreserveOrderTests extends TestSuite {
              "z": "1",
              "a": "2",
              "b": "3"
-           })""", true).toString() ==> """{"z":"z1","a":"a2","b":"b3"}"""
+           })""",
+        true
+      ).toString() ==> """{"z":"z1","a":"a2","b":"b3"}"""
     }
 
     test("preserveOrderPrune") {
@@ -173,7 +203,9 @@ object PreserveOrderTests extends TestSuite {
              "d": {},
              "b": "3"
            },
-           []])""", true).toString() ==> """[{"a":"2","b":"3"}]"""
+           []])""",
+        true
+      ).toString() ==> """[{"a":"2","b":"3"}]"""
     }
 
     test("preserveOrderManifestIni") {
@@ -181,8 +213,12 @@ object PreserveOrderTests extends TestSuite {
         """std.manifestIni({
              main: { b: "1", a: 2, c: true, e: null, d: [1, {"2": 2}, [3]], f: {"hello": "world"} },
              sections: {}
-          })""", true) ==>
-        ujson.Str("b = 1\na = 2\nc = true\ne = null\nd = 1\nd = {\"2\": 2}\nd = [3]\nf = {\"hello\": \"world\"}\n")
+          })""",
+        true
+      ) ==>
+      ujson.Str(
+        "b = 1\na = 2\nc = true\ne = null\nd = 1\nd = {\"2\": 2}\nd = [3]\nf = {\"hello\": \"world\"}\n"
+      )
     }
 
     test("preserveOrderPython") {
@@ -191,19 +227,22 @@ object PreserveOrderTests extends TestSuite {
              "z": "z",
              "a": "a",
              "b": true
-           })""", true) ==> ujson.Str("""{"z": "z", "a": "a", "b": True}""")
+           })""",
+        true
+      ) ==> ujson.Str("""{"z": "z", "a": "a", "b": True}""")
 
       eval(
         """std.manifestPythonVars({
              "z": "z",
              "a": "a",
              "b": true
-           })""", true) ==>
-        ujson.Str(
-          """z = "z"
-            |a = "a"
-            |b = True
-            |""".stripMargin)
+           })""",
+        true
+      ) ==>
+      ujson.Str("""z = "z"
+                  |a = "a"
+                  |b = True
+                  |""".stripMargin)
     }
 
     test("preserveOrderJsonEx") {
@@ -212,13 +251,14 @@ object PreserveOrderTests extends TestSuite {
              "z": "z",
              "a": "a",
              "b": true
-           }, "  ")""", true) ==>
-        ujson.Str(
-          """{
-            |  "z": "z",
-            |  "a": "a",
-            |  "b": true
-            |}""".stripMargin)
+           }, "  ")""",
+        true
+      ) ==>
+      ujson.Str("""{
+                  |  "z": "z",
+                  |  "a": "a",
+                  |  "b": true
+                  |}""".stripMargin)
     }
 
     test("preserveOrderYaml") {
@@ -230,15 +270,16 @@ object PreserveOrderTests extends TestSuite {
                "s": "s",
                "c": "c"
              }
-           })""", true) ==>
-        ujson.Str(
-          """"z": "z"
-            |"a":
-            |- 1
-            |- 2
-            |"b":
-            |  "s": "s"
-            |  "c": "c"""".stripMargin)
+           })""",
+        true
+      ) ==>
+      ujson.Str(""""z": "z"
+                  |"a":
+                  |- 1
+                  |- 2
+                  |"b":
+                  |  "s": "s"
+                  |  "c": "c"""".stripMargin)
 
       eval(
         """std.manifestYamlStream([5, {
@@ -248,28 +289,31 @@ object PreserveOrderTests extends TestSuite {
                "s": "s",
                "c": "c"
              }
-           }])""", true) ==>
-        ujson.Str(
-          """---
-            |5
-            |---
-            |"z": "z"
-            |"a":
-            |- 1
-            |- 2
-            |"b":
-            |  "s": "s"
-            |  "c": "c"
-            |...
-            |""".stripMargin)
+           }])""",
+        true
+      ) ==>
+      ujson.Str("""---
+                  |5
+                  |---
+                  |"z": "z"
+                  |"a":
+                  |- 1
+                  |- 2
+                  |"b":
+                  |  "s": "s"
+                  |  "c": "c"
+                  |...
+                  |""".stripMargin)
     }
 
     test("preserveOrderXml") {
       eval(
         """std.manifestXmlJsonml([
             'a', { c: 'c', b: 'b' }
-          ])""", true) ==>
-        ujson.Str("""<a c="c" b="b"></a>""")
+          ])""",
+        true
+      ) ==>
+      ujson.Str("""<a c="c" b="b"></a>""")
     }
 
     test("preserveOrderToString") {
@@ -278,21 +322,23 @@ object PreserveOrderTests extends TestSuite {
              "z": "1",
              "a": "2",
              "b": "3"
-           })""", true) ==>
-        ujson.Str("""{"z": "1", "a": "2", "b": "3"}""")
+           })""",
+        true
+      ) ==>
+      ujson.Str("""{"z": "1", "a": "2", "b": "3"}""")
     }
 
     test("preserveOrderMemberConcat") {
-      eval(
-        """{b: "b", a: "a"} + {a+: {d: 1, c: 2}, s: 4}""", true).toString ==>
-        """{"b":"b","a":"a{\"d\": 1, \"c\": 2}","s":4}"""
+      eval("""{b: "b", a: "a"} + {a+: {d: 1, c: 2}, s: 4}""", true).toString ==>
+      """{"b":"b","a":"a{\"d\": 1, \"c\": 2}","s":4}"""
     }
 
     test("preserveOrderError") {
       assert(
         evalErr(
           """local x = { b: 1, a: 2, c: self.a + self.b };
-           error x""", preserveOrder = true
+           error x""",
+          preserveOrder = true
         )
           .startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}""")
       )
@@ -305,29 +351,40 @@ object PreserveOrderTests extends TestSuite {
     test("preserveOrderSet") {
       eval(
         """std.set([{a: 1, b: 2}, {a:3}, {b: 2, a: 1}],
-           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2},{"a":3}]"""
+           keyF=function(v) v.a)""",
+        true
+      ).toString ==> """[{"a":1,"b":2},{"a":3}]"""
     }
 
     test("preserveOrderPreservesSetMembership") {
-      eval("""std.setMember({q: {a: 1, b: 2}}, [{q: {b: 2, a: 1}}], keyF=function(v) v.q.a)""", true).toString ==> "true"
+      eval(
+        """std.setMember({q: {a: 1, b: 2}}, [{q: {b: 2, a: 1}}], keyF=function(v) v.q.a)""",
+        true
+      ).toString ==> "true"
     }
 
     test("preserveOrderSetIntersection") {
       eval(
         """std.setInter([{a: 1, b: 2}], [{b: 2, a: 1}],
-           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2}]"""
+           keyF=function(v) v.a)""",
+        true
+      ).toString ==> """[{"a":1,"b":2}]"""
     }
 
     test("preserveOrderSetUnion") {
       eval(
         """std.setUnion([{a: 1, b: 2}, {a:3}], [{b: 2, a: 1}],
-           keyF=function(v) v.a)""", true).toString ==> """[{"a":1,"b":2},{"a":3}]"""
+           keyF=function(v) v.a)""",
+        true
+      ).toString ==> """[{"a":1,"b":2},{"a":3}]"""
     }
 
     test("preserveOrderSetDiff") {
       eval(
         """std.setDiff([{a: 1, b: 2}, {a:3}], [{b: 2, a: 1}],
-           keyF=function(v) v.a)""", true).toString ==> """[{"a":3}]"""
+           keyF=function(v) v.a)""",
+        true
+      ).toString ==> """[{"a":3}]"""
     }
   }
 }
