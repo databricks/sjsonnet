@@ -1,6 +1,5 @@
 package sjsonnet
 
-import java.util.Base64
 import java.nio.charset.StandardCharsets
 import scala.scalajs.js
 import utest._
@@ -39,7 +38,7 @@ object FileTests extends TestSuite {
 
   def checkFail(expected: String)(implicit tp: utest.framework.TestPath) = {
     try {
-      val res = ujson.WebJson.transform(eval(s"${tp.value.last}.jsonnet"), ujson.Value)
+      ujson.WebJson.transform(eval(s"${tp.value.last}.jsonnet"), ujson.Value)
       assert(false)
     } catch {
       case e: js.JavaScriptException =>

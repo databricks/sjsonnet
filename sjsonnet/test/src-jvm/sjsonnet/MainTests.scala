@@ -57,7 +57,7 @@ object MainTests extends TestSuite {
     test("yamlStream") {
       val source = testSuiteRoot / "db" / "stream.jsonnet"
       val (res, out, err) = runMain(source, "--yaml-stream")
-      assert((res, out, err) == (0, streamedOut + "\n", ""))
+      assert((res, out, err) == ((0, streamedOut + "\n", "")))
     }
 
     test("exec") {
@@ -69,7 +69,7 @@ object MainTests extends TestSuite {
           |   2
           |]
           |""".stripMargin
-      assert((res, out, err) == (0, expectedJson, ""))
+      assert((res, out, err) == ((0, expectedJson, "")))
     }
     test("execYaml") {
       val source = "local x = [1]; local y = [2]; x + y"
@@ -79,14 +79,14 @@ object MainTests extends TestSuite {
           |- 2
           |
           |""".stripMargin
-      assert((res, out, err) == (0, expectedYaml, ""))
+      assert((res, out, err) == ((0, expectedYaml, "")))
     }
 
     test("yamlStreamOutputFile") {
       val source = testSuiteRoot / "db" / "stream.jsonnet"
       val dest = os.temp()
       val (res, out, err) = runMain(source, "--yaml-stream", "--output-file", dest)
-      assert((res, out, err) == (0, "", ""))
+      assert((res, out, err) == ((0, "", "")))
       val destStr = os.read(dest)
       assert(destStr == streamedOut)
     }
@@ -96,7 +96,7 @@ object MainTests extends TestSuite {
       val multiDest = os.temp.dir()
       val (res, out, err) = runMain(source, "--multi", multiDest)
       val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
-      assert((res, out, err) == (0, expectedOut, ""))
+      assert((res, out, err) == ((0, expectedOut, "")))
 
       val helloDestStr = os.read(multiDest / "hello")
       assert(helloDestStr == "1")
@@ -111,7 +111,7 @@ object MainTests extends TestSuite {
       val multiDest = os.temp.dir()
       val (res, out, err) = runMain(source, "--multi", multiDest, "--output-file", dest)
       val expectedOut = s"$multiDest/hello\n$multiDest/world"
-      assert((res, out, err) == (0, "", ""))
+      assert((res, out, err) == ((0, "", "")))
 
       val destStr = os.read(dest)
       assert(destStr == expectedOut)
@@ -128,7 +128,7 @@ object MainTests extends TestSuite {
       val multiDest = os.temp.dir()
       val (res, out, err) = runMain(source, "--multi", multiDest, "--yaml-out")
       val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
-      assert((res, out, err) == (0, expectedOut, ""))
+      assert((res, out, err) == ((0, expectedOut, "")))
 
       val helloDestStr = os.read(multiDest / "hello")
       assert(helloDestStr == "1")

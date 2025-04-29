@@ -1,6 +1,5 @@
 package sjsonnet
 
-import sjsonnet.Expr._
 import utest._
 
 object RendererTests extends TestSuite{

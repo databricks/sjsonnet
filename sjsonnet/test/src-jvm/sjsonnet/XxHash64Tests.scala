@@ -4,10 +4,9 @@ import java.nio.file.{Files, Path => JavaPath}
 
 import scala.util.Random
 
-import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory, XXHash64}
+import net.jpountz.xxhash.XXHashFactory
 
 import utest._
-import TestUtils.eval
 
 object XxHash64Tests extends TestSuite {
   val tests: Tests = Tests {

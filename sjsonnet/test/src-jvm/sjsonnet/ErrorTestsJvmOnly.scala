@@ -10,7 +10,7 @@ object ErrorTestsJvmOnly extends TestSuite {
       Map(),
       Map(),
       OsPath(os.pwd),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path]),
+      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path].toIndexedSeq),
       parseCache = new DefaultParseCache
     )
     interp.interpret(os.read(p), OsPath(p))

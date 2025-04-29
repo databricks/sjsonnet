@@ -1,7 +1,5 @@
 package sjsonnet
 
-import fastparse.IndexedParserInput
-
 import scala.collection.mutable
 
 /**

@@ -120,9 +120,11 @@ object Std0150FunctionsTests extends TestSuite {
         new Importer {
           override def resolve(docBase: Path, importName: String): Option[Path] = importName match{
             case "bar.json" => Some(DummyPath("bar"))
+            case _ => None
           }
           override def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = path match{
             case DummyPath("bar") => Some(StaticResolvedFile("""{"x": "y"}"""))
+            case _ => None
           }
         },
         parseCache = new DefaultParseCache,

@@ -1,10 +1,8 @@
 package sjsonnet
 
-import java.util.Base64
 import java.nio.charset.StandardCharsets
 import scala.scalajs.js
 import utest._
-import ujson.Value
 
 object ErrorTests extends TestSuite {
   def joinPath(a: String, b: String) = {
@@ -43,7 +41,7 @@ object ErrorTests extends TestSuite {
   def check(expected: String, suite: String = "test_suite")(implicit tp: utest.framework.TestPath): Unit = {
     val fileName = s"error.${tp.value.mkString(".")}.jsonnet"
     try {
-      val res = ujson.WebJson.transform(eval(fileName, suite), ujson.Value)
+      ujson.WebJson.transform(eval(fileName, suite), ujson.Value)
       assert(false)
     } catch {
       case e: js.JavaScriptException =>

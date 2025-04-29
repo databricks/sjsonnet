@@ -22,7 +22,7 @@ class MaterializerBenchmark {
   @Setup
   def setup(): Unit = {
     val parser = mainargs.ParserForClass[Config]
-    val config = parser.constructEither(MainBenchmark.mainArgs, autoPrintHelpAndExit = None).getOrElse(???)
+    val config = parser.constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None).getOrElse(???)
     val file = config.file
     val wd = os.pwd
     val path = os.Path(file, wd)
@@ -31,7 +31,7 @@ class MaterializerBenchmark {
       Map.empty[String, String],
       Map.empty[String, String],
       OsPath(wd),
-      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
+      importer = SjsonnetMain.resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
       parseCache = new DefaultParseCache
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)

@@ -19,7 +19,7 @@ object ValLiteralFunctionTest extends TestSuite with FunctionBuilder {
   )
 
   private def variableResolve(name: String): Option[Expr] = {
-    if (name == "$ext" || name == "ext") {
+    if (name == f"$$ext" || name == "ext") {
       Some(ext)
     } else {
       None

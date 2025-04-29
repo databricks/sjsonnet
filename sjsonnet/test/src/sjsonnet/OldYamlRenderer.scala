@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.{StringWriter, Writer}
+import java.io.StringWriter
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 

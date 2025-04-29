@@ -12,6 +12,8 @@ object DecimalFormatTests extends TestSuite{
         (wholeStr, Some(fracStr), None)
       case Array(Array(wholeStr: String), Array(fracStr: String, expStr: String)) =>
         (wholeStr, Some(fracStr), Some(expStr))
+      case _ =>
+        throw new IllegalArgumentException("Invalid pattern")
     }
     val wholeLength = wholeStr.length
     assert(wholeLength == 1)

@@ -22,7 +22,7 @@ object SjsonnetMain {
         .find(os.exists)
         .flatMap(p => try Some(OsPath(p)) catch{case NonFatal(_) => None})
 
-    def read(path: Path, binaryData: Boolean = false): Option[ResolvedFile] = {
+    def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
       readPath(path, binaryData)
     }
   }
@@ -61,7 +61,7 @@ object SjsonnetMain {
     val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
     val result = for{
       config <- parser.constructEither(
-        args,
+        args.toIndexedSeq,
         allowRepeats = true,
         customName = name, customDoc = doc,
         autoPrintHelpAndExit = None
@@ -144,9 +144,10 @@ object SjsonnetMain {
                             codeFiles: Seq[String],
                             wd: os.Path) = {
 
-    def split(s: String) = s.split("=", 2) match{
+    def split(s: String) = s.split("=", 2) match {
       case Array(x) => (x, System.getenv(x))
       case Array(x, v) => (x, v)
+      case _ => ???
     }
 
     def splitMap(s: Seq[String], f: String => String) = s.map(split).map{case (x, v) => (x, f(v))}
@@ -167,10 +168,10 @@ object SjsonnetMain {
                              config: Config,
                              parseCache: ParseCache,
                              wd: os.Path,
-                             allowedInputs: Option[Set[os.Path]] = None,
-                             importer: Option[(Path, String) => Option[os.Path]] = None,
-                             warnLogger: String => Unit = null,
-                             std: Val.Obj = new Std().Std): Either[String, String] = {
+                             allowedInputs: Option[Set[os.Path]],
+                             importer: Option[(Path, String) => Option[os.Path]],
+                             warnLogger: String => Unit,
+                             std: Val.Obj): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))

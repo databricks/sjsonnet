@@ -82,6 +82,8 @@ class Evaluator(resolver: CachedResolver,
       Error.fail("Can't use $ outside of an object", pos)
     case Super(pos) =>
       Error.fail("Can't use super outside of an object", pos)
+    case _ =>
+      Error.fail("Should not have happened.", e.pos)
   }
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
@@ -137,6 +139,7 @@ class Evaluator(resolver: CachedResolver,
       case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
       case ext: ObjBody.ObjComp => visitObjComp(ext, original)
       case o: Val.Obj => o.addSuper(e.pos, original)
+      case _ => Error.fail("Should not have happened", e.pos)
     }
   }
 
@@ -176,7 +179,7 @@ class Evaluator(resolver: CachedResolver,
         case _ => fail()
       }
       case Expr.UnaryOp.OP_~ => v match {
-        case Val.Num(_, v) => Val.Num(pos, ~v.toLong)
+        case Val.Num(_, v) => Val.Num(pos, (~v.toLong).toDouble)
         case _ => fail()
       }
       case Expr.UnaryOp.OP_+ => v match {
@@ -269,7 +272,7 @@ class Evaluator(resolver: CachedResolver,
     }
   }
 
-  protected def visitApplyBuiltin0(e: ApplyBuiltin0)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin0(e: ApplyBuiltin0) = {
     if (tailstrict) {
       e.func.evalRhs(this, e.pos)
     } else if (e.tailstrict) {
@@ -436,14 +439,14 @@ class Evaluator(resolver: CachedResolver,
     sup.value(key.value, e.pos)
   }
 
-  def visitImportStr(e: ImportStr)(implicit scope: ValScope): Val.Str =
+  def visitImportStr(e: ImportStr): Val.Str =
     Val.Str(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)._2.readString())
 
   def visitImportBin(e: ImportBin): Val.Arr =
     new Val.Arr(e.pos, importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)._2.readRawBytes().map(
       x => Val.Num(e.pos, (x & 0xff).doubleValue)))
 
-  def visitImport(e: Import)(implicit scope: ValScope): Val = {
+  def visitImport(e: Import): Val = {
     val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)
     cachedImports.getOrElseUpdate(
       p,
@@ -577,12 +580,12 @@ class Evaluator(resolver: CachedResolver,
       }
 
       case Expr.BinaryOp.OP_<< => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong << r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong << r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_>> => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong >> r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong >> r.toLong).toDouble)
         case _ => fail()
       }
 
@@ -592,17 +595,17 @@ class Evaluator(resolver: CachedResolver,
       }
 
       case Expr.BinaryOp.OP_& => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong & r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong & r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_^ => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong ^ r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong ^ r.toLong).toDouble)
         case _ => fail()
       }
 
       case Expr.BinaryOp.OP_| => (l, r) match {
-        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l.toLong | r.toLong)
+        case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong | r.toLong).toDouble)
         case _ => fail()
       }
 
@@ -890,11 +893,11 @@ class Evaluator(resolver: CachedResolver,
 }
 
 class NewEvaluator(
-  resolver: CachedResolver,
-  extVars: String => Option[Expr],
-  wd: Path,
-  settings: Settings,
-  warnLogger: Error => Unit = null) extends Evaluator(resolver, extVars, wd, settings, warnLogger) {
+  private val r: CachedResolver,
+  private val e: String => Option[Expr],
+  private val w: Path,
+  private val s: Settings,
+  private val wa: Error => Unit = null) extends Evaluator(r, e, w, s, wa) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     (e._tag: @switch) match {

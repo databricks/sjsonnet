@@ -3,7 +3,6 @@ package java.util
 import java.util.stream.IntStream
 
 import scala.collection.mutable.{BitSet => SBitSet}
-import scala.collection.JavaConverters._
 
 class BitSet(_initialSizeDummy: Int) extends java.lang.Cloneable {
   val bs: SBitSet = SBitSet.empty
