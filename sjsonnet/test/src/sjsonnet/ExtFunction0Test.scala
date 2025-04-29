@@ -25,8 +25,7 @@ object ExtFunction0Test extends TestSuite with FunctionModule {
     Map(),
     DummyPath(),
     Importer.empty,
-    parseCache = new DefaultParseCache,
-    variableResolver = variableResolve,
+    parseCache = new DefaultParseCache
   )
 
   def check(s: String)(f: Function[Any, Boolean]): Unit = {

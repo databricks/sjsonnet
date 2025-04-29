@@ -219,8 +219,7 @@ object SjsonnetMain {
       ),
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       warnLogger = warnLogger,
-      std = std,
-      variableResolver = _ => None
+      std = std
     )
 
     (config.multi, config.yamlStream.value) match {
