@@ -409,6 +409,9 @@ object Val{
         f(k, v)
       }
     }
+
+    /** Is this builtin safe to use in static evaluation */
+    def staticSafe: Boolean = true
   }
 
   final class StaticObjectFieldSet(protected val keys: Array[String]) {
