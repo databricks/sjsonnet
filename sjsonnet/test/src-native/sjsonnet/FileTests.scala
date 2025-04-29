@@ -50,7 +50,11 @@ object FileTests extends TestSuite{
     test("local") - check()
     test("lazy") - checkGolden()
     test("lazy_operator1") - checkGolden()
-    test("lazy_operator2") - checkFail("sjsonnet.Error: should happen\n    at [Error].(lazy_operator2.jsonnet:1:9)\n")
+    test("lazy_operator2") - checkFail(
+      """sjsonnet.Error: should happen
+        |    at [Error].(lazy_operator2.jsonnet:1:9)
+        |    at [And].(lazy_operator2.jsonnet:1:6)
+        |""".stripMargin)
     test("merge") - check()
     test("null") - check()
     test("object") - check()

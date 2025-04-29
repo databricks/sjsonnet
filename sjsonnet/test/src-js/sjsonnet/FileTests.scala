@@ -77,6 +77,7 @@ object FileTests extends TestSuite {
     test("lazy_operator2") - checkFail(
       """sjsonnet.Error: should happen
         |  at [Error].((memory):1:9)
+        |  at [And].((memory):1:6)
         |""".stripMargin)
     test("merge") - check()
     test("null") - check()
