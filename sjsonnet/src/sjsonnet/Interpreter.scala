@@ -20,8 +20,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
                   settings: Settings,
                   storePos: Position => Unit,
                   warnLogger: String => Unit,
-                  std: Val.Obj,
-                  variableResolver: String => Option[Expr]
+                  std: Val.Obj
                  ) { self =>
 
   def this(extVars: Map[String, String],
@@ -32,11 +31,10 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
            settings: Settings = Settings.default,
            storePos: Position => Unit = null,
            warnLogger: (String => Unit) = null,
-           std: Val.Obj = new Std().Std,
-           variableResolver: String => Option[Expr] = _ => None) =
+           std: Val.Obj = new Std().Std) =
     this(key => extVars.get(key).map(ExternalVariable.code(_)),
       key => tlaVars.get(key).map(ExternalVariable.code(_)),
-      wd, importer, parseCache, settings, storePos, warnLogger, std, variableResolver)
+      wd, importer, parseCache, settings, storePos, warnLogger, std)
 
   private val noOffsetPos = new Position(new FileScope(wd), -1)
 
@@ -58,7 +56,7 @@ class Interpreter(queryExtVar: String => Option[ExternalVariable[_]],
                                 std: Val.Obj,
                                 internedStrings: mutable.HashMap[String, String],
                                 internedStaticFieldSets: mutable.HashMap[Val.StaticObjectFieldSet, java.util.LinkedHashMap[String, java.lang.Boolean]]): StaticOptimizer = {
-    new StaticOptimizer(ev, variableResolver, std, internedStrings, internedStaticFieldSets)
+    new StaticOptimizer(ev, std, internedStrings, internedStaticFieldSets)
   }
 
   /**
