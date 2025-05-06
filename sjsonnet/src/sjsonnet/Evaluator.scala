@@ -841,45 +841,40 @@ class Evaluator(
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope // .clearSuper
-
-    lazy val newSelf: Val.Obj = {
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-      for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
-        visitExpr(e.key)(s) match {
-          case Val.Str(_, k) =>
-            val prev_length = builder.size()
-            builder.put(
-              k,
-              new Val.Obj.Member(e.plus, Visibility.Normal) {
-                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-                  lazy val newScope: ValScope = s.extend(newBindings, self, sup)
-                  lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
-                  visitExpr(e.value)(
-                    s.extend(newBindings, self, null)
-                  )
-                }
+    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
+      visitExpr(e.key)(s) match {
+        case Val.Str(_, k) =>
+          val prev_length = builder.size()
+          builder.put(
+            k,
+            new Val.Obj.Member(e.plus, Visibility.Normal) {
+              def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                lazy val newScope: ValScope = s.extend(newBindings, self, sup)
+                lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
+                visitExpr(e.value)(
+                  s.extend(newBindings, self, null)
+                )
               }
-            )
-            if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
-              Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
             }
-          case Val.Null(_) => // do nothing
-          case x =>
-            Error.fail(
-              s"Field name must be string or null, not ${x.prettyName}",
-              e.pos
-            )
-        }
+          )
+          if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
+            Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
+          }
+        case Val.Null(_) => // do nothing
+        case x =>
+          Error.fail(
+            s"Field name must be string or null, not ${x.prettyName}",
+            e.pos
+          )
       }
-      val valueCache = if (sup == null) {
-        Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
-      } else {
-        new java.util.HashMap[Any, Val]()
-      }
-      new Val.Obj(e.pos, builder, false, null, sup, valueCache)
     }
-
-    newSelf
+    val valueCache = if (sup == null) {
+      Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
+    } else {
+      new java.util.HashMap[Any, Val]()
+    }
+    new Val.Obj(e.pos, builder, false, null, sup, valueCache)
   }
 
   @tailrec
