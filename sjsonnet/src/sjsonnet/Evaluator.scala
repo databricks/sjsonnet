@@ -845,20 +845,19 @@ class Evaluator(
     lazy val newSelf: Val.Obj = {
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
-        lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
-
-        lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
-
         visitExpr(e.key)(s) match {
           case Val.Str(_, k) =>
             val prev_length = builder.size()
             builder.put(
               k,
               new Val.Obj.Member(e.plus, Visibility.Normal) {
-                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                  lazy val newScope: ValScope = s.extend(newBindings, self, null)
+                  lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
                   visitExpr(e.value)(
                     s.extend(newBindings, self, null)
                   )
+                }
               }
             )
             if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
