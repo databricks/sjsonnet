@@ -852,7 +852,7 @@ class Evaluator(
               k,
               new Val.Obj.Member(e.plus, Visibility.Normal) {
                 def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-                  lazy val newScope: ValScope = s.extend(newBindings, self, null)
+                  lazy val newScope: ValScope = s.extend(newBindings, self, sup)
                   lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
                   visitExpr(e.value)(
                     s.extend(newBindings, self, null)
