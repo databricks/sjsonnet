@@ -194,6 +194,21 @@ object EvaluatorTests extends TestSuite {
           |""".stripMargin,
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Yet another related bug involving super references _not_ in locals:
+      eval(
+        """
+          |local lib = {
+          |  foo():: {
+          |    [k]: super.x + 1
+          |    for k in ["x"]
+          |  },
+          |};
+          |
+          |{ x: 2 }
+          |+ lib.foo()
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
         """sjsonnet.Error: Field name must be string or null, not number
