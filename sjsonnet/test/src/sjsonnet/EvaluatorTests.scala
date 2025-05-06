@@ -177,6 +177,22 @@ object EvaluatorTests extends TestSuite {
           |""".stripMargin,
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Obj("foo" -> ujson.Obj("foo" -> "foo"))
+      // Regression test for a related bug involving local references to `super`:
+      eval(
+        """
+          |local lib = {
+          |  foo():: {
+          |    local sx = super.x,
+          |    [k]: sx + 1
+          |    for k in ["x"]
+          |  },
+          |};
+          |
+          |{ x: 2 }
+          |+ lib.foo()
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
     }
     test("super") {
       test("implicit") {
