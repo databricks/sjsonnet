@@ -152,7 +152,8 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.Obj("x" -> ujson.Num(3))
       // Locals which reference variables from the comprehension:
       eval(
-        """{local x2 = k*2, [std.toString(k)]: x2 for k in [1]}"""
+        """{local x2 = k*2, [std.toString(k)]: x2 for k in [1]}""",
+        useNewEvaluator = useNewEvaluator
       ) ==> ujson.Obj("1" -> ujson.Num(2))
       // Regression test for https://github.com/databricks/sjsonnet/issues/357
       // self references in object comprehension locals are properly rebound during inheritance:
