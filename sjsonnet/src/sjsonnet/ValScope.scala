@@ -22,8 +22,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
       newBindings: Array[Lazy],
       newSelf: Val.Obj,
       newSuper: Val.Obj): ValScope = {
-    val by = newBindings.length + 2
-    val b = Arrays.copyOf(bindings, bindings.length + by)
+    val b = Arrays.copyOf(bindings, bindings.length + newBindings.length + 2)
     b(bindings.length) = newSelf
     b(bindings.length + 1) = newSuper
     System.arraycopy(newBindings, 0, b, bindings.length + 2, newBindings.length)
