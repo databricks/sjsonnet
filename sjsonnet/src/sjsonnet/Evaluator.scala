@@ -697,9 +697,7 @@ class Evaluator(
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
     }
 
-  def visitBindings(
-      bindings: Array[Bind],
-      scope: => ValScope): Array[Lazy] = {
+  def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Lazy] = {
     val arrF = new Array[Lazy](bindings.length)
     var i = 0
     while (i < bindings.length) {

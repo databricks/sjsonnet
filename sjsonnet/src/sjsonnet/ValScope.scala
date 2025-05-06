@@ -18,10 +18,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
 
   def length: Int = bindings.length
 
-  def extend(
-      newBindings: Array[Lazy],
-      newSelf: Val.Obj,
-      newSuper: Val.Obj): ValScope = {
+  def extend(newBindings: Array[Lazy], newSelf: Val.Obj, newSuper: Val.Obj): ValScope = {
     val b = Arrays.copyOf(bindings, bindings.length + newBindings.length + 2)
     b(bindings.length) = newSelf
     b(bindings.length + 1) = newSuper
