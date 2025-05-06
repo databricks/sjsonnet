@@ -193,6 +193,10 @@ object EvaluatorTests extends TestSuite {
           |""".stripMargin,
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Regression test for a bug in handling of non-string field names:
+      evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
+        """sjsonnet.Error: Field name must be string or null, not number
+          |at .(:1:2)""".stripMargin
     }
     test("super") {
       test("implicit") {
