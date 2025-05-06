@@ -699,18 +699,16 @@ class Evaluator(
 
   def visitBindings(
       bindings: Array[Bind],
-      scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Lazy] = {
-    val arrF = new Array[(Val.Obj, Val.Obj) => Lazy](bindings.length)
+      scope: => ValScope): Array[Lazy] = {
+    val arrF = new Array[Lazy](bindings.length)
     var i = 0
     while (i < bindings.length) {
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          (self: Val.Obj, sup: Val.Obj) =>
-            new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope(self, sup)))
+          new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          (self: Val.Obj, sup: Val.Obj) =>
-            new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup)))
+          new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope))
       }
       i += 1
     }
@@ -851,7 +849,7 @@ class Evaluator(
             new Val.Obj.Member(e.plus, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
                 lazy val newScope: ValScope = s.extend(newBindings, self, sup)
-                lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
+                lazy val newBindings = visitBindings(binds, newScope)
                 visitExpr(e.value)(newScope)
               }
             }
