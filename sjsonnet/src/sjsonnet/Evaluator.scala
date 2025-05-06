@@ -864,7 +864,11 @@ class Evaluator(
               Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
             }
           case Val.Null(_) => // do nothing
-          case _           =>
+          case x =>
+            Error.fail(
+              s"Field name must be string or null, not ${x.prettyName}",
+              e.pos
+            )
         }
       }
       val valueCache = if (sup == null) {
