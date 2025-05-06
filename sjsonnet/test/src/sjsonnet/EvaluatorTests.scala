@@ -145,6 +145,15 @@ object EvaluatorTests extends TestSuite {
         """{local y = $["2"], [x]: if x == "1" then y else 0, for x in ["1", "2"]}["1"]""",
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Num(0)
+      // References between locals in an object comprehension:
+      eval(
+        """{local a = 1, local b = a + 1, [k]: b + 1 for k in ["x"]}""",
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Locals which reference variables from the comprehension:
+      eval(
+        """{local x2 = k*2, [std.toString(k)]: x2 for k in [1]}"""
+      ) ==> ujson.Obj("1" -> ujson.Num(2))
     }
     test("super") {
       test("implicit") {
