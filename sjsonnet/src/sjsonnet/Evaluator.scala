@@ -685,7 +685,7 @@ class Evaluator(
     }
   }
 
-  @inline private def fieldNameTypeError(fieldName: Val, pos: Position): Nothing = {
+  private def fieldNameTypeError(fieldName: Val, pos: Position): Nothing = {
     Error.fail(s"Field name must be string or null, not ${fieldName.prettyName}", pos)
   }
 
