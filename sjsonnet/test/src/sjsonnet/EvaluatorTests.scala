@@ -213,6 +213,29 @@ object EvaluatorTests extends TestSuite {
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
         """sjsonnet.Error: Field name must be string or null, not number
           |at .(:1:2)""".stripMargin
+      // Basic function support:
+      eval(
+        """
+          |local funcs = {
+          |  [a](x): x * 2
+          |  for a in ["f1", "f2", "f3"]
+          |};
+          |funcs.f1(10)
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Num(20)
+      // Functions which use locals from the comprehension:
+      eval(
+        """
+          |local funcs = {
+          |  local y = b,
+          |  [a](x): x * y
+          |  for a in ["f1", "f2", "f3"] for b in [2]
+          |};
+          |funcs.f1(10)
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Num(20)
     }
     test("super") {
       test("implicit") {
