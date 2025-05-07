@@ -680,13 +680,13 @@ class Evaluator(
         visitExpr(k) match {
           case Val.Str(_, k1) => k1
           case Val.Null(_)    => null
-          case x =>
-            Error.fail(
-              s"Field name must be string or null, not ${x.prettyName}",
-              pos
-            )
+          case x              => fieldNameTypeError(x, pos)
         }
     }
+  }
+
+  private def fieldNameTypeError(fieldName: Val, pos: Position): Nothing = {
+    Error.fail(s"Field name must be string or null, not ${fieldName.prettyName}", pos)
   }
 
   def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit
@@ -856,11 +856,7 @@ class Evaluator(
             Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
           }
         case Val.Null(_) => // do nothing
-        case x =>
-          Error.fail(
-            s"Field name must be string or null, not ${x.prettyName}",
-            e.pos
-          )
+        case x           => fieldNameTypeError(x, e.pos)
       }
     }
     val valueCache = if (sup == null) {
