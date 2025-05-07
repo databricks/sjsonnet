@@ -846,6 +846,9 @@ class Evaluator(
             k,
             new Val.Obj.Member(e.plus, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                // There is a circular dependency between `newScope` and `newBindings` because
+                // bindings may refer to other bindings (e.g. chains of locals that build on
+                // each other):
                 lazy val newScope: ValScope = s.extend(newBindings, self, sup)
                 lazy val newBindings = visitBindings(binds, newScope)
                 visitExpr(e.value)(newScope)
