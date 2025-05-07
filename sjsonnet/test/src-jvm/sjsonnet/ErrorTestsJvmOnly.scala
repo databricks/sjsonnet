@@ -22,6 +22,17 @@ object ErrorTestsJvmOnly extends TestSuite {
   }
 
   val tests: Tests = Tests {
+    // Hack: this test suite may flakily fail if this suite runs prior to other error tests:
+    // if classloading or linking happens inside the StackOverflowError handling then that
+    // may will trigger a secondary StackOverflowError and cause the test to fail.
+    // As a temporary solution, we redundantly run one of the other error tests first.
+    // A better long term solution would be to change how we handle StackOverflowError
+    // to avoid this failure mode, but for now we add this hack to avoid CI flakiness:
+    test("02") - check(
+      """sjsonnet.Error: Foo.
+        |    at [Error].(sjsonnet/test/resources/test_suite/error.02.jsonnet:17:1)
+        |""".stripMargin
+    )
     test("array_recursive_manifest") - check(
       """sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
         |    at .(sjsonnet/test/resources/test_suite/error.array_recursive_manifest.jsonnet:17:12)
