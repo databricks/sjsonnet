@@ -278,8 +278,13 @@ To publish, make sure the version number in `build.sc` is correct, then run the 
 
 ## Changelog
 
-## 0.5.0 (Upcoming)
-- Preliminary support for Scala3
+## 0.5.0 (Latest)
+- Add support for Scala3
+- Fix std.min/maxArray
+- Add array compare
+- Fix formatter for Array and Obj and add ErrorTests to JS
+- Fix overly-eager evaluation of unmerged or removed target fields in std.mergePatch
+- [Full Release Note](https://github.com/databricks/sjsonnet/releases/tag/0.5.0)
 
 ### 0.4.15.1
 - Various small bug fixes.
