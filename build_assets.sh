@@ -4,7 +4,7 @@ set -euo pipefail
 # TODO: move that into mill.
 
 VERSION="0.5.0"
-SCALA_VERSION="3.3.5"
+SCALA_VERSION="3.3.6"
 OS=$(uname -s)
 ARCH=$(uname -m)
 TMPDIR=$(mktemp -d)
