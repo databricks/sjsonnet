@@ -430,8 +430,20 @@ class Parser(
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      val Expr.Member.Field(offset, Expr.FieldName.Dyn(lhs), plus, args, Visibility.Normal, rhs) =
+      val Expr.Member.Field(
+        offset,
+        Expr.FieldName.Dyn(lhs),
+        plus,
+        args,
+        Visibility.Normal,
+        rhsBody
+      ) =
         exprs(preLocals.length): @unchecked
+      val rhs = if (args == null) {
+        rhsBody
+      } else {
+        Expr.Function(offset, args, rhsBody)
+      }
       val postLocals = exprs
         .drop(preLocals.length + 1)
         .takeWhile(_.isInstanceOf[Expr.Bind])
