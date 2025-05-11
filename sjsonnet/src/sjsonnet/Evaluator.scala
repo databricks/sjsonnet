@@ -680,13 +680,13 @@ class Evaluator(
         visitExpr(k) match {
           case Val.Str(_, k1) => k1
           case Val.Null(_)    => null
-          case x =>
-            Error.fail(
-              s"Field name must be string or null, not ${x.prettyName}",
-              pos
-            )
+          case x              => fieldNameTypeError(x, pos)
         }
     }
+  }
+
+  private def fieldNameTypeError(fieldName: Val, pos: Position): Nothing = {
+    Error.fail(s"Field name must be string or null, not ${fieldName.prettyName}", pos)
   }
 
   def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit
@@ -697,20 +697,16 @@ class Evaluator(
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
     }
 
-  def visitBindings(
-      bindings: Array[Bind],
-      scope: (Val.Obj, Val.Obj) => ValScope): Array[(Val.Obj, Val.Obj) => Lazy] = {
-    val arrF = new Array[(Val.Obj, Val.Obj) => Lazy](bindings.length)
+  def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Lazy] = {
+    val arrF = new Array[Lazy](bindings.length)
     var i = 0
     while (i < bindings.length) {
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          (self: Val.Obj, sup: Val.Obj) =>
-            new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope(self, sup)))
+          new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          (self: Val.Obj, sup: Val.Obj) =>
-            new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope(self, sup)))
+          new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope))
       }
       i += 1
     }
@@ -841,42 +837,37 @@ class Evaluator(
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope // .clearSuper
-
-    lazy val newSelf: Val.Obj = {
-      val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-      for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
-        lazy val newScope: ValScope = s.extend(newBindings, newSelf, null)
-
-        lazy val newBindings = visitBindings(binds, (self, sup) => newScope)
-
-        visitExpr(e.key)(s) match {
-          case Val.Str(_, k) =>
-            val prev_length = builder.size()
-            builder.put(
-              k,
-              new Val.Obj.Member(e.plus, Visibility.Normal) {
-                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
-                  visitExpr(e.value)(
-                    s.extend(newBindings, self, null)
-                  )
+    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
+    for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
+      visitExpr(e.key)(s) match {
+        case Val.Str(_, k) =>
+          val prev_length = builder.size()
+          builder.put(
+            k,
+            new Val.Obj.Member(e.plus, Visibility.Normal) {
+              def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                // There is a circular dependency between `newScope` and `newBindings` because
+                // bindings may refer to other bindings (e.g. chains of locals that build on
+                // each other):
+                lazy val newScope: ValScope = s.extend(newBindings, self, sup)
+                lazy val newBindings = visitBindings(binds, newScope)
+                visitExpr(e.value)(newScope)
               }
-            )
-            if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
-              Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
             }
-          case Val.Null(_) => // do nothing
-          case _           =>
-        }
+          )
+          if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
+            Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
+          }
+        case Val.Null(_) => // do nothing
+        case x           => fieldNameTypeError(x, e.pos)
       }
-      val valueCache = if (sup == null) {
-        Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
-      } else {
-        new java.util.HashMap[Any, Val]()
-      }
-      new Val.Obj(e.pos, builder, false, null, sup, valueCache)
     }
-
-    newSelf
+    val valueCache = if (sup == null) {
+      Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
+    } else {
+      new java.util.HashMap[Any, Val]()
+    }
+    new Val.Obj(e.pos, builder, false, null, sup, valueCache)
   }
 
   @tailrec

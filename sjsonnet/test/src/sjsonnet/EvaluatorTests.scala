@@ -145,6 +145,97 @@ object EvaluatorTests extends TestSuite {
         """{local y = $["2"], [x]: if x == "1" then y else 0, for x in ["1", "2"]}["1"]""",
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Num(0)
+      // References between locals in an object comprehension:
+      eval(
+        """{local a = 1, local b = a + 1, [k]: b + 1 for k in ["x"]}""",
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Locals which reference variables from the comprehension:
+      eval(
+        """{local x2 = k*2, [std.toString(k)]: x2 for k in [1]}""",
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("1" -> ujson.Num(2))
+      // Regression test for https://github.com/databricks/sjsonnet/issues/357
+      // self references in object comprehension locals are properly rebound during inheritance:
+      eval(
+        """
+          |local lib = {
+          |  foo()::
+          |    {
+          |      local global = self,
+          |
+          |      [iterParam]: global.base {
+          |        foo: iterParam
+          |      }
+          |      for iterParam in ["foo"]
+          |    },
+          |};
+          |
+          |{
+          | base:: {}
+          |}
+          |+ lib.foo()
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("foo" -> ujson.Obj("foo" -> "foo"))
+      // Regression test for a related bug involving local references to `super`:
+      eval(
+        """
+          |local lib = {
+          |  foo():: {
+          |    local sx = super.x,
+          |    [k]: sx + 1
+          |    for k in ["x"]
+          |  },
+          |};
+          |
+          |{ x: 2 }
+          |+ lib.foo()
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Yet another related bug involving super references _not_ in locals:
+      eval(
+        """
+          |local lib = {
+          |  foo():: {
+          |    [k]: super.x + 1
+          |    for k in ["x"]
+          |  },
+          |};
+          |
+          |{ x: 2 }
+          |+ lib.foo()
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Obj("x" -> ujson.Num(3))
+      // Regression test for a bug in handling of non-string field names:
+      evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
+        """sjsonnet.Error: Field name must be string or null, not number
+          |at .(:1:2)""".stripMargin
+      // Basic function support:
+      eval(
+        """
+          |local funcs = {
+          |  [a](x): x * 2
+          |  for a in ["f1", "f2", "f3"]
+          |};
+          |funcs.f1(10)
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Num(20)
+      // Functions which use locals from the comprehension:
+      eval(
+        """
+          |local funcs = {
+          |  local y = b,
+          |  [a](x): x * y
+          |  for a in ["f1", "f2", "f3"] for b in [2]
+          |};
+          |funcs.f1(10)
+          |""".stripMargin,
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Num(20)
     }
     test("super") {
       test("implicit") {
