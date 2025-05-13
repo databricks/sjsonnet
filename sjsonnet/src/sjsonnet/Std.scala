@@ -165,14 +165,23 @@ class Std(
   private object ObjectFields extends Val.Builtin1("objectFields", "o") {
     def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val = {
       val keys = getVisibleKeys(ev, o.force.asObj)
-      new Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
   private object ObjectFieldsAll extends Val.Builtin1("objectFieldsAll", "o") {
     def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val = {
       val keys = getAllKeys(ev, o.force.asObj)
-      new Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+    }
+  }
+
+  private object ObjectFieldsEx extends Val.Builtin2("objectFieldsEx", "o", "inc_hidden") {
+    def evalRhs(o: Lazy, incHidden: Lazy, ev: EvalScope, pos: Position): Val = {
+      val keys =
+        if (incHidden.force.asBoolean) getAllKeys(ev, o.force.asObj)
+        else getVisibleKeys(ev, o.force.asObj)
+      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
@@ -1072,8 +1081,17 @@ class Std(
     builtin(Length),
     builtin(ObjectHas),
     builtin(ObjectHasAll),
+    builtin("objectHasEx", "o", "k", "inc_hidden") {
+      (_, _, o: Val, k: String, incHidden: Boolean) =>
+        if (incHidden) {
+          o.asObj.containsKey(k)
+        } else {
+          o.asObj.containsVisibleKey(k)
+        }
+    },
     builtin(ObjectFields),
     builtin(ObjectFieldsAll),
+    builtin(ObjectFieldsEx),
     builtin(ObjectValues),
     builtin(ObjectValuesAll),
     builtin(Type),
