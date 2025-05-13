@@ -421,28 +421,37 @@ class Evaluator(
         }
       case None => default
     }
-    visitExpr(e.value) match {
+    def length0(e: Val): Int = e match {
+      case Val.Str(_, s) => s.length
+      case a: Val.Arr    => a.length
+      case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)
+    }
+    val indexable = visitExpr(e.value) match {
+      case arr: Val.Arr => arr
+      case str: Val.Str => str
+      case x            => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
+    }
+    val length = length0(indexable)
+    val start = {
+      val _start = extractParam(e.start, 0)
+      if (_start < 0) Math.max(0, length + _start) else _start
+    }
+    val end = {
+      val _end = extractParam(e.end, length)
+      if (_end < 0) length + _end else _end
+    }
+    val step = extractParam(e.stride, 1)
+    if (step < 0) {
+      Error.fail(s"got [$start:$end:$step] but negative steps are not supported", e.pos)
+    } else if (step == 0) {
+      Error.fail(s"got $step but step must be greater than 0", e.pos)
+    }
+    indexable match {
       case a: Val.Arr =>
-        new Val.Arr(
-          e.pos,
-          Util.sliceArr(
-            a.asLazyArray,
-            extractParam(e.start, 0),
-            extractParam(e.end, a.length),
-            extractParam(e.stride, 1)
-          )
-        )
+        Val.Arr(e.pos, Util.sliceArr(a.asLazyArray, start, end, step))
 
       case Val.Str(_, s) =>
-        Val.Str(
-          e.pos,
-          Util.sliceStr(
-            s,
-            e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-          )
-        )
+        Val.Str(e.pos, Util.sliceStr(s, start, end, step))
 
       case x => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
     }

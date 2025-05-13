@@ -49,14 +49,16 @@ object SjsonnetTestMain {
     val start = System.currentTimeMillis()
     var count = 0
     val parseCache = new DefaultParseCache
-    while(System.currentTimeMillis() - start < 20000){
+    while (System.currentTimeMillis() - start < 20000) {
       count += 1
-      for(name <- names/*Seq(
+      for (
+        name <- names /*Seq(
         "kube-config/sentry/dev/sentry.jsonnet",
         "kube-config/runbot/staging/runbot-app.jsonnet",
         "kubernetes/config/prometheus/prom-jobs/prod/azure/westus/prometheus.jsonnet",
         "kube-config/shard/multitenant/aws/test/test-personal-shard.jsonnet"
-      )*/){
+      )*/
+      ) {
 
 //        println(name)
 //

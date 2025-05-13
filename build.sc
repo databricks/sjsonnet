@@ -1,4 +1,5 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._, scalajslib.api._, scalafmt._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._,
+  scalajslib.api._, scalafmt._
 import scalalib.api.ZincWorkerUtil
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
@@ -23,7 +24,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
   )
   def publishVersion = sjsonnetVersion
 
-  def generatedSources = T{
+  def generatedSources = T {
     os.write(
       T.ctx().dest / "Version.scala",
       s"""package sjsonnet
@@ -41,17 +42,18 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
     licenses = Seq(License.MIT),
     versionControl = VersionControl.github("databricks", "sjsonnet"),
     developers = Seq(
-      Developer("lihaoyi", "Li Haoyi","https://github.com/lihaoyi")
+      Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi")
     )
   )
   def scalacOptions = Seq("-deprecation", "-Werror") ++ (
-    if (!ZincWorkerUtil.isScala3(scalaVersion())) Seq(
-      "-opt:l:inline",
-      "-opt-inline-from:sjsonnet.*,sjsonnet.**",
-      "-Xsource:3",
-      "-Xlint:_") ++ (
-        if (scalaVersion() startsWith "2.13") Seq("-Wconf:origin=scala.collection.compat.*:s")
-        else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
+    if (!ZincWorkerUtil.isScala3(scalaVersion()))
+      Seq(
+        "-opt:l:inline",
+        "-opt-inline-from:sjsonnet.*,sjsonnet.**",
+        "-Xsource:3",
+        "-Xlint:_"
+      ) ++ (if (scalaVersion() startsWith "2.13") Seq("-Wconf:origin=scala.collection.compat.*:s")
+            else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
@@ -68,7 +70,7 @@ trait SjsonnetJvmNative extends ScalaModule {
 
 object sjsonnet extends Module {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
-  trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule{
+  trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule {
     def millSourcePath = super.millSourcePath / os.up
     def scalaJSVersion = "1.17.0"
     def esVersion = ESVersion.ES2018
@@ -78,17 +80,22 @@ object sjsonnet extends Module {
       this.millSourcePath / "src-jvm-js"
     )
     object test extends ScalaJSTests with CrossTests {
-      def jsEnvConfig = JsEnvConfig.NodeJs(args=List("--stack-size=" + stackSizekBytes))
-      def generatedSources = T{
-        val files = os.walk(this.millSourcePath / "resources").filterNot(os.isDir).map(p => p.relativeTo(this.millSourcePath / "resources") -> os.read.bytes(p)).toMap
+      def jsEnvConfig = JsEnvConfig.NodeJs(args = List("--stack-size=" + stackSizekBytes))
+      def generatedSources = T {
+        val files = os
+          .walk(this.millSourcePath / "resources")
+          .filterNot(os.isDir)
+          .map(p => p.relativeTo(this.millSourcePath / "resources") -> os.read.bytes(p))
+          .toMap
         os.write(
           T.ctx().dest / "TestResources.scala",
           s"""package sjsonnet
              |
              |object TestResources{
              |  val files = Map(
-             |""".stripMargin)
-        for((k, v) <- files) {
+             |""".stripMargin
+        )
+        for ((k, v) <- files) {
           val name = k.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
           val values = Base64.getEncoder().encodeToString(v).grouped(65535).toSeq
           os.write(
@@ -103,7 +110,8 @@ object sjsonnet extends Module {
                |  )
                |  def content = Base64.getDecoder().decode(contentArr.mkString)
                |}
-               |""".stripMargin)
+               |""".stripMargin
+          )
           os.write.append(
             T.ctx().dest / "TestResources.scala",
             s"""    "$k" -> $name.content,
@@ -116,13 +124,21 @@ object sjsonnet extends Module {
              |}
              |""".stripMargin
         )
-        Seq(PathRef(T.ctx().dest / "TestResources.scala")) ++ files.keys.map(p => PathRef(T.ctx().dest / s"${p.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")}.scala"))
+        Seq(PathRef(T.ctx().dest / "TestResources.scala")) ++ files.keys.map(p =>
+          PathRef(
+            T.ctx()
+              .dest / s"${p.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")}.scala"
+          )
+        )
       }
     }
   }
 
   object native extends Cross[SjsonnetNativeModule](scalaVersions)
-  trait SjsonnetNativeModule extends SjsonnetCrossModule with ScalaNativeModule with SjsonnetJvmNative {
+  trait SjsonnetNativeModule
+      extends SjsonnetCrossModule
+      with ScalaNativeModule
+      with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def scalaNativeVersion = "0.5.7"
     def sources = T.sources(
@@ -136,7 +152,7 @@ object sjsonnet extends Module {
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
       def forkEnv = Map(
-        "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize,
+        "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize
       )
       def nativeLTO = LTO.None
     }
@@ -149,16 +165,16 @@ object sjsonnet extends Module {
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-jvm",
-      this.millSourcePath / "src-jvm-native",
+      this.millSourcePath / "src-jvm-native"
     )
     def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.json:json:20250107",
       ivy"org.tukaani:xz::1.10",
       ivy"org.lz4:lz4-java::1.8.0",
       ivy"org.yaml:snakeyaml::2.0",
-      ivy"com.google.re2j:re2j:1.8",
+      ivy"com.google.re2j:re2j:1.8"
     )
-    
+
     object test extends ScalaTests with CrossTests {
       def forkArgs = Seq("-Xss" + stackSize)
     }
@@ -173,7 +189,7 @@ object sjsonnet extends Module {
       object test extends JavaTests with TestModule.Junit4
     }
 
-    object server extends ScalaModule{
+    object server extends ScalaModule {
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
       def ivyDeps = Agg(
@@ -222,7 +238,7 @@ object sjsonnet extends Module {
       def sources = T.sources(
         this.millSourcePath / os.up / os.up / "bench" / "src",
         this.millSourcePath / os.up / "test" / "src" / "sjsonnet" / "OldRenderer.scala",
-        this.millSourcePath / os.up / "test" / "src" / "sjsonnet" / "OldYamlRenderer.scala",
+        this.millSourcePath / os.up / "test" / "src" / "sjsonnet" / "OldYamlRenderer.scala"
       )
       def scalacOptions = SjsonnnetJvmModule.this.scalacOptions
     }

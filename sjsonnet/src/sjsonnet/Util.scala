@@ -21,12 +21,15 @@ object Util {
       start: Int,
       end: Int,
       step: Int): Array[T] = {
-    step match {
-      case 1 => arr.slice(start, end)
-      case _ =>
-        val range = start until end by step
-        range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
-    }
+    if (start >= end || start >= arr.length) {
+      Array.empty[T]
+    } else
+      step match {
+        case 1 => arr.slice(start, end)
+        case _ =>
+          val range = start until end by step
+          range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
+      }
   }
   def sliceArr[T: scala.reflect.ClassTag](
       arr: Array[T],
@@ -36,12 +39,15 @@ object Util {
     sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
   }
   def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
-    step match {
-      case 1 => s.slice(start, end)
-      case _ =>
-        val range = start until end by step
-        new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
-    }
+    if (start >= end || start >= s.length) {
+      ""
+    } else
+      step match {
+        case 1 => s.slice(start, end)
+        case _ =>
+          val range = start until end by step
+          new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
+      }
   }
   def sliceStr(s: String, start: Option[Int], end: Option[Int], step: Option[Int]): String = {
     sliceStr(s, start.getOrElse(0), end.getOrElse(s.length), step.getOrElse(1))
