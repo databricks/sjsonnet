@@ -1216,13 +1216,8 @@ class Std(
         math.max(minVal, math.min(x, maxVal))
     },
     builtin("slice", "indexable", "index", "end", "step") {
-      (pos, ev, indexable: Val, index: Option[Int], end: Option[Int], step: Option[Int]) =>
-        val res = indexable match {
-          case Val.Str(pos0, s) => Val.Str(pos, Util.sliceStr(s, index, end, step))
-          case arr: Val.Arr => new Val.Arr(pos, Util.sliceArr(arr.asLazyArray, index, end, step))
-          case _            => Error.fail("std.slice first argument must be indexable")
-        }
-        res: Val
+      (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
+        Util.slice(pos, ev, indexable, index, _end, _step)
     },
     builtin("makeArray", "sz", "func") { (pos, ev, sz: Int, func: Val.Func) =>
       new Val.Arr(

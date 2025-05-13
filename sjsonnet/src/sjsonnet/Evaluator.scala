@@ -412,40 +412,25 @@ class Evaluator(
   }
 
   protected def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
-    def extractParam(e: Option[Expr], default: Int): Int = e match {
-      case Some(expr) =>
-        visitExpr(expr) match {
-          case _: Val.Null => default
-          case v: Val.Num  => v.value.toInt
-          case v: Val      => v.cast[Val.Num].value.toInt
-        }
-      case None => default
-    }
-    visitExpr(e.value) match {
-      case a: Val.Arr =>
-        new Val.Arr(
-          e.pos,
-          Util.sliceArr(
-            a.asLazyArray,
-            extractParam(e.start, 0),
-            extractParam(e.end, a.length),
-            extractParam(e.stride, 1)
-          )
-        )
+    def extractParam(e: Option[Expr]): Option[Int] = e.flatMap(visitExpr(_) match {
+      case _: Val.Null => None
+      case v: Val.Num  => Some(v.value.toInt)
+      case v: Val      => Some(v.cast[Val.Num].value.toInt)
+    })
 
-      case Val.Str(_, s) =>
-        Val.Str(
-          e.pos,
-          Util.sliceStr(
-            s,
-            e.start.fold(0)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.end.fold(s.length)(visitExpr(_).cast[Val.Num].value.toInt),
-            e.stride.fold(1)(visitExpr(_).cast[Val.Num].value.toInt)
-          )
-        )
-
-      case x => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
+    val indexable = visitExpr(e.value) match {
+      case arr: Val.Arr => arr
+      case str: Val.Str => str
+      case x            => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
     }
+    Util.slice(
+      e.pos,
+      this,
+      indexable,
+      extractParam(e.start),
+      extractParam(e.end),
+      extractParam(e.stride)
+    )
   }
 
   def visitLookup(e: Lookup)(implicit scope: ValScope): Val = {

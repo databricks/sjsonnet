@@ -21,13 +21,56 @@ object Util {
       start: Int,
       end: Int,
       step: Int): Array[T] = {
-    step match {
-      case 1 => arr.slice(start, end)
-      case _ =>
-        val range = start until end by step
-        range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
-    }
+    if (start >= end || start >= arr.length) {
+      Array.empty[T]
+    } else
+      step match {
+        case 1 => arr.slice(start, end)
+        case _ =>
+          val range = start until end by step
+          range.dropWhile(_ < 0).takeWhile(_ < arr.length).map(arr).toArray
+      }
   }
+
+  def slice(
+      pos: Position,
+      ev: EvalScope,
+      indexable: Val,
+      index: Option[Int],
+      _end: Option[Int],
+      _step: Option[Int]): Val = {
+    def length0(e: Val): Int = e match {
+      case Val.Str(_, s) => s.length
+      case a: Val.Arr    => a.length
+      case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)(ev)
+    }
+    val length = length0(indexable)
+    val start = index match {
+      case None    => 0
+      case Some(i) => if (i < 0) Math.max(0, length + i) else i
+    }
+    val end = _end match {
+      case None    => length
+      case Some(e) => if (e < 0) length + e else e
+    }
+    val step = _step match {
+      case None => 1
+      case Some(s) =>
+        if (s < 0) {
+          Error.fail(s"got [$start:$end:$s] but negative steps are not supported", pos)(ev)
+        } else if (s == 0) {
+          Error.fail(s"got $s but step must be greater than 0", pos)(ev)
+        }
+        s
+    }
+    val res = indexable match {
+      case Val.Str(_, s) => Val.Str(pos, Util.sliceStr(s, start, end, step))
+      case arr: Val.Arr  => Val.Arr(pos, Util.sliceArr(arr.asLazyArray, start, end, step))
+      case _ => Error.fail("Can only slice array or string, not " + indexable.prettyName, pos)(ev)
+    }
+    res: Val
+  }
+
   def sliceArr[T: scala.reflect.ClassTag](
       arr: Array[T],
       start: Option[Int],
@@ -36,12 +79,15 @@ object Util {
     sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
   }
   def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
-    step match {
-      case 1 => s.slice(start, end)
-      case _ =>
-        val range = start until end by step
-        new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
-    }
+    if (start >= end || start >= s.length) {
+      ""
+    } else
+      step match {
+        case 1 => s.slice(start, end)
+        case _ =>
+          val range = start until end by step
+          new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
+      }
   }
   def sliceStr(s: String, start: Option[Int], end: Option[Int], step: Option[Int]): String = {
     sliceStr(s, start.getOrElse(0), end.getOrElse(s.length), step.getOrElse(1))

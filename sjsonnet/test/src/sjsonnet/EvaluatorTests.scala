@@ -27,6 +27,9 @@ object EvaluatorTests extends TestSuite {
         "std.slice(std.range(1,4), null, null, null)",
         useNewEvaluator = useNewEvaluator
       ) ==> ujson.Arr(1, 2, 3, 4)
+      eval("""
+             |std.slice("jsonnet", -3, null, null)
+             |""".stripMargin) ==> ujson.Str("net")
       eval("std.range(1,4)[0::2]", useNewEvaluator = useNewEvaluator) ==> ujson.Arr(1, 3)
       eval("std.range(1,4)[0:null:2]", useNewEvaluator = useNewEvaluator) ==> ujson.Arr(1, 3)
       eval("std.range(1,4)[null:null:2]", useNewEvaluator = useNewEvaluator) ==> ujson.Arr(1, 3)
@@ -211,7 +214,7 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.Obj("x" -> ujson.Num(3))
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
-        """sjsonnet.Error: Field name must be string or null, not number
+      """sjsonnet.Error: Field name must be string or null, not number
           |at .(:1:2)""".stripMargin
       // Basic function support:
       eval(
