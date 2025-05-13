@@ -4,7 +4,11 @@ import utest._
 import ujson.Value
 
 object FileTests extends TestSuite {
-  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT") match {
+    case Some(path) => os.Path(path)
+    case None => os.pwd
+  }
+  val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(p: os.Path): Either[String, Value] = {
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),

@@ -58,6 +58,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def testSandboxWorkingDir = false
+    def forkEnv = Map("MILL_WORKSPACE_ROOT" -> T.workspace.toString())
     def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.5")
   }
 }
@@ -152,7 +153,7 @@ object sjsonnet extends Module {
 
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
-      def forkEnv = Map(
+      def forkEnv = super.forkEnv() ++ Map(
         "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize
       )
       def nativeLTO = LTO.None
