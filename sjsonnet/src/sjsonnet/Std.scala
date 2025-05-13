@@ -1217,36 +1217,7 @@ class Std(
     },
     builtin("slice", "indexable", "index", "end", "step") {
       (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
-        def length0(e: Val): Int = e match {
-          case Val.Str(_, s) => s.length
-          case a: Val.Arr    => a.length
-          case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)(ev)
-        }
-        val length = length0(indexable)
-        val start = index match {
-          case None    => 0
-          case Some(i) => if (i < 0) Math.max(0, length + i) else i
-        }
-        val end = _end match {
-          case None    => length
-          case Some(e) => if (e < 0) length + e else e
-        }
-        val step = _step match {
-          case None => 1
-          case Some(s) =>
-            if (s < 0) {
-              Error.fail(s"got [$start:$end:$s] but negative steps are not supported", pos)(ev)
-            } else if (s == 0) {
-              Error.fail(s"got $s but step must be greater than 0", pos)(ev)
-            }
-            s
-        }
-        val res = indexable match {
-          case Val.Str(_, s) => Val.Str(pos, Util.sliceStr(s, start, end, step))
-          case arr: Val.Arr  => Val.Arr(pos, Util.sliceArr(arr.asLazyArray, start, end, step))
-          case _             => Error.fail("std.slice first argument must be indexable")
-        }
-        res: Val
+        Util.slice(pos, ev, indexable, index, _end, _step)
     },
     builtin("makeArray", "sz", "func") { (pos, ev, sz: Int, func: Val.Func) =>
       new Val.Arr(

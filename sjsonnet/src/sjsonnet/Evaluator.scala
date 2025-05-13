@@ -412,49 +412,25 @@ class Evaluator(
   }
 
   protected def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
-    def extractParam(e: Option[Expr], default: Int): Int = e match {
-      case Some(expr) =>
-        visitExpr(expr) match {
-          case _: Val.Null => default
-          case v: Val.Num  => v.value.toInt
-          case v: Val      => v.cast[Val.Num].value.toInt
-        }
-      case None => default
-    }
-    def length0(e: Val): Int = e match {
-      case Val.Str(_, s) => s.length
-      case a: Val.Arr    => a.length
-      case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)
-    }
+    def extractParam(e: Option[Expr]): Option[Int] = e.flatMap(visitExpr(_) match {
+      case _: Val.Null => None
+      case v: Val.Num  => Some(v.value.toInt)
+      case v: Val      => Some(v.cast[Val.Num].value.toInt)
+    })
+
     val indexable = visitExpr(e.value) match {
       case arr: Val.Arr => arr
       case str: Val.Str => str
       case x            => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
     }
-    val length = length0(indexable)
-    val start = {
-      val _start = extractParam(e.start, 0)
-      if (_start < 0) Math.max(0, length + _start) else _start
-    }
-    val end = {
-      val _end = extractParam(e.end, length)
-      if (_end < 0) length + _end else _end
-    }
-    val step = extractParam(e.stride, 1)
-    if (step < 0) {
-      Error.fail(s"got [$start:$end:$step] but negative steps are not supported", e.pos)
-    } else if (step == 0) {
-      Error.fail(s"got $step but step must be greater than 0", e.pos)
-    }
-    indexable match {
-      case a: Val.Arr =>
-        Val.Arr(e.pos, Util.sliceArr(a.asLazyArray, start, end, step))
-
-      case Val.Str(_, s) =>
-        Val.Str(e.pos, Util.sliceStr(s, start, end, step))
-
-      case x => Error.fail("Can only slice array or string, not " + x.prettyName, e.pos)
-    }
+    Util.slice(
+      e.pos,
+      this,
+      indexable,
+      extractParam(e.start),
+      extractParam(e.end),
+      extractParam(e.stride)
+    )
   }
 
   def visitLookup(e: Lookup)(implicit scope: ValScope): Val = {
