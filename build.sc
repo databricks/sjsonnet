@@ -57,6 +57,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
+    def testSandboxWorkingDir = false
     def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.5")
   }
 }
