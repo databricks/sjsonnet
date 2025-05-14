@@ -168,14 +168,14 @@ class Parser(
     (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
   )
 
-  def arr[$: P]: P[Expr] = P((Pos ~~ &("]")).map(new Val.Arr(_, emptyLazyArray)) | arrBody)
+  def arr[$: P]: P[Expr] = P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody)
   def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] =
     P(forspec ~ compspec).map(Left(_))
   def arrBody[$: P]: P[Expr] = P(
     Pos ~~ expr ~
     (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
   ).map {
-    case (offset, first: Val, None)        => new Val.Arr(offset, Array(first))
+    case (offset, first: Val, None)        => Val.Arr(offset, Array(first))
     case (offset, first, None)             => Expr.Arr(offset, Array(first))
     case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
     case (offset, first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
@@ -186,7 +186,7 @@ class Parser(
         a(i) = v.asInstanceOf[Val]
         i += 1
       }
-      new Val.Arr(offset, a)
+      Val.Arr(offset, a)
     case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
   }
 

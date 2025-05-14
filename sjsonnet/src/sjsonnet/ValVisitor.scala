@@ -17,7 +17,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     val a = new mutable.ArrayBuilder.ofRef[Lazy]
     def subVisitor: Visitor[?, ?] = self
     def visitValue(v: Val, index: Int): Unit = a.+=(v)
-    def visitEnd(index: Int): Val = new Val.Arr(pos, a.result())
+    def visitEnd(index: Int): Val = Val.Arr(pos, a.result())
   }
 
   def visitObject(length: Int, index: Int): ObjVisitor[Val, Val] = new ObjVisitor[Val, Val] {

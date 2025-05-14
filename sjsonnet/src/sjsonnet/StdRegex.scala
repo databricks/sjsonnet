@@ -26,7 +26,7 @@ object StdRegex {
         "captures" -> new Obj.ConstMember(
           true,
           Visibility.Normal,
-          new Val.Arr(pos.noOffset, captures)
+          Val.Arr(pos.noOffset, captures)
         ),
         "namedCaptures" -> new Obj.ConstMember(
           true,

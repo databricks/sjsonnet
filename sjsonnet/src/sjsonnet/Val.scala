@@ -112,7 +112,7 @@ object Val {
     override def asDouble: Double = value
   }
 
-  case class Arr(val pos: Position, private val value: Array[? <: Lazy]) extends Literal {
+  case class Arr(pos: Position, private val value: Array[? <: Lazy]) extends Literal {
     def prettyName = "array"
 
     override def asArr: Arr = this
@@ -122,8 +122,7 @@ object Val {
     def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
     def asStrictArray: Array[Val] = value.map(_.force)
 
-    def concat(newPos: Position, rhs: Arr): Arr =
-      new Arr(newPos, value ++ rhs.value)
+    def concat(newPos: Position, rhs: Arr): Arr = Arr(newPos, value ++ rhs.value)
 
     def iterator: Iterator[Val] = value.iterator.map(_.force)
     def foreach[U](f: Val => U): Unit = {
@@ -369,7 +368,7 @@ object Val {
       } else if (l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
         val ll = l.asInstanceOf[Val.Arr].asLazyArray
         val rr = r.asInstanceOf[Val.Arr].asLazyArray
-        new Val.Arr(pos, ll ++ rr)
+        Val.Arr(pos, ll ++ rr)
       } else if (l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
         val ll = l.asInstanceOf[Val.Obj]
         val rr = r.asInstanceOf[Val.Obj]
