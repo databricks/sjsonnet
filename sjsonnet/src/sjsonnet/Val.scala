@@ -1,7 +1,6 @@
 package sjsonnet
 
 import java.util
-import java.util.Arrays
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
@@ -16,7 +15,7 @@ import scala.reflect.ClassTag
  * on-demand
  */
 abstract class Lazy {
-  protected var cached: Val = null
+  protected var cached: Val = _
   def compute(): Val
   final def force: Val = {
     if (cached == null) cached = compute()
@@ -231,7 +230,7 @@ object Val {
       with Expr.ObjBody {
     var asserting: Boolean = false
 
-    def getSuper = `super`
+    def getSuper: Obj = `super`
 
     private def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       // value0 is always defined for non-static objects, so if we're computing it here
@@ -354,27 +353,23 @@ object Val {
      * Merge two values for "nested field inheritance"; see
      * https://jsonnet.org/ref/language.html#nested-field-inheritance for background.
      */
-    def mergeMember(l: Val, r: Val, pos: Position)(implicit evaluator: EvalScope): Literal = {
-      val lStr = l.isInstanceOf[Val.Str]
-      val rStr = r.isInstanceOf[Val.Str]
-      if (lStr || rStr) {
-        val ll = if (lStr) l.asInstanceOf[Val.Str].value else renderString(l)
-        val rr = if (rStr) r.asInstanceOf[Val.Str].value else renderString(r)
-        Val.Str(pos, ll ++ rr)
-      } else if (l.isInstanceOf[Val.Num] && r.isInstanceOf[Val.Num]) {
-        val ll = l.asInstanceOf[Val.Num].value
-        val rr = r.asInstanceOf[Val.Num].value
-        Val.Num(pos, ll + rr)
-      } else if (l.isInstanceOf[Val.Arr] && r.isInstanceOf[Val.Arr]) {
-        val ll = l.asInstanceOf[Val.Arr].asLazyArray
-        val rr = r.asInstanceOf[Val.Arr].asLazyArray
-        Val.Arr(pos, ll ++ rr)
-      } else if (l.isInstanceOf[Val.Obj] && r.isInstanceOf[Val.Obj]) {
-        val ll = l.asInstanceOf[Val.Obj]
-        val rr = r.asInstanceOf[Val.Obj]
-        rr.addSuper(pos, ll)
-      } else throw new MatchError((l, r))
-    }
+    private def mergeMember(l: Val, r: Val, pos: Position)(implicit evaluator: EvalScope): Literal =
+      (l, r) match {
+        case (lStr: Val.Str, rStr: Val.Str) =>
+          Val.Str(pos, lStr.value ++ rStr.value)
+        case (lStr: Val.Str, _) =>
+          Val.Str(pos, lStr.value ++ renderString(r))
+        case (_, rStr: Val.Str) =>
+          Val.Str(pos, renderString(l) ++ rStr.value)
+        case (lNum: Val.Num, rNum: Val.Num) =>
+          Val.Num(pos, lNum.value + rNum.value)
+        case (lArr: Val.Arr, rArr: Val.Arr) =>
+          Val.Arr(pos, lArr.asLazyArray ++ rArr.asLazyArray)
+        case (lObj: Val.Obj, rObj: Val.Obj) =>
+          rObj.addSuper(pos, lObj)
+        case _ =>
+          throw new MatchError((l, r))
+      }
 
     def valueRaw(
         k: String,
@@ -418,7 +413,7 @@ object Val {
   final class StaticObjectFieldSet(protected val keys: Array[String]) {
 
     override def hashCode(): Int = {
-      Arrays.hashCode(keys.asInstanceOf[Array[Object]])
+      util.Arrays.hashCode(keys.asInstanceOf[Array[Object]])
     }
 
     override def equals(obj: scala.Any): Boolean = {
@@ -451,7 +446,7 @@ object Val {
         idx += 1
       case other =>
         throw new Error(
-          s"Unexpected non-literal field in static object: ${other} of class ${other.getClass}"
+          s"Unexpected non-literal field in static object: $other of class ${other.getClass}"
         )
     }
     val fieldSet = new StaticObjectFieldSet(keys)
@@ -482,15 +477,16 @@ object Val {
     override def asFunc: Func = this
 
     def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit
-        ev: EvalScope): Val = {
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match {
         case null => outerPos.fileScope
         case p    => p.fileScope
       }
       // println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
-      if (simple || ev.tailstrict) {
-        if (ev.tailstrict) {
+      if (simple || tailstrictMode == TailstrictModeEnabled) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argsL.foreach(_.force)
         }
         val newScope = defSiteValScope.extendSimple(argsL)
@@ -547,13 +543,12 @@ object Val {
               outerPos
             )
           }
-          // println(argVals.mkString(s"params: ${params.names.length}, argsL: ${argsL.length}, argVals: [", ", ", "]"))
         }
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
 
-    def apply0(outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply0(outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match {
@@ -564,14 +559,16 @@ object Val {
       }
     }
 
-    def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply1(argVal: Lazy, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match {
           case null => outerPos.fileScope
           case p    => p.fileScope
         }
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal.force
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal)
@@ -579,14 +576,16 @@ object Val {
       }
     }
 
-    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope): Val = {
+    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match {
           case null => outerPos.fileScope
           case p    => p.fileScope
         }
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal1.force
           argVal2.force
         }
@@ -596,14 +595,15 @@ object Val {
     }
 
     def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit
-        ev: EvalScope): Val = {
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
         val funDefFileScope: FileScope = pos match {
           case null => outerPos.fileScope
           case p    => p.fileScope
         }
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal1.force
           argVal2.force
           argVal3.force
@@ -638,20 +638,23 @@ object Val {
 
     def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val
 
-    override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope): Val =
+    override def apply1(argVal: Lazy, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal.force
         }
         evalRhs(Array(argVal), ev, outerPos)
       }
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
-        ev: EvalScope): Val =
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal1.force
           argVal2.force
         }
@@ -659,10 +662,11 @@ object Val {
       }
 
     override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit
-        ev: EvalScope): Val =
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
-        if (ev.tailstrict) {
+        if (tailstrictMode == TailstrictModeEnabled) {
           argVal1.force
           argVal2.force
           argVal3.force
@@ -692,7 +696,9 @@ object Val {
     def evalRhs(ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
-        implicit ev: EvalScope): Val =
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 0)
         evalRhs(ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -706,7 +712,9 @@ object Val {
     def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
-        implicit ev: EvalScope): Val =
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
@@ -719,13 +727,16 @@ object Val {
     def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
-        implicit ev: EvalScope): Val =
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
     override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
-        ev: EvalScope): Val =
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (params.names.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos)
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
@@ -743,7 +754,9 @@ object Val {
     def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
-        implicit ev: EvalScope): Val =
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
@@ -763,7 +776,9 @@ object Val {
     def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, arg4: Lazy, ev: EvalScope, pos: Position): Val
 
     override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
-        implicit ev: EvalScope): Val =
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 4)
         evalRhs(
           argVals(0).force,
@@ -777,13 +792,15 @@ object Val {
   }
 }
 
+sealed trait TailstrictMode
+case object TailstrictModeEnabled extends TailstrictMode
+case object TailstrictModeDisabled extends TailstrictMode
+
 /**
  * [[EvalScope]] models the per-evaluator context that is propagated throughout the Jsonnet
  * evaluation.
  */
 abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
-  def tailstrict: Boolean
-
   def visitExpr(expr: Expr)(implicit scope: ValScope): Val
 
   def materialize(v: Val): ujson.Value
@@ -792,7 +809,7 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
 
   def compare(x: Val, y: Val): Int
 
-  val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
+  private val emptyMaterializeFileScope = new FileScope(wd / "(materialize)")
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
   def settings: Settings

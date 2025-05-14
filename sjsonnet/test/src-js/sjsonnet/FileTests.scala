@@ -107,6 +107,8 @@ object FileTests extends TestSuite {
     test("slice.sugar") - check()
     test("std_all_hidden") - check()
     test("stdlib_native") - check()
+    test("tailstrict_eager_params") - checkGolden()
+    test("tailstrict_missing_bindings") - checkGolden()
     test("text_block") - check()
     test("tla.simple") - check()
     test("unicode") - check()

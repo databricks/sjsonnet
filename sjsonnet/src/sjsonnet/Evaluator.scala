@@ -1,7 +1,7 @@
 package sjsonnet
 
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.Expr.{Error => _, _}
+import sjsonnet.Expr.{Error as _, *}
 import ujson.Value
 
 import scala.annotation.{switch, tailrec}
@@ -29,7 +29,6 @@ class Evaluator(
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
     collection.mutable.HashMap.empty[Path, Val]
-  var tailstrict: Boolean = false
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     e match {
@@ -202,49 +201,31 @@ class Evaluator(
     }
   }
 
-  protected def visitApply(e: Apply)(implicit scope: ValScope) = {
+  protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
+    implicit val tailstrictMode: TailstrictMode =
+      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
-    if (tailstrict) {
+    if (e.tailstrict) {
       lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
-      tailstrict = false
-      res
     } else {
-      val args = e.args
-      val argsL = new Array[Lazy](args.length)
-      var idx = 0
-      while (idx < args.length) {
-        argsL(idx) = visitAsLazy(args(idx))
-        idx += 1
-      }
-      lhs.cast[Val.Func].apply(argsL, e.namedNames, e.pos)
+      lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
     }
   }
 
   protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (e.tailstrict) {
-      tailstrict = true
-      val res = lhs.cast[Val.Func].apply0(e.pos)
-      tailstrict = false
-      res
-    } else {
-      lhs.cast[Val.Func].apply0(e.pos)
-    }
+    implicit val tailstrictMode: TailstrictMode =
+      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+    lhs.cast[Val.Func].apply0(e.pos)
   }
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (tailstrict) {
+    implicit val tailstrictMode: TailstrictMode =
+      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+    if (e.tailstrict) {
       lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
-      tailstrict = false
-      res
     } else {
       val l1 = visitAsLazy(e.a1)
       lhs.cast[Val.Func].apply1(l1, e.pos)
@@ -253,13 +234,11 @@ class Evaluator(
 
   protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (tailstrict) {
+    implicit val tailstrictMode: TailstrictMode =
+      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+
+    if (e.tailstrict) {
       lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
-      tailstrict = false
-      res
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
@@ -269,13 +248,11 @@ class Evaluator(
 
   protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
-    if (tailstrict) {
+    implicit val tailstrictMode: TailstrictMode =
+      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+
+    if (e.tailstrict) {
       lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
-      tailstrict = false
-      res
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
@@ -284,60 +261,34 @@ class Evaluator(
     }
   }
 
-  protected def visitApplyBuiltin0(e: ApplyBuiltin0) = {
-    if (tailstrict) {
-      e.func.evalRhs(this, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = e.func.evalRhs(this, e.pos)
-      tailstrict = false
-      res
-    } else {
-      e.func.evalRhs(this, e.pos)
-    }
-  }
+  protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = e.func.evalRhs(this, e.pos)
 
-  protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope) = {
-    if (tailstrict) {
+  protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
+    if (e.tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), this, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = e.func.evalRhs(visitExpr(e.a1), this, e.pos)
-      tailstrict = false
-      res
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
     }
   }
 
-  protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope) = {
-    if (tailstrict) {
+  protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
+    if (e.tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
-      tailstrict = false
-      res
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
     }
   }
 
-  protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope) = {
-    if (tailstrict) {
+  protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
+    if (e.tailstrict) {
       e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
-      tailstrict = false
-      res
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
     }
   }
 
-  protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope) = {
-    if (tailstrict) {
+  protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
+    if (e.tailstrict) {
       e.func.evalRhs(
         visitExpr(e.a1),
         visitExpr(e.a2),
@@ -346,18 +297,6 @@ class Evaluator(
         this,
         e.pos
       )
-    } else if (e.tailstrict) {
-      tailstrict = true
-      val res = e.func.evalRhs(
-        visitExpr(e.a1),
-        visitExpr(e.a2),
-        visitExpr(e.a3),
-        visitExpr(e.a4),
-        this,
-        e.pos
-      )
-      tailstrict = false
-      res
     } else {
       e.func.evalRhs(
         visitAsLazy(e.a1),
@@ -370,27 +309,17 @@ class Evaluator(
     }
   }
 
-  protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope) = {
+  protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
     val arr = new Array[Lazy](e.argExprs.length)
     var idx = 0
 
-    if (tailstrict) {
+    if (e.tailstrict) {
       while (idx < e.argExprs.length) {
         arr(idx) = visitExpr(e.argExprs(idx))
         idx += 1
       }
       e.func.evalRhs(arr, this, e.pos)
-    } else if (e.tailstrict) {
-      tailstrict = true
-      while (idx < e.argExprs.length) {
-        arr(idx) = visitExpr(e.argExprs(idx))
-        idx += 1
-      }
-      val res = e.func.evalRhs(arr, this, e.pos)
-      tailstrict = false
-      res
     } else {
-
       while (idx < e.argExprs.length) {
         val boundIdx = idx
         arr(idx) = visitAsLazy(e.argExprs(boundIdx))

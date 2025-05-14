@@ -197,7 +197,7 @@ class Interpreter(
                 if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs
               )
             }
-          }.apply0(f.pos)(evaluator)
+          }.apply0(f.pos)(evaluator, TailstrictModeDisabled)
         case x => x
       }
     } yield res

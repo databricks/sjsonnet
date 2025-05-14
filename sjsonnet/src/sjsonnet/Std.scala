@@ -109,7 +109,7 @@ class Std(
       var res = 0
       if (func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while (i < a.length) {
-          if (func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) res += 1
+          if (func.apply1(a(i), p)(ev, TailstrictModeDisabled).isInstanceOf[Val.True]) res += 1
           i += 1
         }
       } else {
@@ -231,7 +231,11 @@ class Std(
         arr.asStrictArray.min(ev)
       } else {
         val minTuple = arr.asStrictArray
-          .map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev))
+          .map(v =>
+            keyF
+              .asInstanceOf[Val.Func]
+              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          )
           .zipWithIndex
           .min((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
         arr.force(minTuple._2)
@@ -259,7 +263,11 @@ class Std(
         arr.asStrictArray.max(ev)
       } else {
         val maxTuple = arr.asStrictArray
-          .map(v => keyF.asInstanceOf[Val.Func].apply1(v, pos.fileScope.noOffsetPos)(ev))
+          .map(v =>
+            keyF
+              .asInstanceOf[Val.Func]
+              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          )
           .zipWithIndex
           .max((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
         arr.force(maxTuple._2)
@@ -296,7 +304,7 @@ class Std(
           var current = init.force
           for (item <- arr.asLazyArray) {
             val c = current
-            current = func.apply2(c, item, pos.noOffset)(ev)
+            current = func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
           }
           current
 
@@ -304,7 +312,10 @@ class Std(
           var current = init.force
           for (char <- s.value) {
             val c = current
-            current = func.apply2(c, Val.Str(pos, new String(Array(char))), pos.noOffset)(ev)
+            current = func.apply2(c, Val.Str(pos, new String(Array(char))), pos.noOffset)(
+              ev,
+              TailstrictModeDisabled
+            )
           }
           current
 
@@ -322,14 +333,17 @@ class Std(
           var current = init.force
           for (item <- arr.asLazyArray.reverse) {
             val c = current
-            current = func.apply2(item, c, pos.noOffset)(ev)
+            current = func.apply2(item, c, pos.noOffset)(ev, TailstrictModeDisabled)
           }
           current
         case s: Val.Str =>
           var current = init.force
           for (char <- s.value.reverse) {
             val c = current
-            current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(ev)
+            current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(
+              ev,
+              TailstrictModeDisabled
+            )
           }
           current
         case arr => Error.fail("Cannot call foldr on " + arr.prettyName)
@@ -383,12 +397,12 @@ class Std(
       val func = _func.force.asFunc
       if (func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while (i < a.length) {
-          if (!func.apply1(a(i), p)(ev).isInstanceOf[Val.True]) {
+          if (!func.apply1(a(i), p)(ev, TailstrictModeDisabled).isInstanceOf[Val.True]) {
             var b = new Array[Lazy](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
-              if (func.apply1(a(j), p)(ev).isInstanceOf[Val.True]) {
+              if (func.apply1(a(j), p)(ev, TailstrictModeDisabled).isInstanceOf[Val.True]) {
                 b(i) = a(j)
                 i += 1
               }
@@ -437,7 +451,9 @@ class Std(
       val func = _func.force.asFunc
       Val.Arr(
         pos,
-        arr.force.asArr.asLazyArray.map(v => (() => func.apply1(v, pos.noOffset)(ev)): Lazy)
+        arr.force.asArr.asLazyArray.map(v =>
+          (() => func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)): Lazy
+        )
       )
     }
   }
@@ -453,7 +469,10 @@ class Std(
         val k = allKeys(i)
         val v = new Val.Obj.Member(false, Visibility.Normal) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
-            func.apply2(Val.Str(pos, k), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(ev)
+            func.apply2(Val.Str(pos, k), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(
+              ev,
+              TailstrictModeDisabled
+            )
         }
         m.put(k, v)
         i += 1
@@ -472,7 +491,7 @@ class Std(
       while (i < a.length) {
         val x = arr(i)
         val idx = Val.Num(pos, i)
-        a(i) = () => func.apply2(idx, x, pos.noOffset)(ev)
+        a(i) = () => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled)
         i += 1
       }
       Val.Arr(pos, a)
@@ -1244,7 +1263,8 @@ class Std(
           var i = 0
           while (i < sz) {
             val forcedI = i
-            a(i) = () => func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev)
+            a(i) =
+              () => func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
             i += 1
           }
           a
@@ -1349,7 +1369,7 @@ class Std(
         case a: Val.Arr =>
           val arrResults = a.asLazyArray.flatMap { v =>
             {
-              val fres = func.apply1(v, pos.noOffset)(ev)
+              val fres = func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
               fres match {
                 case va: Val.Arr => va.asLazyArray
                 case unknown     => Error.fail("flatMap func must return an array, not " + unknown)
@@ -1361,7 +1381,8 @@ class Std(
         case s: Val.Str =>
           val builder = new StringBuilder()
           for (c: Char <- s.value) {
-            val fres = func.apply1(Val.Str(pos, c.toString), pos.noOffset)(ev)
+            val fres =
+              func.apply1(Val.Str(pos, c.toString), pos.noOffset)(ev, TailstrictModeDisabled)
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
@@ -1387,8 +1408,12 @@ class Std(
           pos,
           arr.asLazyArray.flatMap { i =>
             i.force
-            if (!filter_func.apply1(i, pos.noOffset)(ev).isInstanceOf[Val.True]) None
-            else Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev))
+            if (
+              !filter_func
+                .apply1(i, pos.noOffset)(ev, TailstrictModeDisabled)
+                .isInstanceOf[Val.True]
+            ) None
+            else Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
           }
         )
     },
@@ -1914,15 +1939,16 @@ class Std(
       arr: mutable.IndexedSeq[? <: Lazy],
       toFind: Val): Boolean = {
     val appliedX = keyF match {
-      case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev)
+      case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev, TailstrictModeDisabled)
       case _                  => toFind
     }
     if (ev.settings.strictSetOperations) {
       arr
         .search(appliedX.force)((toFind: Lazy, value: Lazy) => {
           val appliedValue = keyF match {
-            case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
-            case _                  => value
+            case keyFFunc: Val.Func =>
+              keyFFunc.apply1(value, pos.noOffset)(ev, TailstrictModeDisabled)
+            case _ => value
           }
           ev.compare(toFind.force, appliedValue.force)
         })
@@ -1930,8 +1956,9 @@ class Std(
     } else {
       arr.exists(value => {
         val appliedValue = keyF match {
-          case keyFFunc: Val.Func => keyFFunc.apply1(value, pos.noOffset)(ev)
-          case _                  => value
+          case keyFFunc: Val.Func =>
+            keyFFunc.apply1(value, pos.noOffset)(ev, TailstrictModeDisabled)
+          case _ => value
         }
         ev.equal(appliedValue.force, appliedX.force)
       })
@@ -1980,8 +2007,8 @@ class Std(
         }
       } else if (!keyF.isInstanceOf[Val.False]) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
-        val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev)
-        val o2Key = keyFFunc.apply1(out.last, pos.noOffset)(ev)
+        val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
+        val o2Key = keyFFunc.apply1(out.last, pos.noOffset)(ev, TailstrictModeDisabled)
         if (!ev.equal(o1Key, o2Key)) {
           out.append(v)
         }
@@ -2001,7 +2028,9 @@ class Std(
       Val.Arr(
         pos,
         if (keyFFunc != null) {
-          val keys: Array[Val] = vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).force)
+          val keys: Array[Val] = vs.map(v =>
+            keyFFunc(Array(v.force), null, pos.noOffset)(ev, TailstrictModeDisabled).force
+          )
           val keyType = keys(0).getClass
           if (classOf[Val.Bool].isAssignableFrom(keyType)) {
             Error.fail("Cannot sort with key values that are booleans")

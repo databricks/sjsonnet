@@ -74,6 +74,8 @@ object FileTests extends TestSuite {
     "slice.sugar" - check()
     test("std_all_hidden") - check()
     test("stdlib") - check()
+    test("tailstrict_eager_params") - checkGolden()
+    test("tailstrict_missing_bindings") - checkGolden()
     test("text_block") - check()
     "tla.simple" - check()
     test("unicode") - check()
