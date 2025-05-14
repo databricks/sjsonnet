@@ -355,5 +355,23 @@ object ErrorTests extends TestSuite {
          |    at [std.manifestTomlEx].(sjsonnet/test/resources/test_suite/error.manifest_toml_null_value.jsonnet:17:19)
          |""".stripMargin
     )
+
+    test("integer_conversion") - check(
+      """|sjsonnet.Error: numeric value outside safe integer range for bitwise operation
+         |    at [BinaryOp <<].(sjsonnet/test/resources/test_suite/error.integer_conversion.jsonnet:3:12)
+         |""".stripMargin
+    )
+
+    test("integer_left_shift") - check(
+      """|sjsonnet.Error: numeric value outside safe integer range for bitwise operation
+         |    at [BinaryOp <<].(sjsonnet/test/resources/test_suite/error.integer_left_shift.jsonnet:3:13)
+         |""".stripMargin
+    )
+
+    test("integer_left_shift_runtime") - check(
+      """|sjsonnet.Error: numeric value outside safe integer range for bitwise operation
+         |    at [BinaryOp <<].(sjsonnet/test/resources/test_suite/error.integer_left_shift_runtime.jsonnet:2:13)
+         |""".stripMargin
+    )
   }
 }

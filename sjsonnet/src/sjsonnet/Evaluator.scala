@@ -549,14 +549,21 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_<< =>
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong << r.toLong).toDouble)
-          case _                              => fail()
+          case (l: Val.Num, r: Val.Num) =>
+            val ll = l.asSafeLong(pos)
+            val rr = r.asSafeLong(pos)
+            if (rr >= 1 && ll >= (1L << (63 - rr)))
+              Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+            else
+              Val.Num(pos, (ll << rr).toDouble)
+          case _ => fail()
         }
 
       case Expr.BinaryOp.OP_>> =>
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong >> r.toLong).toDouble)
-          case _                              => fail()
+          case (l: Val.Num, r: Val.Num) =>
+            Val.Num(pos, (l.asSafeLong(pos) >> r.asSafeLong(pos)).toDouble)
+          case _ => fail()
         }
 
       case Expr.BinaryOp.OP_in =>
@@ -567,20 +574,23 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_& =>
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong & r.toLong).toDouble)
-          case _                              => fail()
+          case (l: Val.Num, r: Val.Num) =>
+            Val.Num(pos, (l.asSafeLong(pos) & r.asSafeLong(pos)).toDouble)
+          case _ => fail()
         }
 
       case Expr.BinaryOp.OP_^ =>
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong ^ r.toLong).toDouble)
-          case _                              => fail()
+          case (l: Val.Num, r: Val.Num) =>
+            Val.Num(pos, (l.asSafeLong(pos) ^ r.asSafeLong(pos)).toDouble)
+          case _ => fail()
         }
 
       case Expr.BinaryOp.OP_| =>
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, (l.toLong | r.toLong).toDouble)
-          case _                              => fail()
+          case (l: Val.Num, r: Val.Num) =>
+            Val.Num(pos, (l.asSafeLong(pos) | r.asSafeLong(pos)).toDouble)
+          case _ => fail()
         }
 
       case _ => fail()
