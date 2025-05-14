@@ -24,8 +24,14 @@ trait SjsonnetServerMain[T] {
       wd: os.Path): (Boolean, Option[T])
 }
 
-object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
+object SjsonnetServerRealMain {
   def main(args0: Array[String]): Unit = {
+    SjsonnetServerMain.internalMain(args0)
+  }
+}
+
+object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
+  def internalMain(args0: Array[String]): Unit = {
     // Disable SIGINT interrupt signal in the Mill server.
     //
     // This gets passed through from the client to server whenever the user

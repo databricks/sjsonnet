@@ -11,10 +11,24 @@ val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.6")
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
 
-trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with ScalafmtModule {
-  def crossValue: String
+trait SjsonnetPublishModule extends PublishModule {
   def artifactName = "sjsonnet"
+  def publishVersion = sjsonnetVersion
 
+  def pomSettings = PomSettings(
+    description = artifactName(),
+    organization = "com.databricks",
+    url = "https://github.com/databricks/sjsonnet",
+    licenses = Seq(License.MIT),
+    versionControl = VersionControl.github("databricks", "sjsonnet"),
+    developers = Seq(
+      Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi")
+    )
+  )
+}
+
+trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
+  def crossValue: String
   def ivyDeps = Agg(
     ivy"com.lihaoyi::fastparse::3.1.1",
     ivy"com.lihaoyi::pprint::0.9.0",
@@ -22,7 +36,6 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
     ivy"com.lihaoyi::scalatags::0.13.1",
     ivy"org.scala-lang.modules::scala-collection-compat::2.13.0"
   )
-  def publishVersion = sjsonnetVersion
 
   def generatedSources = T {
     os.write(
@@ -35,20 +48,11 @@ trait SjsonnetCrossModule extends CrossScalaModule with PublishModule with Scala
     )
     Seq(PathRef(T.ctx().dest / "Version.scala"))
   }
-  def pomSettings = PomSettings(
-    description = artifactName(),
-    organization = "com.databricks",
-    url = "https://github.com/databricks/sjsonnet",
-    licenses = Seq(License.MIT),
-    versionControl = VersionControl.github("databricks", "sjsonnet"),
-    developers = Seq(
-      Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi")
-    )
-  )
   def scalacOptions = Seq("-deprecation", "-Werror") ++ (
     if (!ZincWorkerUtil.isScala3(scalaVersion()))
       Seq(
         "-opt:l:inline",
+        "-feature",
         "-opt-inline-from:sjsonnet.*,sjsonnet.**",
         "-Xsource:3",
         "-Xlint:_"
@@ -159,7 +163,7 @@ object sjsonnet extends Module {
   }
 
   object jvm extends Cross[SjsonnnetJvmModule](scalaVersions)
-  trait SjsonnnetJvmModule extends SjsonnetCrossModule with ScalaModule with SjsonnetJvmNative {
+  trait SjsonnnetJvmModule extends SjsonnetCrossModule with ScalaModule with SjsonnetPublishModule with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def mainClass = Some("sjsonnet.SjsonnetMain")
     def sources = T.sources(

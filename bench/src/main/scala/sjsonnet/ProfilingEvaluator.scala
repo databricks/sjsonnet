@@ -4,6 +4,7 @@ import java.util
 import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
+import scala.language.existentials
 
 class ProfilingEvaluator(
     r: CachedResolver,
@@ -91,7 +92,7 @@ class ProfilingEvaluator(
       (0 until p.productArity).iterator
         .map(p.productElement)
         .flatMap {
-          case e: Expr                          => Seq(e)
+          case _: Expr                          => Seq(e)
           case a: Array[Expr]                   => a.toSeq
           case a: Array[Expr.CompSpec]          => a.toSeq
           case p: Expr.Params                   => getChildren(p)
@@ -99,8 +100,8 @@ class ProfilingEvaluator(
           case a: Array[Expr.Bind]              => a.iterator.flatMap(getChildren).toSeq
           case a: Array[Expr.Member.Field]      => a.iterator.flatMap(getChildren).toSeq
           case a: Array[Expr.Member.AssertStmt] => a.iterator.flatMap(getChildren).toSeq
-          case s: Seq[?]                        => s.collect { case e: Expr => e }
-          case s: Some[?]                       => s.collect { case e: Expr => e }
+          case s: Seq[?]                        => s.collect { case ee: Expr => ee }
+          case s: Some[?]                       => s.collect { case ee: Expr => ee }
           case _                                => Nil
         }
         .filter(_ != null)
@@ -161,7 +162,7 @@ class ProfilingEvaluator(
     all.foreach { b =>
       val cl = b.expr match {
         case _: Val => classOf[Val]
-        case e      => e.getClass
+        case ee      => ee.getClass
       }
       val n = cl.getName.replaceAll("^sjsonnet\\.", "").replace('$', '.')
       val eb = m.getOrElseUpdate(n, new ExprTypeBox(n))

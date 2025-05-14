@@ -28,11 +28,11 @@ jobs:
           cache: sbt
       - uses: sbt/setup-sbt@v1
       - name: Check Formating
-        run: ./mill _.${{ matrix.lang }}[_].checkFormat
+        run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Compile with mill
-        run: ./mill _.${{ matrix.lang }}[_].compile
+        run: ./mill _.${{ matrix.lang }}[_].__.compile
       - name: Run mill tests for ${{ matrix.lang }}
-        run: ./mill _.${{ matrix.lang }}[_].test
+        run: ./mill _.${{ matrix.lang }}[_].__.test
       - name: Compile with sbt
         if: ${{ matrix.lang == 'jvm' }}
         run: sbt compile bench/compile bench/jmh:compile
