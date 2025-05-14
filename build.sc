@@ -171,7 +171,7 @@ object sjsonnet extends Module {
       ivy"org.json:json:20250107",
       ivy"org.tukaani:xz::1.10",
       ivy"org.lz4:lz4-java::1.8.0",
-      ivy"org.yaml:snakeyaml::2.0",
+      ivy"org.yaml:snakeyaml::2.4",
       ivy"com.google.re2j:re2j:1.8"
     )
 
@@ -181,7 +181,7 @@ object sjsonnet extends Module {
 
     object client extends JavaModule {
       def ivyDeps = Agg(
-        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
+        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
           "net.java.dev.jna" -> "jna",
           "net.java.dev.jna" -> "jna-platform"
         )
@@ -193,12 +193,12 @@ object sjsonnet extends Module {
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
       def ivyDeps = Agg(
-        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.0.0".exclude(
+        ivy"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
           "net.java.dev.jna" -> "jna",
           "net.java.dev.jna" -> "jna-platform"
         ),
-        ivy"net.java.dev.jna:jna:4.5.0",
-        ivy"net.java.dev.jna:jna-platform:4.5.0"
+        ivy"net.java.dev.jna:jna:5.17.0",
+        ivy"net.java.dev.jna:jna-platform:5.17.0"
       )
 
       override def prependShellScript = mill.util.Jvm.universalScript(
