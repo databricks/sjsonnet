@@ -87,7 +87,7 @@ object Format {
     val values = values0 match {
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x          => new Val.Arr(pos, Array[Lazy](x))
+      case x          => Val.Arr(pos, Array[Lazy](x))
     }
     val output = new StringBuilder
     output.append(leading)

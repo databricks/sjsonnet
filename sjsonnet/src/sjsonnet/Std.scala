@@ -395,7 +395,7 @@ class Std(
               j += 1
             }
             if (i != b.length) b = util.Arrays.copyOf(b, i)
-            return new Val.Arr(pos, b)
+            return Val.Arr(pos, b)
           }
           i += 1
         }
@@ -423,19 +423,19 @@ class Std(
               j += 1
             }
             if (i != b.length) b = util.Arrays.copyOf(b, i)
-            return new Val.Arr(pos, b)
+            return Val.Arr(pos, b)
           }
           i += 1
         }
       }
-      new Val.Arr(pos, a)
+      Val.Arr(pos, a)
     }
   }
 
   private object Map_ extends Val.Builtin2("map", "func", "arr") {
     def evalRhs(_func: Lazy, arr: Lazy, ev: EvalScope, pos: Position): Val = {
       val func = _func.force.asFunc
-      new Val.Arr(
+      Val.Arr(
         pos,
         arr.force.asArr.asLazyArray.map(v => (() => func.apply1(v, pos.noOffset)(ev)): Lazy)
       )
@@ -475,7 +475,7 @@ class Std(
         a(i) = () => func.apply2(idx, x, pos.noOffset)(ev)
         i += 1
       }
-      new Val.Arr(pos, a)
+      Val.Arr(pos, a)
     }
   }
 
@@ -491,13 +491,13 @@ class Std(
         }
         i += 1
       }
-      new Val.Arr(pos, b.result())
+      Val.Arr(pos, b.result())
     }
   }
 
   private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "s") {
     def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val =
-      new Val.Arr(pos, s.force.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
+      Val.Arr(pos, s.force.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
   }
 
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
@@ -693,7 +693,7 @@ class Std(
               case x => Error.fail("Cannot join " + x.prettyName)
             }
           }
-          new Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.toArray)
         case x => Error.fail("Cannot join " + x.prettyName)
       }
     }
@@ -732,7 +732,7 @@ class Std(
           case x           => Error.fail("Cannot call flattenArrays on " + x)
         }
       }
-      new Val.Arr(pos, out.result())
+      Val.Arr(pos, out.result())
     }
   }
 
@@ -747,7 +747,7 @@ class Std(
           case x          => out += x
         }
       }
-      new Val.Arr(pos, out.result())
+      Val.Arr(pos, out.result())
     }
   }
 
@@ -769,7 +769,7 @@ class Std(
 
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Lazy, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(pos, arrs.force.asArr.asLazyArray.reverse)
+      Val.Arr(pos, arrs.force.asArr.asLazyArray.reverse)
     }
   }
 
@@ -797,19 +797,19 @@ class Std(
 
   private object Split extends Val.Builtin2("split", "str", "c") {
     def evalRhs(str: Lazy, c: Lazy, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, -1))
+      Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, -1))
     }
   }
 
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxSplits") {
     def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, maxSplits.force.asInt))
+      Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, maxSplits.force.asInt))
     }
   }
 
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxSplits") {
     def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
-      new Val.Arr(
+      Val.Arr(
         pos,
         splitLimit(pos, str.force.asString.reverse, c.force.asString.reverse, maxSplits.force.asInt)
           .map(s => Val.Str(pos, s.force.force.asString.reverse))
@@ -910,7 +910,7 @@ class Std(
 
   private object Range extends Val.Builtin2("range", "from", "to") {
     def evalRhs(from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
-      new Val.Arr(
+      Val.Arr(
         pos,
         (from.force.asInt to to.force.asInt).map(i => Val.Num(pos, i)).toArray
       )
@@ -1238,7 +1238,7 @@ class Std(
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
     builtin("makeArray", "sz", "func") { (pos, ev, sz: Int, func: Val.Func) =>
-      new Val.Arr(
+      Val.Arr(
         pos, {
           val a = new Array[Lazy](sz)
           var i = 0
@@ -1356,7 +1356,7 @@ class Std(
               }
             }
           }
-          new Val.Arr(pos, arrResults)
+          Val.Arr(pos, arrResults)
 
         case s: Val.Str =>
           val builder = new StringBuilder()
@@ -1383,7 +1383,7 @@ class Std(
     },
     builtin("filterMap", "filter_func", "map_func", "arr") {
       (pos, ev, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
-        new Val.Arr(
+        Val.Arr(
           pos,
           arr.asLazyArray.flatMap { i =>
             i.force
@@ -1394,17 +1394,17 @@ class Std(
     },
     builtin(Find),
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
-      if (pat.length == 0) new Val.Arr(pos, emptyLazyArray)
+      if (pat.length == 0) Val.Arr(pos, emptyLazyArray)
       else {
         var matchIndex = str.indexOf(pat)
-        if (matchIndex == -1) new Val.Arr(pos, emptyLazyArray)
+        if (matchIndex == -1) Val.Arr(pos, emptyLazyArray)
         else {
           val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
           while (0 <= matchIndex && matchIndex < str.length) {
             indices.+=(Val.Num(pos, matchIndex))
             matchIndex = str.indexOf(pat, matchIndex + 1)
           }
-          new Val.Arr(pos, indices.result())
+          Val.Arr(pos, indices.result())
         }
       }
     },
@@ -1432,7 +1432,7 @@ class Std(
           for (i <- 1 to count) {
             out.appendAll(a.asLazyArray)
           }
-          new Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.toArray)
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
@@ -1613,7 +1613,7 @@ class Std(
       new String(Base64.getDecoder.decode(s))
     },
     builtin("base64DecodeBytes", "s") { (pos, ev, s: String) =>
-      new Val.Arr(pos, Base64.getDecoder.decode(s).map(i => Val.Num(pos, i)))
+      Val.Arr(pos, Base64.getDecoder.decode(s).map(i => Val.Num(pos, i)))
     },
     builtin(EncodeUTF8),
     builtin(DecodeUTF8),
@@ -1633,7 +1633,7 @@ class Std(
         } else if (b.isEmpty) {
           uniqArr(pos, ev, sortArr(pos, ev, args(0), args(2)), args(2))
         } else {
-          val concat = new Val.Arr(pos, a ++ b)
+          val concat = Val.Arr(pos, a ++ b)
           uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
         }
     },
@@ -1659,9 +1659,9 @@ class Std(
           }
         }
         if (ev.settings.strictSetOperations) {
-          new Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.toArray)
         } else {
-          sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+          sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
         }
     },
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
@@ -1684,9 +1684,9 @@ class Std(
         }
 
         if (ev.settings.strictSetOperations) {
-          new Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.toArray)
         } else {
-          sortArr(pos, ev, new Val.Arr(pos, out.toArray), keyF)
+          sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
         }
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) {
@@ -1722,7 +1722,7 @@ class Std(
           } yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
           Val.Obj.mk(pos, bindings)
         case a: Val.Arr =>
-          new Val.Arr(pos, a.asLazyArray.map(rec).filter(filter))
+          Val.Arr(pos, a.asLazyArray.map(rec).filter(filter))
         case x => x
       }
       rec(s)
@@ -1789,7 +1789,7 @@ class Std(
       if (idx == -1) {
         arr
       } else {
-        new Val.Arr(
+        Val.Arr(
           arr.pos,
           arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
         )
@@ -1799,14 +1799,14 @@ class Std(
       if (!(0 <= idx && idx < arr.length)) {
         Error.fail("index out of bounds: 0 <= " + idx + " < " + arr.length)
       }
-      new Val.Arr(
+      Val.Arr(
         arr.pos,
         arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
       )
     },
     builtin("objectKeysValues", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getVisibleKeys(ev, o)
-      new Val.Arr(
+      Val.Arr(
         pos,
         keys.map(k =>
           Val.Obj.mk(
@@ -1827,7 +1827,7 @@ class Std(
     },
     builtin("objectKeysValuesAll", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getAllKeys(ev, o)
-      new Val.Arr(
+      Val.Arr(
         pos,
         keys.map(k =>
           Val.Obj.mk(
@@ -1988,7 +1988,7 @@ class Std(
       }
     }
 
-    new Val.Arr(pos, out.toArray)
+    Val.Arr(pos, out.toArray)
   }
 
   private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
@@ -1998,7 +1998,7 @@ class Std(
     } else {
       val keyFFunc =
         if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
-      new Val.Arr(
+      Val.Arr(
         pos,
         if (keyFFunc != null) {
           val keys: Array[Val] = vs.map(v => keyFFunc(Array(v.force), null, pos.noOffset)(ev).force)
@@ -2050,7 +2050,7 @@ class Std(
       a(i) = new Val.Str(pos, String.valueOf(str.charAt(i)))
       i += 1
     }
-    new Val.Arr(pos, a)
+    Val.Arr(pos, a)
   }
 
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
@@ -2067,7 +2067,7 @@ class Std(
       ev: EvalScope,
       v1: Val.Obj,
       keys: Array[String]): Val.Arr =
-    new Val.Arr(
+    Val.Arr(
       pos,
       keys.map { k =>
         (() => v1.value(k, pos.noOffset)(ev)): Lazy

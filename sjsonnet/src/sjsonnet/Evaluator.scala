@@ -126,13 +126,13 @@ class Evaluator(
   }
 
   def visitComp(e: Comp)(implicit scope: ValScope): Val =
-    new Val.Arr(
+    Val.Arr(
       e.pos,
       visitComp(e.first :: e.rest.toList, Array(scope)).map(s => visitAsLazy(e.value)(s))
     )
 
   def visitArr(e: Arr)(implicit scope: ValScope): Val =
-    new Val.Arr(e.pos, e.value.map(visitAsLazy))
+    Val.Arr(e.pos, e.value.map(visitAsLazy))
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
@@ -465,7 +465,7 @@ class Evaluator(
     )
 
   def visitImportBin(e: ImportBin): Val.Arr =
-    new Val.Arr(
+    Val.Arr(
       e.pos,
       importer
         .resolveAndReadOrFail(e.value, e.pos, binaryData = true)

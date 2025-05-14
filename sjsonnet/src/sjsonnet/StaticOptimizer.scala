@@ -85,7 +85,7 @@ class StaticOptimizer(
       failOrWarn("Can't use super outside of an object", e)
 
     case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
-      new Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
+      Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
     case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
       if (binds == null && asserts == null && fields.forall(_.isStatic))
