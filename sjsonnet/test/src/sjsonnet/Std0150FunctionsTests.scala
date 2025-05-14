@@ -158,7 +158,6 @@ object Std0150FunctionsTests extends TestSuite {
       ujson.Str("j s o n n e t this is")
       eval("std.foldr(function(v, i) i + v + v, 'bcd', 'a')") ==> ujson.Str("addccbb")
 
-
       eval("""std.foldl(function (acc, it) acc + " " + it, "jsonnet", "this is")""") ==>
       ujson.Str("this is j s o n n e t")
     }

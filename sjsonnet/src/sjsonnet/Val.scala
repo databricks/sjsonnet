@@ -81,6 +81,10 @@ object PrettyNamed {
   implicit val nullName: PrettyNamed[Val.Null] = new PrettyNamed("null")
 }
 object Val {
+  // Constants for safe double-to-int conversion
+  // IEEE 754 doubles precisely represent integers up to 2^53, beyond which precision is lost
+  private val DOUBLE_MAX_SAFE_INTEGER = (1L << 53) - 1
+  private val DOUBLE_MIN_SAFE_INTEGER = -((1L << 53) - 1)
 
   abstract class Literal extends Val with Expr {
     final override private[sjsonnet] val _tag = ExprTags.`Val.Literal`
@@ -108,6 +112,17 @@ object Val {
     def prettyName = "number"
     override def asInt: Int = value.toInt
     override def asLong: Long = value.toLong
+
+    def asSafeLong(pos: Position)(implicit ev: EvalErrorScope): Long = {
+      if (value.isInfinite || value.isNaN) {
+        Error.fail("numeric value is not finite", pos)
+      }
+
+      if (value < DOUBLE_MIN_SAFE_INTEGER || value > DOUBLE_MAX_SAFE_INTEGER) {
+        Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+      }
+      value.toLong
+    }
     override def asDouble: Double = value
   }
 

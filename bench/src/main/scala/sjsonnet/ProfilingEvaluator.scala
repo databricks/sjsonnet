@@ -162,7 +162,7 @@ class ProfilingEvaluator(
     all.foreach { b =>
       val cl = b.expr match {
         case _: Val => classOf[Val]
-        case ee      => ee.getClass
+        case ee     => ee.getClass
       }
       val n = cl.getName.replaceAll("^sjsonnet\\.", "").replace('$', '.')
       val eb = m.getOrElseUpdate(n, new ExprTypeBox(n))
