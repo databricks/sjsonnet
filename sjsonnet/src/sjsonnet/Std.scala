@@ -327,7 +327,7 @@ class Std(
           current
         case s: Val.Str =>
           var current = init.force
-          for (char <- s.value) {
+          for (char <- s.value.reverse) {
             val c = current
             current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(ev)
           }
