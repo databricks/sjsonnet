@@ -312,6 +312,16 @@ object ErrorTests extends TestSuite {
       suite = "imports"
     )
 
+    test("tailstrict_stack") - check(
+      """|sjsonnet.Error: n is 0
+         |    at [Error].(sjsonnet/test/resources/test_suite/error.tailstrict_stack.jsonnet:10:9)
+         |    at [Apply2].(sjsonnet/test/resources/test_suite/error.tailstrict_stack.jsonnet:12:26)
+         |    at [Apply2].(sjsonnet/test/resources/test_suite/error.tailstrict_stack.jsonnet:14:37)
+         |    at [ValidId result].(sjsonnet/test/resources/test_suite/error.tailstrict_stack.jsonnet:15:5)
+         |    at [Apply1].(sjsonnet/test/resources/test_suite/error.tailstrict_stack.jsonnet:19:18)
+         |""".stripMargin
+    )
+
     test("too_many_arg") - check(
       """|sjsonnet.Error: Too many args, function has 2 parameter(s)
          |    at [Apply].(sjsonnet/test/resources/imports/error.too_many_arg.jsonnet:3:6)
