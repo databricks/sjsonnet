@@ -18,7 +18,6 @@ import org.openjdk.jmh.infra._
 class ParserBenchmark {
 
   private var allFiles: IndexedSeq[(Path, String)] = _
-  private var interp: Interpreter = _
 
   @Setup
   def setup(): Unit =

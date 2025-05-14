@@ -17,7 +17,6 @@ import scala.collection.mutable
 class OptimizerBenchmark {
 
   private var inputs: Iterable[(Expr, FileScope)] = _
-  private var allFiles: IndexedSeq[(Path, String)] = _
   private var ev: EvalScope = _
 
   @Setup
