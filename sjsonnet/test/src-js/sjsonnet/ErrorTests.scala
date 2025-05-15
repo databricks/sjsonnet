@@ -12,6 +12,8 @@ object ErrorTests extends BaseFileTests {
     "test_suite/error.parse.string.invalid_escape.jsonnet",
     "test_suite/error.parse_json.jsonnet",
     "test_suite/error.std_makeArray_negative.jsonnet",
+
+    // Stack size issues with the JS runner
     "test_suite/error.array_recursive_manifest.jsonnet",
     "test_suite/error.function_infinite_default.jsonnet",
     "test_suite/error.obj_recursive.jsonnet",

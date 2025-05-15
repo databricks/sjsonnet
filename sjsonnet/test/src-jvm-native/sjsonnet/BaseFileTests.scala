@@ -35,6 +35,7 @@ abstract class BaseFileTests extends TestSuite {
     val res = eval(fileName)
     val expected = ujson.read(os.read(os.Path(fileName.toString + ".golden")))
     assert(res == Right(expected))
+    assert(stderr.toString.isEmpty)
   }
 
   def checkStderr(fileName: os.Path): Unit = {
@@ -59,6 +60,8 @@ abstract class BaseFileTests extends TestSuite {
         assert(expected.contains("StackOverflowError"))
       case e: sjsonnet.Error =>
         assert(expected.stripLineEnd.contains(e.getMessage))
+      case _: Throwable =>
+        assert(false)
     }
   }
 

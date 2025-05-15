@@ -4,11 +4,10 @@ import utest._
 
 object FileTests extends BaseFileTests {
   val skippedTests = Set(
-    "test_suite/dos_line_endings.jsonnet",
     "test_suite/stdlib.jsonnet",
-    "test_suite/recursive_function.jsonnet",
     "test_suite/regex.jsonnet",
-    "test_suite/trace.jsonnet"
+    "test_suite/dos_line_endings.jsonnet",
+    "test_suite/recursive_function.jsonnet"
   )
 
   val tests: Tests = Tests {
@@ -18,7 +17,11 @@ object FileTests extends BaseFileTests {
         .filter(f => !skippedTests.contains(f))
       assert(t.nonEmpty)
       t.foreach { file =>
-        check(file)
+        if (file.endsWith("trace.jsonnet")) {
+          checkStderr(file)
+        } else {
+          check(file)
+        }
       }
     }
   }
