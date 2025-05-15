@@ -5,9 +5,9 @@ import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 import java.util.Base64
 
-val sjsonnetVersion = "0.5.0"
+val sjsonnetVersion = os.read(os.pwd / "VERSION").trim
+val scalaVersions = os.read(os.pwd / "SCALA_VERSIONS").trim.split(" ").map(_.trim).toSeq
 
-val scalaVersions = Seq("2.12.20", "2.13.16", "3.3.6")
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
 

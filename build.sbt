@@ -1,7 +1,8 @@
-val sjsonnetVersion = "0.5.0"
+val sjsonnetVersion = IO.readLines(new File("VERSION")).head.trim
 
-val scala213 = "2.13.16"
-val scala3 = "3.3.6"
+val scalaVersions = IO.readLines(new File("SCALA_VERSIONS")).head.split(" ").map(_.trim)
+val scala213 = scalaVersions.find(_.startsWith("2.13.")).get
+val scala3 = scalaVersions.find(_.startsWith("3.")).get
 
 cancelable in Global := true
 

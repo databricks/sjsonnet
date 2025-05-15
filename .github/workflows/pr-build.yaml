@@ -1,8 +1,6 @@
 name: Pull Request Validation
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -27,7 +25,7 @@ jobs:
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - name: Check Formating
+      - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Compile with mill
         run: ./mill _.${{ matrix.lang }}[_].__.compile
