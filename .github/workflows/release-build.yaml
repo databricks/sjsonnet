@@ -1,6 +1,9 @@
 name: Release Build
 
-on: push
+on:
+  push:
+    tags:
+      - "*.*.*"
 
 jobs:
   release:
@@ -76,7 +79,7 @@ jobs:
           path: release/*
           retention-days: 1
           if-no-files-found: error
-  create-draft-release:
+  create-release-package:
     permissions:
       contents: write
     needs:
