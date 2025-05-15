@@ -3,17 +3,17 @@ A Scala implementation of the [Jsonnet](https://jsonnet.org/) configuration lang
 
 ## Usage
 
-Sjsonnet can be used from Java:
+Sjsonnet can be used from Java and Scala:
 
 ```xml
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_3</artifactId>
-    <version>0.5.0</version>
 </dependency>
 ```
 
 ```java
+// Java
 sjsonnet.SjsonnetMain.main0(
     new String[]{"foo.jsonnet"},
     new DefaultParseCache,
@@ -23,16 +23,8 @@ sjsonnet.SjsonnetMain.main0(
     os.package$.MODULE$.pwd(),
     scala.None$.empty()
 );
-```
 
-From Scala:
-
-```scala
-"com.databricks" %% "sjsonnet" % "0.5.0" // SBT
-ivy"com.databricks::sjsonnet:0.5.0" // Mill
-```
-
-```scala
+// Scala
 sjsonnet.SjsonnetMain.main0(
     Array("foo.jsonnet"),
     new DefaultParseCache,
@@ -44,22 +36,14 @@ sjsonnet.SjsonnetMain.main0(
 );
 ```
 
-As a standalone executable assembly:
-
-- <https://github.com/databricks/sjsonnet/releases/download/0.5.0/sjsonnet-0.5.0.jar> (JVM)
-- <https://github.com/databricks/sjsonnet/releases/download/0.5.0/sjsonnet-0.5.0-Linux-x86_64> (Scala Native)
-- <https://github.com/databricks/sjsonnet/releases/download/0.5.0/sjsonnet-0.5.0-Darwin-arm64> (Scala Native)
-
+As a standalone executable assembly from the [github release page](https://github.com/databricks/sjsonnet/releases):
 ```bash
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.5.0/sjsonnet-0.5.0.jar > sjsonnet.jar
-
 $ chmod +x sjsonnet.jar
 
 $ ./sjsonnet.jar
 error: Need to pass in a jsonnet file to evaluate
 usage: sjsonnet [sjsonnet-options] script-file
 
-  -i, --interactive  Run Mill in interactive mode, suitable for opening REPLs and taking user input
   -n, --indent       How much to indent your output JSON
   -J, --jpath        Specify an additional library search dir (left-most wins)
   -o, --output-file  Write to the output file rather than stdout
@@ -71,8 +55,6 @@ $ ./sjsonnet.jar foo.jsonnet
 Or from Javascript:
 
 ```javascript
-$ curl -L https://github.com/databricks/sjsonnet/releases/download/0.5.0/sjsonnet-0.5.0.js > sjsonnet.js
-
 $ node
 
 > require("./sjsonnet.js")
@@ -110,7 +92,7 @@ stack size as follows:
 java -Xss100m -cp sjsonnet.jar sjsonnet.SjsonnetMain foo.jsonnet
 
 # Scala Native
-SCALANATIVE_THREAD_STACK_SIZE=100m ./sjsonnet-0.5.0-Linux-x86_64 foo.jsonnet
+SCALANATIVE_THREAD_STACK_SIZE=100m ./sjsonnet foo.jsonnet
 
 # ScalaJS (Node)
 node --stack-size=100m
