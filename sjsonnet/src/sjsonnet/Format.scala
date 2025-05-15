@@ -175,10 +175,11 @@ object Format {
   }
 
   def formatInteger(formatted: FormatSpec, s: Double): String = {
-    val (lhs, rhs) = if (s < 0) {
-      ("-", s.toLong.toString.substring(1))
+    val sl = s.toLong
+    val (lhs, rhs) = if (sl < 0) {
+      ("-", sl.toString.substring(1))
     } else {
-      ("", s.toLong.toString)
+      ("", sl.toString)
     }
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
@@ -187,7 +188,7 @@ object Format {
       "",
       rhs2,
       true,
-      s > 0
+      sl >= 0
     )
   }
 

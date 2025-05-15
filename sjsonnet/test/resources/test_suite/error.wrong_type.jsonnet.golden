@@ -1,2 +1,3 @@
-RUNTIME ERROR: Builtin function codepoint expected (string) but got (number)
-	error.wrong_type.jsonnet:1:1-18	
+sjsonnet.Error: Wrong parameter type: expected String, got number
+    at [std.codepoint].(sjsonnet/test/resources/test_suite/error.wrong_type.jsonnet:1:14)
+

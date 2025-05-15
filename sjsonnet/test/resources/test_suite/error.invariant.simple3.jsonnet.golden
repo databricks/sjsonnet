@@ -1,3 +1,3 @@
-RUNTIME ERROR: my error message
-	error.invariant.simple3.jsonnet:18:10-34	thunk <object_assert>
-	During manifestation	
+sjsonnet.Error: my error message
+    at [Error].(sjsonnet/test/resources/test_suite/error.invariant.simple3.jsonnet:18:10)
+

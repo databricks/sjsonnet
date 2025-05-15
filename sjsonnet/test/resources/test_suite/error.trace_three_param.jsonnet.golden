@@ -1,4 +1,4 @@
-RUNTIME ERROR: too many args, function has 2 parameter(s)
-	error.trace_three_param.jsonnet:17:11-32	thunk <v>
-	error.trace_three_param.jsonnet:19:6	object <anonymous>
-	During manifestation	
+sjsonnet.Error: Too many args, function has 2 parameter(s)
+    at [Apply3].(sjsonnet/test/resources/test_suite/error.trace_three_param.jsonnet:17:20)
+    at [ValidId v].(sjsonnet/test/resources/test_suite/error.trace_three_param.jsonnet:19:6)
+

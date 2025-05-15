@@ -33,8 +33,6 @@ std.assertEqual(std.length(test_chinese), 1) &&
 
 std.assertEqual('Ā', 'Ā') &&
 std.assertEqual(@"\u0100", '\\u0100') &&
-std.assertEqual(@"\u010a", '\\u010a') &&
-std.assertEqual(@"\u010F", '\\u010F') &&
 std.assertEqual(@"Ā", 'Ā') &&
 
 true

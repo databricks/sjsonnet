@@ -1,1 +1,3 @@
-STATIC ERROR: error.static_error_var_not_exist.jsonnet:17:16-20: Unknown variable: tmp2
+sjsonnet.StaticError: Unknown variable: tmp2
+    at [Id tmp2].(sjsonnet/test/resources/test_suite/error.static_error_var_not_exist.jsonnet:17:16)
+

@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.array_comma.jsonnet:17:7: expected a comma before next array element.
+sjsonnet.ParseError: Expected "]":17:7, found "3]\n"
+    at .(sjsonnet/test/resources/test_suite/error.parse.array_comma.jsonnet:17:7)
+

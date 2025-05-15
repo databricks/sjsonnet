@@ -1,0 +1,3 @@
+sjsonnet.StaticError: Unknown variable: foo
+    at [Id foo].(sjsonnet/test/resources/test_suite/error.args_commafodder.jsonnet:1:1)
+

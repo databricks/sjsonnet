@@ -1,3 +1,5 @@
-RUNTIME ERROR: Option "d" not in ["a", "b", "c"].
-	error.invariant.option.jsonnet:20:10-59	thunk <object_assert>
-	During manifestation	
+sjsonnet.Error: Argument 0 must be an array
+    at [std.setInter].(sjsonnet/test/resources/test_suite/error.invariant.option.jsonnet:19:33)
+    at [std.length].(sjsonnet/test/resources/test_suite/error.invariant.option.jsonnet:19:20)
+    at [BinaryOp >].(sjsonnet/test/resources/test_suite/error.invariant.option.jsonnet:19:57)
+

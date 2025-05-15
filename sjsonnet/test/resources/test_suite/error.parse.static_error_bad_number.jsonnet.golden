@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.static_error_bad_number.jsonnet:17:1: unexpected: "." while parsing terminal
+sjsonnet.ParseError: Expected fail:17:2, found "5\n"
+    at .(sjsonnet/test/resources/test_suite/error.parse.static_error_bad_number.jsonnet:17:2)
+

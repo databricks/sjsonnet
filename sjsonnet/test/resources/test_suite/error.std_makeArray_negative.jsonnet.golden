@@ -1,2 +1,26 @@
-RUNTIME ERROR: makeArray requires size >= 0, got -10
-	error.std_makeArray_negative.jsonnet:17:1-37	
+sjsonnet.Error: Internal Error
+    at [std.makeArray].(sjsonnet/test/resources/test_suite/error.std_makeArray_negative.jsonnet:17:14)
+Caused by: java.lang.NegativeArraySizeException: -10
+    at sjsonnet.Std.$init$$$anonfun$13(Std.scala:1262)
+    at sjsonnet.Std.$init$$$anonfun$adapted$7(Std.scala:1259)
+    at sjsonnet.functions.FunctionBuilder$$anon$3.evalRhs(FunctionBuilder.scala:47)
+    at sjsonnet.Evaluator.visitApplyBuiltin2(Evaluator.scala:278)
+    at sjsonnet.Evaluator.visitExpr(Evaluator.scala:41)
+    at sjsonnet.Interpreter.evaluate$$anonfun$2$$anonfun$1(Interpreter.scala:177)
+    at sjsonnet.Interpreter.sjsonnet$Interpreter$$handleException(Interpreter.scala:163)
+    at sjsonnet.Interpreter.evaluate$$anonfun$2(Interpreter.scala:177)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at sjsonnet.Interpreter.evaluate(Interpreter.scala:175)
+    at sjsonnet.Interpreter.interpret0(Interpreter.scala:158)
+    at sjsonnet.SjsonnetMain$.renderNormal$$anonfun$1(SjsonnetMain.scala:157)
+    at sjsonnet.SjsonnetMain$.writeToFile(SjsonnetMain.scala:131)
+    at sjsonnet.SjsonnetMain$.renderNormal(SjsonnetMain.scala:155)
+    at sjsonnet.SjsonnetMain$.mainConfigured(SjsonnetMain.scala:332)
+    at sjsonnet.SjsonnetMain$.$anonfun$30$$anonfun$1(SjsonnetMain.scala:85)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at sjsonnet.SjsonnetMain$.$anonfun$30(SjsonnetMain.scala:84)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at sjsonnet.SjsonnetMain$.main0(SjsonnetMain.scala:77)
+    at sjsonnet.SjsonnetMain$.main(SjsonnetMain.scala:44)
+    at sjsonnet.SjsonnetMain.main(SjsonnetMain.scala)
+

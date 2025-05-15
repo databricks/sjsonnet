@@ -541,6 +541,11 @@ class Std(
       Val.bool(pos, a.force.asString.startsWith(b.force.asString))
   }
 
+  private object Native extends Val.Builtin1("native", "name") {
+    def evalRhs(name: Lazy, ev: EvalScope, pos: Position): Val =
+      nativeFunctions.getOrElse(name.force.asString, Val.Null(pos))
+  }
+
   private object EndsWith extends Val.Builtin2("endsWith", "a", "b") {
     def evalRhs(a: Lazy, b: Lazy, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, a.force.asString.endsWith(b.force.asString))
@@ -1883,13 +1888,7 @@ class Std(
     builtin("primitiveEquals", "x", "y") { (_, ev, x: Val, y: Val) =>
       x.isInstanceOf[y.type] && ev.compare(x, y) == 0
     },
-    builtin("native", "name") { (pos, ev, name: String) =>
-      if (nativeFunctions.contains(name)) {
-        nativeFunctions(name)
-      } else {
-        Error.fail("Native function " + name + " not found", pos)(ev)
-      }
-    }
+    builtin(Native)
   ) ++ builtinNativeFunctions
 
   require(

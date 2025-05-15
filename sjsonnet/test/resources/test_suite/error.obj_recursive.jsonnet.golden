@@ -1,22 +1,3 @@
-RUNTIME ERROR: max stack frames exceeded.
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	...
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	error.obj_recursive.jsonnet:17:6-10	object <anonymous>
-	During manifestation	
+sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
+    at .(sjsonnet/test/resources/test_suite/error.obj_recursive.jsonnet:17:3)
+

@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.string.invalid_escape_unicode_short2.jsonnet:17:1-8: Truncated unicode escape sequence in string literal.
+sjsonnet.ParseError: Expected "\"":17:2, found "\\u333\"\n"
+    at .(sjsonnet/test/resources/test_suite/error.parse.string.invalid_escape_unicode_short2.jsonnet:17:2)
+

@@ -1,10 +1,4 @@
-RUNTIME ERROR: should happen
--------------------------------------------------
-	testdata/lazy_operator2:1:9-30	$
-
-true && error "should happen"
-
--------------------------------------------------
-	During evaluation	
-
+sjsonnet.Error: should happen
+    at [Error].(sjsonnet/test/resources/test_suite/lazy_operator2.jsonnet:1:9)
+    at [And].(sjsonnet/test/resources/test_suite/lazy_operator2.jsonnet:1:6)
 

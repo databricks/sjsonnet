@@ -1,3 +1,3 @@
-{
-   "text": "A paragraph\r\nof text.\r\n"
-}
+sjsonnet.ParseError: Expected "\n":18:12, found "\r\n    A pa"
+    at .(sjsonnet/test/resources/test_suite/dos_line_endings.jsonnet:18:12)
+

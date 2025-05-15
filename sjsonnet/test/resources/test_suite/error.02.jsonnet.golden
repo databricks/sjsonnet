@@ -1,2 +1,3 @@
-RUNTIME ERROR: Foo.
-	error.02.jsonnet:17:1-13	
+sjsonnet.Error: Foo.
+    at [Error].(sjsonnet/test/resources/test_suite/error.02.jsonnet:17:1)
+

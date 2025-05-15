@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.self_in_computed_field.jsonnet:17:15-19: unexpected: self while parsing field definition
+sjsonnet.ParseError: Expected "}":17:15, found "self.f = \""
+    at .(sjsonnet/test/resources/test_suite/error.parse.self_in_computed_field.jsonnet:17:15)
+

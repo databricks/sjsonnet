@@ -1,1 +1,3 @@
-STATIC ERROR: error.function_duplicate_param.jsonnet:17:1-17: Duplicate function parameter: x
+sjsonnet.ParseError: Expected no duplicate parameter: x:17:14, found ") x\n"
+    at .(sjsonnet/test/resources/test_suite/error.function_duplicate_param.jsonnet:17:14)
+
