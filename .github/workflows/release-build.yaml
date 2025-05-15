@@ -1,0 +1,109 @@
+name: Release Build
+
+on: push
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    env:
+      LANG: C
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+      - name: Set up environment variables
+        run: |
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
+      - name: JAR Build
+        run: ./mill "sjsonnet.jvm[$SCALA_VERSION].assembly"
+      - name: JS Build
+        run: ./mill "sjsonnet.js[$SCALA_VERSION].fullOpt"
+      - name: Rename Artifacts
+        run: |
+          mkdir release
+          cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js ./release/sjsonnet-$VERSION.js
+          cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js.map ./release/sjsonnet-$VERSION.js.map
+          cp ./out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar ./release/sjsonnet-$VERSION.jar
+      - uses: actions/upload-artifact@v4
+        name: Upload Artifacts
+        with:
+          name: sjsonnet-${{ env.VERSION }}-jvmjs
+          path: release/*
+          retention-days: 1
+          if-no-files-found: error
+  release-native:
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        platform:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+          - name: linux-arm64
+            os: ubuntu-22.04-arm
+          - name: darwin-x86_64
+            os: macos-13
+          - name: darwin-arm64
+            os: macos-15
+    runs-on: ${{ matrix.platform.os }}
+    env:
+      LANG: C
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+      - name: Set up environment variables
+        run: |
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
+      - name: Native Binary Build
+        run: ./mill "sjsonnet.native[$SCALA_VERSION].nativeLink"
+      - name: Rename Artifacts
+        run: |
+          mkdir release
+          cp ./out/sjsonnet/native/$SCALA_VERSION/nativeLink.dest/out ./release/sjsonnet-$VERSION-${{ matrix.platform.name }}
+      - uses: actions/upload-artifact@v4
+        name: Upload Native Binary
+        with:
+          name: sjsonnet-${{ env.VERSION }}-${{ matrix.platform.name }}
+          path: release/*
+          retention-days: 1
+          if-no-files-found: error
+  create-draft-release:
+    permissions:
+      contents: write
+    needs:
+      - release
+      - release-native
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up environment variables
+        run: |
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+          mkdir -p release
+      - uses: actions/download-artifact@v4
+        name: Download Artifacts
+        with:
+          path: release
+          merge-multiple: true
+      - name: Compute SHA256 Sum
+        run: |
+          pushd release
+          ls -la
+          sha256sum sjsonnet-* > sums.sha256
+          popd
+      - uses: actions/upload-artifact@v4
+        name: Upload Package
+        with:
+          name: sjsonnet-${{ env.VERSION }}-release
+          path: release/*
+          retention-days: 30
+          if-no-files-found: error
