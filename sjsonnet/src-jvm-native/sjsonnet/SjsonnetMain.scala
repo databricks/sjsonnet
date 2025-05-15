@@ -65,9 +65,12 @@ object SjsonnetMain {
       std: Val.Obj = new Std().Std): Int = {
 
     var hasWarnings = false
-    def warn(msg: String): Unit = {
-      hasWarnings = true
-      stderr.println("[warning] " + msg)
+    def warn(isTrace: Boolean, msg: String): Unit = {
+      hasWarnings = hasWarnings || !isTrace
+      if (!isTrace)
+        stderr.println("[warning] " + msg)
+      else
+        stderr.println(msg)
     }
 
     val parser = mainargs.ParserForClass[Config]
@@ -198,7 +201,7 @@ object SjsonnetMain {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]],
       importer: Option[(Path, String) => Option[os.Path]],
-      warnLogger: String => Unit,
+      warnLogger: (Boolean, String) => Unit,
       std: Val.Obj): Either[String, String] = {
 
     val (jsonnetCode, path) =
@@ -226,8 +229,8 @@ object SjsonnetMain {
 
     var currentPos: Position = null
     val interp = new Interpreter(
-      queryExtVar = key => extBinding.get(key).map(ExternalVariable.code(_)),
-      queryTlaVar = key => tlaBinding.get(key).map(ExternalVariable.code(_)),
+      queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
+      queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
       OsPath(wd),
       importer = importer match {
         case Some(i) =>
@@ -253,7 +256,7 @@ object SjsonnetMain {
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value
       ),
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
-      warnLogger = warnLogger,
+      logger = warnLogger,
       std = std,
       variableResolver = _ => None
     )

@@ -1,0 +1,4 @@
+sjsonnet.Error: should happen
+    at [Error].(sjsonnet/test/resources/test_suite/error.lazy_operator2.jsonnet:1:9)
+    at [And].(sjsonnet/test/resources/test_suite/error.lazy_operator2.jsonnet:1:6)
+

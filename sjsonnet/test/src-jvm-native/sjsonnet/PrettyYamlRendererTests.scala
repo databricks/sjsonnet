@@ -1,5 +1,6 @@
-import sjsonnet._
-import utest._
+package sjsonnet
+
+import utest.*
 
 object PrettyYamlRendererTests extends TestSuite {
   val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"

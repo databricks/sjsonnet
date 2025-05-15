@@ -1,9 +1,6 @@
 package sjsonnet
 
-import java.io.{PrintWriter, StringWriter}
-
 import scala.collection.mutable
-
 import sjsonnet.Expr.Params
 
 import scala.util.control.NonFatal
@@ -13,14 +10,14 @@ import scala.util.control.NonFatal
  * materialization, into a convenient wrapper class.
  */
 class Interpreter(
-    queryExtVar: String => Option[ExternalVariable[_]],
-    queryTlaVar: String => Option[ExternalVariable[_]],
+    queryExtVar: String => Option[ExternalVariable[?]],
+    queryTlaVar: String => Option[ExternalVariable[?]],
     wd: Path,
     importer: Importer,
     parseCache: ParseCache,
     settings: Settings,
     storePos: Position => Unit,
-    warnLogger: String => Unit,
+    logger: Evaluator.Logger,
     std: Val.Obj,
     variableResolver: String => Option[Expr]
 ) { self =>
@@ -33,18 +30,18 @@ class Interpreter(
       parseCache: ParseCache,
       settings: Settings = Settings.default,
       storePos: Position => Unit = null,
-      warnLogger: (String => Unit) = null,
+      logger: (Boolean, String) => Unit = null,
       std: Val.Obj = new Std().Std,
       variableResolver: String => Option[Expr] = _ => None) =
     this(
-      key => extVars.get(key).map(ExternalVariable.code(_)),
-      key => tlaVars.get(key).map(ExternalVariable.code(_)),
+      key => extVars.get(key).map(ExternalVariable.code),
+      key => tlaVars.get(key).map(ExternalVariable.code),
       wd,
       importer,
       parseCache,
       settings,
       storePos,
-      warnLogger,
+      logger,
       std,
       variableResolver
     )
@@ -95,17 +92,14 @@ class Interpreter(
    */
   def createVarParseCache: ParseCache = new DefaultParseCache()
 
-  private def warn(e: Error): Unit = warnLogger("[warning] " + formatError(e))
-
   def createEvaluator(
       resolver: CachedResolver,
       extVars: String => Option[Expr],
       wd: Path,
-      settings: Settings,
-      warn: Error => Unit): Evaluator = if (settings.useNewEvaluator)
-    new NewEvaluator(resolver, extVars, wd, settings, warn)
+      settings: Settings): Evaluator = if (settings.useNewEvaluator)
+    new NewEvaluator(resolver, extVars, wd, settings, logger)
   else
-    new Evaluator(resolver, extVars, wd, settings, warn)
+    new Evaluator(resolver, extVars, wd, settings, logger)
 
   /**
    * Evaluate a variable to an `Expr`.
@@ -133,19 +127,10 @@ class Interpreter(
     // parse extVars lazily, because they can refer to each other and be recursive
     k => queryExtVar(k).map(v => evaluateVar("ext", k, v)),
     wd,
-    settings,
-    warn
+    settings
   )
 
   evaluator // force the lazy val
-
-  def formatError(e: Error): String = {
-    val s = new StringWriter()
-    val p = new PrintWriter(s)
-    e.printStackTrace(p)
-    p.close()
-    s.toString.replace("\t", "    ")
-  }
 
   def interpret(txt: String, path: Path): Either[String, ujson.Value] =
     interpret0(txt, path, ujson.Value)
@@ -157,7 +142,7 @@ class Interpreter(
     (for {
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
-    } yield r).left.map(formatError)
+    } yield r).left.map(Error.formatError)
 
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)

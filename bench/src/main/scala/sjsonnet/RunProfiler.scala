@@ -23,9 +23,8 @@ object RunProfiler extends App {
         resolver: CachedResolver,
         extVars: String => Option[Expr],
         wd: Path,
-        settings: Settings,
-        warn: Error => Unit): Evaluator =
-      new ProfilingEvaluator(resolver, extVars, wd, settings, warn)
+        settings: Settings): Evaluator =
+      new ProfilingEvaluator(resolver, extVars, wd, settings, null)
   }
   val profiler = interp.evaluator.asInstanceOf[ProfilingEvaluator]
 

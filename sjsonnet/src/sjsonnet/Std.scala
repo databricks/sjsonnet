@@ -879,7 +879,7 @@ class Std(
 
   private object Trace extends Val.Builtin2("trace", "str", "rest") {
     def evalRhs(str: Lazy, rest: Lazy, ev: EvalScope, pos: Position): Val = {
-      System.err.println(
+      ev.trace(
         s"TRACE: ${pos.fileScope.currentFileLastPathElement} " + str.force.asString
       )
       rest.force

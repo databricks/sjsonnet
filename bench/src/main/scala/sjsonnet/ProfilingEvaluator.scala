@@ -11,7 +11,7 @@ class ProfilingEvaluator(
     e: String => Option[Expr],
     w: Path,
     s: Settings,
-    wa: Error => Unit)
+    wa: (Boolean, String) => Unit)
     extends Evaluator(r, e, w, s, wa) {
 
   trait Box {
