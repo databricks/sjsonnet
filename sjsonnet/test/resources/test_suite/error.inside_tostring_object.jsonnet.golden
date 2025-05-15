@@ -1,3 +1,4 @@
-RUNTIME ERROR: foobar
-	error.inside_tostring_object.jsonnet:17:12-26	object <anonymous>
-	error.inside_tostring_object.jsonnet:17:1-28	
+sjsonnet.Error: foobar
+    at [Error].(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:12)
+    at [BinaryOp +].(sjsonnet/test/resources/test_suite/error.inside_tostring_object.jsonnet:17:29)
+

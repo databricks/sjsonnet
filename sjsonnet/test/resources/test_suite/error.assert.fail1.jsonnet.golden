@@ -1,2 +1,3 @@
-RUNTIME ERROR: Assertion failed.
-	error.assert.fail1.jsonnet:(20:1)-(22:5)	
+sjsonnet.Error: Assertion failed
+    at [AssertExpr].(sjsonnet/test/resources/test_suite/error.assert.fail1.jsonnet:20:1)
+

@@ -1,2 +1,3 @@
-RUNTIME ERROR: overflow
-	error.overflow3.jsonnet:17:1-6	
+sjsonnet.Error: numeric value is not finite
+    at [BinaryOp &].(sjsonnet/test/resources/test_suite/error.overflow3.jsonnet:17:7)
+

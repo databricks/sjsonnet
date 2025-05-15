@@ -1,1 +1,3 @@
-STATIC ERROR: error.static_error_self.jsonnet:17:2-6: Can't use self outside of an object.
+sjsonnet.StaticError: Can't use self outside of an object
+    at [Self].(sjsonnet/test/resources/test_suite/error.static_error_self.jsonnet:17:2)
+

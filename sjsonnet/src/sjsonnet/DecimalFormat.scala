@@ -39,7 +39,7 @@ object DecimalFormat {
       number: Double): String = {
     expLengthOpt match {
       case Some(expLength) =>
-        val roundLog10 = Math.ceil(Math.log10(Math.abs(number))).toLong
+        val roundLog10 = if (number == 0.0) 1L else Math.ceil(Math.log10(math.abs(number))).toLong
         val expNum = roundLog10 - 1
         val scaled = number / math.pow(10, expNum.toDouble)
         val prefix = scaled.toLong.toString

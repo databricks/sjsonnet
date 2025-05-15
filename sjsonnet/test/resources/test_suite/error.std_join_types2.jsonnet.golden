@@ -1,4 +1,3 @@
-RUNTIME ERROR: expected array but arr[0] was string 
-	std.jsonnet:260:9-87	function <aux>
-	std.jsonnet:270:7-28	function <anonymous>
-	error.std_join_types2.jsonnet:17:1-31	
+sjsonnet.Error: Cannot join string
+    at [std.join].(sjsonnet/test/resources/test_suite/error.std_join_types2.jsonnet:17:9)
+

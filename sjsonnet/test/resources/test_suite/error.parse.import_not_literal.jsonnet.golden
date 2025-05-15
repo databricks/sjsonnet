@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.import_not_literal.jsonnet:17:8-28: computed imports are not allowed.
+sjsonnet.ParseError: Expected string literal (computed imports are not allowed):18:1, found ""
+    at .(sjsonnet/test/resources/test_suite/error.parse.import_not_literal.jsonnet:18:1)
+

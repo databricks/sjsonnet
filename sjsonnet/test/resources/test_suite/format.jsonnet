@@ -53,6 +53,27 @@ std.assertEqual(std.format('thing-%-5.3d', [10.3]), 'thing-010  ') &&
 std.assertEqual(std.format('thing-%#-5.3d', [10.3]), 'thing-010  ') &&
 std.assertEqual(std.format('thing-%#-5.3i', [10.3]), 'thing-010  ') &&
 std.assertEqual(std.format('thing-%#-5.3u', [10.3]), 'thing-010  ') &&
+std.assertEqual(std.format('thing-%5.3d', [-10.3]), 'thing- -010') &&
+std.assertEqual(std.format('thing-%+5.3d', [-10.3]), 'thing- -010') &&
+std.assertEqual(std.format('thing-%+-5.3d', [-10.3]), 'thing--010 ') &&
+std.assertEqual(std.format('thing-%-5.3d', [-10.3]), 'thing--010 ') &&
+std.assertEqual(std.format('thing-%#-5.3d', [-10.3]), 'thing--010 ') &&
+std.assertEqual(std.format('thing-%#-5.3i', [-10.3]), 'thing--010 ') &&
+std.assertEqual(std.format('thing-%#-5.3u', [-10.3]), 'thing--010 ') &&
+std.assertEqual(std.format('thing-%5.3d', [0.3]), 'thing-  000') &&
+std.assertEqual(std.format('thing-%+5.3d', [0.3]), 'thing- +000') &&
+std.assertEqual(std.format('thing-%+-5.3d', [0.3]), 'thing-+000 ') &&
+std.assertEqual(std.format('thing-%-5.3d', [0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3d', [0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3i', [0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3u', [0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%5.3d', [-0.3]), 'thing-  000') &&
+std.assertEqual(std.format('thing-%+5.3d', [-0.3]), 'thing- +000') &&
+std.assertEqual(std.format('thing-%+-5.3d', [-0.3]), 'thing-+000 ') &&
+std.assertEqual(std.format('thing-%-5.3d', [-0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3d', [-0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3i', [-0.3]), 'thing-000  ') &&
+std.assertEqual(std.format('thing-%#-5.3u', [-0.3]), 'thing-000  ') &&
 
 // o
 std.assertEqual(std.format('thing-%o', [10]), 'thing-12') &&
@@ -134,7 +155,9 @@ std.assertEqual(std.format('thing-%#-8.4X', [910.3]), 'thing-0X038E  ') &&
 
 // e
 std.assertEqual(std.format('%e', [910]), '9.100000e+02') &&
+std.assertEqual(std.format('%e', [0]), '0.000000e+00') &&
 std.assertEqual(std.format('%.0le', [910]), '9e+02') &&
+std.assertEqual(std.format('%.0le', [0]), '0e+00') &&
 std.assertEqual(std.format('%#e', [-910]), '-9.100000e+02') &&
 std.assertEqual(std.format('%16e', [910]), '    9.100000e+02') &&
 std.assertEqual(std.format('%016e', [910]), '00009.100000e+02') &&
@@ -148,6 +171,10 @@ std.assertEqual(std.format('%-16.4e', [910.3]), '9.1030e+02      ') &&
 std.assertEqual(std.format('%#.0e', [910.3]), '9.e+02') &&
 std.assertEqual(std.format('%#.0e', [900]), '9.e+02') &&
 std.assertEqual(std.format('%.3e', [1000000001]), '1.000e+09') &&
+// For very small numbers, Go and C++ differ in the accuracy of log().
+// The following test makes sure that we don't at least have a runtime error
+// while calculating it.
+std.assertEqual(std.type(std.format('%e', [3.94066e-324])), 'string') &&
 
 // E
 std.assertEqual(std.format('%E', [910]), '9.100000E+02') &&
@@ -183,8 +210,14 @@ std.assertEqual(std.format('%-12.4f', [910.3]), '910.3000    ') &&
 std.assertEqual(std.format('%#.0f', [910.3]), '910.') &&
 std.assertEqual(std.format('%#.0f', [910]), '910.') &&
 std.assertEqual(std.format('%.3f', [1000000001]), '1000000001.000') &&
+std.assertEqual(std.format('%f', [-0.1]), '-0.100000') &&
+//std.assertEqual(std.format('%.1f', [0.99]), '1.0') &&
+//std.assertEqual(std.format('%.1f', [1.95555]), '2.0') &&
+//std.assertEqual(std.format('%.4f', [0.99995]), '1.0000') &&
 
 // g
+
+//std.assertEqual(std.format('%g', [0]), '0') &&
 std.assertEqual(std.format('%#.3g', [1000000001]), '1.00e+09') &&
 std.assertEqual(std.format('%#.3g', [1100]), '1.10e+03') &&
 std.assertEqual(std.format('%#.3g', [1.1]), '1.10') &&
@@ -192,6 +225,9 @@ std.assertEqual(std.format('%#.5g', [1000000001]), '1.0000e+09') &&
 std.assertEqual(std.format('%#.5g', [1100]), '1100.0') &&
 std.assertEqual(std.format('%#.5g', [110]), '110.00') &&
 std.assertEqual(std.format('%#.5g', [1.1]), '1.1000') &&
+//std.assertEqual(std.format('%#.1g', [0.99]), '1.') &&
+//std.assertEqual(std.format('%#.1g', [1.95555]), '2.') &&
+//std.assertEqual(std.format('%#.4g', [0.99995]), '1.000') &&
 std.assertEqual(std.format('%#10.3g', [1000000001]), '  1.00e+09') &&
 std.assertEqual(std.format('%#10.3g', [1100]), '  1.10e+03') &&
 std.assertEqual(std.format('%#10.3g', [1.1]), '      1.10') &&
@@ -215,6 +251,7 @@ std.assertEqual(std.format('%10.5g', [110]), '       110') &&
 std.assertEqual(std.format('%10.5g', [1.1]), '       1.1') &&
 
 // G
+//std.assertEqual(std.format('%G', [0]), '0') &&
 std.assertEqual(std.format('%#.3G', [1000000001]), '1.00E+09') &&
 std.assertEqual(std.format('%#.3G', [1100]), '1.10E+03') &&
 std.assertEqual(std.format('%#.3G', [1.1]), '1.10') &&

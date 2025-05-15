@@ -1,2 +1,3 @@
-RUNTIME ERROR: {"a": 1, "b": 2, "c": 3}
-	error.08.jsonnet:18:1-8	
+sjsonnet.Error: {"a": 1, "b": 2, "c": 3}
+    at [Error].(sjsonnet/test/resources/test_suite/error.08.jsonnet:18:1)
+

@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.text_block_bad_whitespace.jsonnet:17:1: text block not terminated with |||
+sjsonnet.ParseError: Expected "|||":19:2, found "bar\n|||\n"
+    at .(sjsonnet/test/resources/test_suite/error.parse.text_block_bad_whitespace.jsonnet:19:2)
+

@@ -1,2 +1,3 @@
-RUNTIME ERROR: In comprehension, can only iterate over array.
-	error.comprehension_spec_object2.jsonnet:17:1-32	
+sjsonnet.Error: In comprehension, can only iterate over array, not object
+    at [ForSpec].(sjsonnet/test/resources/test_suite/error.comprehension_spec_object2.jsonnet:17:13)
+

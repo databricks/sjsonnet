@@ -1,3 +1,3 @@
-RUNTIME ERROR: Object assertion failed.
-	error.invariant.simple.jsonnet:18:10-15	thunk <object_assert>
-	During manifestation	
+sjsonnet.Error: Assertion failed
+    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.simple.jsonnet:18:10)
+

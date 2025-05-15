@@ -1,0 +1,3 @@
+sjsonnet.Error: Expected number, found string
+    at [std.decodeUTF8].(sjsonnet/test/resources/test_suite/error.decodeUTF8_nan.jsonnet:1:15)
+

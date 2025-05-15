@@ -1,1 +1,3 @@
-STATIC ERROR: error.computed_field_scope.jsonnet:17:21: Unknown variable: x
+sjsonnet.StaticError: Unknown variable: x
+    at [Id x].(sjsonnet/test/resources/test_suite/error.computed_field_scope.jsonnet:17:21)
+

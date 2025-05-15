@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 Google Inc. All rights reserved.
 #
@@ -16,7 +16,9 @@
 
 set -e
 
-source "tests.source"
+JAVA_OPTS="-Xss100m"
+JSONNET_BIN="../../../../out/sjsonnet/jvm/3.3.6/assembly.dest/out.jar"
+PARAMS="--no-duplicate-keys-in-comprehension --strict-import-syntax --strict-inherited-assertions --strict-set-operations"
 
 if [ $# -eq 0 ] ; then
     echo "Usage: $0 <filename.jsonnet>" 2>&1
@@ -37,16 +39,16 @@ for FILE in "$@" ; do
 
     EXT_PARAMS=""
     TLA_PARAMS=""
-    if [[ "$TEST" =~ ^tla[.] ]] ; then
-        TLA_PARAMS="--tla-str var1=test --tla-code var2='{x:1,y:2}'"
+    if [[ $FILE = */tla.* ]] ; then
+        TLA_PARAMS="--tla-str=var1=test --tla-code=var2='{x:1,y:2}'"
     else
-        EXT_PARAMS="--ext-str var1=test --ext-code var2='{x:1,y:2}'"
+        EXT_PARAMS="--ext-str=var1=test --ext-code=var2='{x:1,y:2}'"
     fi
 
     if [ -n "$DISABLE_EXT_PARAMS" ]; then
         EXT_PARAMS=""
     fi
-    JSONNET_CMD="$JSONNET_BIN $PARAMS $EXT_PARAMS $TLA_PARAMS"
+    JSONNET_CMD="JAVA_OPTS=$JAVA_OPTS $JSONNET_BIN $PARAMS $EXT_PARAMS $TLA_PARAMS"
 
     # Avoid set -e terminating us if the run fails.
     eval "$JSONNET_CMD" "$FILE" > "${FILE}.golden" 2>&1 || true

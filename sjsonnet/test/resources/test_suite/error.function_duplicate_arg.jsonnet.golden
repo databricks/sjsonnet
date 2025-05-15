@@ -1,2 +1,3 @@
-RUNTIME ERROR: binding parameter a second time: x
-	error.function_duplicate_arg.jsonnet:17:1-29	
+sjsonnet.Error: binding parameter a second time: x
+    at [Apply].(sjsonnet/test/resources/test_suite/error.function_duplicate_arg.jsonnet:17:21)
+

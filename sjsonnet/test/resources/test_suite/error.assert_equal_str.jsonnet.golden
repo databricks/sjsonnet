@@ -1,0 +1,3 @@
+sjsonnet.Error: assertEqual failed: "one\ntwo" != "three\nfour\n"
+    at [std.assertEqual].(sjsonnet/test/resources/test_suite/error.assert_equal_str.jsonnet:17:16)
+

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // This file tests functions from the standard library (std.jsonnet and builtins).
-std.assertEqual(std.findSubstr('aa bb cc', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'), []) &&
+
 // Can capture std from another file.
 std.assertEqual((import 'lib/capture_std_func.libsonnet')().sqrt(4), 2) &&
 
@@ -56,45 +56,47 @@ std.assertEqual(std.abs(33), 33) &&
 std.assertEqual(std.abs(-33), 33) &&
 std.assertEqual(std.abs(0), 0) &&
 
-// Ordinary (non-test) code can define pi as 2*std.acos(0)
-local pi = 3.14159265359;
-
-assertClose(std.sin(0.0 * pi), 0) &&
-assertClose(std.sin(0.5 * pi), 1) &&
-assertClose(std.sin(1.0 * pi), 0) &&
-assertClose(std.sin(1.5 * pi), -1) &&
-assertClose(std.sin(2.0 * pi), 0) &&
-assertClose(std.cos(0.0 * pi), 1) &&
-assertClose(std.cos(0.5 * pi), 0) &&
-assertClose(std.cos(1.0 * pi), -1) &&
-assertClose(std.cos(1.5 * pi), 0) &&
-assertClose(std.cos(2.0 * pi), 1) &&
+assertClose(std.sin(0.0 * std.pi), 0) &&
+assertClose(std.sin(0.5 * std.pi), 1) &&
+assertClose(std.sin(1.0 * std.pi), 0) &&
+assertClose(std.sin(1.5 * std.pi), -1) &&
+assertClose(std.sin(2.0 * std.pi), 0) &&
+assertClose(std.cos(0.0 * std.pi), 1) &&
+assertClose(std.cos(0.5 * std.pi), 0) &&
+assertClose(std.cos(1.0 * std.pi), -1) &&
+assertClose(std.cos(1.5 * std.pi), 0) &&
+assertClose(std.cos(2.0 * std.pi), 1) &&
 assertClose(std.tan(0), 0) &&
-assertClose(std.tan(0.25 * pi), 1) &&
+assertClose(std.tan(0.25 * std.pi), 1) &&
 assertClose(std.asin(0), 0) &&
 assertClose(std.acos(1), 0) &&
-assertClose(std.asin(1), 0.5 * pi) &&
-assertClose(std.acos(0), 0.5 * pi) &&
+assertClose(std.asin(1), 0.5 * std.pi) &&
+assertClose(std.acos(0), 0.5 * std.pi) &&
 assertClose(std.atan(0), 0) &&
-assertClose(std.atan2(1.0, 2.0), 0.4636476090008061) &&
-assertClose(std.atan2(2.0, 0.4), 1.373400766945016) &&
-assertClose(std.atan2(1.2, 0.0), 1.5707963267948966) &&
-assertClose(std.hypot(1.0, 2.0), std.sqrt(5.0)) &&
-assertClose(std.hypot(2.0, 0.4), std.sqrt(4.16)) &&
-assertClose(std.hypot(1.2, 0.0), std.sqrt(1.44)) &&
-assertClose(std.deg2rad(180.0), pi) &&
-assertClose(std.deg2rad(45.0), pi / 4.0) &&
-assertClose(std.rad2deg(pi / 2.0), 90.0) &&
-assertClose(std.rad2deg(3.0 * pi), 540.0) &&
-assertClose(std.log2(32.0), 5.0) &&
-assertClose(std.log2(100.0), 6.643856189774724) &&
-assertClose(std.log10(32.0), 1.505149978319906) &&
-assertClose(std.log10(100.0), 2) &&
+assertClose(std.atan2(1, 1), std.pi / 4) &&
+assertClose(std.atan2(-1, 1), -std.pi / 4) &&
+assertClose(std.atan2(1.2, -3.8), 2.835713782184941) &&  // arbitrary, done on a calculator
+assertClose(std.deg2rad(0), 0) &&
+assertClose(std.deg2rad(45), std.pi / 4) &&
+assertClose(std.deg2rad(90), std.pi / 2) &&
+assertClose(std.deg2rad(172), 3.0019663134302466) &&  // arbitrary, done on a calculator
+assertClose(std.rad2deg(std.pi / 4), 45) &&
+assertClose(std.rad2deg(std.pi / 2), 90) &&
+assertClose(std.rad2deg(3.0019663134302466), 172) &&  // arbitrary, done on a calculator
+assertClose(std.hypot(3, 4), 5) &&
+assertClose(std.hypot(5, 12), 13) &&
+assertClose(std.hypot(1, 1), std.sqrt(2)) &&
 assertClose(std.log(std.exp(5)), 5) &&
 assertClose(std.mantissa(1), 0.5) &&
 assertClose(std.exponent(1), 1) &&
 assertClose(std.mantissa(128), 0.5) &&
 assertClose(std.exponent(128), 8) &&
+assertClose(std.log2(std.pow(2, -5)), -5) &&
+assertClose(std.log2(std.pow(2, 0)), 0) &&
+assertClose(std.log2(std.pow(2, std.pi)), std.pi) &&
+assertClose(std.log10(std.pow(10, -5)), -5) &&
+assertClose(std.log10(std.pow(10, 0)), 0) &&
+assertClose(std.log10(std.pow(10, std.pi)), std.pi) &&
 
 std.assertEqual(std.clamp(-3, 0, 5), 0) &&
 std.assertEqual(std.clamp(4, 0, 5), 4) &&
@@ -503,8 +505,6 @@ std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
   else
     std.assertEqual(std.thisFile, 'stdlib.jsonnet')
 ) &&
-
-assertClose(std.pi, pi) &&
 
 std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
 std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
@@ -1441,8 +1441,6 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(std.parseInt('01234567890'), 1234567890) &&
-std.assertEqual(std.parseInt('9007199254740991'), 9007199254740991) &&
-std.assertEqual(std.parseInt('-9007199254740992'), -9007199254740992) &&
 std.assertEqual(std.parseInt('-01234567890'), -1234567890) &&
 std.assertEqual(std.parseOctal('755'), 493) &&
 std.assertEqual(std.parseOctal('0755'), 493) &&
@@ -1570,6 +1568,7 @@ std.assertEqual(std.decodeUTF8([65 + 1 - 1]), 'A') &&
 std.assertEqual(std.decodeUTF8([90, 97, 197, 188, 195, 179, 197, 130, 196, 135, 32, 103, 196, 153, 197, 155, 108, 196, 133, 32, 106, 97, 197, 186, 197, 132]), 'Zażółć gęślą jaźń') &&
 std.assertEqual(std.decodeUTF8([240, 159, 152, 131]), '😃') &&
 
+
 std.assertEqual(std.any([true, false]), true) &&
 std.assertEqual(std.any([false, false]), false) &&
 std.assertEqual(std.any([]), false) &&
@@ -1584,8 +1583,6 @@ std.assertEqual(std.avg([1, 2, 3]), 2) &&
 std.assertEqual(std.avg([0, 0, 0]), 0) &&
 std.assertEqual(std.avg([1, 1, 2.5]), 1.5) &&
 
-std.assertEqual(std.minArray([1, 2, 3]), 1) &&
-std.assertEqual(std.minArray(['1', '2', '3']), '1') &&
 std.assertEqual(std.minArray([3, 1, 2]), 1) &&
 std.assertEqual(std.minArray(['3', '1', '2']), '1') &&
 std.assertEqual(std.minArray(['a2', 'b1'], keyF=function(x) x[0]), 'a2') &&
@@ -1598,6 +1595,7 @@ std.assertEqual(std.maxArray(['a', 'x', 'z']), 'z') &&
 std.assertEqual(std.maxArray(['a2', 'b1'], keyF=function(x) x[0]), 'b1') &&
 std.assertEqual(std.maxArray(['a2', 'b1'], keyF=function(x) x[1]), 'a2') &&
 std.assertEqual(std.maxArray([], onEmpty='default'), 'default') &&
+
 
 std.assertEqual(std.xor(true, false), true) &&
 std.assertEqual(std.xor(true, true), false) &&

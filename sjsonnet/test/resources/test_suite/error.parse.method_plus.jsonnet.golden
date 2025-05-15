@@ -1,1 +1,3 @@
-STATIC ERROR: error.parse.method_plus.jsonnet:17:15: cannot use +: syntax sugar in a method: a
+sjsonnet.ParseError: Expected (":" | "::" | ":::"):17:18, found "+:: 1, b: "
+    at .(sjsonnet/test/resources/test_suite/error.parse.method_plus.jsonnet:17:18)
+

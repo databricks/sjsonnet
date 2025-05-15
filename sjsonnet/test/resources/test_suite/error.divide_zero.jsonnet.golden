@@ -1,2 +1,3 @@
-RUNTIME ERROR: division by zero.
-	error.divide_zero.jsonnet:17:1-8	
+sjsonnet.Error: division by zero
+    at [BinaryOp /].(sjsonnet/test/resources/test_suite/error.divide_zero.jsonnet:17:5)
+

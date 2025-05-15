@@ -1,2 +1,3 @@
-RUNTIME ERROR: array index was not integer: 1.5
-	error.array_fractional_index.jsonnet:17:1-15	
+sjsonnet.Error: array index was not integer: 1.5
+    at [Lookup].(sjsonnet/test/resources/test_suite/error.array_fractional_index.jsonnet:17:10)
+
