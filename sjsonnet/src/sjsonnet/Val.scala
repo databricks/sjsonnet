@@ -828,5 +828,6 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
   def settings: Settings
+  def trace(msg: String): Unit
   def warn(e: Error): Unit
 }

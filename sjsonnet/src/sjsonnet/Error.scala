@@ -1,5 +1,6 @@
 package sjsonnet
 
+import java.io.{PrintWriter, StringWriter}
 import scala.util.control.NonFatal
 
 /**
@@ -72,6 +73,14 @@ object Error {
 
   def fail(msg: String): Nothing =
     throw new Error(msg)
+
+  def formatError(e: Error): String = {
+    val s = new StringWriter()
+    val p = new PrintWriter(s)
+    e.printStackTrace(p)
+    p.close()
+    s.toString.replace("\t", "    ")
+  }
 }
 
 class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)

@@ -18,6 +18,7 @@ object FormatTests extends TestSuite {
         def compare(x: Val, y: Val): Int = ???
         def importer: sjsonnet.CachedImporter = ???
         def settings = Settings.default
+        override def trace(msg: String): Unit = ()
         def warn(e: Error) = ()
       }
     )

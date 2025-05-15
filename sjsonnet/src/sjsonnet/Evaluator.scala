@@ -19,12 +19,13 @@ class Evaluator(
     val extVars: String => Option[Expr],
     val wd: Path,
     val settings: Settings,
-    warnLogger: Error => Unit = null)
+    logger: Evaluator.Logger = null)
     extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
 
-  def warn(e: Error): Unit = if (warnLogger != null) warnLogger(e)
+  def trace(e: String): Unit = if (logger != null) logger(true, e)
+  def warn(e: Error): Unit = if (logger != null) logger(false, Error.formatError(e))
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
@@ -901,7 +902,7 @@ class NewEvaluator(
     private val e: String => Option[Expr],
     private val w: Path,
     private val s: Settings,
-    private val wa: Error => Unit = null)
+    private val wa: Evaluator.Logger = null)
     extends Evaluator(r, e, w, s, wa) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
@@ -967,6 +968,12 @@ class NewEvaluator(
 }
 
 object Evaluator {
+
+  /**
+   * Logger, used for warnings and trace. The first argument is true if the message is a trace
+   * emitted by std.trace
+   */
+  type Logger = (Boolean, String) => Unit
   val emptyStringArray = new Array[String](0)
   val emptyLazyArray = new Array[Lazy](0)
 }
