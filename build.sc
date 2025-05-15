@@ -183,7 +183,8 @@ object sjsonnet extends Module {
       def forkArgs = Seq("-Xss" + stackSize)
     }
 
-    object client extends JavaModule {
+    object client extends JavaModule with SjsonnetPublishModule {
+      def artifactName = "sjsonnet-server"
       def ivyDeps = Agg(
         ivy"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
           "net.java.dev.jna" -> "jna",
@@ -193,7 +194,8 @@ object sjsonnet extends Module {
       object test extends JavaTests with TestModule.Junit4
     }
 
-    object server extends ScalaModule {
+    object server extends ScalaModule with SjsonnetPublishModule {
+      def artifactName = "sjsonnet-server"
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
       def ivyDeps = Agg(
