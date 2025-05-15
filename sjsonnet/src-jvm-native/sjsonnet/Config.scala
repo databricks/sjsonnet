@@ -11,6 +11,11 @@ final case class Config(
     )
     jpaths: List[String] = Nil,
     @arg(
+      name = "debug-importer",
+      doc = "Print some additional debugging information about the importer"
+    )
+    debugImporter: Flag = Flag(),
+    @arg(
       name = "output-file",
       short = 'o',
       doc = "Write to the output file rather than stdout"

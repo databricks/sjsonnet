@@ -12,10 +12,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
 import scala.annotation.unused
 import scala.util.Try
-import scala.util.control.NonFatal
 
 object SjsonnetMain {
-  def resolveImport(searchRoots0: Seq[Path], allowedInputs: Option[Set[os.Path]] = None): Importer =
+  def resolveImport(
+      searchRoots0: Seq[Path],
+      allowedInputs: Option[Set[os.Path]] = None,
+      debugImporter: Boolean = false): Importer =
     new Importer {
       def resolve(docBase: Path, importName: String): Option[Path] =
         (docBase +: searchRoots0)
@@ -28,15 +30,33 @@ object SjsonnetMain {
               case a: os.Path => Some(a)
             }
           )
-          .filter(p => allowedInputs.fold(true)(_(p)))
+          .filter(p => {
+            val allowed = allowedInputs.fold(true)(_(p))
+            if (debugImporter) {
+              if (allowed) System.err.println(s"[import $importName] candidate $p")
+              else
+                System.err.println(
+                  s"[import $importName] excluded $p because it's not in $allowedInputs"
+                )
+            }
+            allowed
+          })
           .find(os.exists)
-          .flatMap(p =>
-            try Some(OsPath(p))
-            catch { case NonFatal(_) => None }
-          )
+          .orElse({
+            if (debugImporter) {
+              System.err.println(s"[import $importName] none of the candidates exist")
+            }
+            None
+          })
+          .flatMap(p => {
+            if (debugImporter) {
+              System.err.println(s"[import $importName] $p is selected as it exists")
+            }
+            Some(OsPath(p))
+          })
 
       def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
-        readPath(path, binaryData)
+        readPath(path, binaryData, debugImporter)
       }
     }
 
@@ -242,7 +262,11 @@ object SjsonnetMain {
             }
           }
         case None =>
-          resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath.apply), allowedInputs)
+          resolveImport(
+            config.jpaths.map(os.Path(_, wd)).map(OsPath.apply),
+            allowedInputs,
+            config.debugImporter.value
+          )
       },
       parseCache,
       settings = new Settings(
@@ -342,7 +366,10 @@ object SjsonnetMain {
    * of caching on top of the underlying file system. Small files are read into memory, while large
    * files are read from disk.
    */
-  private def readPath(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
+  private def readPath(
+      path: Path,
+      binaryData: Boolean,
+      debugImporter: Boolean = false): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
     if (os.exists(osPath) && os.isFile(osPath)) {
       Some(
@@ -353,6 +380,9 @@ object SjsonnetMain {
         )
       )
     } else {
+      if (debugImporter) {
+        System.err.println(s"[read $path] file does not exist or is not a file")
+      }
       None
     }
   }
