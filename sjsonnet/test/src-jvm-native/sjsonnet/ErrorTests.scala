@@ -11,6 +11,7 @@ object ErrorTests extends BaseFileTests {
     "error.recursive_import.jsonnet",
     "error.recursive_function_nonterm.jsonnet"
   )
+
   val skippedTests = Set(
     "error.decodeUTF8_float.jsonnet",
     "error.function_no_default_arg.jsonnet",

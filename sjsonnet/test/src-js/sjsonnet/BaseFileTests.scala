@@ -5,6 +5,8 @@ import scala.scalajs.js
 import utest._
 
 abstract class BaseFileTests extends TestSuite {
+  private val stderr = new StringBuffer()
+
   def joinPath(a: String, b: String): String = {
     val aStripped = if (a.endsWith("/")) a.substring(0, a.length - 1) else a
     val bStripped = if (b.startsWith("/")) b.substring(1) else b
@@ -33,6 +35,7 @@ abstract class BaseFileTests extends TestSuite {
     }
 
   def eval(fileName: String, suite: String) = {
+    stderr.setLength(0)
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
@@ -48,6 +51,11 @@ abstract class BaseFileTests extends TestSuite {
             case Left(s)    => Some(StaticResolvedFile(s))
             case Right(arr) => Some(StaticBinaryResolvedFile(arr))
           }
+      },
+      logger = (isTrace: Boolean, msg: String) => {
+        if (isTrace) {
+          stderr.append(msg).append("\n")
+        }
       },
       parseCache = new DefaultParseCache,
       settings = new Settings(
@@ -74,6 +82,14 @@ abstract class BaseFileTests extends TestSuite {
       ujson.read(new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8))
     val res = ujson.WebJson.transform(eval(fileName, "test_suite"), ujson.Value)
     assert(res == expected)
+    assert(stderr.toString.isEmpty)
+  }
+
+  def checkStderr(fileName: String): Unit = {
+    println(s"Checking $fileName")
+    eval(fileName, "test_suite")
+    val expected = new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8)
+    assert(expected.startsWith(stderr.toString))
   }
 
   def checkError(fileName: String): Unit = {
@@ -92,6 +108,8 @@ abstract class BaseFileTests extends TestSuite {
         assert(msg == expected)
       case e: sjsonnet.Error =>
         assert(expected.stripLineEnd.contains(e.getMessage))
+      case _: Throwable =>
+        assert(false)
     }
   }
 }
