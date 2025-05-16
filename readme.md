@@ -221,7 +221,8 @@ does not implement the Jsonnet standard library `std` in Jsonnet code. Rather,
 those functions are implemented as intrinsics directly in the host language (in
 `Std.scala`). This allows both better error messages when the input types are
 wrong, as well as better performance for the more computationally-intense
-builtin functions.
+builtin functions, other implementations [google/go-jsonnet](https://github.com/google/go-jsonnet/)
+and [jrsonnet](https://github.com/CertainLach/jrsonnet) implement the Jsonnet standard library in the host language too.
 
 ## Client-Server
 
