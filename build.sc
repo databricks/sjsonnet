@@ -150,7 +150,7 @@ object sjsonnet extends Module {
       this.millSourcePath / "src-native",
       this.millSourcePath / "src-jvm-native"
     )
-    def releaseMode = ReleaseMode.ReleaseFast
+    def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
 
     object test extends ScalaNativeTests with CrossTests {
