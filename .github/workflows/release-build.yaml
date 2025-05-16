@@ -1,9 +1,9 @@
 name: Release Build
 
-on:
-  push:
-    tags:
-      - "*.*.*"
+on: push
+  # push:
+  #   tags:
+  #     - "*.*.*"
 
 jobs:
   release:
@@ -55,6 +55,10 @@ jobs:
             os: macos-13
           - name: darwin-arm64
             os: macos-15
+          - name: windows-x86_64
+            os: windows-2025
+          - name: windows-arm64
+            os: windows-11-arm
     runs-on: ${{ matrix.platform.os }}
     env:
       LANG: C
@@ -65,12 +69,15 @@ jobs:
           java-version: 17
           distribution: 'zulu'
       - name: Set up environment variables
+        shell: bash
         run: |
           echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
           echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
       - name: Native Binary Build
+        shell: bash
         run: ./mill "sjsonnet.native[$SCALA_VERSION].nativeLink"
       - name: Rename Artifacts
+        shell: bash
         run: |
           mkdir release
           cp ./out/sjsonnet/native/$SCALA_VERSION/nativeLink.dest/out ./release/sjsonnet-$VERSION-${{ matrix.platform.name }}
