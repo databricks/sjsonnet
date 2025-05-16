@@ -23,7 +23,7 @@ jobs:
           echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
           echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
       - name: JAR Build
-        run: ./mill "sjsonnet.jvm[$SCALA_VERSION].assembly"
+        run: ./mill "sjsonnet.jvm[$SCALA_VERSION].__.assembly"
       - name: JS Build
         run: ./mill "sjsonnet.js[$SCALA_VERSION].fullOpt"
       - name: Rename Artifacts
@@ -32,6 +32,8 @@ jobs:
           cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js ./release/sjsonnet-$VERSION.js
           cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js.map ./release/sjsonnet-$VERSION.js.map
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar ./release/sjsonnet-$VERSION.jar
+          cp ./out/sjsonnet/jvm/$SCALA_VERSION/client/assembly.dest/out.jar ./release/sjsonnet-client-$VERSION.jar
+          cp ./out/sjsonnet/jvm/$SCALA_VERSION/server/assembly.dest/out.jar ./release/sjsonnet-server-$VERSION.jar
       - uses: actions/upload-artifact@v4
         name: Upload Artifacts
         with:
