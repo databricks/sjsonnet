@@ -4,7 +4,8 @@ import ujson.Value
 import utest.{TestSuite, assert}
 
 abstract class BaseFileTests extends TestSuite {
-  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources" / "test_suite"
+  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
+  val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources" / "test_suite"
   private val stderr = new StringBuffer()
 
   def eval(p: os.Path): Either[String, Value] = {
@@ -31,7 +32,7 @@ abstract class BaseFileTests extends TestSuite {
   }
 
   def check(fileName: os.Path): Unit = {
-    println(s"Checking ${fileName.relativeTo(os.pwd)}")
+    println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
     val res = eval(fileName)
     val expected = ujson.read(os.read(os.Path(fileName.toString + ".golden")))
     assert(res == Right(expected))
@@ -39,14 +40,14 @@ abstract class BaseFileTests extends TestSuite {
   }
 
   def checkStderr(fileName: os.Path): Unit = {
-    println(s"Checking ${fileName.relativeTo(os.pwd)}")
+    println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
     eval(fileName)
     val expected = os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
     assert(expected.startsWith(stderr.toString))
   }
 
   def checkError(fileName: os.Path): Unit = {
-    println(s"Checking ${fileName.relativeTo(os.pwd)}")
+    println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
     val expected = os
       .read(os.Path(fileName.toString + ".golden"))
       .replaceAll("\\(sjsonnet/test/resources/test_suite/", "(")
