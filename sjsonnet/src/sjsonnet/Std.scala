@@ -6,8 +6,9 @@ import java.util.Base64
 import java.util
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.functions.FunctionBuilder
+import sjsonnet.functions.std.{ExternalVariables, TypesAndReflection}
 
-import scala.collection.Searching._
+import scala.collection.Searching.*
 import scala.collection.mutable
 
 /**
@@ -279,10 +280,6 @@ class Std(
     def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.bool(pos, arr.force.asArr.iterator.exists(v => v.asBoolean))
     }
-  }
-
-  private object Type extends Val.Builtin1("type", "x") {
-    def evalRhs(x: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.force.prettyName)
   }
 
   private object Format_ extends Val.Builtin2("format", "str", "vals") {
@@ -886,14 +883,6 @@ class Std(
     }
   }
 
-  private object ExtVar extends Val.Builtin1("extVar", "x") {
-    def evalRhs(_x: Lazy, ev: EvalScope, pos: Position): Val = {
-      val x = _x.force.asString
-      ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
-    }
-    override def staticSafe = false
-  }
-
   private object ObjectValues extends Val.Builtin1("objectValues", "o") {
     def evalRhs(_o: Lazy, ev: EvalScope, pos: Position): Val = {
       val o = _o.force.asObj
@@ -1118,7 +1107,6 @@ class Std(
     builtin(ObjectFieldsEx),
     builtin(ObjectValues),
     builtin(ObjectValuesAll),
-    builtin(Type),
     builtin(Lines),
     builtin(Format_),
     builtin(Foldl),
@@ -1760,7 +1748,6 @@ class Std(
     builtin(AsciiUpper),
     builtin(AsciiLower),
     builtin(Trace),
-    builtin(ExtVar),
     builtin(Get),
     builtin(All),
     builtin(Any),
@@ -1966,7 +1953,9 @@ class Std(
 
   val Std: Val.Obj = Val.Obj.mk(
     null,
-    (functions ++ additionalStdFunctions).toSeq
+    (ExternalVariables.functions ++
+    TypesAndReflection.functions ++
+    (functions ++ additionalStdFunctions).toSeq)
       .map { case (k, v) =>
         (
           k,

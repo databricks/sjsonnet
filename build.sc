@@ -163,7 +163,11 @@ object sjsonnet extends Module {
   }
 
   object jvm extends Cross[SjsonnnetJvmModule](scalaVersions)
-  trait SjsonnnetJvmModule extends SjsonnetCrossModule with ScalaModule with SjsonnetPublishModule with SjsonnetJvmNative {
+  trait SjsonnnetJvmModule
+      extends SjsonnetCrossModule
+      with ScalaModule
+      with SjsonnetPublishModule
+      with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def mainClass = Some("sjsonnet.SjsonnetMain")
     def sources = T.sources(
