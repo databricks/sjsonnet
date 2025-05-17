@@ -6,8 +6,8 @@ import java.io.{ByteArrayOutputStream, File, PrintStream}
 import java.util.Arrays
 
 object MainTests extends TestSuite {
-
-  val testSuiteRoot: os.Path = os.pwd / "sjsonnet" / "test" / "resources"
+  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
+  val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   // stdout mode uses println so it has an extra platform-specific line separator at the end
   val eol: String = System.getProperty("line.separator")
 
@@ -24,7 +24,7 @@ object MainTests extends TestSuite {
         System.in,
         pout,
         System.err,
-        os.pwd,
+        workspaceRoot,
         None
       )
       pout.flush()
@@ -34,7 +34,7 @@ object MainTests extends TestSuite {
         System.in,
         System.out,
         System.err,
-        os.pwd,
+        workspaceRoot,
         None
       )
       val stdoutBytes = out.toByteArray
@@ -170,7 +170,7 @@ object MainTests extends TestSuite {
       System.in,
       pout,
       perr,
-      os.pwd,
+      workspaceRoot,
       None
     )
     (res, new String(out.toByteArray, "UTF-8"), new String(err.toByteArray, "UTF-8"))
