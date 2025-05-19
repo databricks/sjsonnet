@@ -152,9 +152,11 @@ object sjsonnet extends Module {
     )
     def releaseMode = ReleaseMode.ReleaseFast
     def nativeLTO = LTO.Full
+    def nativeMultithreading = None
 
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
+      def nativeMultithreading = None
       def forkEnv = Map(
         "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize
       )
