@@ -5,8 +5,9 @@ import $ivy.`com.lihaoyi::mill-contrib-jmh:`
 import contrib.jmh.JmhModule
 import java.util.Base64
 
-val sjsonnetVersion = os.read(os.pwd / "VERSION").trim
-val scalaVersions = os.read(os.pwd / "SCALA_VERSIONS").trim.split(" ").map(_.trim).toSeq
+val sjsonnetVersion = os.read(mill.api.WorkspaceRoot.workspaceRoot / "VERSION").trim
+val scalaVersions =
+  os.read(mill.api.WorkspaceRoot.workspaceRoot / "SCALA_VERSIONS").trim.split(" ").map(_.trim).toSeq
 
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
@@ -62,6 +63,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def ivyDeps = Agg(ivy"com.lihaoyi::utest::0.8.5")
+    def testSandboxWorkingDir = false
+    def forkEnv = Map("MILL_WORKSPACE_ROOT" -> T.workspace.toString())
   }
 }
 
@@ -157,7 +160,7 @@ object sjsonnet extends Module {
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
       def nativeMultithreading = None
-      def forkEnv = Map(
+      def forkEnv = super.forkEnv() ++ Map(
         "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize
       )
       def nativeLTO = LTO.None
@@ -165,7 +168,11 @@ object sjsonnet extends Module {
   }
 
   object jvm extends Cross[SjsonnnetJvmModule](scalaVersions)
-  trait SjsonnnetJvmModule extends SjsonnetCrossModule with ScalaModule with SjsonnetPublishModule with SjsonnetJvmNative {
+  trait SjsonnnetJvmModule
+      extends SjsonnetCrossModule
+      with ScalaModule
+      with SjsonnetPublishModule
+      with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def mainClass = Some("sjsonnet.SjsonnetMain")
     def sources = T.sources(
