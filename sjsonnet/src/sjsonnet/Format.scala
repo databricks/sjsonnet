@@ -23,7 +23,7 @@ object Format {
       conversion: Char)
   import fastparse._, NoWhitespace._
   def integer[$: P]: P[Unit] = P(CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0")
-  def label[$: P]: P[Option[String]] = P(("(" ~ CharsWhile(_ != ')').! ~ ")").?)
+  def label[$: P]: P[Option[String]] = P(("(" ~ CharsWhile(_ != ')', 0).! ~ ")").?)
   def flags[$: P]: P[String] = P(CharsWhileIn("#0\\- +", 0).!)
   def width[$: P]: P[Option[String]] = P((integer | "*").!.?)
   def precision[$: P]: P[Option[String]] = P(("." ~/ integer.!).?)
