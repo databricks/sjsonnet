@@ -7,9 +7,9 @@ final case class Config(
     @arg(
       name = "jpath",
       short = 'J',
-      doc = "Specify an additional library search dir (left-most wins)"
+      doc = "Specify an additional library search dir (left-most wins unless reverse-jpaths-priority is set)"
     )
-    jpaths: List[String] = Nil,
+    private val jpaths: List[String] = Nil,
     @arg(
       name = "debug-importer",
       doc = "Print some additional debugging information about the importer"
@@ -145,8 +145,23 @@ final case class Config(
     )
     throwErrorForInvalidSets: Flag = Flag(),
     @arg(
+      name = "reverse-jpaths-priority",
+      doc = """If set, reverses the import order of specified jpaths (so that the rightmost wins)"""
+    )
+    reverseJpathsPriority: Flag = Flag(),
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )
     file: String
-)
+) {
+  def getJpaths: Seq[String] = {
+    if (jpaths == null) {
+      null
+    } else if (reverseJpathsPriority.value) {
+      jpaths.reverse
+    } else {
+      jpaths
+    }
+  }
+}
