@@ -263,7 +263,7 @@ object SjsonnetMain {
           }
         case None =>
           resolveImport(
-            config.jpaths.map(os.Path(_, wd)).map(OsPath.apply),
+            config.getJpaths.map(os.Path(_, wd)).map(OsPath.apply),
             allowedInputs,
             config.debugImporter.value
           )
