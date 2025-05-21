@@ -457,10 +457,10 @@ class Std(
     }
 
     private def evalArr(
-                         _func: Val.Func,
-                         arg: Array[Lazy],
-                         ev: EvalScope,
-                         pos: Position): Val.Arr = {
+        _func: Val.Func,
+        arg: Array[Lazy],
+        ev: EvalScope,
+        pos: Position): Val.Arr = {
       Val.Arr(
         pos,
         arg.map(v => (() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)): Lazy)
