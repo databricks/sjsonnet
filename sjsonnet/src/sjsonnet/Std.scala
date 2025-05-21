@@ -449,12 +449,26 @@ class Std(
   private object Map_ extends Val.Builtin2("map", "func", "arr") {
     def evalRhs(_func: Lazy, arr: Lazy, ev: EvalScope, pos: Position): Val = {
       val func = _func.force.asFunc
+      val arg = arr.force
+      arg match {
+        case Val.Str(_, str) => evalStr(func, str, ev, pos.noOffset)
+        case _               => evalArr(func, arg.asArr.asLazyArray, ev, pos)
+      }
+    }
+
+    private def evalArr(
+        _func: Val.Func,
+        arg: Array[Lazy],
+        ev: EvalScope,
+        pos: Position): Val.Arr = {
       Val.Arr(
         pos,
-        arr.force.asArr.asLazyArray.map(v =>
-          (() => func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)): Lazy
-        )
+        arg.map(v => (() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)): Lazy)
       )
+    }
+
+    private def evalStr(_func: Val.Func, arg: String, ev: EvalScope, pos: Position): Val.Arr = {
+      evalArr(_func, stringChars(pos, arg).asLazyArray, ev, pos)
     }
   }
 
