@@ -7,7 +7,8 @@ final case class Config(
     @arg(
       name = "jpath",
       short = 'J',
-      doc = "Specify an additional library search dir (left-most wins unless reverse-jpaths-priority is set)"
+      doc =
+        "Specify an additional library search dir (left-most wins unless reverse-jpaths-priority is set)"
     )
     private val jpaths: List[String] = Nil,
     @arg(
