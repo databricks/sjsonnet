@@ -7,7 +7,7 @@ package sjsonnet
  */
 object DecimalFormat {
 
-  def trailingZeroes(n: Long): Int = {
+  private def trailingZeroes(n: Long): Int = {
     var count = 0
     var current = n
     var done = false
@@ -18,13 +18,15 @@ object DecimalFormat {
     }
     count
   }
-  def leftPad(n: Long, targetWidth: Int): String = {
+
+  private def leftPad(n: Long, targetWidth: Int): String = {
     val sign = if (n < 0) "-" else ""
     val absN = math.abs(n)
     val nWidth = if (absN == 0) 1 else Math.log10(absN.toDouble).toInt + 1
     sign + "0" * (targetWidth - nWidth) + absN
   }
-  def rightPad(n0: Long, minWidth: Int, maxWidth: Int): String = {
+
+  private def rightPad(n0: Long, minWidth: Int, maxWidth: Int): String = {
     if (n0 == 0 && minWidth == 0) ""
     else {
       val n = (n0 / Math.pow(10, trailingZeroes(n0))).toInt
@@ -33,8 +35,11 @@ object DecimalFormat {
       ("" + n + "0" * (minWidth - nWidth)).take(maxWidth)
     }
   }
+
   def format(
-      fracLengthOpt: Option[(Int, Int)],
+      zeroes: Int,
+      hashes: Int,
+      alternate: Boolean,
       expLengthOpt: Option[Int],
       number: Double): String = {
     expLengthOpt match {
@@ -44,28 +49,32 @@ object DecimalFormat {
         val scaled = number / math.pow(10, expNum.toDouble)
         val prefix = scaled.toLong.toString
         val expFrag = leftPad(expNum, expLength)
-        val fracFrag = fracLengthOpt.map { case (zeroes, hashes) =>
-          if (zeroes == 0 && hashes == 0) ""
-          else {
-            val divided = number / Math.pow(10, (expNum - zeroes - hashes).toDouble)
-            val scaledFrac = divided % Math.pow(10, zeroes + hashes)
-            rightPad(Math.abs(Math.round(scaledFrac)), zeroes, zeroes + hashes)
-          }
-        }
+        val precision = zeroes + hashes
 
-        fracFrag match {
-          case None => prefix + "E" + expFrag
-          case Some("") =>
-            if (fracLengthOpt.contains((0, 0))) prefix + ".E" + expFrag else prefix + "E" + expFrag
-          case Some(frac) => prefix + "." + frac + "E" + expFrag
+        (precision, alternate) match {
+          case (0, false) => prefix + "E" + expFrag
+          case (0, true)  => prefix + ".E" + expFrag
+          case (_, _) =>
+            val divided = number / Math.pow(10, (expNum - precision).toDouble)
+            val scaledFrac = divided % Math.pow(10, precision)
+            val frac = rightPad(Math.abs(Math.round(scaledFrac)), zeroes, precision)
+            if (frac.isEmpty) {
+              prefix + "E" + expFrag
+            } else {
+              prefix + "." + frac + "E" + expFrag
+            }
+
         }
 
       case None =>
-        val prefix = number.toLong.toString
-        val fracFrag = fracLengthOpt.map { case (zeroes, hashes) =>
-          var fracNum = Math
-            .round(number * math.pow(10, zeroes + hashes)) % math.pow(10, zeroes + hashes).toLong
+        val precision = zeroes + hashes
+        val denominator = math.pow(10, precision)
+        val numerator = number * denominator + 0.5
+        val whole = math.floor(numerator / denominator)
+        var fracNum = (math.floor(numerator) % denominator).toLong
+        val prefix = whole.toLong.toString
 
+        val frac =
           if (fracNum == 0 && zeroes == 0) ""
           else {
             var n = 0
@@ -73,14 +82,13 @@ object DecimalFormat {
               fracNum /= 10
               n += 1
             }
-            leftPad(fracNum, zeroes + hashes - n)
+            leftPad(fracNum, precision - n)
           }
-        }
 
-        fracFrag match {
-          case None       => prefix
-          case Some("")   => if (fracLengthOpt.contains((0, 0))) prefix + "." else prefix
-          case Some(frac) => prefix + "." + frac
+        (precision, alternate) match {
+          case (0, false) => prefix
+          case (0, true)  => prefix + "."
+          case (_, _)     => if (frac.isEmpty) prefix else prefix + "." + frac
         }
     }
   }

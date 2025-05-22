@@ -539,8 +539,8 @@ object EvaluatorTests extends TestSuite {
       eval("\"%(hello)s\" % {hello: \"world\"}", useNewEvaluator = useNewEvaluator) ==> ujson.Str(
         "world"
       )
-      eval("\"%()s %()s!\" % [\"Hello\", \"World\"]", useNewEvaluator = useNewEvaluator) ==> ujson.Str(
-        "Hello World!")
+      eval("\"%()s %()s!\" % [\"Hello\", \"World\"]", useNewEvaluator = useNewEvaluator) ==> ujson
+        .Str("Hello World!")
     }
     test("binaryOps") {
       val ex = intercept[Exception](eval("1 && 2", useNewEvaluator = useNewEvaluator))

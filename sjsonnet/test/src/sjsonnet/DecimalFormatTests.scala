@@ -19,8 +19,15 @@ object DecimalFormatTests extends TestSuite {
     assert(wholeLength == 1)
     val fracLengthOpt =
       fracStrOpt.map(fracStr => (fracStr.count(_ == '0'), fracStr.count(_ == '#')))
+    val alternate = fracLengthOpt.contains((0, 0))
     val expLengthOpt = expStrOpt.map(_.length)
-    sjsonnet.DecimalFormat.format(fracLengthOpt, expLengthOpt, n)
+    sjsonnet.DecimalFormat.format(
+      fracLengthOpt.map(_._1).getOrElse(0),
+      fracLengthOpt.map(_._2).getOrElse(0),
+      alternate,
+      expLengthOpt,
+      n
+    )
   }
   def tests: Tests = Tests {
 
