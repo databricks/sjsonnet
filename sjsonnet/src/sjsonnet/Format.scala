@@ -174,7 +174,7 @@ object Format {
     output.toString()
   }
 
-  def formatInteger(formatted: FormatSpec, s: Double): String = {
+  private def formatInteger(formatted: FormatSpec, s: Double): String = {
     val sl = s.toLong
     val (lhs, rhs) = if (sl < 0) {
       ("-", sl.toString.substring(1))
@@ -187,30 +187,32 @@ object Format {
       lhs,
       "",
       rhs2,
-      true,
-      sl >= 0
+      numeric = true,
+      signedConversion = sl >= 0
     )
   }
 
-  def formatFloat(formatted: FormatSpec, s: Double): String = {
+  private def formatFloat(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
       if (s < 0) "-" else "",
       "",
       sjsonnet.DecimalFormat
         .format(
-          maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
+          formatted.precision.getOrElse(6),
+          0,
+          formatted.alternate,
           None,
           math.abs(s)
         )
         .replace("E", "E+"),
-      true,
-      s > 0
+      numeric = true,
+      signedConversion = s > 0
     )
 
   }
 
-  def formatOctal(formatted: FormatSpec, s: Double): String = {
+  private def formatOctal(formatted: FormatSpec, s: Double): String = {
     val (lhs, rhs) = if (s < 0) {
       ("-", s.toLong.abs.toOctalString)
     } else {
@@ -222,12 +224,12 @@ object Format {
       lhs,
       if (!formatted.alternate || rhs2(0) == '0') "" else "0",
       rhs2,
-      true,
-      s > 0
+      numeric = true,
+      signedConversion = s > 0
     )
   }
 
-  def formatHexadecimal(formatted: FormatSpec, s: Double): String = {
+  private def formatHexadecimal(formatted: FormatSpec, s: Double): String = {
     val (lhs, rhs) = if (s < 0) {
       ("-", s.toLong.abs.toHexString)
     } else {
@@ -239,12 +241,12 @@ object Format {
       lhs,
       if (!formatted.alternate) "" else "0x",
       rhs2,
-      true,
-      s > 0
+      numeric = true,
+      signedConversion = s > 0
     )
   }
 
-  def precisionPad(lhs: String, rhs: String, precision: Option[Int]): String = {
+  private def precisionPad(lhs: String, rhs: String, precision: Option[Int]): String = {
     precision match {
       case None => rhs
       case Some(p) =>
@@ -253,58 +255,58 @@ object Format {
     }
   }
 
-  def formatGeneric(formatted: FormatSpec, s: Double): String = {
+  private def formatGeneric(formatted: FormatSpec, s: Double): String = {
     val precision = formatted.precision.getOrElse(6)
-    val leadingPrecision = math.floor(math.log10(s)).toInt + 1
-    val trailingPrecision = math.max(0, precision - leadingPrecision)
-    if (s < 0.0001 || math.pow(10, formatted.precision.getOrElse(6): Int) < s) {
+    val exponent = if (s != 0) math.floor(math.log10(math.abs(s))).toInt else 0
+    if (exponent < -4 || exponent >= precision) {
       widen(
         formatted,
         if (s < 0) "-" else "",
         "",
         sjsonnet.DecimalFormat
           .format(
-            maybeDecimalPoint(
-              formatted,
-              if (formatted.alternate) (precision - 1, 0) else (0, precision - 1)
-            ),
+            if (formatted.alternate) precision - 1 else 0,
+            if (formatted.alternate) 0 else precision - 1,
+            formatted.alternate,
             Some(2),
             math.abs(s)
           )
           .replace("E", "E+"),
-        true,
-        s > 0
+        numeric = true,
+        signedConversion = s > 0
       )
     } else {
+      val digitsBeforePoint = math.max(1, exponent + 1)
       widen(
         formatted,
         if (s < 0) "-" else "",
         "",
         sjsonnet.DecimalFormat
           .format(
-            maybeDecimalPoint(
-              formatted,
-              if (formatted.alternate) (trailingPrecision, 0) else (0, trailingPrecision)
-            ),
+            if (formatted.alternate) precision - digitsBeforePoint else 0,
+            if (formatted.alternate) 0 else precision - digitsBeforePoint,
+            formatted.alternate,
             None,
             math.abs(s)
           )
           .replace("E", "E+"),
-        true,
-        s > 0
+        numeric = true,
+        signedConversion = s > 0
       )
     }
 
   }
 
-  def formatExponent(formatted: FormatSpec, s: Double): String = {
+  private def formatExponent(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
       if (s < 0) "-" else "",
       "",
       sjsonnet.DecimalFormat
         .format(
-          maybeDecimalPoint(formatted, (formatted.precision.getOrElse(6), 0)),
+          formatted.precision.getOrElse(6),
+          0,
+          formatted.alternate,
           Some(2),
           math.abs(s)
         )
@@ -312,10 +314,6 @@ object Format {
       true,
       s > 0
     )
-  }
-
-  def maybeDecimalPoint(formatted: FormatSpec, fracLengths: (Int, Int)): Option[(Int, Int)] = {
-    if (formatted.precision.contains(0) && !formatted.alternate) None else Some(fracLengths)
   }
 
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
