@@ -77,7 +77,7 @@ trait SjsonnetJvmNative extends ScalaModule {
 
 object sjsonnet extends Module {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
-  trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule {
+  trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def millSourcePath = super.millSourcePath / os.up
     def scalaJSVersion = "1.17.0"
     def esVersion = ESVersion.ES2018
@@ -145,6 +145,7 @@ object sjsonnet extends Module {
   trait SjsonnetNativeModule
       extends SjsonnetCrossModule
       with ScalaNativeModule
+        with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def scalaNativeVersion = "0.5.7"
