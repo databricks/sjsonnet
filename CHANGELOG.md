@@ -1,4 +1,19 @@
-## 0.5.1 (Latest)
+## 0.5.2 (Latest)
+* Fix readme to publish and allow for server/client to be pushed to maven by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/389
+* chore: Update readme for std library by @He-Pin in https://github.com/databricks/sjsonnet/pull/390
+* Add client/server to the build workflow by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/393
+* chore: Turn off the multi threading support in scala native by @He-Pin in https://github.com/databricks/sjsonnet/pull/396
+* chore: bump mill 0.12.14 by @He-Pin in https://github.com/databricks/sjsonnet/pull/397
+* Allow empty labels for fmtstrings. by @Danstahrm in https://github.com/databricks/sjsonnet/pull/401
+* chore: Change Scala native's release mode to ReleaseFull by @He-Pin in https://github.com/databricks/sjsonnet/pull/395
+* Allow `std.map` to operate on string args as well. by @Danstahrm in https://github.com/databricks/sjsonnet/pull/404
+* fix(publish): fix publishing for js and native projects by @ngbinh in https://github.com/databricks/sjsonnet/pull/403
+* Fix formatting for g/G and f when rounding the value by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/407
+* Implement * in FormatSpec to dynamically insert width/precision by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/408
+* chore: Uncomment missing `g` formatting test. by @He-Pin in https://github.com/databricks/sjsonnet/pull/409
+* Fix various small issues found when I imported all recent error tests by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/410
+
+## 0.5.1
 * Fix multiple object comprehension bugs by @JoshRosen in https://github.com/databricks/sjsonnet/pull/358
 * Update Scala 3 to 3.3.6 by @He-Pin in https://github.com/databricks/sjsonnet/pull/365
 * feat: Allow negative start/end on std.slice by @He-Pin in https://github.com/databricks/sjsonnet/pull/367
