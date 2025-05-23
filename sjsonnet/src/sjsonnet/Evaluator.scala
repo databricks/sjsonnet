@@ -553,6 +553,9 @@ class Evaluator(
           case (l: Val.Num, r: Val.Num) =>
             val ll = l.asSafeLong(pos)
             val rr = r.asSafeLong(pos)
+            if (rr < 0) {
+              Error.fail("shift by negative exponent", pos)
+            }
             if (rr >= 1 && ll >= (1L << (63 - rr)))
               Error.fail("numeric value outside safe integer range for bitwise operation", pos)
             else
@@ -563,7 +566,12 @@ class Evaluator(
       case Expr.BinaryOp.OP_>> =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong(pos) >> r.asSafeLong(pos)).toDouble)
+            val ll = l.asSafeLong(pos)
+            val rr = r.asSafeLong(pos)
+            if (rr < 0) {
+              Error.fail("shift by negative exponent", pos)
+            }
+            Val.Num(pos, (ll >> rr).toDouble)
           case _ => fail()
         }
 

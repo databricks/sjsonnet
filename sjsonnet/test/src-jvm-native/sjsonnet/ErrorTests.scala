@@ -12,22 +12,11 @@ object ErrorTests extends BaseFileTests {
     "error.recursive_function_nonterm.jsonnet"
   )
 
-  val skippedTests = Set(
-    "error.decodeUTF8_float.jsonnet",
-    "error.function_no_default_arg.jsonnet",
-    "error.negative_shfit.jsonnet",
-    "error.overflow.jsonnet",
-    "error.overflow2.jsonnet",
-    "error.parse.string.invalid_escape.jsonnet",
-    "error.parse_json.jsonnet",
-    "error.std_makeArray_negative.jsonnet"
-  ) ++ (
-    if (isScalaNative) {
-      skippedTestInScalaNative
-    } else {
-      Set()
-    }
-  )
+  val skippedTests = if (isScalaNative) {
+    skippedTestInScalaNative
+  } else {
+    Set.empty[String]
+  }
 
   val tests: Tests = Tests {
     test("error") - {

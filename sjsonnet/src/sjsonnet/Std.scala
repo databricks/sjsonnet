@@ -534,11 +534,19 @@ class Std(
   }
 
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
-    def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val =
-      new Val.Str(
+    def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val = {
+      for ((v, idx) <- arr.force.asArr.iterator.zipWithIndex) {
+        if (!v.isInstanceOf[Val.Num] || !v.asDouble.isWhole || v.asInt < 0 || v.asInt > 255) {
+          throw Error.fail(
+            f"Element $idx of the provided array was not an integer in range [0,255]"
+          )
+        }
+      }
+      Val.Str(
         pos,
-        new String(arr.force.asArr.iterator.map(_.cast[Val.Num].value.toByte).toArray, UTF_8)
+        new String(arr.force.asArr.iterator.map(_.asInt.toByte).toArray, UTF_8)
       )
+    }
   }
 
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
@@ -1004,8 +1012,14 @@ class Std(
   }
 
   private object ParseJson extends Val.Builtin1("parseJson", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      ujson.StringParser.transform(str.force.asString, new ValVisitor(pos))
+    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
+      try {
+        ujson.StringParser.transform(str.force.asString, new ValVisitor(pos))
+      } catch {
+        case e: ujson.ParseException =>
+          throw Error.fail("Invalid JSON: " + e.getMessage, pos)(ev)
+      }
+    }
   }
 
   private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
@@ -1276,6 +1290,9 @@ class Std(
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
     builtin("makeArray", "sz", "func") { (pos, ev, sz: Int, func: Val.Func) =>
+      if (sz < 0) {
+        Error.fail(f"std.makeArray requires size >= 0, got $sz")
+      }
       Val.Arr(
         pos, {
           val a = new Array[Lazy](sz)
