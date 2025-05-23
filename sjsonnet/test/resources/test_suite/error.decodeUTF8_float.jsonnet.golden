@@ -1,1 +1,3 @@
-"\u0011"
+sjsonnet.Error: Element 0 of the provided array was not an integer in range [0,255]
+    at [std.decodeUTF8].(sjsonnet/test/resources/test_suite/error.decodeUTF8_float.jsonnet:1:15)
+

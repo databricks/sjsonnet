@@ -4,15 +4,6 @@ import utest._
 
 object ErrorTests extends BaseFileTests {
   val skippedTests = Set(
-    "test_suite/error.decodeUTF8_float.jsonnet",
-    "test_suite/error.function_no_default_arg.jsonnet",
-    "test_suite/error.negative_shfit.jsonnet",
-    "test_suite/error.overflow.jsonnet",
-    "test_suite/error.overflow2.jsonnet",
-    "test_suite/error.parse.string.invalid_escape.jsonnet",
-    "test_suite/error.parse_json.jsonnet",
-    "test_suite/error.std_makeArray_negative.jsonnet",
-
     // Stack size issues with the JS runner
     "test_suite/error.array_recursive_manifest.jsonnet",
     "test_suite/error.function_infinite_default.jsonnet",

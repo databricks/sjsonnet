@@ -97,16 +97,17 @@ class Parser(
   ).map(s => Val.Num(s._1, s._2.toDouble))
 
   def escape[$: P]: P[String] = P(escape0 | escape1)
-  def escape0[$: P]: P[String] = P("\\" ~~ !"u" ~~ AnyChar.!).map {
-    case "\"" => "\""
-    case "'"  => "\'"
-    case "\\" => "\\"
-    case "/"  => "/"
-    case "b"  => "\b"
-    case "f"  => "\f"
-    case "n"  => "\n"
-    case "r"  => "\r"
-    case "t"  => "\t"
+  def escape0[$: P]: P[String] = P("\\" ~~ !"u" ~~ AnyChar.!).flatMapX {
+    case "\"" => Pass("\"")
+    case "'"  => Pass("\'")
+    case "\\" => Pass("\\")
+    case "/"  => Pass("/")
+    case "b"  => Pass("\b")
+    case "f"  => Pass("\f")
+    case "n"  => Pass("\n")
+    case "r"  => Pass("\r")
+    case "t"  => Pass("\t")
+    case s    => Fail.opaque(f"Unknown escape sequence in string literal: $s")
   }
   def escape1[$: P]: P[String] = P("\\u" ~~ CharIn("0-9a-fA-F").repX(min = 4, max = 4).!).map { s =>
     Integer.parseInt(s, 16).toChar.toString

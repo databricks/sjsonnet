@@ -109,6 +109,9 @@ object Val {
     override def asString: String = value
   }
   final case class Num(pos: Position, value: Double) extends Literal {
+    if (value.isInfinite) {
+      Error.fail("overflow")
+    }
     def prettyName = "number"
     override def asInt: Int = value.toInt
     override def asLong: Long = value.toLong

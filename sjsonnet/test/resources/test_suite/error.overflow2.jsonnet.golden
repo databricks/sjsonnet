@@ -1,1 +1,3 @@
-Infinity
+sjsonnet.Error: overflow
+    at [BinaryOp *].(error.overflow2.jsonnet:17:7)
+

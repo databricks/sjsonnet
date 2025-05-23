@@ -55,13 +55,18 @@ abstract class BaseFileTests extends TestSuite {
     var res: Either[String, Value] = Right(null)
     try {
       res = eval(fileName)
-      assert(res == Left(expected.stripLineEnd))
+      assert(res.isLeft)
+      val actual = res.left.getOrElse("")
+      assert(actual == expected.stripLineEnd)
     } catch {
       case _: java.lang.StackOverflowError =>
         assert(expected.contains("StackOverflowError"))
       case e: sjsonnet.Error =>
-        assert(expected.stripLineEnd.contains(e.getMessage))
-      case _: Throwable =>
+        assert(expected.stripLineEnd.contains(e.getMessage.stripLineEnd))
+      case e: AssertionError =>
+        throw e
+      case e: Throwable =>
+        println(s"Unexpected error: ${e}")
         assert(false)
     }
   }
