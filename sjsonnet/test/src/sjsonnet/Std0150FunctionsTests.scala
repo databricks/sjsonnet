@@ -107,6 +107,8 @@ object Std0150FunctionsTests extends TestSuite {
       check("""std.extVar("std")""", 5)
       check("""std.extVar("stdExtVar")""", 15)
       check("""std.extVar("stdExtVarRecursive")""", 115)
+      // The key can also be a lazily evaluated expression
+      check("""std.extVar(std.join("", ["s", "t", "r"]))""", "hello")
     }
 
     test("tlaVars") {
