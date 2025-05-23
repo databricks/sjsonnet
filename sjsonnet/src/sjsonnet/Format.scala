@@ -19,14 +19,25 @@ object Format {
       blankBeforePositive: Boolean,
       signCharacter: Boolean,
       width: Option[Int],
+      widthStar: Boolean,
       precision: Option[Int],
-      conversion: Char)
+      precisionStar: Boolean,
+      conversion: Char) {
+    def updateWithStarValues(newWidth: Option[Int], newPrecision: Option[Int]): FormatSpec = {
+      this.copy(
+        width = newWidth.orElse(this.width),
+        widthStar = newWidth.isDefined || this.widthStar,
+        precision = newPrecision.orElse(this.precision),
+        precisionStar = newPrecision.isDefined || this.precisionStar
+      )
+    }
+  }
   import fastparse._, NoWhitespace._
   def integer[$: P]: P[Unit] = P(CharIn("1-9") ~ CharsWhileIn("0-9", 0) | "0")
   def label[$: P]: P[Option[String]] = P(("(" ~ CharsWhile(_ != ')', 0).! ~ ")").?)
   def flags[$: P]: P[String] = P(CharsWhileIn("#0\\- +", 0).!)
   def width[$: P]: P[Option[String]] = P((integer | "*").!.?)
-  def precision[$: P]: P[Option[String]] = P(("." ~/ integer.!).?)
+  def precision[$: P]: P[Option[String]] = P(("." ~/ (integer | "*").!).?)
   def conversion[$: P]: P[String] = P(CharIn("diouxXeEfFgGcrsa%").!)
   def formatSpec[$: P]: P[FormatSpec] = P(
     label ~ flags ~ width ~ precision ~ CharIn("hlL").? ~ conversion
@@ -38,8 +49,10 @@ object Format {
       flags.contains('-'),
       flags.contains(' '),
       flags.contains('+'),
-      width.map(_.toInt),
-      precision.map(_.toInt),
+      width.filterNot(_ == "*").map(_.toInt),
+      width.contains("*"),
+      precision.filterNot(_ == "*").map(_.toInt),
+      precision.contains("*"),
       conversion.charAt(0)
     )
   }
@@ -92,7 +105,8 @@ object Format {
     val output = new StringBuilder
     output.append(leading)
     var i = 0
-    for ((formatted, literal) <- chunks) {
+    for (((rawFormatted, literal), idx) <- chunks.zipWithIndex) {
+      var formatted = rawFormatted
       val cooked0 = formatted.conversion match {
         case '%' => widenRaw(formatted, "%")
         case _ =>
@@ -105,7 +119,54 @@ object Format {
             )
           }
           val raw = formatted.label match {
-            case None => values.cast[Val.Arr].force(i)
+            case None =>
+              (formatted.widthStar, formatted.precisionStar) match {
+                case (false, false) => values.cast[Val.Arr].force(i)
+                case (true, false) =>
+                  val width = values.cast[Val.Arr].force(i)
+                  if (!width.isInstanceOf[Val.Num]) {
+                    Error.fail(
+                      "A * was specified at position %d. An integer is expected for a width".format(
+                        idx
+                      )
+                    )
+                  }
+                  i += 1
+                  formatted = formatted.updateWithStarValues(Some(width.asInt), None)
+                  values.cast[Val.Arr].force(i)
+                case (false, true) =>
+                  val precision = values.cast[Val.Arr].force(i)
+                  if (!precision.isInstanceOf[Val.Num]) {
+                    Error.fail(
+                      "A * was specified at position %d. An integer is expected for a precision"
+                        .format(idx)
+                    )
+                  }
+                  i += 1
+                  formatted = formatted.updateWithStarValues(None, Some(precision.asInt))
+                  values.cast[Val.Arr].force(i)
+                case (true, true) =>
+                  val width = values.cast[Val.Arr].force(i)
+                  if (!width.isInstanceOf[Val.Num]) {
+                    Error.fail(
+                      "A * was specified at position %d. An integer is expected for a width".format(
+                        idx
+                      )
+                    )
+                  }
+                  i += 1
+                  val precision = values.cast[Val.Arr].force(i)
+                  if (!precision.isInstanceOf[Val.Num]) {
+                    Error.fail(
+                      "A * was specified at position %d. An integer is expected for a precision"
+                        .format(idx)
+                    )
+                  }
+                  i += 1
+                  formatted =
+                    formatted.updateWithStarValues(Some(width.asInt), Some(precision.asInt))
+                  values.cast[Val.Arr].force(i)
+              }
             case Some(key) =>
               values match {
                 case v: Val.Arr => v.force(i)
