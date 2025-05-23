@@ -217,7 +217,7 @@ std.assertEqual(std.format('%.4f', [0.99995]), '1.0000') &&
 
 // g
 
-//std.assertEqual(std.format('%g', [0]), '0') &&
+std.assertEqual(std.format('%g', [0]), '0') &&
 std.assertEqual(std.format('%#.3g', [1000000001]), '1.00e+09') &&
 std.assertEqual(std.format('%#.3g', [1100]), '1.10e+03') &&
 std.assertEqual(std.format('%#.3g', [1.1]), '1.10') &&
