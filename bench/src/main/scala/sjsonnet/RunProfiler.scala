@@ -48,21 +48,19 @@ object RunProfiler extends App {
   roots.foreach(profiler.accumulate)
 
   println(s"\nTop 20 by time:")
-  profiler.all.sortBy(-_.time).take(20).foreach { b => show(b.time, b, "- ", false) }
+  profiler.all.sortBy(-_.time).take(20).foreach { b => show(b.time, b, "- ", rec = false) }
 
   val cutoff = 0.02
   println(s"\nTrees with >= $cutoff time:")
   showAll(roots, "")
 
-  def showAll(es: Seq[Expr], indent: String) = {
+  def showAll(es: Seq[Expr], indent: String): Unit = {
     val timed = es.iterator
       .map(profiler.get)
-      .filter { case b =>
-        b.totalTime.toDouble / total.toDouble >= cutoff
-      }
+      .filter(_.totalTime.toDouble / total.toDouble >= cutoff)
       .toSeq
       .sortBy(-_.time)
-    timed.foreach { case b => show(b.totalTime, b, indent, true) }
+    timed.foreach { b => show(b.totalTime, b, indent, rec = true) }
   }
 
   def show(time: Long, box: profiler.ExprBox, indent: String, rec: Boolean): Unit = {

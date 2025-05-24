@@ -173,9 +173,9 @@ final case class StaticResolvedFile(content: String) extends ResolvedFile {
 }
 
 final case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
-  def getParserInput(): ParserInput = ??? // Not used for binary imports
+  def getParserInput(): ParserInput = throw new NotImplementedError("Not used for binary imports")
 
-  def readString(): String = ??? // Not used for binary imports
+  def readString(): String = throw new NotImplementedError("Not used for binary imports")
 
   // We just cheat, the content hash can be the content itself for static imports
   def contentHash(): String = content.hashCode().toString

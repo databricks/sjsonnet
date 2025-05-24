@@ -1,12 +1,11 @@
 package sjsonnet
 
 import java.util.concurrent.TimeUnit
-
-import scala.collection.mutable.HashMap
-
 import fastparse.Parsed.Success
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra._
+import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.*
+
+import scala.collection.mutable
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -26,7 +25,10 @@ class ParserBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(allFiles.foreach { case (p, s) =>
-      val res = fastparse.parse(s, new Parser(p, true, HashMap.empty, HashMap.empty).document(_))
+      val res = fastparse.parse(
+        s,
+        new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
+      )
       bh.consume(res.asInstanceOf[Success[?]])
     })
   }

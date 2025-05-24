@@ -63,7 +63,7 @@ object Format {
   )
 
   def widenRaw(formatted: FormatSpec, txt: String): String =
-    widen(formatted, "", "", txt, false, false)
+    widen(formatted, "", "", txt, numeric = false, signedConversion = false)
   def widen(
       formatted: FormatSpec,
       lhs: String,
@@ -372,8 +372,8 @@ object Format {
           math.abs(s)
         )
         .replace("E", "E+"),
-      true,
-      s > 0
+      numeric = true,
+      signedConversion = s > 0
     )
   }
 

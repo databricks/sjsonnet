@@ -94,10 +94,11 @@ class Std(
           case x             => Error.fail("Cannot get length of " + x.prettyName)
         }
       )
-    override def specialize(args: Array[Expr], tailstrict: Boolean) = args match {
-      case Array(Expr.ApplyBuiltin2(_, Filter, f, a, tailstrict)) => (CountF, Array(f, a))
-      case _                                                      => null
-    }
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
+      args match {
+        case Array(Expr.ApplyBuiltin2(_, Filter, f, a, tailstrict)) => (CountF, Array(f, a))
+        case _                                                      => null
+      }
   }
 
   private object CountF extends Val.Builtin2("length", "func", "arr") {
@@ -127,7 +128,7 @@ class Std(
           i += 1
         }
       }
-      new Val.Num(pos, res)
+      Val.Num(pos, res)
     }
   }
 
@@ -139,10 +140,11 @@ class Std(
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
     def evalRhs(o: Lazy, f: Lazy, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.force.asObj.containsVisibleKey(f.force.asString))
-    override def specialize(args: Array[Expr], tailstrict: Boolean) = args match {
-      case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
-      case _                    => null
-    }
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
+      args match {
+        case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+        case _                    => null
+      }
     private class SpecF(f: String) extends Val.Builtin1("objectHas", "o") {
       def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val =
         Val.bool(pos, o.force.asObj.containsVisibleKey(f))
@@ -152,10 +154,11 @@ class Std(
   private object ObjectHasAll extends Val.Builtin2("objectHasAll", "o", "f") {
     def evalRhs(o: Lazy, f: Lazy, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.force.asObj.containsKey(f.force.asString))
-    override def specialize(args: Array[Expr], tailstrict: Boolean) = args match {
-      case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
-      case _                    => null
-    }
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
+      args match {
+        case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+        case _                    => null
+      }
     class SpecF(f: String) extends Val.Builtin1("objectHasAll", "o") {
       def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val =
         Val.bool(pos, o.force.asObj.containsKey(f))
@@ -287,13 +290,14 @@ class Std(
 
   private object Format_ extends Val.Builtin2("format", "str", "vals") {
     def evalRhs(str: Lazy, vals: Lazy, ev: EvalScope, pos: Position): Val =
-      new Val.Str(pos, Format.format(str.force.asString, vals.force, pos)(ev))
-    override def specialize(args: Array[Expr], tailstrict: Boolean) = args match {
-      case Array(str, fmt: Val.Str) =>
-        try { (new Format.PartialApplyFmt(fmt.value), Array(str)) }
-        catch { case _: Exception => null }
-      case _ => null
-    }
+      Val.Str(pos, Format.format(str.force.asString, vals.force, pos)(ev))
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
+      args match {
+        case Array(str, fmt: Val.Str) =>
+          try { (new Format.PartialApplyFmt(fmt.value), Array(str)) }
+          catch { case _: Exception => null }
+        case _ => null
+      }
   }
 
   private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
@@ -586,12 +590,13 @@ class Std(
   private object StrReplaceAll extends Val.Builtin3("strReplaceAll", "str", "from", "to") {
     def evalRhs(str: Lazy, from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, str.force.asString.replaceAll(from.force.asString, to.force.asString))
-    override def specialize(args: Array[Expr], tailstrict: Boolean) = args match {
-      case Array(str, from: Val.Str, to) =>
-        try { (new SpecFrom(from.value), Array(str, to)) }
-        catch { case _: Exception => null }
-      case _ => null
-    }
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
+      args match {
+        case Array(str, from: Val.Str, to) =>
+          try { (new SpecFrom(from.value), Array(str, to)) }
+          catch { case _: Exception => null }
+        case _ => null
+      }
     private class SpecFrom(from: String) extends Val.Builtin2("strReplaceAll", "str", "to") {
       private val pattern = Platform.getPatternFromCache(from)
       def evalRhs(str: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
@@ -974,7 +979,7 @@ class Std(
         Materializer
           .apply0(
             v.force,
-            new MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
+            MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
           )(ev)
           .toString
       )
@@ -1455,7 +1460,7 @@ class Std(
     },
     builtin(Find),
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
-      if (pat.length == 0) Val.Arr(pos, emptyLazyArray)
+      if (pat.isEmpty) Val.Arr(pos, emptyLazyArray)
       else {
         var matchIndex = str.indexOf(pat)
         if (matchIndex == -1) Val.Arr(pos, emptyLazyArray)
@@ -1622,7 +1627,7 @@ class Std(
                   item.force,
                   new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
                 )(ev)
-                .toString()
+                .toString
             }
             .mkString("---\n", "\n---\n", if (cDocumentEnd) "\n...\n" else "\n")
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
@@ -2106,7 +2111,7 @@ class Std(
     val a = new Array[Lazy](str.length)
     var i = 0
     while (i < a.length) {
-      a(i) = new Val.Str(pos, String.valueOf(str.charAt(i)))
+      a(i) = Val.Str(pos, String.valueOf(str.charAt(i)))
       i += 1
     }
     Val.Arr(pos, a)

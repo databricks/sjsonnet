@@ -55,9 +55,9 @@ class Interpreter(
     java.util.LinkedHashMap[String, java.lang.Boolean]
   ]
 
-  val resolver = createResolver(parseCache)
+  val resolver: CachedResolver = createResolver(parseCache)
 
-  val varResolver = createResolver(createVarParseCache)
+  val varResolver: CachedResolver = createResolver(createVarParseCache)
 
   private def createResolver(parseCache: ParseCache) = new CachedResolver(
     importer,
@@ -175,9 +175,9 @@ class Interpreter(
             i += 1
           }
           new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
-            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position) =
+            def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
               f.evalRhs(vs, es, fs, pos)
-            override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = {
+            override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
               evaluator.visitExpr(expr)(
                 if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs
               )

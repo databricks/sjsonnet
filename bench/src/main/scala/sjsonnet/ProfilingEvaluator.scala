@@ -23,7 +23,8 @@ class ProfilingEvaluator(
   class ExprBox(val expr: Expr) extends Box {
     var children: Seq[Expr] = Nil
     var totalTime: Long = 0
-    lazy val prettyOffset = prettyIndex(expr.pos).map { case (l, c) => s"$l:$c" }.getOrElse("?:?")
+    lazy val prettyOffset: String =
+      prettyIndex(expr.pos).map { case (l, c) => s"$l:$c" }.getOrElse("?:?")
     lazy val prettyPos = s"${expr.pos.currentFile.asInstanceOf[OsPath].p}:$prettyOffset"
     lazy val name: String = {
       val exprName = expr.getClass.getName.split('.').last.split('$').last
@@ -48,7 +49,7 @@ class ProfilingEvaluator(
   class BuiltinBox(val name: String) extends Box
 
   private val data = new util.IdentityHashMap[Expr, ExprBox]
-  private var parent: ExprBox = null
+  private var parent: ExprBox = _
 
   private def getOrCreate(e: Expr): ExprBox = {
     var box = data.get(e)

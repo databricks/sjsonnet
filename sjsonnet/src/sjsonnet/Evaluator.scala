@@ -166,7 +166,7 @@ class Evaluator(
     Error.fail(materializeError(visitExpr(e.value)), e.pos)
   }
 
-  protected def materializeError(value: Val) = value match {
+  protected def materializeError(value: Val): String = value match {
     case Val.Str(_, s) => s
     case r             => Materializer.stringify(r)
   }
@@ -371,7 +371,7 @@ class Evaluator(
         if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
         if (v.length == 0) Error.fail(s"array bounds error: array is empty", pos)
         if (int >= v.length)
-          Error.fail(s"array bounds error: ${int} not within [0, ${v.length})", pos)
+          Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
         v.force(int)
       case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
       case (v: Val.Obj, i: Val.Str) =>
@@ -627,7 +627,7 @@ class Evaluator(
     new Val.Func(outerPos, scope, params) {
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExpr(rhs)(vs)
-      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope) = visitExpr(expr)(vs)
+      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = visitExpr(expr)(vs)
     }
 
   def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Lazy] = {
@@ -789,7 +789,7 @@ class Evaluator(
             }
           )
           if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
-            Error.fail(s"Duplicate key ${k} in evaluated object comprehension.", e.pos);
+            Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
           }
         case Val.Null(_) => // do nothing
         case x           => fieldNameTypeError(x, e.pos)
