@@ -1,6 +1,7 @@
 package sjsonnet
 
 object Util {
+  private val hashMapDefaultLoadFactor = 0.75f
   def prettyIndex(lineStarts: Array[Int], index: Int): String = {
     // Returns (-insertionPoint - 1) when the value is not found, where
     // insertionPoint is the index where the element would have been inserted.
@@ -112,17 +113,21 @@ object Util {
   }
 
   def preSizedJavaLinkedHashMap[K, V](expectedElems: Int): java.util.LinkedHashMap[K, V] = {
-    // Set the initial capacity to the number of elems divided by the default load factor + 1
-    // this ensures that we can fill up the map to the total number of fields without resizing.
-    // From JavaDoc - true for both Scala & Java HashMaps
-    val hashMapDefaultLoadFactor = 0.75f
-    val capacity = (expectedElems / hashMapDefaultLoadFactor).toInt + 1
-    new java.util.LinkedHashMap[K, V](capacity, hashMapDefaultLoadFactor)
+    new java.util.LinkedHashMap[K, V](hashMapCapacity(expectedElems), hashMapDefaultLoadFactor)
   }
 
   def preSizedJavaHashMap[K, V](expectedElems: Int): java.util.HashMap[K, V] = {
-    val hashMapDefaultLoadFactor = 0.75f
-    val capacity = (expectedElems / hashMapDefaultLoadFactor).toInt + 1
-    new java.util.HashMap[K, V](capacity, hashMapDefaultLoadFactor)
+    new java.util.HashMap[K, V](hashMapCapacity(expectedElems), hashMapDefaultLoadFactor)
+  }
+
+  private def hashMapCapacity(expectedElems: Int): Int = {
+    if (expectedElems < 3) {
+      expectedElems + 1
+    } else {
+      // Set the initial capacity to the number of elems divided by the default load factor + 1
+      // this ensures that we can fill up the map to the total number of fields without resizing.
+      // From JavaDoc - true for both Scala & Java HashMaps
+      (expectedElems / hashMapDefaultLoadFactor).toInt + 1
+    }
   }
 }

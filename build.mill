@@ -145,7 +145,7 @@ object sjsonnet extends Module {
   trait SjsonnetNativeModule
       extends SjsonnetCrossModule
       with ScalaNativeModule
-        with SjsonnetPublishModule
+      with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
     def scalaNativeVersion = "0.5.7"
