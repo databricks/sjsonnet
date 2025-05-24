@@ -198,7 +198,7 @@ class Parser(
     P("(" ~/ params ~ ")" ~ expr).map(t => Expr.Function(pos, t._1, t._2))
 
   def ifElse[$: P](pos: Position): P[Expr] =
-    P(Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.getOrElse(null)))
+    P(Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.orNull))
       .map { case (pos, cond, t, e) => Expr.IfElse(pos, cond, t, e) }
 
   def localExpr[$: P]: P[Expr] =
@@ -286,7 +286,7 @@ class Parser(
             Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map {
               case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
               case (start, ins) =>
-                Expr.Slice(i, _: Expr, start, ins.lift(0).flatten, ins.lift(1).flatten)
+                Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
             }
           case '(' =>
             Pass ~ (args ~ ")" ~ "tailstrict".!.?).map { case (args, namedNames, tailstrict) =>
@@ -479,7 +479,7 @@ class Parser(
   def field[$: P]: P[Expr.Member.Field] = P(
     (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map {
       case (pos, name, plus, p, h2, e) =>
-        Expr.Member.Field(pos, name, plus.nonEmpty, p.getOrElse(null), h2, e)
+        Expr.Member.Field(pos, name, plus.nonEmpty, p.orNull, h2, e)
     }
   )
   def fieldKeySep[$: P]: P[Visibility] = P(StringIn(":::", "::", ":")).!.map {
@@ -502,12 +502,12 @@ class Parser(
     "[" ~ expr.map(Expr.FieldName.Dyn.apply) ~ "]"
   )
   def assertStmt[$: P]: P[Expr.Member.AssertStmt] =
-    P(expr ~ (":" ~ expr).?.map(_.getOrElse(null))).map { case (value, msg) =>
+    P(expr ~ (":" ~ expr).?.map(_.orNull)).map { case (value, msg) =>
       Expr.Member.AssertStmt(value, msg)
     }
 
   def bind[$: P]: P[Expr.Bind] =
-    P(Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.getOrElse(null)) ~ "=" ~ expr)
+    P(Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.orNull) ~ "=" ~ expr)
       .map { case (pos, name, args, rhs) => Expr.Bind(pos, name, args, rhs) }
 
   def args[$: P]: P[(Array[Expr], Array[String])] =
@@ -535,7 +535,7 @@ class Parser(
     }
     if (overlap == null) {
       val names = x.map(_._1).toArray[String]
-      val exprs = x.map(_._2.getOrElse(null)).toArray[Expr]
+      val exprs = x.map(_._2.orNull).toArray[Expr]
       Pass(Expr.Params(names, exprs))
     } else Fail.opaque("no duplicate parameter: " + overlap)
 
@@ -569,8 +569,8 @@ class Parser(
 }
 
 final class Position(val fileScope: FileScope, val offset: Int) {
-  def currentFile = fileScope.currentFile
-  def noOffset = fileScope.noOffsetPos
+  def currentFile: Path = fileScope.currentFile
+  def noOffset: Position = fileScope.noOffsetPos
   override def equals(o: Any): Boolean = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _           => false

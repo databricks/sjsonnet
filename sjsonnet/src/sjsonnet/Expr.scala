@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.util.Arrays
+import java.util
 
 /**
  * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the program mostly
@@ -83,7 +83,7 @@ object Expr {
   }
 
   final case class Params(names: Array[String], defaultExprs: Array[Expr]) {
-    val paramMap = names.zipWithIndex.toMap
+    val paramMap: Map[String, Int] = names.zipWithIndex.toMap
     override def toString: String = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
 
@@ -161,7 +161,7 @@ object Expr {
     override def toString: String = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
     override def equals(o: Any): Boolean = o match {
       case o: LocalExpr =>
-        pos == o.pos && Arrays.equals(
+        pos == o.pos && util.Arrays.equals(
           bindings.asInstanceOf[Array[AnyRef]],
           o.bindings.asInstanceOf[Array[AnyRef]]
         ) && returned == o.returned

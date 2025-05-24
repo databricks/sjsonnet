@@ -45,7 +45,7 @@ abstract class Materializer {
         objVisitor.visitEnd(-1)
       case Val.Num(pos, n) => storePos(pos); visitor.visitFloat64(n, -1)
       case xs: Val.Arr =>
-        storePos(xs.pos);
+        storePos(xs.pos)
         val arrVisitor = visitor.visitArray(xs.length, -1)
         var i = 0
         while (i < xs.length) {
@@ -107,7 +107,7 @@ abstract class Materializer {
           yield Member.Field(
             ev.emptyMaterializeFileScopePos,
             FieldName.Fixed(k),
-            false,
+            plus = false,
             null,
             Visibility.Normal,
             toExpr(v)

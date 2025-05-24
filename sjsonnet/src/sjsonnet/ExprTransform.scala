@@ -22,7 +22,7 @@ abstract class ExprTransform {
 
       case Apply0(pos, x, tailstrict) =>
         val x2 = transform(x)
-        if ((x2 eq x)) expr
+        if (x2 eq x) expr
         else Apply0(pos, x2, tailstrict)
 
       case Apply1(pos, x, y, tailstrict) =>

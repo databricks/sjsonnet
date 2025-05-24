@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.util.Arrays
+import java.util
 
 /**
  * [[ValScope]]s which model the lexical scopes within a Jsonnet file that bind variable names to
@@ -19,7 +19,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
   def length: Int = bindings.length
 
   def extend(newBindings: Array[Lazy], newSelf: Val.Obj, newSuper: Val.Obj): ValScope = {
-    val b = Arrays.copyOf(bindings, bindings.length + newBindings.length + 2)
+    val b = util.Arrays.copyOf(bindings, bindings.length + newBindings.length + 2)
     b(bindings.length) = newSelf
     b(bindings.length + 1) = newSuper
     System.arraycopy(newBindings, 0, b, bindings.length + 2, newBindings.length)
@@ -29,7 +29,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
   def extendSimple(newBindingsV: Array[? <: Lazy]): ValScope = {
     if (newBindingsV == null || newBindingsV.length == 0) this
     else {
-      val b = Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
+      val b = util.Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
       System.arraycopy(newBindingsV, 0, b, bindings.length, newBindingsV.length)
       new ValScope(b)
     }
@@ -37,23 +37,23 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
 
   def extendBy(num: Int): ValScope =
     if (num == 0) this
-    else new ValScope(Arrays.copyOf(bindings, bindings.length + num))
+    else new ValScope(util.Arrays.copyOf(bindings, bindings.length + num))
 
   def extendSimple(l1: Lazy): ValScope = {
-    val b = Arrays.copyOf(bindings, bindings.length + 1)
+    val b = util.Arrays.copyOf(bindings, bindings.length + 1)
     b(bindings.length) = l1
     new ValScope(b)
   }
 
   def extendSimple(l1: Lazy, l2: Lazy): ValScope = {
-    val b = Arrays.copyOf(bindings, bindings.length + 2)
+    val b = util.Arrays.copyOf(bindings, bindings.length + 2)
     b(bindings.length) = l1
     b(bindings.length + 1) = l2
     new ValScope(b)
   }
 
   def extendSimple(l1: Lazy, l2: Lazy, l3: Lazy): ValScope = {
-    val b = Arrays.copyOf(bindings, bindings.length + 3)
+    val b = util.Arrays.copyOf(bindings, bindings.length + 3)
     b(bindings.length) = l1
     b(bindings.length + 1) = l2
     b(bindings.length + 2) = l3

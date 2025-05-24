@@ -55,7 +55,7 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
       flushBuffer()
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): Writer = {
       commaBuffered = false
       newlineBuffered = false
       depth -= 1
@@ -89,7 +89,7 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): Writer = {
       commaBuffered = false
       newlineBuffered = false
       depth -= 1
@@ -159,7 +159,7 @@ class PythonRenderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     def visitValue(v: Writer, index: Int): Unit = {
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): Writer = {
       commaBuffered = false
       depth -= 1
       renderIndent()
@@ -209,7 +209,7 @@ final case class MaterializeJsonRenderer(
       flushBuffer()
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): StringWriter = {
       commaBuffered = false
       depth -= 1
       renderIndent()
@@ -222,7 +222,7 @@ final case class MaterializeJsonRenderer(
   override def visitObject(
       length: Int,
       index: Int): upickle.core.ObjVisitor[java.io.StringWriter, java.io.StringWriter] {
-    def subVisitor: sjsonnet.MaterializeJsonRenderer;
+    def subVisitor: sjsonnet.MaterializeJsonRenderer
     def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer
   } = new ObjVisitor[StringWriter, StringWriter] {
     flushBuffer()
@@ -240,7 +240,7 @@ final case class MaterializeJsonRenderer(
     def visitValue(v: StringWriter, index: Int): Unit = {
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): StringWriter = {
       commaBuffered = false
       depth -= 1
       renderIndent()

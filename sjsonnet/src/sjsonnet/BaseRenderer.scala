@@ -42,7 +42,7 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
       flushBuffer()
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): T = {
       commaBuffered = false
       depth -= 1
       renderIndent()
@@ -62,7 +62,7 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
     def visitValue(v: T, index: Int): Unit = {
       commaBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): T = {
       commaBuffered = false
       depth -= 1
       renderIndent()

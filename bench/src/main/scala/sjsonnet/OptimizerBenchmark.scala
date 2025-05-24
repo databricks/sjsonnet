@@ -29,19 +29,19 @@ class OptimizerBenchmark {
       ) match {
         case Success(v, _) => v
         case f: fastparse.Parsed.Failure =>
-          throw new Exception(s"Failed to parse ${p}: ${f.msg}")
+          throw new Exception(s"Failed to parse $p: ${f.msg}")
       }
     }
     this.ev = ev
     val static = inputs.map { case (expr, fs) =>
       (
-        (new StaticOptimizer(
+        new StaticOptimizer(
           ev,
           _ => None,
           new Std().Std,
           mutable.HashMap.empty,
           mutable.HashMap.empty
-        )).optimize(expr),
+        ).optimize(expr),
         fs
       )
     }
@@ -57,13 +57,13 @@ class OptimizerBenchmark {
   def main(bh: Blackhole): Unit = {
     bh.consume(inputs.foreach { case (expr, fs) =>
       bh.consume(
-        (new StaticOptimizer(
+        new StaticOptimizer(
           ev,
           _ => None,
           new Std().Std,
           mutable.HashMap.empty,
           mutable.HashMap.empty
-        )).optimize(expr)
+        ).optimize(expr)
       )
     })
   }

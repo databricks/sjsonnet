@@ -34,7 +34,7 @@ class CachedResolvedFile(
   // Assert that the file is less than limit
   assert(
     jFile.length() <= memoryLimitBytes,
-    s"Resolved import path $resolvedImportPath is too large: ${jFile.length()} bytes > ${memoryLimitBytes} bytes"
+    s"Resolved import path $resolvedImportPath is too large: ${jFile.length()} bytes > $memoryLimitBytes bytes"
   )
 
   private val resolvedImportContent: ResolvedFile = {
@@ -50,7 +50,7 @@ class CachedResolvedFile(
   }
 
   private def readString(jFile: File): String = {
-    new String(Files.readAllBytes(jFile.toPath), StandardCharsets.UTF_8);
+    new String(Files.readAllBytes(jFile.toPath), StandardCharsets.UTF_8)
   }
 
   private def readRawBytes(jFile: File): Array[Byte] = Files.readAllBytes(jFile.toPath)

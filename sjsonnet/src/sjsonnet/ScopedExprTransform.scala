@@ -120,7 +120,7 @@ class ScopedExprTransform extends ExprTransform {
 
   protected def nestedWith[T](n: String, e: Expr)(f: => T): T =
     nestedNew(
-      new Scope(scope.mappings.updated(n, new ScopedVal(e, scope, scope.size)), scope.size + 1)
+      new Scope(scope.mappings.updated(n, ScopedVal(e, scope, scope.size)), scope.size + 1)
     )(f)
 
   protected def nestedFileScope[T](fs: FileScope)(f: => T): T =
@@ -133,7 +133,7 @@ class ScopedExprTransform extends ExprTransform {
       val oldScope = scope
       try {
         val mappings = a.zipWithIndex.map { case (b, idx) =>
-          (b.name, new ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
+          (b.name, ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
         }
         scope = new Scope(oldScope.mappings ++ mappings, oldScope.size + a.length)
         var changed = false
@@ -154,15 +154,15 @@ class ScopedExprTransform extends ExprTransform {
     else {
       val newm = a.zipWithIndex.map { case (b, idx) =>
         // println(s"Binding ${b.name} to ${scope.size + idx}")
-        (b.name, new ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
+        (b.name, ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
       }
       nestedNew(new Scope(scope.mappings ++ newm, scope.size + a.length))(f)
     }
   }
 
   protected def nestedObject[T](self0: Expr, super0: Expr)(f: => T): T = {
-    val self = new ScopedVal(self0, scope, scope.size)
-    val sup = new ScopedVal(super0, scope, scope.size + 1)
+    val self = ScopedVal(self0, scope, scope.size)
+    val sup = ScopedVal(super0, scope, scope.size + 1)
     val newm = {
       val m1 = scope.mappings + (("self", self)) + (("super", sup))
       if (scope.contains("self")) m1 else m1 + (("$", self))
@@ -177,7 +177,7 @@ class ScopedExprTransform extends ExprTransform {
     if (a == null || a.length == 0) f
     else {
       val newm = a.zipWithIndex.map { case (n, idx) =>
-        (n, new ScopedVal(dynamicExpr, scope, scope.size + idx))
+        (n, ScopedVal(dynamicExpr, scope, scope.size + idx))
       }
       nestedNew(new Scope(scope.mappings ++ newm, scope.size + a.length))(f)
     }
