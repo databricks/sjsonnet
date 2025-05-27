@@ -15,7 +15,7 @@ import scala.util.Try
 
 object SjsonnetMain {
   def resolveImport(
-      searchRoots0: Seq[Path],
+      searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
       allowedInputs: Option[Set[os.Path]] = None,
       debugImporter: Boolean = false): Importer =
     new Importer {
@@ -263,7 +263,7 @@ object SjsonnetMain {
           }
         case None =>
           resolveImport(
-            config.jpaths.map(os.Path(_, wd)).map(OsPath.apply),
+            config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath.apply),
             allowedInputs,
             config.debugImporter.value
           )
