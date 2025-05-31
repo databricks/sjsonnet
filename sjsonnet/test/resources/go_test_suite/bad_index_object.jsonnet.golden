@@ -1,0 +1,3 @@
+sjsonnet.Error: attempted to index a object with number
+    at [Lookup].(bad_index_object.jsonnet:1:3)
+

@@ -108,25 +108,44 @@ object Val {
     def prettyName = "string"
     override def asString: String = value
   }
-  final case class Num(pos: Position, value: Double) extends Literal {
+  final case class Num(pos: Position, private val value: Double) extends Literal {
     if (value.isInfinite) {
       Error.fail("overflow")
     }
+
     def prettyName = "number"
     override def asInt: Int = value.toInt
+
+    def asPositiveInt: Int = {
+      if (!value.isWhole || !value.isValidInt) {
+        Error.fail("index value is not a valid integer, got: %s".format(value.toString))
+      }
+
+      if (value.toInt < 0) {
+        Error.fail("index value is not a positive integer, got: " + value.toInt)
+      }
+      value.toInt
+    }
+
     override def asLong: Long = value.toLong
 
-    def asSafeLong(pos: Position)(implicit ev: EvalErrorScope): Long = {
+    def asSafeLong: Long = {
       if (value.isInfinite || value.isNaN) {
-        Error.fail("numeric value is not finite", pos)
+        Error.fail("numeric value is not finite")
       }
 
       if (value < DOUBLE_MIN_SAFE_INTEGER || value > DOUBLE_MAX_SAFE_INTEGER) {
-        Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+        Error.fail("numeric value outside safe integer range for bitwise operation")
       }
       value.toLong
     }
-    override def asDouble: Double = value
+
+    override def asDouble: Double = {
+      if (value.isNaN) {
+        Error.fail("not a number")
+      }
+      value
+    }
   }
 
   case class Arr(pos: Position, private val value: Array[? <: Lazy]) extends Literal {
@@ -380,11 +399,15 @@ object Val {
         case (_, rStr: Val.Str) =>
           Val.Str(pos, renderString(l) ++ rStr.value)
         case (lNum: Val.Num, rNum: Val.Num) =>
-          Val.Num(pos, lNum.value + rNum.value)
+          Val.Num(pos, lNum.asDouble + rNum.asDouble)
         case (lArr: Val.Arr, rArr: Val.Arr) =>
           Val.Arr(pos, lArr.asLazyArray ++ rArr.asLazyArray)
         case (lObj: Val.Obj, rObj: Val.Obj) =>
           rObj.addSuper(pos, lObj)
+        case (_: Val.Null, _) =>
+          Error.fail("Cannot merge null with " + r.prettyName, pos)
+        case (_, _: Val.Null) =>
+          Error.fail("Cannot merge " + l.prettyName + " with null", pos)
         case _ =>
           throw new MatchError((l, r))
       }

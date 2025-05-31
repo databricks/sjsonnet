@@ -1,0 +1,3 @@
+sjsonnet.StaticError: Unknown variable: y
+    at [Id y].(sjsonnet/test/resources/go_test_suite/arrcomp_if4.jsonnet:1:33)
+

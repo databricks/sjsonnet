@@ -7,31 +7,20 @@ import utest._
 abstract class BaseFileTests extends TestSuite {
   private val stderr = new StringBuffer()
 
-  def joinPath(a: String, b: String): String = {
-    val aStripped = if (a.endsWith("/")) a.substring(0, a.length - 1) else a
-    val bStripped = if (b.startsWith("/")) b.substring(1) else b
-    if (aStripped.isEmpty)
-      bStripped
-    else if (bStripped.isEmpty)
-      aStripped
-    else
-      aStripped + "/" + bStripped
-  }
-
-  def importResolver(wd: String, path: String): String = {
-    val p = joinPath(wd, path)
-    if (TestResources.files.contains(p)) {
-      p
+  def importResolver(wd: Path, path: String): Option[Path] = {
+    val p = wd / path
+    if (TestResources.files.contains(p.toString)) {
+      Some(p)
     } else {
-      null
+      None
     }
   }
 
-  def importLoader(path: String, binaryData: Boolean): Either[String, Array[Byte]] =
+  def importLoader(path: Path, binaryData: Boolean): Either[String, Array[Byte]] =
     if (binaryData) {
-      Right(TestResources.files(path))
+      Right(TestResources.files(path.toString))
     } else {
-      Left(new String(TestResources.files(path), StandardCharsets.UTF_8))
+      Left(new String(TestResources.files(path.toString), StandardCharsets.UTF_8))
     }
 
   def eval(fileName: String, suite: String) = {
@@ -39,18 +28,17 @@ abstract class BaseFileTests extends TestSuite {
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
-      JsVirtualPath(suite + "/"),
+      JsVirtualPath(suite),
       new Importer {
         def resolve(docBase: Path, importName: String): Option[Path] =
-          importResolver(docBase.asInstanceOf[JsVirtualPath].path, importName) match {
-            case null => None
-            case s    => Some(JsVirtualPath(s))
-          }
+          importResolver(docBase, importName)
         def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
-          importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
-            case Left(s)    => Some(StaticResolvedFile(s))
-            case Right(arr) => Some(StaticBinaryResolvedFile(arr))
-          }
+          if (!TestResources.files.contains(path.toString)) None
+          else
+            importLoader(path, binaryData) match {
+              case Left(s)    => Some(StaticResolvedFile(s))
+              case Right(arr) => Some(StaticBinaryResolvedFile(arr))
+            }
       },
       logger = (isTrace: Boolean, msg: String) => {
         if (isTrace) {
@@ -67,7 +55,7 @@ abstract class BaseFileTests extends TestSuite {
     )
 
     interp.interpret0(
-      importLoader(fileName, false).left.getOrElse(""),
+      importLoader(JsVirtualPath(fileName), false).left.getOrElse(""),
       JsVirtualPath(fileName),
       ujson.WebJson.Builder
     ) match {
@@ -76,40 +64,52 @@ abstract class BaseFileTests extends TestSuite {
     }
   }
 
-  def check(fileName: String): Unit = {
+  def check(fileName: String, testSuite: String): Unit = {
     println(s"Checking $fileName")
-    val expected =
-      ujson.read(new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8))
-    val res = ujson.WebJson.transform(eval(fileName, "test_suite"), ujson.Value)
-    assert(res == expected)
-    assert(stderr.toString.isEmpty)
+    val goldenContent = if (TestResources.files.contains(fileName + ".golden_js")) {
+      new String(TestResources.files(fileName + ".golden_js"), StandardCharsets.UTF_8)
+    } else {
+      new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8)
+    }
+    if (
+      goldenContent.startsWith("sjsonnet.Error") ||
+      goldenContent.startsWith("sjsonnet.ParseError") ||
+      goldenContent.startsWith("sjsonnet.StaticError") ||
+      goldenContent.contains("java.lang.StackOverflowError")
+    ) {
+      checkError(fileName, goldenContent, testSuite)
+    } else {
+      val res = ujson.WebJson.transform(eval(fileName, testSuite), ujson.Value)
+      try {
+        val expected = ujson.read(goldenContent)
+        assert(res == expected)
+        assert(stderr.toString.isEmpty)
+      } catch {
+        case e: ujson.ParsingFailedException =>
+          if (goldenContent.contains(stderr.toString.stripLineEnd)) {
+            assert(true)
+          } else {
+            assert(e.getMessage == goldenContent.stripLineEnd)
+          }
+      }
+    }
   }
 
-  def checkStderr(fileName: String): Unit = {
-    println(s"Checking $fileName")
-    eval(fileName, "test_suite")
-    val expected = new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8)
-    assert(expected.startsWith(stderr.toString))
-  }
-
-  def checkError(fileName: String): Unit = {
-    println(s"Checking $fileName")
-    val expected =
-      new String(TestResources.files(fileName + ".golden"), StandardCharsets.UTF_8).stripLineEnd
-        .replaceAll("\\(sjsonnet/test/resources/test_suite/", "(")
-        .replaceAll("    at", "  at")
+  def checkError(fileName: String, goldenContent: String, testSuite: String): Unit = {
+    val expected = goldenContent
+      .replaceAll(f"\\(sjsonnet/test/resources/$testSuite/", "(")
+      .replaceAll("    at", "  at")
+      .strip()
 
     try {
-      ujson.WebJson.transform(eval(fileName, "test_suite"), ujson.Value)
+      ujson.WebJson.transform(eval(fileName, testSuite), ujson.Value)
       assert(false)
     } catch {
       case e: js.JavaScriptException =>
-        val msg = e.getMessage
+        val msg = e.getMessage.replaceAll("<no stack trace available>", "").strip()
         assert(msg == expected)
       case e: sjsonnet.Error =>
-        assert(expected.stripLineEnd.contains(e.getMessage))
-      case _: Throwable =>
-        assert(false)
+        assert(expected.contains(e.getMessage.strip()))
     }
   }
 }

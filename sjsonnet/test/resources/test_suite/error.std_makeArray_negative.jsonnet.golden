@@ -1,3 +1,3 @@
-sjsonnet.Error: std.makeArray requires size >= 0, got -10
+sjsonnet.Error: index value is not a positive integer, got: -10
     at [std.makeArray].(sjsonnet/test/resources/test_suite/error.std_makeArray_negative.jsonnet:17:14)
 

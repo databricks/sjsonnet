@@ -1,0 +1,3 @@
+sjsonnet.Error: assertEqual failed: "\u001b[31m" != ""
+    at [std.assertEqual].(assert_equal6.jsonnet:1:16)
+

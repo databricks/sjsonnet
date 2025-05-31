@@ -1,0 +1,3 @@
+sjsonnet.ParseError: Expected end-of-input:1:2, found "x42\n"
+    at .(sjsonnet/test/resources/go_test_suite/error_hexnumber.jsonnet:1:2)
+

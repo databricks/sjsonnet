@@ -1,0 +1,3 @@
+sjsonnet.Error: Assertion failed
+    at [AssertExpr].(assert3.jsonnet:1:1)
+

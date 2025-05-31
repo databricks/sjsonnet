@@ -1,0 +1,4 @@
+sjsonnet.Error: xxx
+    at [Error].(sjsonnet/test/resources/go_test_suite/error_in_method.jsonnet:1:23)
+    at [Apply1].(sjsonnet/test/resources/go_test_suite/error_in_method.jsonnet:1:41)
+

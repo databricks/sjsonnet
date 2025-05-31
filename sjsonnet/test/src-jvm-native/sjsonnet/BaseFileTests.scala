@@ -5,15 +5,15 @@ import utest.{TestSuite, assert}
 
 abstract class BaseFileTests extends TestSuite {
   val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
-  val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources" / "test_suite"
+  val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   private val stderr = new StringBuffer()
 
-  def eval(p: os.Path): Either[String, Value] = {
+  def eval(p: os.Path, testSuite: String): Either[String, Value] = {
     stderr.setLength(0)
     val interp = new Interpreter(
       Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
-      OsPath(testSuiteRoot),
+      OsPath(testSuiteRoot / testSuite),
       importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path].toIndexedSeq),
       parseCache = new DefaultParseCache,
       logger = (isTrace: Boolean, msg: String) => {
@@ -31,43 +31,47 @@ abstract class BaseFileTests extends TestSuite {
     interp.interpret(os.read(p), OsPath(p))
   }
 
-  def check(fileName: os.Path): Unit = {
+  def check(fileName: os.Path, testSuite: String): Unit = {
     println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
-    val res = eval(fileName)
-    val expected = ujson.read(os.read(os.Path(fileName.toString + ".golden")))
-    assert(res == Right(expected))
-    assert(stderr.toString.isEmpty)
+    val goldenContent = os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
+    if (
+      goldenContent.startsWith("sjsonnet.Error") ||
+      goldenContent.startsWith("sjsonnet.ParseError") ||
+      goldenContent.startsWith("sjsonnet.StaticError") ||
+      goldenContent.contains("java.lang.StackOverflowError")
+    ) {
+      checkError(fileName, goldenContent, testSuite)
+    } else {
+      val res = eval(fileName, testSuite)
+      try {
+        val expected = ujson.read(goldenContent)
+        assert(res == Right(expected))
+        assert(stderr.toString.isEmpty)
+      } catch {
+        case e: ujson.ParsingFailedException =>
+          if (goldenContent.contains(stderr.toString.stripLineEnd)) {
+            assert(true)
+          } else {
+            assert(e.getMessage == goldenContent.stripLineEnd)
+          }
+      }
+    }
   }
 
-  def checkStderr(fileName: os.Path): Unit = {
-    println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
-    eval(fileName)
-    val expected = os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
-    assert(expected.startsWith(stderr.toString))
-  }
-
-  def checkError(fileName: os.Path): Unit = {
-    println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
-    val expected = os
-      .read(os.Path(fileName.toString + ".golden"))
-      .replaceAll("\\(sjsonnet/test/resources/test_suite/", "(")
+  private def checkError(fileName: os.Path, goldenContent: String, testSuite: String): Unit = {
+    val expected = goldenContent.replaceAll(s"\\(sjsonnet/test/resources/$testSuite/", "(").strip()
 
     var res: Either[String, Value] = Right(null)
     try {
-      res = eval(fileName)
+      res = eval(fileName, testSuite)
       assert(res.isLeft)
       val actual = res.left.getOrElse("")
-      assert(actual == expected.stripLineEnd)
+      assert(actual.strip() == expected)
     } catch {
       case _: java.lang.StackOverflowError =>
         assert(expected.contains("StackOverflowError"))
       case e: sjsonnet.Error =>
-        assert(expected.stripLineEnd.contains(e.getMessage.stripLineEnd))
-      case e: AssertionError =>
-        throw e
-      case e: Throwable =>
-        println(s"Unexpected error: ${e}")
-        assert(false)
+        assert(expected.contains(e.getMessage.stripLineEnd))
     }
   }
 

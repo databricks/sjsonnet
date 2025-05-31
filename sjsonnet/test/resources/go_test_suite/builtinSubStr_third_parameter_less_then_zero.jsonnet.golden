@@ -1,0 +1,3 @@
+sjsonnet.Error: index value is not a positive integer, got: -1
+    at [std.substr].(builtinSubStr_third_parameter_less_then_zero.jsonnet:1:11)
+

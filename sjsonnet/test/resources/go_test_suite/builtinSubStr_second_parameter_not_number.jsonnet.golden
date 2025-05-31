@@ -1,0 +1,2 @@
+sjsonnet.Error: Expected a number for offset in substr, got string
+    at [std.substr].(sjsonnet/test/resources/go_test_suite/builtinSubStr_second_parameter_not_number.jsonnet:1:11)

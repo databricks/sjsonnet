@@ -1,0 +1,4 @@
+sjsonnet.Error: Attempt to use `super` when there is no super class
+    at [SelectSuper x].(object_invariant7.jsonnet:1:21)
+    at [BinaryOp ==].(object_invariant7.jsonnet:1:24)
+

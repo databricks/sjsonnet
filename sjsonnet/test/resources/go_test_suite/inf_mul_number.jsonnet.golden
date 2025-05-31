@@ -1,0 +1,3 @@
+sjsonnet.Error: overflow
+    at [BinaryOp *].(inf_mul_number.jsonnet:1:7)
+

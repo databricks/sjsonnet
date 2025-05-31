@@ -1,0 +1,4 @@
+sjsonnet.Error: Couldn't manifest function with params [x]
+    at .(sjsonnet/test/resources/go_test_suite/error_function_fail.jsonnet:1:8)
+    at [Error].(sjsonnet/test/resources/go_test_suite/error_function_fail.jsonnet:1:1)
+
