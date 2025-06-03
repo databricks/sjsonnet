@@ -1,0 +1,3 @@
+sjsonnet.Error: xxx
+    at [Error].(sjsonnet/test/resources/go_test_suite/error_from_array.jsonnet:1:2)
+    at [Lookup].(sjsonnet/test/resources/go_test_suite/error_from_array.jsonnet:1:14)

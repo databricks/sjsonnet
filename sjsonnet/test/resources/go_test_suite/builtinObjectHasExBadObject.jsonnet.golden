@@ -1,0 +1,3 @@
+sjsonnet.Error: Wrong parameter type: expected Object, got number
+    at [std.objectHasEx].(builtinObjectHasExBadObject.jsonnet:1:16)
+

@@ -1,0 +1,1 @@
+'%s %s' % [std.member('bar', 'foo'), std.member('foobar', 'foo')]

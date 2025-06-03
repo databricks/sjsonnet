@@ -1,0 +1,5 @@
+sjsonnet.Error: xxx
+    at [Error].(tailstrict2.jsonnet:1:13)
+    at [Apply1].(tailstrict2.jsonnet:2:15)
+    at [Apply1].(tailstrict2.jsonnet:2:19)
+

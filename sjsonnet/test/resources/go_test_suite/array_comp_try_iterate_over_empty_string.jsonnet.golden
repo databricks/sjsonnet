@@ -1,0 +1,4 @@
+sjsonnet.Error: In comprehension, can only iterate over array, not string
+    at [ForSpec].(array_comp_try_iterate_over_empty_string.jsonnet:1:4)
+    at [Comp].(array_comp_try_iterate_over_empty_string.jsonnet:1:2)
+

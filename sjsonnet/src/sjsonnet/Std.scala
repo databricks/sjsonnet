@@ -7,7 +7,7 @@ import java.util
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.functions.FunctionBuilder
 
-import scala.collection.Searching._
+import scala.collection.Searching.*
 import scala.collection.mutable
 
 /**
@@ -31,12 +31,12 @@ class Std(
       v match {
         case Val.Str(_, value) => Platform.gzipString(value)
         case arr: Val.Arr =>
-          Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
+          Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray)
         case x => Error.fail("Cannot gzip encode " + x.prettyName)
       }
     },
     builtinWithDefaults("xz", "v" -> null, "compressionLevel" -> Val.Null(dummyPos)) {
-      (args, pos, ev) =>
+      (args, _, _) =>
         val compressionLevel: Option[Int] = args(1) match {
           case Val.Null(_) =>
             // Use default compression level if the user didn't set one
@@ -50,7 +50,7 @@ class Std(
           case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
           case arr: Val.Arr =>
             Platform.xzBytes(
-              arr.iterator.map(_.cast[Val.Num].value.toByte).toArray,
+              arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray,
               compressionLevel
             )
           case x => Error.fail("Cannot xz encode " + x.prettyName)
@@ -96,8 +96,8 @@ class Std(
       )
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
-        case Array(Expr.ApplyBuiltin2(_, Filter, f, a, tailstrict)) => (CountF, Array(f, a))
-        case _                                                      => null
+        case Array(Expr.ApplyBuiltin2(_, Filter, f, a, _)) => (CountF, Array(f, a))
+        case _                                             => null
       }
   }
 
@@ -133,8 +133,13 @@ class Std(
   }
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.force.asString.charAt(0).toDouble)
+    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = if (
+      str.force.asString.length != 1 || str.force.asString.codePointCount(0, 1) > 1
+    ) {
+      Error.fail("expected a single character string, got " + str.force.asString)
+    } else {
+      Val.Num(pos, str.force.asString.codePointAt(0).toDouble)
+    }
   }
 
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
@@ -532,7 +537,7 @@ class Std(
     }
   }
 
-  private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "s") {
+  private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "str") {
     def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val =
       Val.Arr(pos, s.force.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
   }
@@ -556,8 +561,16 @@ class Std(
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
     def evalRhs(_s: Lazy, from: Lazy, len: Lazy, ev: EvalScope, pos: Position): Val = {
       val str = _s.force.asString
-      val safeOffset = math.min(from.force.asInt, str.length)
-      val safeLength = math.min(len.force.asInt, str.length - safeOffset)
+      val offset = from.force match {
+        case v: Val.Num => v.asPositiveInt
+        case _ => Error.fail("Expected a number for offset in substr, got " + from.force.prettyName)
+      }
+      val length = len.force match {
+        case v: Val.Num => v.asPositiveInt
+        case _ => Error.fail("Expected a number for len in substr, got " + len.force.prettyName)
+      }
+      val safeOffset = math.min(offset, str.length)
+      val safeLength = math.min(length, str.length - safeOffset)
       Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
     }
   }
@@ -578,13 +591,23 @@ class Std(
   }
 
   private object Char_ extends Val.Builtin1("char", "n") {
-    def evalRhs(n: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, n.force.asLong.toChar.toString)
+    def evalRhs(n: Lazy, ev: EvalScope, pos: Position): Val = {
+      val c = n.force.asInt
+      if (!Character.isValidCodePoint(c)) {
+        Error.fail(s"Invalid unicode code point, got " + c)
+      }
+      Val.Str(pos, c.toChar.toString)
+    }
   }
 
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
-    def evalRhs(str: Lazy, from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.force.asString.replace(from.force.asString, to.force.asString))
+    def evalRhs(str: Lazy, from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
+      val fromForce = from.force.asString
+      if (fromForce.isEmpty) {
+        Error.fail("Cannot replace empty string in strReplace")
+      }
+      Val.Str(pos, str.force.asString.replace(fromForce, to.force.asString))
+    }
   }
 
   private object StrReplaceAll extends Val.Builtin3("strReplaceAll", "str", "from", "to") {
@@ -648,7 +671,7 @@ class Std(
     }
   }
 
-  object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
+  private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.Str(
         pos,
@@ -669,7 +692,7 @@ class Std(
       }
   }
 
-  object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
+  private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.Str(
         pos,
@@ -690,7 +713,7 @@ class Std(
       }
   }
 
-  object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
+  private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.Str(
         pos,
@@ -825,6 +848,13 @@ class Std(
   }
 
   private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Lazy] = {
+    if (maxSplits < 0 && maxSplits != -1) {
+      Error.fail("maxSplits should be -1 or non-negative, got " + maxSplits)
+    }
+    if (cStr.isEmpty) {
+      Error.fail("Cannot split by an empty string")
+    }
+
     val b = new mutable.ArrayBuilder.ofRef[Lazy]
     var sz = 0
     var i = 0
@@ -852,13 +882,13 @@ class Std(
     }
   }
 
-  private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxSplits") {
+  private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
     def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, maxSplits.force.asInt))
     }
   }
 
-  private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxSplits") {
+  private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
       Val.Arr(
         pos,
@@ -876,7 +906,12 @@ class Std(
 
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, str.force.asString.toLong.toDouble)
+      try {
+        Val.Num(pos, str.force.asString.toInt.toDouble)
+      } catch {
+        case _: NumberFormatException =>
+          Error.fail("Cannot parse '" + str.force.asString + "' as an integer in base 10")
+      }
   }
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
@@ -972,7 +1007,7 @@ class Std(
       Val.Str(pos, Materializer.apply0(v.force, MaterializeJsonRenderer())(ev).toString)
   }
 
-  private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "v") {
+  private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "value") {
     def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
       Val.Str(
         pos,
@@ -1283,7 +1318,13 @@ class Std(
     builtin("min", "a", "b") { (pos, ev, a: Double, b: Double) =>
       math.min(a, b)
     },
-    builtin("mod", "a", "b") { (pos, ev, a: Int, b: Int) =>
+    builtin("mod", "a", "b") { (pos, ev, a: Val, b: Val) =>
+      (a.force, b.force) match {
+        case (x: Val.Num, y: Val.Num) => Val.Num(pos, x.asDouble % y.asDouble)
+        case _                        => Format_.evalRhs(a, b, ev, pos)
+      }
+    },
+    builtin("modulo", "a", "b") { (pos, ev, a: Double, b: Double) =>
       a % b
     },
     builtin("clamp", "x", "minVal", "maxVal") {
@@ -1294,12 +1335,10 @@ class Std(
       (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
-    builtin("makeArray", "sz", "func") { (pos, ev, sz: Int, func: Val.Func) =>
-      if (sz < 0) {
-        Error.fail(f"std.makeArray requires size >= 0, got $sz")
-      }
+    builtin("makeArray", "sz", "func") { (pos, ev, size: Val, func: Val.Func) =>
       Val.Arr(
         pos, {
+          val sz = size.cast[Val.Num].asPositiveInt
           val a = new Array[Lazy](sz)
           var i = 0
           while (i < sz) {
@@ -1324,8 +1363,11 @@ class Std(
     builtin("ceil", "x") { (pos, ev, x: Double) =>
       math.ceil(x)
     },
-    builtin("abs", "x") { (pos, ev, x: Double) =>
+    builtin("abs", "n") { (pos, ev, x: Double) =>
       math.abs(x)
+    },
+    builtin("sign", "n") { (_, _, x: Double) =>
+      math.signum(x)
     },
     builtin("sin", "x") { (pos, ev, x: Double) =>
       math.sin(x)
@@ -1383,16 +1425,17 @@ class Std(
       math.exp(x)
     },
     builtin("mantissa", "x") { (pos, ev, x: Double) =>
-      val value = x
-      val exponent = (Math.log(value) / Math.log(2)).toLong + 1
-      val mantissa = value * Math.pow(2.0, (-exponent).toDouble)
-      mantissa
+      if (x == 0) 0
+      else {
+        val exponent = (Math.log(x) / Math.log(2)).toLong + 1
+        x * Math.pow(2.0, (-exponent).toDouble)
+      }
     },
     builtin("exponent", "x") { (pos, ev, x: Double) =>
-      val value = x
-      val exponent = (Math.log(value) / Math.log(2)).toLong + 1
-      // val mantissa = value * Math.pow(2.0, -exponent)
-      exponent
+      if (x == 0) 0L
+      else {
+        (Math.log(x) / Math.log(2)).toLong + 1
+      }
     },
     builtin(IsString),
     builtin(IsBoolean),
@@ -1507,7 +1550,7 @@ class Std(
     builtin(FlattenDeepArrays),
     builtin(DeepJoin),
     builtin(Reverse),
-    builtin("manifestIni", "v") { (pos, ev, v: Val) =>
+    builtin("manifestIni", "ini") { (pos, ev, v: Val) =>
       val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match {
         case ujson.Str(vv)  => vv
@@ -1536,7 +1579,12 @@ class Std(
           )
       lines.flatMap(Seq(_, "\n")).mkString
     },
-    builtin("escapeStringJson", "str") { (pos, ev, str: String) =>
+    builtin("escapeStringJson", "str_") { (pos, ev, str: String) =>
+      val out = new StringWriter()
+      BaseRenderer.escape(out, str, unicode = true)
+      out.toString
+    },
+    builtin("escapeStringPython", "str") { (pos, ev, str: String) =>
       val out = new StringWriter()
       BaseRenderer.escape(out, str, unicode = true)
       out.toString
@@ -1555,10 +1603,10 @@ class Std(
       }
       out.toString
     },
-    builtin("escapeStringBash", "str") { (pos, ev, str: String) =>
+    builtin("escapeStringBash", "str_") { (pos, ev, str: String) =>
       "'" + str.replace("'", """'"'"'""") + "'"
     },
-    builtin("escapeStringDollars", "str") { (pos, ev, str: String) =>
+    builtin("escapeStringDollars", "str_") { (pos, ev, str: String) =>
       str.replace("$", "$$")
     },
     builtin("manifestPython", "v") { (pos, ev, v: Val) =>
@@ -1573,7 +1621,7 @@ class Std(
     builtin(ManifestTomlEx),
     builtinWithDefaults(
       "manifestYamlDoc",
-      "v" -> null,
+      "value" -> null,
       "indent_array_in_object" -> Val.False(dummyPos),
       "quote_keys" -> Val.True(dummyPos)
     ) { (args, pos, ev) =>
@@ -1597,7 +1645,7 @@ class Std(
     },
     builtinWithDefaults(
       "manifestYamlStream",
-      "v" -> null,
+      "value" -> null,
       "indent_array_in_object" -> Val.False(dummyPos),
       "c_document_end" -> Val.True(dummyPos),
       "quote_keys" -> Val.True(dummyPos)
@@ -1633,7 +1681,7 @@ class Std(
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
-    builtin("manifestPythonVars", "v") { (pos, ev, v: Val.Obj) =>
+    builtin("manifestPythonVars", "conf") { (pos, ev, v: Val.Obj) =>
       // TODO remove the `toSeq` once this is fixed in scala3
       Materializer(v)(ev).obj.toSeq.map { case (k, v) =>
         k + " = " + v.transform(new PythonRenderer()).toString + "\n"
@@ -1667,19 +1715,41 @@ class Std(
       }
       rec(Materializer(value)(ev)).render
     },
-    builtin("base64", "v") { (pos, ev, v: Val) =>
-      v match {
-        case Val.Str(_, value) => Base64.getEncoder.encodeToString(value.getBytes)
+    builtin("base64", "input") { (_, _, input: Val) =>
+      val b: Array[Int] = input match {
+        case Val.Str(_, value) => value.indices.map(value.codePointAt).toArray
         case arr: Val.Arr =>
-          Base64.getEncoder.encodeToString(arr.iterator.map(_.cast[Val.Num].value.toByte).toArray)
+          if (!arr.forall(_.isInstanceOf[Val.Num])) {
+            Error.fail("Expected an array of numbers or a string")
+          }
+          arr.iterator.map(_.cast[Val.Num].asInt).toArray
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
+
+      for (i <- b) {
+        if (i < 0 || i > 255) {
+          Error.fail(
+            f"Found an invalid codepoint value in the ${input.prettyName} (must be 0 <= X <= 255), got $i"
+          )
+        }
+      }
+      Base64.getEncoder.encodeToString(b.map(_.toByte))
     },
-    builtin("base64Decode", "s") { (pos, ev, s: String) =>
-      new String(Base64.getDecoder.decode(s))
+    builtin("base64Decode", "str") { (_, _, str: String) =>
+      try {
+        new String(Base64.getDecoder.decode(str))
+      } catch {
+        case e: IllegalArgumentException =>
+          Error.fail("Invalid base64 string: " + e.getMessage)
+      }
     },
-    builtin("base64DecodeBytes", "s") { (pos, ev, s: String) =>
-      Val.Arr(pos, Base64.getDecoder.decode(s).map(i => Val.Num(pos, i)))
+    builtin("base64DecodeBytes", "str") { (pos, _, str: String) =>
+      try {
+        Val.Arr(pos, Base64.getDecoder.decode(str).map(i => Val.Num(pos, i)))
+      } catch {
+        case e: IllegalArgumentException =>
+          Error.fail("Invalid base64 string: " + e.getMessage)
+      }
     },
     builtin(EncodeUTF8),
     builtin(DecodeUTF8),
@@ -1772,7 +1842,7 @@ class Std(
     builtin(ParseJson),
     builtin(ParseYaml),
     builtin(MD5),
-    builtin("prune", "x") { (pos, ev, s: Val) =>
+    builtin("prune", "a") { (pos, ev, s: Val) =>
       def filter(x: Val) = x match {
         case c: Val.Arr if c.length == 0                 => false
         case c: Val.Obj if c.visibleKeyNames.length == 0 => false
@@ -1922,7 +1992,28 @@ class Std(
     builtin(MinArray),
     builtin(MaxArray),
     builtin("primitiveEquals", "x", "y") { (_, ev, x: Val, y: Val) =>
-      x.isInstanceOf[y.type] && ev.compare(x, y) == 0
+      val xForce = x.force
+      val yForce = y.force
+      if (xForce.prettyName != yForce.prettyName) {
+        false
+      } else {
+        (xForce, yForce) match {
+          case (_: Val.Num, _: Val.Num) =>
+            ev.compare(xForce, yForce) == 0
+          case (_: Val.Str, _: Val.Str) =>
+            ev.compare(xForce, yForce) == 0
+          case (_: Val.Bool, _: Val.Bool) =>
+            ev.compare(xForce, yForce) == 0
+          case (_: Val.Null, _) =>
+            true
+          case (_, _: Val.Null) =>
+            true
+          case _ =>
+            Error.fail(
+              "primitiveEquals operates on primitive types, got " + xForce.prettyName + " and " + yForce.prettyName
+            )
+        }
+      }
     },
     builtin(Native)
   ) ++ builtinNativeFunctions

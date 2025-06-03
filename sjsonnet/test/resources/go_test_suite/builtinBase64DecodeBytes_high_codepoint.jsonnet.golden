@@ -1,0 +1,3 @@
+sjsonnet.Error: Invalid base64 string: Illegal base64 character 3f
+    at [std.base64DecodeBytes].(builtinBase64DecodeBytes_high_codepoint.jsonnet:1:22)
+

@@ -1,0 +1,3 @@
+sjsonnet.StaticError: Can't use super outside of an object
+    at [Super].(sjsonnet/test/resources/go_test_suite/insuper4.jsonnet:1:8)
+

@@ -180,8 +180,7 @@ object Format {
             case r: Val.Obj  => Materializer.apply0(r, new Renderer(indent = -1))
             case raw         => Materializer(raw)
           }
-          i += 1
-          value match {
+          val formattedValue = value match {
             case ujson.Str(s) =>
               if (formatted.conversion != 's' && formatted.conversion != 'c')
                 Error.fail("Format required a number at %d, got string".format(i))
@@ -222,6 +221,8 @@ object Format {
               }
             case v => widenRaw(formatted, v.toString)
           }
+          i += 1
+          formattedValue
       }
       output.append(cooked0)
       output.append(literal)

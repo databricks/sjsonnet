@@ -1,0 +1,3 @@
+sjsonnet.Error: Wrong parameter type: expected String, got number
+    at [std.isEmpty].(builtinIsEmpty2.jsonnet:1:12)
+

@@ -1,0 +1,4 @@
+sjsonnet.Error: Condition must be boolean, got number
+    at [IfSpec].(arrcomp_if7.jsonnet:1:23)
+    at [Comp].(arrcomp_if7.jsonnet:1:2)
+

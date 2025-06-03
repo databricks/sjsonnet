@@ -1,0 +1,4 @@
+sjsonnet.Error: x
+    at [Error].(bitwise_xor7.jsonnet:1:5)
+    at [BinaryOp ^].(bitwise_xor7.jsonnet:1:3)
+

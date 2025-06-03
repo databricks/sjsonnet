@@ -1,0 +1,3 @@
+sjsonnet.Error: expected a single character string, got aa
+    at [std.codepoint].(std.codepoint3.jsonnet:1:14)
+

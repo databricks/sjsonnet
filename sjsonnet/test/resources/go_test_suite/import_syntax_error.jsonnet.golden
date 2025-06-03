@@ -1,0 +1,4 @@
+sjsonnet.ParseError: Expected any-char:2:1, found ""
+    at .(syntax_error.jsonnet:2:1)
+    at [Import].(import_syntax_error.jsonnet:1:1)
+

@@ -49,8 +49,9 @@ object SjsonnetMain {
 
 final case class JsVirtualPath(path: String) extends Path {
   def relativeToString(p: Path): String = p match {
-    case other: JsVirtualPath if path.startsWith(other.path) => path.drop(other.path.length)
-    case _                                                   => path
+    case other: JsVirtualPath if path.startsWith(other.path) =>
+      path.drop(other.path.length).stripPrefix("/")
+    case _ => path
   }
 
   def debugRead(): Option[String] = None
@@ -61,11 +62,22 @@ final case class JsVirtualPath(path: String) extends Path {
 
   def last: String = path.split('/').last
 
-  def /(s: String): Path = JsVirtualPath(path + "/" + s)
+  def /(s: String): Path = {
+    val aStripped = path.stripSuffix("/")
+    val bStripped = s.stripPrefix("/")
+    if (aStripped.isEmpty)
+      JsVirtualPath(bStripped)
+    else if (bStripped.isEmpty)
+      JsVirtualPath(aStripped)
+    else
+      JsVirtualPath(aStripped + "/" + bStripped)
+  }
 
   def renderOffsetStr(
       offset: Int,
       loadedFileContents: mutable.HashMap[Path, Array[Int]]): String = {
     path + ":" + offset
   }
+
+  override def toString: String = path
 }

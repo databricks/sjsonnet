@@ -1,0 +1,3 @@
+sjsonnet.Error: Unknown binary operation: string - number
+    at [BinaryOp -].(string_minus_number.jsonnet:1:5)
+

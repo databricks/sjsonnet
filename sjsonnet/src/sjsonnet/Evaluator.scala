@@ -344,8 +344,8 @@ class Evaluator(
   protected def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
     def extractParam(e: Option[Expr]): Option[Int] = e.flatMap(visitExpr(_) match {
       case _: Val.Null => None
-      case v: Val.Num  => Some(v.value.toInt)
-      case v: Val      => Some(v.cast[Val.Num].value.toInt)
+      case v: Val.Num  => Some(v.asInt)
+      case v: Val      => Some(v.cast[Val.Num].asInt)
     })
 
     val indexable = visitExpr(e.value) match {
@@ -367,13 +367,17 @@ class Evaluator(
     val pos = e.pos
     (visitExpr(e.value), visitExpr(e.index)) match {
       case (v: Val.Arr, i: Val.Num) =>
-        val int = i.value.toInt
-        if (int != i.value) Error.fail("array index was not integer: " + i.value, pos)
-        if (v.length == 0) Error.fail(s"array bounds error: array is empty", pos)
+        val int = i.asPositiveInt
+        if (v.length == 0) Error.fail("array bounds error: array is empty", pos)
         if (int >= v.length)
           Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
         v.force(int)
-      case (v: Val.Str, i: Val.Num) => Val.Str(pos, new String(Array(v.value(i.value.toInt))))
+      case (v: Val.Str, i: Val.Num) =>
+        val int = i.asPositiveInt
+        if (v.value.isEmpty) Error.fail("string bounds error: string is empty", pos)
+        if (int >= v.value.length)
+          Error.fail(s"string bounds error: $int not within [0, ${v.value.length})", pos)
+        Val.Str(pos, new String(Array(v.value(int))))
       case (v: Val.Obj, i: Val.Str) =>
         v.value(i.value, pos)
       case (lhs, rhs) =>
@@ -551,8 +555,8 @@ class Evaluator(
       case Expr.BinaryOp.OP_<< =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            val ll = l.asSafeLong(pos)
-            val rr = r.asSafeLong(pos)
+            val ll = l.asSafeLong
+            val rr = r.asSafeLong
             if (rr < 0) {
               Error.fail("shift by negative exponent", pos)
             }
@@ -566,8 +570,8 @@ class Evaluator(
       case Expr.BinaryOp.OP_>> =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            val ll = l.asSafeLong(pos)
-            val rr = r.asSafeLong(pos)
+            val ll = l.asSafeLong
+            val rr = r.asSafeLong
             if (rr < 0) {
               Error.fail("shift by negative exponent", pos)
             }
@@ -584,21 +588,21 @@ class Evaluator(
       case Expr.BinaryOp.OP_& =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong(pos) & r.asSafeLong(pos)).toDouble)
+            Val.Num(pos, (l.asSafeLong & r.asSafeLong).toDouble)
           case _ => fail()
         }
 
       case Expr.BinaryOp.OP_^ =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong(pos) ^ r.asSafeLong(pos)).toDouble)
+            Val.Num(pos, (l.asSafeLong ^ r.asSafeLong).toDouble)
           case _ => fail()
         }
 
       case Expr.BinaryOp.OP_| =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong(pos) | r.asSafeLong(pos)).toDouble)
+            Val.Num(pos, (l.asSafeLong | r.asSafeLong).toDouble)
           case _ => fail()
         }
 
@@ -838,7 +842,7 @@ class Evaluator(
 
   def compare(x: Val, y: Val): Int = (x, y) match {
     case (_: Val.Null, _: Val.Null) => 0
-    case (x: Val.Num, y: Val.Num)   => x.value.compareTo(y.value)
+    case (x: Val.Num, y: Val.Num)   => x.asDouble.compareTo(y.asDouble)
     case (x: Val.Str, y: Val.Str)   => x.value.compareTo(y.value)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
     case (x: Val.Arr, y: Val.Arr) =>
@@ -864,7 +868,7 @@ class Evaluator(
       }
     case x: Val.Num =>
       y match {
-        case y: Val.Num => x.value == y.value
+        case y: Val.Num => x.asDouble == y.asDouble
         case _          => false
       }
     case x: Val.Arr =>

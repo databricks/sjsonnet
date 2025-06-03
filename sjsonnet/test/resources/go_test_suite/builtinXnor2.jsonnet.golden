@@ -1,0 +1,3 @@
+sjsonnet.Error: Wrong parameter type: expected Boolean, got string
+    at [std.xnor].(builtinXnor2.jsonnet:1:9)
+

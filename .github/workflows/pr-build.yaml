@@ -12,9 +12,6 @@ jobs:
       matrix:
         lang: ['jvm', 'js', 'native']
         java: ['17', '21']
-    env:
-      # Set LANG=C to simulate least-common-denominator target deployment environments:
-      LANG: C
     name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v4

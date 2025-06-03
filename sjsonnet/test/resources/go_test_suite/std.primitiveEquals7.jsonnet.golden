@@ -1,0 +1,3 @@
+sjsonnet.Error: primitiveEquals operates on primitive types, got function and function
+    at [std.primitiveEquals].(std.primitiveEquals7.jsonnet:1:20)
+
