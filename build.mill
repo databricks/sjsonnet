@@ -88,55 +88,59 @@ object sjsonnet extends Module {
     )
     object test extends ScalaJSTests with CrossTests {
       def jsEnvConfig = JsEnvConfig.NodeJs(args = List("--stack-size=" + stackSizekBytes))
+      def resources = T.sources(
+        this.millSourcePath / "resources" / "test_suite",
+        this.millSourcePath / "resources" / "go_test_suite"
+      )
       def generatedSources = T {
-        val files = os
-          .walk(this.millSourcePath / "resources")
-          .filterNot(os.isDir)
-          .map(p => p.relativeTo(this.millSourcePath / "resources") -> os.read.bytes(p))
-          .toMap
-        os.write(
-          T.ctx().dest / "TestResources.scala",
-          s"""package sjsonnet
-             |
-             |object TestResources{
-             |  val files = Map(
-             |""".stripMargin
-        )
-        for ((k, v) <- files) {
-          val name = k.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
-          val values = Base64.getEncoder().encodeToString(v).grouped(65535).toSeq
-          os.write(
-            T.ctx().dest / s"$name.scala",
-            s"""package sjsonnet
-               |
-               |import java.util.Base64
-               |
-               |object $name {
-               |  def contentArr = Seq(
-               |    ${values.map("\"" + _ + "\"").mkString(",\n    ")}
-               |  )
-               |  def content = Base64.getDecoder().decode(contentArr.mkString)
+        resources().map(_.path).flatMap { testSuite =>
+          val fileNames = os.walk(testSuite).filter(os.isFile).map { k =>
+            val name = k.relativeTo(testSuite).toString
+              .replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
+            val values = Base64.getEncoder().encodeToString(os.read.bytes(k)).grouped(65535).toSeq
+            val fName = T.ctx().dest / s"${testSuite.last}_$name.scala"
+            os.write.over(
+              fName,
+              s"""package sjsonnet
+                 |
+                 |import java.util.Base64
+                 |
+                 |object ${testSuite.last}_$name {
+                 |  def contentArr = Seq(
+                 |    ${values.map("\"" + _ + "\"").mkString(",\n    ")}
+                 |  )
+                 |  def content() = Base64.getDecoder().decode(contentArr.mkString)
+                 |}
+                 |""".stripMargin
+            )
+            k -> fName
+          }.toMap
+
+          val testSuiteClassPath = T.ctx().dest / s"TestResources_${testSuite.last}.scala"
+          os.write.over(
+              testSuiteClassPath,
+              s"""package sjsonnet
+                 |
+                 |object TestResources_${testSuite.last}{
+                 |  val files: Map[String, () => Array[Byte]] = Map(
+                 |""".stripMargin
+          )
+          for ( (k, fName) <- fileNames) {
+            os.write.append(
+              testSuiteClassPath,
+              s"""    "${k.relativeTo(testSuite)}" -> ${fName.baseName}.content _,
+                 |""".stripMargin
+            )
+          }
+          os.write.append(
+            testSuiteClassPath,
+            s"""  )
                |}
                |""".stripMargin
           )
-          os.write.append(
-            T.ctx().dest / "TestResources.scala",
-            s"""    "$k" -> $name.content,
-               |""".stripMargin
-          )
+
+          Seq(PathRef(testSuiteClassPath)) ++ fileNames.values.map(k => PathRef(k))
         }
-        os.write.append(
-          T.ctx().dest / "TestResources.scala",
-          s"""  )
-             |}
-             |""".stripMargin
-        )
-        Seq(PathRef(T.ctx().dest / "TestResources.scala")) ++ files.keys.map(p =>
-          PathRef(
-            T.ctx()
-              .dest / s"${p.toString.replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")}.scala"
-          )
-        )
       }
     }
   }

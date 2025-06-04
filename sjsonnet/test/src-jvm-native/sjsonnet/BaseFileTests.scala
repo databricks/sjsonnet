@@ -7,11 +7,47 @@ abstract class BaseFileTests extends TestSuite {
   val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   private val stderr = new StringBuffer()
+  private val std = new Std(
+    additionalNativeFunctions = Map(
+      "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
+        override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
+          Val.Str(
+            pos,
+            Materializer
+              .apply0(
+                arg1.force,
+                MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
+              )(ev)
+              .toString
+          )
+        }
+      },
+      "nativeError" -> new Val.Builtin0("nativeError") {
+        override def evalRhs(ev: EvalScope, pos: Position): Val =
+          Error.fail("native function error")
+      },
+      "nativePanic" -> new Val.Builtin0("nativePanic") {
+        override def evalRhs(ev: EvalScope, pos: Position): Val =
+          throw new RuntimeException("native function panic")
+      }
+    )
+  )
 
   def eval(p: os.Path, testSuite: String): Either[String, Value] = {
     stderr.setLength(0)
     val interp = new Interpreter(
-      Map("var1" -> "\"test\"", "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)"""),
+      Map(
+        "var1" -> "\"test\"",
+        "var2" -> """local f(a, b) = {[a]: b, "y": 2}; f("x", 1)""",
+        "stringVar" -> """"2 + 2"""",
+        "codeVar" -> "3 + 3",
+        "errorVar" -> "error 'xxx'",
+        "staticErrorVar" -> ")",
+        "UndeclaredX" -> "x",
+        "selfRecursiveVar" -> """[42, std.extVar("selfRecursiveVar")[0] + 1]""",
+        "mutuallyRecursiveVar1" -> """[42, std.extVar("mutuallyRecursiveVar2")[0] + 1]""",
+        "mutuallyRecursiveVar2" -> """[42, std.extVar("mutuallyRecursiveVar1")[0] + 1]"""
+      ),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
       OsPath(testSuiteRoot / testSuite),
       importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path].toIndexedSeq),
@@ -26,19 +62,26 @@ abstract class BaseFileTests extends TestSuite {
         strictImportSyntax = true,
         strictInheritedAssertions = true,
         strictSetOperations = true
-      )
+      ),
+      std = std.Std
     )
     interp.interpret(os.read(p), OsPath(p))
   }
 
   def check(fileName: os.Path, testSuite: String): Unit = {
     println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
-    val goldenContent = os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
+    val goldenContent =
+      if (isScalaNative && os.exists(os.Path(fileName.toString + ".golden_native"))) {
+        os.read(os.Path(fileName.toString + ".golden_native")).stripLineEnd
+      } else {
+        os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
+      }
     if (
       goldenContent.startsWith("sjsonnet.Error") ||
       goldenContent.startsWith("sjsonnet.ParseError") ||
       goldenContent.startsWith("sjsonnet.StaticError") ||
-      goldenContent.contains("java.lang.StackOverflowError")
+      goldenContent.contains("java.lang.StackOverflowError") ||
+      goldenContent.startsWith("RUNTIME ERROR")
     ) {
       checkError(fileName, goldenContent, testSuite)
     } else {
@@ -49,9 +92,14 @@ abstract class BaseFileTests extends TestSuite {
         assert(stderr.toString.isEmpty)
       } catch {
         case e: ujson.ParsingFailedException =>
-          if (goldenContent.contains(stderr.toString.stripLineEnd)) {
+          if (
+            res.isRight && stderr.toString.stripLineEnd.nonEmpty && goldenContent.contains(
+              stderr.toString.stripLineEnd
+            )
+          ) {
             assert(true)
           } else {
+            println(res.left.getOrElse(""))
             assert(e.getMessage == goldenContent.stripLineEnd)
           }
       }
@@ -66,12 +114,15 @@ abstract class BaseFileTests extends TestSuite {
       res = eval(fileName, testSuite)
       assert(res.isLeft)
       val actual = res.left.getOrElse("")
-      assert(actual.strip() == expected)
+      if (fileName.last == "native_panic.jsonnet")
+        assert(actual.strip().contains(expected))
+      else
+        assert(actual.strip() == expected)
     } catch {
       case _: java.lang.StackOverflowError =>
         assert(expected.contains("StackOverflowError"))
       case e: sjsonnet.Error =>
-        assert(expected.contains(e.getMessage.stripLineEnd))
+        assert(expected.contains(e.getMessage.strip()))
     }
   }
 

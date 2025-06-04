@@ -48,7 +48,7 @@ object Error {
     val ste: StackTraceElement = {
       val cl = if (exprErrorString == null) "" else s"[$exprErrorString]"
       val (frameFile, frameLine) = ev.prettyIndex(pos) match {
-        case None              => (pos.currentFile.relativeToString(ev.wd) + " offset:", pos.offset)
+        case None              => (pos.currentFile.relativeToString(ev.wd) + " offset", pos.offset)
         case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col)
       }
       new StackTraceElement(cl, "", frameFile, frameLine)

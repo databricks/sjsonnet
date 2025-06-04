@@ -1427,14 +1427,14 @@ class Std(
     builtin("mantissa", "x") { (pos, ev, x: Double) =>
       if (x == 0) 0
       else {
-        val exponent = (Math.log(x) / Math.log(2)).toLong + 1
+        val exponent = Math.floor((Math.log(Math.abs(x)) / Math.log(2)) + 1).toLong
         x * Math.pow(2.0, (-exponent).toDouble)
       }
     },
     builtin("exponent", "x") { (pos, ev, x: Double) =>
       if (x == 0) 0L
       else {
-        (Math.log(x) / Math.log(2)).toLong + 1
+        Math.floor((Math.log(Math.abs(x)) / Math.log(2)) + 1).toLong
       }
     },
     builtin(IsString),
