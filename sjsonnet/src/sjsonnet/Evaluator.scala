@@ -792,7 +792,7 @@ class Evaluator(
               }
             }
           )
-          if (prev_length == builder.size() && settings.noDuplicateKeysInComprehension) {
+          if (prev_length == builder.size()) {
             Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
           }
         case Val.Null(_) => // do nothing

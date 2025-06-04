@@ -201,7 +201,6 @@ class CachedImporter(parent: Importer) extends Importer {
 class CachedResolver(
     parentImporter: Importer,
     val parseCache: ParseCache,
-    strictImportSyntax: Boolean,
     internedStrings: mutable.HashMap[String, String],
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
@@ -215,7 +214,7 @@ class CachedResolver(
       (path, content.contentHash()), {
         val parsed = fastparse.parse(
           content.getParserInput(),
-          new Parser(path, strictImportSyntax, internedStrings, internedStaticFieldSets).document(_)
+          new Parser(path, internedStrings, internedStaticFieldSets).document(_)
         ) match {
           case f @ Parsed.Failure(_, _, _) =>
             val traced = f.trace()

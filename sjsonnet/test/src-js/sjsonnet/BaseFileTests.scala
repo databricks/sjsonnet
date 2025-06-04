@@ -89,8 +89,6 @@ abstract class BaseFileTests extends TestSuite {
       },
       parseCache = new DefaultParseCache,
       settings = new Settings(
-        noDuplicateKeysInComprehension = true,
-        strictImportSyntax = true,
         strictInheritedAssertions = true,
         strictSetOperations = true
       ),
