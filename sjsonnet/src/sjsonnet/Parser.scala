@@ -70,7 +70,6 @@ object Parser {
 
 class Parser(
     val currentFile: Path,
-    strictImportSyntax: Boolean,
     internedStrings: mutable.HashMap[String, String],
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
@@ -312,12 +311,10 @@ class Parser(
   def error[$: P](pos: Position): P[Expr.Error] = P(expr.map(Expr.Error(pos, _)))
 
   def importExpr[$: P]: P[String] = P(
-    if (!strictImportSyntax) string
-    else
-      expr.flatMap {
-        case Val.Str(_, s) => Pass(s)
-        case _             => Fail.opaque("string literal (computed imports are not allowed)")
-      }
+    expr.flatMap {
+      case Val.Str(_, s) => Pass(s)
+      case _             => Fail.opaque("string literal (computed imports are not allowed)")
+    }
   )
 
   def unaryOpExpr[$: P](pos: Position, op: Char): P[Expr.UnaryOp] = P(

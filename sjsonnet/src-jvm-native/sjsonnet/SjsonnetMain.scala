@@ -273,8 +273,6 @@ object SjsonnetMain {
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
         noStaticErrors = config.noStaticErrors.value,
-        noDuplicateKeysInComprehension = config.noDuplicateKeysInComprehension.value,
-        strictImportSyntax = config.strictImportSyntax.value,
         strictInheritedAssertions = config.strictInheritedAssertions.value,
         strictSetOperations = config.strictSetOperations.value,
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value

@@ -58,8 +58,6 @@ abstract class BaseFileTests extends TestSuite {
         }
       },
       settings = new Settings(
-        noDuplicateKeysInComprehension = true,
-        strictImportSyntax = true,
         strictInheritedAssertions = true,
         strictSetOperations = true
       ),

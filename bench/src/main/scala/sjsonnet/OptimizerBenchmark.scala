@@ -25,7 +25,7 @@ class OptimizerBenchmark {
     this.inputs = allFiles.map { case (p, s) =>
       fastparse.parse(
         s,
-        new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
+        new Parser(p, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
       ) match {
         case Success(v, _) => v
         case f: fastparse.Parsed.Failure =>

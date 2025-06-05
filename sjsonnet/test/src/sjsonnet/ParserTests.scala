@@ -7,18 +7,18 @@ import fastparse.Parsed
 import Val.{Num, True}
 import sjsonnet.Expr.FieldName.Fixed
 object ParserTests extends TestSuite {
-  def parse(s: String, strictImportSyntax: Boolean = false): Expr = fastparse
+  def parse(s: String): Expr = fastparse
     .parse(
       s,
-      new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
+      new Parser(null, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
     )
     .get
     .value
     ._1
-  def parseErr(s: String, strictImportSyntax: Boolean = false): String = fastparse
+  def parseErr(s: String): String = fastparse
     .parse(
       s,
-      new Parser(null, strictImportSyntax, mutable.HashMap.empty, mutable.HashMap.empty)
+      new Parser(null, mutable.HashMap.empty, mutable.HashMap.empty)
         .document(_),
       verboseFailures = true
     )
@@ -101,23 +101,12 @@ object ParserTests extends TestSuite {
         Num(pos(34), 0.0)
       )
 
-      parse("""import "foo".bar""", strictImportSyntax = false) ==> Select(
-        pos(12),
-        Import(pos(0), "foo"),
-        "bar"
-      )
-      parse("""import "foo"[1]""", strictImportSyntax = false) ==> Lookup(
-        pos(12),
-        Import(pos(0), "foo"),
-        Num(pos(13), 1)
-      )
+      parseErr("""import "foo".bar""")
+      parseErr("""import "foo"[1]""")
 
-      parseErr("""import "foo".bar""", strictImportSyntax = true)
-      parseErr("""import "foo"[1]""", strictImportSyntax = true)
-
-      parseErr("""local foo = import ("foo" + bar); 0""", strictImportSyntax = true) ==>
+      parseErr("""local foo = import ("foo" + bar); 0""") ==>
       """Expected string literal (computed imports are not allowed):1:33, found "; 0""""
-      parseErr("""local foo = import "foo" + bar; 0""", strictImportSyntax = true) ==>
+      parseErr("""local foo = import "foo" + bar; 0""") ==>
       """Expected string literal (computed imports are not allowed):1:31, found "; 0""""
     }
 

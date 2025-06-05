@@ -7,7 +7,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      noDuplicateKeysInComprehension: Boolean = false,
       strictInheritedAssertions: Boolean = false,
       strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): Either[String, Value] = {
@@ -20,7 +19,6 @@ object TestUtils {
       new Settings(
         preserveOrder = preserveOrder,
         strict = strict,
-        noDuplicateKeysInComprehension = noDuplicateKeysInComprehension,
         strictInheritedAssertions = strictInheritedAssertions,
         strictSetOperations = strictSetOperations,
         throwErrorForInvalidSets = true,
@@ -33,7 +31,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      noDuplicateKeysInComprehension: Boolean = false,
       strictInheritedAssertions: Boolean = false,
       strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): Value = {
@@ -41,7 +38,6 @@ object TestUtils {
       s,
       preserveOrder,
       strict,
-      noDuplicateKeysInComprehension,
       strictInheritedAssertions,
       strictSetOperations,
       useNewEvaluator
@@ -55,7 +51,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      noDuplicateKeysInComprehension: Boolean = false,
       strictInheritedAssertions: Boolean = false,
       strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): String = {
@@ -63,7 +58,6 @@ object TestUtils {
       s,
       preserveOrder,
       strict,
-      noDuplicateKeysInComprehension,
       strictInheritedAssertions,
       strictSetOperations,
       useNewEvaluator

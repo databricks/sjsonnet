@@ -27,7 +27,7 @@ class ParserBenchmark {
     bh.consume(allFiles.foreach { case (p, s) =>
       val res = fastparse.parse(
         s,
-        new Parser(p, true, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
+        new Parser(p, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
       )
       bh.consume(res.asInstanceOf[Success[?]])
     })

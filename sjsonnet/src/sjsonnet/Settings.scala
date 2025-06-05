@@ -8,8 +8,6 @@ class Settings(
     val preserveOrder: Boolean = false,
     val strict: Boolean = false,
     val noStaticErrors: Boolean = false,
-    val noDuplicateKeysInComprehension: Boolean = false,
-    val strictImportSyntax: Boolean = false,
     val strictInheritedAssertions: Boolean = false,
     val strictSetOperations: Boolean = false,
     val throwErrorForInvalidSets: Boolean = false,

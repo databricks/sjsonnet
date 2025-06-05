@@ -62,7 +62,6 @@ class Interpreter(
   private def createResolver(parseCache: ParseCache) = new CachedResolver(
     importer,
     parseCache,
-    settings.strictImportSyntax,
     internedStrings,
     internedStaticFieldSets
   ) {
