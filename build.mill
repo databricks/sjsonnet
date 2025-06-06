@@ -1,20 +1,22 @@
-import mill._, scalalib._, publish._, scalajslib._, scalanativelib._, scalanativelib.api._,
-  scalajslib.api._, scalafmt._
-import scalalib.api.ZincWorkerUtil
+import mill._
+import scalalib._
+import publish._
+import scalajslib._
+import scalanativelib._
+import scalanativelib.api._
+import scalajslib.api._
+import scalafmt._
+import scalalib.api.JvmWorkerUtil
 import $ivy.`com.lihaoyi::mill-contrib-jmh:`
+import $ivy.`com.lihaoyi::mill-contrib-versionfile:`
+import contrib.versionfile.VersionFileModule
 import contrib.jmh.JmhModule
+
 import java.util.Base64
-
-val sjsonnetVersion = os.read(mill.api.WorkspaceRoot.workspaceRoot / "VERSION").trim
-val scalaVersions =
-  os.read(mill.api.WorkspaceRoot.workspaceRoot / "SCALA_VERSIONS").trim.split(" ").map(_.trim).toSeq
-
-val stackSize = "100m"
-val stackSizekBytes = 100 * 1024
 
 trait SjsonnetPublishModule extends PublishModule {
   def artifactName = "sjsonnet"
-  def publishVersion = sjsonnetVersion
+  def publishVersion = sjsonnet.currentVersion().toString
 
   def pomSettings = PomSettings(
     description = artifactName(),
@@ -43,14 +45,14 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
       T.ctx().dest / "Version.scala",
       s"""package sjsonnet
           |object Version{
-          |  val version = ${pprint.Util.literalize(sjsonnetVersion)}
+          |  val version = ${pprint.Util.literalize(sjsonnet.currentVersion().toString)}
           |}
           |""".stripMargin
     )
     Seq(PathRef(T.ctx().dest / "Version.scala"))
   }
   def scalacOptions = Seq("-deprecation", "-Werror") ++ (
-    if (!ZincWorkerUtil.isScala3(scalaVersion()))
+    if (!JvmWorkerUtil.isScala3(scalaVersion()))
       Seq(
         "-opt:l:inline",
         "-feature",
@@ -75,12 +77,15 @@ trait SjsonnetJvmNative extends ScalaModule {
   )
 }
 
-object sjsonnet extends Module {
+object sjsonnet extends VersionFileModule {
+  private val scalaVersions = Seq("3.3.6", "2.13.16", "2.12.20")
+  private val stackSize = "100m"
+  private val stackSizekBytes = 100 * 1024
+
   object js extends Cross[SjsonnetJsModule](scalaVersions)
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def millSourcePath = super.millSourcePath / os.up
     def scalaJSVersion = "1.17.0"
-    def esVersion = ESVersion.ES2018
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-js",
@@ -97,7 +102,7 @@ object sjsonnet extends Module {
           val fileNames = os.walk(testSuite).filter(os.isFile).map { k =>
             val name = k.relativeTo(testSuite).toString
               .replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
-            val values = Base64.getEncoder().encodeToString(os.read.bytes(k)).grouped(65535).toSeq
+            val values = Base64.getEncoder.encodeToString(os.read.bytes(k)).grouped(65535).toSeq
             val fName = T.ctx().dest / s"${testSuite.last}_$name.scala"
             os.write.over(
               fName,
@@ -224,7 +229,7 @@ object sjsonnet extends Module {
       override def prependShellScript = mill.util.Jvm.universalScript(
         shellCommands = {
           def java(mainClass: String) =
-            s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=$sjsonnetVersion $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
+            s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=${sjsonnet.currentVersion().toString} $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
 
           s"""case "$$1" in
               |  -i | --interactive )
@@ -237,7 +242,7 @@ object sjsonnet extends Module {
         },
         cmdCommands = {
           def java(mainClass: String) =
-            s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=$sjsonnetVersion %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
+            s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=${sjsonnet.currentVersion().toString} %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
 
           s"""if "%1" == "-i" set _I_=true
               |if "%1" == "--interactive" set _I_=true
