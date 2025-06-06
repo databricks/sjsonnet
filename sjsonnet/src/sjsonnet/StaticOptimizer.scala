@@ -2,8 +2,8 @@ package sjsonnet
 
 import scala.collection.mutable
 
-import Expr._
-import ScopedExprTransform._
+import Expr.*
+import ScopedExprTransform.*
 
 /**
  * StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope indices)
@@ -24,18 +24,6 @@ class StaticOptimizer(
     ])
     extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
-
-  def failOrWarn(msg: String, expr: Expr): Expr = {
-    val e = new StaticError(
-      msg,
-      new sjsonnet.Error.Frame(expr.pos, expr.exprErrorString)(ev) :: Nil,
-      None
-    )
-    if (ev.settings.noStaticErrors) {
-      ev.warn(e)
-      expr
-    } else throw e
-  }
 
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
@@ -58,31 +46,35 @@ class StaticOptimizer(
 
     case e @ Id(pos, name) =>
       scope.get(name) match {
-        case ScopedVal(v: (Val with Expr), _, _) => v
-        case ScopedVal(_, _, idx)                => ValidId(pos, name, idx)
-        case null if name == f"$$std"            => std
-        case null if name == "std"               => std
+        case ScopedVal(v: Val with Expr, _, _) => v
+        case ScopedVal(_, _, idx)              => ValidId(pos, name, idx)
+        case null if name == f"$$std"          => std
+        case null if name == "std"             => std
         case null =>
           variableResolver(name) match {
             case Some(v) => v // additional variable resolution
-            case None    => failOrWarn("Unknown variable: " + name, e)
+            case None =>
+              StaticError.fail(
+                "Unknown variable: " + name,
+                e
+              )(ev)
           }
       }
 
     case e @ Self(pos) =>
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
-        case _ => failOrWarn("Can't use self outside of an object", e)
+        case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
       }
 
     case e @ $(pos) =>
       scope.get("$") match {
         case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
-        case _                                 => failOrWarn("Can't use $ outside of an object", e)
+        case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
       }
 
     case e @ Super(_) if !scope.contains("super") =>
-      failOrWarn("Can't use super outside of an object", e)
+      StaticError.fail("Can't use super outside of an object", e)(ev)
 
     case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
       Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
@@ -95,7 +87,7 @@ class StaticOptimizer(
     case e => e
   }
 
-  object ValidSuper {
+  private object ValidSuper {
     def unapply(s: Super): Option[(Position, Int)] =
       scope.get("self") match {
         case ScopedVal(v, _, idx) if v != null => Some((s.pos, idx))
@@ -105,7 +97,7 @@ class StaticOptimizer(
 
   private def check(e: Expr): Expr = {
     e match {
-      case ObjExtend(pos, base, ext) if ev.settings.strict && isObjLiteral(base) =>
+      case ObjExtend(_, base, _) if ev.settings.strict && isObjLiteral(base) =>
         StaticError.fail(
           "Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects",
           e
@@ -206,7 +198,7 @@ class StaticOptimizer(
           }
       }
 
-    case ValidId(_, name, nameIdx) =>
+    case ValidId(_, name, _) =>
       scope.get(name) match {
         case ScopedVal(Function(_, params, _), _, _) =>
           rebind(args, names, params) match {
@@ -246,8 +238,8 @@ class StaticOptimizer(
     while (i < target.length) {
       if (target(i) == null) {
         params.defaultExprs(i) match {
-          case v: (Val with Expr) => target(i) = v
-          case _                  => return null // no default or non-constant
+          case v: Val with Expr => target(i) = v
+          case _                => return null // no default or non-constant
         }
       }
       i += 1

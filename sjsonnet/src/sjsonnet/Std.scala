@@ -1762,8 +1762,8 @@ class Std(
     builtin(Set_),
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
-        val a = toSetArrOrString(args, 0, pos, ev)
-        val b = toSetArrOrString(args, 1, pos, ev)
+        val a = toSetArr(args, 0, pos, ev)
+        val b = toSetArr(args, 1, pos, ev)
         if (a.isEmpty) {
           uniqArr(pos, ev, sortArr(pos, ev, args(1), args(2)), args(2))
         } else if (b.isEmpty) {
@@ -1779,26 +1779,19 @@ class Std(
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
-        val a = toSetArrOrString(args, 0, pos, ev)
-        val b = toSetArrOrString(args, 1, pos, ev)
+        val a = toSetArr(args, 0, pos, ev)
+        val b = toSetArr(args, 1, pos, ev)
 
         val out = new mutable.ArrayBuffer[Lazy]
 
         // The intersection will always be, at most, the size of the smallest set.
         val sets = if (b.length < a.length) (b, a) else (a, b)
         for (v <- sets._1) {
-          if (
-            existsInSet(ev, pos, keyF, sets._2, v.force) &&
-            (ev.settings.strictSetOperations || !existsInSet(ev, pos, keyF, out, v.force))
-          ) {
+          if (existsInSet(ev, pos, keyF, sets._2, v.force)) {
             out.append(v)
           }
         }
-        if (ev.settings.strictSetOperations) {
-          Val.Arr(pos, out.toArray)
-        } else {
-          sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
-        }
+        Val.Arr(pos, out.toArray)
     },
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
@@ -1806,24 +1799,16 @@ class Std(
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
-        val a = toSetArrOrString(args, 0, pos, ev)
-        val b = toSetArrOrString(args, 1, pos, ev)
+        val a = toSetArr(args, 0, pos, ev)
+        val b = toSetArr(args, 1, pos, ev)
         val out = new mutable.ArrayBuffer[Lazy]
 
         for (v <- a) {
-          if (
-            !existsInSet(ev, pos, keyF, b, v.force) &&
-            (ev.settings.strictSetOperations || !existsInSet(ev, pos, keyF, out, v.force))
-          ) {
+          if (!existsInSet(ev, pos, keyF, b, v.force)) {
             out.append(v)
           }
         }
-
-        if (ev.settings.strictSetOperations) {
-          Val.Arr(pos, out.toArray)
-        } else {
-          sortArr(pos, ev, Val.Arr(pos, out.toArray), keyF)
-        }
+        Val.Arr(pos, out.toArray)
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
@@ -2023,14 +2008,10 @@ class Std(
     "Conflicting std functions"
   )
 
-  private def toSetArrOrString(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
+  private def toSetArr(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
     args(idx) match {
       case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str if !ev.settings.strictSetOperations =>
-        stringChars(pos, str.value).asLazyArray
-      case _ if !ev.settings.strictSetOperations =>
-        Error.fail(f"Argument $idx must be either arrays or strings")
-      case _ => Error.fail(f"Argument $idx must be an array")
+      case _            => Error.fail(f"Argument $idx must be an array", pos)(ev)
     }
   }
 
@@ -2046,14 +2027,7 @@ class Std(
     if (ev.settings.throwErrorForInvalidSets) {
       val sorted = uniqArr(pos.noOffset, ev, sortArr(pos.noOffset, ev, arr, keyF), keyF)
       if (!ev.equal(arr, sorted)) {
-        val err = new Error(
-          "Set operation on " + arr.force.prettyName + " was called with a non-set"
-        )
-        if (ev.settings.strictSetOperations) {
-          throw err
-        } else {
-          ev.warn(err)
-        }
+        Error.fail("Set operation on " + arr.force.prettyName + " was called with a non-set")
       }
     }
   }
@@ -2068,27 +2042,16 @@ class Std(
       case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev, TailstrictModeDisabled)
       case _                  => toFind
     }
-    if (ev.settings.strictSetOperations) {
-      arr
-        .search(appliedX.force)((toFind: Lazy, value: Lazy) => {
-          val appliedValue = keyF match {
-            case keyFFunc: Val.Func =>
-              keyFFunc.apply1(value, pos.noOffset)(ev, TailstrictModeDisabled)
-            case _ => value
-          }
-          ev.compare(toFind.force, appliedValue.force)
-        })
-        .isInstanceOf[Found]
-    } else {
-      arr.exists(value => {
+    arr
+      .search(appliedX.force)((toFind: Lazy, value: Lazy) => {
         val appliedValue = keyF match {
           case keyFFunc: Val.Func =>
             keyFFunc.apply1(value, pos.noOffset)(ev, TailstrictModeDisabled)
           case _ => value
         }
-        ev.equal(appliedValue.force, appliedX.force)
+        ev.compare(toFind.force, appliedValue.force)
       })
-    }
+      .isInstanceOf[Found]
   }
 
   val Std: Val.Obj = Val.Obj.mk(

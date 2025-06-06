@@ -88,10 +88,7 @@ abstract class BaseFileTests extends TestSuite {
         }
       },
       parseCache = new DefaultParseCache,
-      settings = new Settings(
-        strictInheritedAssertions = true,
-        strictSetOperations = true
-      ),
+      settings = new Settings(),
       std = std.Std
     )
 

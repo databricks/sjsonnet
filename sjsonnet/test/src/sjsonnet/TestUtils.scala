@@ -7,8 +7,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      strictInheritedAssertions: Boolean = false,
-      strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): Either[String, Value] = {
     new Interpreter(
       Map(),
@@ -19,8 +17,6 @@ object TestUtils {
       new Settings(
         preserveOrder = preserveOrder,
         strict = strict,
-        strictInheritedAssertions = strictInheritedAssertions,
-        strictSetOperations = strictSetOperations,
         throwErrorForInvalidSets = true,
         useNewEvaluator = useNewEvaluator
       )
@@ -31,15 +27,11 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      strictInheritedAssertions: Boolean = false,
-      strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): Value = {
     eval0(
       s,
       preserveOrder,
       strict,
-      strictInheritedAssertions,
-      strictSetOperations,
       useNewEvaluator
     ) match {
       case Right(x) => x
@@ -51,15 +43,11 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      strictInheritedAssertions: Boolean = false,
-      strictSetOperations: Boolean = true,
       useNewEvaluator: Boolean = false): String = {
     eval0(
       s,
       preserveOrder,
       strict,
-      strictInheritedAssertions,
-      strictSetOperations,
       useNewEvaluator
     ) match {
       case Left(err) =>
