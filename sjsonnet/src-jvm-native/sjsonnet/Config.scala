@@ -119,11 +119,6 @@ final case class Config(
     )
     yamlDebug: Flag = Flag(),
     @arg(
-      name = "no-static-errors",
-      doc = "Turn static errors into warnings"
-    )
-    noStaticErrors: Flag = Flag(),
-    @arg(
       name = "fatal-warnings",
       doc = "Fail if any warnings were emitted"
     )

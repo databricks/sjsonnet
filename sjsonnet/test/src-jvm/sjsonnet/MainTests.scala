@@ -1,17 +1,17 @@
 package sjsonnet
 
-import utest._
+import utest.*
 
 import java.io.{ByteArrayOutputStream, File, PrintStream}
-import java.util.Arrays
+import java.util
 
 object MainTests extends TestSuite {
-  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
+  val workspaceRoot: os.Path = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   // stdout mode uses println so it has an extra platform-specific line separator at the end
-  val eol: String = System.getProperty("line.separator")
+  val eol: String = java.lang.System.lineSeparator()
 
-  val tests = Tests {
+  val tests: Tests = Tests {
     // Compare writing to stdout with writing to a file
     test("writeToFile") {
       val source = testSuiteRoot / "test_suite" / "local.jsonnet"
@@ -42,17 +42,16 @@ object MainTests extends TestSuite {
 
       // println(stdoutBytes.map(_.toInt).mkString(","))
       // println(fileBytes.map(_.toInt).mkString(","))
-      assert(Arrays.equals(fileBytes ++ eol.getBytes, stdoutBytes))
+      assert(util.Arrays.equals(fileBytes ++ eol.getBytes, stdoutBytes))
     }
 
     test("warnings") {
       val source = testSuiteRoot / "db" / "unused_illegal_var.jsonnet"
       val (res1, out1, err1) = runMain(source)
-      val (res2, out2, err2) = runMain("--no-static-errors", source)
-      val (res3, out3, err3) = runMain("--no-static-errors", "--fatal-warnings", source)
-      assert(res1 == 1, res2 == 0, res3 == 1)
-      assert(out1.isEmpty, out2 == "true" + eol, out3.isEmpty)
-      assert(!err1.isEmpty, !err2.isEmpty, !err3.isEmpty)
+      val (res3, out3, err3) = runMain("--fatal-warnings", source)
+      assert(res1 == 1, res3 == 1)
+      assert(out1.isEmpty, out3.isEmpty)
+      assert(err1.nonEmpty, err3.nonEmpty)
     }
 
     val streamedOut =

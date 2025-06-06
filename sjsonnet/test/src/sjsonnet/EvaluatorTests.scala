@@ -700,18 +700,8 @@ object EvaluatorTests extends TestSuite {
         assert(
           evalErr(
             problematicStrictInheritedAssertionsSnippet,
-            strictInheritedAssertions = true,
             useNewEvaluator = useNewEvaluator
           ).contains("sjsonnet.Error: Assertion failed")
-        )
-
-        assert(
-          eval(
-            problematicStrictInheritedAssertionsSnippet,
-            strictInheritedAssertions = false,
-            useNewEvaluator = useNewEvaluator
-          ) ==
-          ujson.Obj("a" -> ujson.Obj("flag" -> true), "b" -> ujson.Obj("flag" -> false))
         )
       }
     }

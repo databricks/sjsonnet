@@ -57,10 +57,7 @@ abstract class BaseFileTests extends TestSuite {
           stderr.append(msg).append("\n")
         }
       },
-      settings = new Settings(
-        strictInheritedAssertions = true,
-        strictSetOperations = true
-      ),
+      settings = new Settings(),
       std = std.Std
     )
     interp.interpret(os.read(p), OsPath(p))

@@ -272,9 +272,6 @@ object SjsonnetMain {
       settings = new Settings(
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
-        noStaticErrors = config.noStaticErrors.value,
-        strictInheritedAssertions = config.strictInheritedAssertions.value,
-        strictSetOperations = config.strictSetOperations.value,
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value
       ),
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
