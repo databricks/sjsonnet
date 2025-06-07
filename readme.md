@@ -9,6 +9,7 @@ Sjsonnet can be used from Java and Scala:
 <dependency>
     <groupId>com.databricks</groupId>
     <artifactId>sjsonnet_3</artifactId>
+    <version>${sjsonnet.version}</version>
 </dependency>
 ```
 
