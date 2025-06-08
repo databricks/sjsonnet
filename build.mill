@@ -157,7 +157,7 @@ object sjsonnet extends VersionFileModule {
       with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def millSourcePath = super.millSourcePath / os.up
-    def scalaNativeVersion = "0.5.7"
+    def scalaNativeVersion = "0.5.8"
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-native",
