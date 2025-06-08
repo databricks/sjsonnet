@@ -55,8 +55,11 @@ object Platform {
   def sha3(s: String): String = computeHash("SHA3-512", s)
 
   def hashFile(file: File): String = {
-    // File hashes in Scala Native are just the file content
-    scala.io.Source.fromFile(file).mkString
+    scala.util.hashing.MurmurHash3
+      .orderedHash(
+        scala.io.Source.fromFile(file)
+      )
+      .toHexString
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
