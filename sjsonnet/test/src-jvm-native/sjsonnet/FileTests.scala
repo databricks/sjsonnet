@@ -41,16 +41,8 @@ object FileTests extends BaseFileTests {
   ) ++ (if (isScalaNative)
           Set(
             "stdlib_smoke_test.jsonnet",
-            "builtinSha1.jsonnet",
-            "builtinSha256.jsonnet",
             "builtinSha3.jsonnet",
-            "builtinSha512.jsonnet",
-            "parseYaml.jsonnet",
-            "std.md5.jsonnet",
-            "std.md5_2.jsonnet",
-            "std.md5_3.jsonnet",
-            "std.md5_4.jsonnet",
-            "std.md5_5.jsonnet"
+            "parseYaml.jsonnet"
           )
         else Set.empty[String])
 
