@@ -34,21 +34,25 @@ object Platform {
   def yamlToJson(s: String): String = {
     throw new Exception("parseYaml() not implemented in Scala Native")
   }
-  def md5(s: String): String = {
-    throw new Exception("MD5 not implemented in Scala Native")
+
+  private def computeHash(algorithm: String, s: String) = {
+    java.security.MessageDigest
+      .getInstance(algorithm)
+      .digest(s.getBytes("UTF-8"))
+      .map { b => String.format("%02x", (b & 0xff).asInstanceOf[Integer]) }
+      .mkString
   }
-  def sha1(s: String): String = {
-    throw new Exception("SHA1 not implemented in Scala Native")
-  }
-  def sha256(s: String): String = {
-    throw new Exception("SHA256 not implemented in Scala Native")
-  }
-  def sha512(s: String): String = {
-    throw new Exception("SHA512 not implemented in Scala Native")
-  }
-  def sha3(s: String): String = {
-    throw new Exception("SHA3 not implemented in Scala Native")
-  }
+
+  def md5(s: String): String = computeHash("MD5", s)
+
+  def sha1(s: String): String = computeHash("SHA-1", s)
+
+  def sha256(s: String): String = computeHash("SHA-256", s)
+
+  def sha512(s: String): String = computeHash("SHA-512", s)
+
+  // Same as go-jsonnet https://github.com/google/go-jsonnet/blob/2b4d7535f540f128e38830492e509a550eb86d57/builtins.go#L959
+  def sha3(s: String): String = computeHash("SHA3-512", s)
 
   def hashFile(file: File): String = {
     // File hashes in Scala Native are just the file content

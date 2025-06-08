@@ -163,6 +163,13 @@ object sjsonnet extends VersionFileModule {
       this.millSourcePath / "src-native",
       this.millSourcePath / "src-jvm-native"
     )
+    def ivyDeps = super.ivyDeps() ++
+      Agg(ivy"com.github.lolgab::scala-native-crypto::0.2.0")
+
+    def nativeLinkingOptions = super.nativeLinkingOptions() ++
+      Seq("-L/usr/local/opt/openssl@3/lib")
+
+
     def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
     def nativeMultithreading = None
