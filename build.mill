@@ -78,7 +78,8 @@ trait SjsonnetJvmNative extends ScalaModule {
 }
 
 object sjsonnet extends VersionFileModule {
-  private val scalaVersions = Seq("3.3.6", "2.13.16", "2.12.20")
+  private val scalaVersions = Seq("3.3.6", "2.13.16")
+  private val jvmScalaVersions = scalaVersions ++ Seq("2.12.20")
   private val stackSize = "100m"
   private val stackSizekBytes = 100 * 1024
 
@@ -91,6 +92,11 @@ object sjsonnet extends VersionFileModule {
       this.millSourcePath / "src-js",
       this.millSourcePath / "src-jvm-js"
     )
+    def ivyDeps = super.ivyDeps() ++
+      Agg(
+        ivy"org.virtuslab::scala-yaml::0.3.0",
+      )
+
     object test extends ScalaJSTests with CrossTests {
       def jsEnvConfig = JsEnvConfig.NodeJs(args = List("--stack-size=" + stackSizekBytes))
       def resources = T.sources(
@@ -164,7 +170,10 @@ object sjsonnet extends VersionFileModule {
       this.millSourcePath / "src-jvm-native"
     )
     def ivyDeps = super.ivyDeps() ++
-      Agg(ivy"com.github.lolgab::scala-native-crypto::0.2.0")
+      Agg(
+        ivy"com.github.lolgab::scala-native-crypto::0.2.0",
+        ivy"org.virtuslab::scala-yaml::0.3.0",
+      )
 
     def nativeLinkingOptions = super.nativeLinkingOptions() ++
       Seq("-L/usr/local/opt/openssl@3/lib")
@@ -184,7 +193,7 @@ object sjsonnet extends VersionFileModule {
     }
   }
 
-  object jvm extends Cross[SjsonnnetJvmModule](scalaVersions)
+  object jvm extends Cross[SjsonnnetJvmModule](jvmScalaVersions)
   trait SjsonnnetJvmModule
       extends SjsonnetCrossModule
       with ScalaModule
@@ -198,7 +207,6 @@ object sjsonnet extends VersionFileModule {
       this.millSourcePath / "src-jvm-native"
     )
     def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"org.json:json:20250107",
       ivy"org.tukaani:xz::1.10",
       ivy"org.lz4:lz4-java::1.8.0",
       ivy"org.yaml:snakeyaml::2.4",

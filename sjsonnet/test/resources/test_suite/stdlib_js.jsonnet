@@ -503,7 +503,7 @@ std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
     // This happens when testing the unparser or scala.js
     true
   else
-    std.assertEqual(std.thisFile, 'stdlib_native.jsonnet')
+    std.assertEqual(std.thisFile, 'stdlib_js.jsonnet')
 ) &&
 
 std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
@@ -1476,60 +1476,60 @@ std.assertEqual(std.parseJson('12'), 12) &&
 std.assertEqual(std.parseJson('12.123'), 12.123) &&
 std.assertEqual(std.parseJson('{"a": {"b": ["c", 42]}}'), { a: { b: ['c', 42] } }) &&
 
-//std.assertEqual(std.parseYaml('{}'), {}) &&
-//std.assertEqual(std.parseYaml('[]'), []) &&
-//std.assertEqual(
-//  std.parseYaml(
-//    |||
-//      foo:
-//        bar:
-//        - true
-//        - 42
-//        - 1.0
-//    |||
-//  ), { foo: { bar: [true, 42, 1] } }
-//) &&
-//std.assertEqual(
-//  std.parseYaml(
-//    |||
-//      ---
-//      foo:
-//        bar:
-//        - true
-//        - 42
-//        - 1.0
-//      ---
-//      wibble:
-//        wobble:
-//        - true
-//        - 42
-//        - 1.0
-//    |||
-//  ), [{ foo: { bar: [true, 42, 1] } }, { wibble: { wobble: [true, 42, 1] } }]
-//) &&
-//std.assertEqual(
-//  std.parseYaml(
-//    |||
-//      - 1
-//      - 2
-//      - 3
-//    |||
-//  ), [1, 2, 3]
-//) &&
-//std.assertEqual(
-//  std.parseYaml(
-//    |||
-//      f1: |
-//        a
-//        b
-//      f2: "a\nb\n"
-//    |||
-//  ), { f1: 'a\nb\n', f2: 'a\nb\n' }
-//) &&
-//// Issue https://github.com/google/jsonnet/issues/1014
-//std.assertEqual(std.parseYaml('version: 1.2.3'), { version: '1.2.3' }) &&
-//// Issue https://github.com/google/jsonnet/issues/1050
-//std.assertEqual(std.type(std.parseYaml('id: "12345"').id), 'string') &&
+std.assertEqual(std.parseYaml('{}'), {}) &&
+std.assertEqual(std.parseYaml('[]'), []) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      foo:
+        bar:
+        - true
+        - 42
+        - 1.0
+    |||
+  ), { foo: { bar: [true, 42, 1] } }
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      ---
+      foo:
+        bar:
+        - true
+        - 42
+        - 1.0
+      ---
+      wibble:
+        wobble:
+        - true
+        - 42
+        - 1.0
+    |||
+  ), [{ foo: { bar: [true, 42, 1] } }, { wibble: { wobble: [true, 42, 1] } }]
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      - 1
+      - 2
+      - 3
+    |||
+  ), [1, 2, 3]
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      f1: |
+        a
+        b
+      f2: "a\nb\n"
+    |||
+  ), { f1: 'a\nb\n', f2: 'a\nb\n' }
+) &&
+// Issue https://github.com/google/jsonnet/issues/1014
+std.assertEqual(std.parseYaml('version: 1.2.3'), { version: '1.2.3' }) &&
+// Issue https://github.com/google/jsonnet/issues/1050
+std.assertEqual(std.type(std.parseYaml('id: "12345"').id), 'string') &&
 
 std.assertEqual(std.asciiUpper('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()ASDFGHFGHJKL09876 ') &&
 std.assertEqual(std.asciiLower('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()asdfghfghjkl09876 ') &&

@@ -1,7 +1,7 @@
 package sjsonnet
 
 import sjsonnet.TestUtils.eval
-import utest._
+import utest.*
 
 object ParseYamlTests extends TestSuite {
   def tests: Tests = Tests {

@@ -5,8 +5,8 @@ import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
-
-import scala.collection.compat._
+import scala.collection.mutable
+import org.virtuslab.yaml.*
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -31,8 +31,76 @@ object Platform {
   def xzString(s: String, compressionLevel: Option[Int]): String = {
     throw new Exception("XZ not implemented in Scala Native")
   }
-  def yamlToJson(s: String): String = {
-    throw new Exception("parseYaml() not implemented in Scala Native")
+
+  private def nodeToJson(node: Node): ujson.Value = node match {
+    case _: Node.ScalarNode =>
+      YamlDecoder.forAny.construct(node) match {
+        case Right(v) =>
+          v match {
+            case null | None   => ujson.Null
+            case v: String     => ujson.Str(v.replaceAll("\\\\n", "\n"))
+            case v: Boolean    => ujson.Bool(v)
+            case v: Byte       => ujson.Num(v.toDouble)
+            case v: Int        => ujson.Num(v.toDouble)
+            case v: Long       => ujson.Num(v.toDouble)
+            case v: Double     => ujson.Num(v)
+            case v: Float      => ujson.Num(v.toDouble)
+            case v: BigDecimal => ujson.Num(v.toDouble)
+            case v: BigInt     => ujson.Num(v.toDouble)
+            case v: Short      => ujson.Num(v.toDouble)
+            case _ =>
+              Error.fail(
+                "Unsupported YAML scalar type: " + v.getClass.getSimpleName + " with value: " + v
+              )
+          }
+        case Left(e) =>
+          Error.fail("Error converting YAML scalar to JSON: " + e.getMessage)
+      }
+    case Node.SequenceNode(nodes, _) =>
+      val buf = new mutable.ArrayBuffer[ujson.Value](nodes.size)
+      for (n <- nodes) {
+        buf += nodeToJson(n)
+      }
+      ujson.Arr(buf)
+    case Node.MappingNode(mappings, _) =>
+      val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
+      buf.sizeHint(mappings.size)
+      for ((key, value) <- mappings) {
+        key match {
+          case Node.ScalarNode(k, _) => buf(k) = nodeToJson(value)
+          case _ => Error.fail("Invalid YAML mapping key class: " + key.getClass.getSimpleName)
+        }
+      }
+      ujson.Obj(buf)
+    case _ =>
+      Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
+  }
+
+  def yamlToJson(s: String): ujson.Value = {
+    val docs = s.split("---\\s*\n")
+    docs.size match {
+      case 0 => ujson.Obj()
+      case 1 =>
+        docs.head.asNode match {
+          case Right(n) =>
+            nodeToJson(n)
+          case Left(e) if docs.head.trim.isEmpty =>
+            ujson.Obj()
+          case Left(e) =>
+            Error.fail("Error converting YAML to JSON: " + e.getMessage)
+        }
+      case _ =>
+        val buf = new mutable.ArrayBuffer[ujson.Value](docs.size)
+        for (doc <- docs) {
+          doc.asNode match {
+            case Right(n)                          => buf += nodeToJson(n)
+            case Left(e) if docs.head.trim.isEmpty =>
+            case Left(e) =>
+              Error.fail("Error converting YAML to JSON: " + e.getMessage)
+          }
+        }
+        ujson.Arr(buf)
+    }
   }
 
   private def computeHash(algorithm: String, s: String) = {

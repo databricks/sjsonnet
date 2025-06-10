@@ -42,7 +42,6 @@ object FileTests extends BaseFileTests {
     "builtinSha256.jsonnet",
     "builtinSha3.jsonnet",
     "builtinSha512.jsonnet",
-    "parseYaml.jsonnet",
     "std.md5.jsonnet",
     "std.md5_2.jsonnet",
     "std.md5_3.jsonnet",
