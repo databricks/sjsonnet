@@ -5,10 +5,10 @@ import utest.*
 object FileTests extends BaseFileTests {
   val testDataSkippedTests: Set[String] = Set(
     "dos_line_endings.jsonnet",
-    "regex_js.jsonnet"
+    "regex_js.jsonnet",
+    "stdlib_js.jsonnet"
   ) ++ (if (isScalaNative) {
           Set(
-            "stdlib.jsonnet",
             "error.obj_recursive_manifest.jsonnet",
             "error.recursive_object_non_term.jsonnet",
             "error.recursive_import.jsonnet",
@@ -17,9 +17,7 @@ object FileTests extends BaseFileTests {
             "error.obj_recursive.jsonnet"
           )
         } else {
-          Set(
-            "stdlib_native.jsonnet"
-          )
+          Set.empty[String]
         })
   val goTestDataSkippedTests: Set[String] = Set(
     "bitwise_or9.jsonnet",
@@ -41,8 +39,7 @@ object FileTests extends BaseFileTests {
   ) ++ (if (isScalaNative)
           Set(
             "stdlib_smoke_test.jsonnet",
-            "builtinSha3.jsonnet",
-            "parseYaml.jsonnet"
+            "builtinSha3.jsonnet"
           )
         else Set.empty[String])
 

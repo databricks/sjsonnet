@@ -1063,13 +1063,8 @@ class Std(
   }
 
   private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
-      try {
-        ujson.StringParser.transform(Platform.yamlToJson(str.force.asString), new ValVisitor(pos))
-      } catch {
-        case _: Exception => null
-      }
-    }
+    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
+      ujson.transform(Platform.yamlToJson(str.force.asString), new ValVisitor(pos))
   }
 
   private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {

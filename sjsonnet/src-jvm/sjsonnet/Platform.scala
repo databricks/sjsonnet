@@ -6,14 +6,14 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import com.google.re2j.Pattern
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
-import org.json.{JSONArray, JSONObject}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
-import scala.collection.compat._
-import scala.jdk.CollectionConverters._
+import scala.collection.compat.*
+import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 
 object Platform {
   def gzipBytes(b: Array[Byte]): String = {
@@ -53,21 +53,53 @@ object Platform {
     xzBytes(s.getBytes(), compressionLevel)
   }
 
-  def yamlToJson(yamlString: String): String = {
+  private def nodeToJson(node: Any): ujson.Value = node match {
+    case m: java.util.List[?] =>
+      val buf = new mutable.ArrayBuffer[ujson.Value](m.size)
+      for (n <- m.asScala) {
+        buf += nodeToJson(n)
+      }
+      ujson.Arr(buf)
+    case m: java.util.Map[?, ?] =>
+      val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
+      buf.sizeHint(m.size)
+      for ((key, value) <- m.asScala) {
+        key match {
+          case k: String => buf(k) = nodeToJson(value)
+          case _ => Error.fail("Invalid YAML mapping key class: " + key.getClass.getSimpleName)
+        }
+      }
+      ujson.Obj(buf)
+    case null          => ujson.Null
+    case v: String     => ujson.Str(v)
+    case v: Boolean    => ujson.Bool(v)
+    case v: Int        => ujson.Num(v.toDouble)
+    case v: Long       => ujson.Num(v.toDouble)
+    case v: Double     => ujson.Num(v)
+    case v: Float      => ujson.Num(v.toDouble)
+    case v: BigDecimal => ujson.Num(v.toDouble)
+    case v: BigInt     => ujson.Num(v.toDouble)
+    case v: Short      => ujson.Num(v.toDouble)
+    case _ =>
+      Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
+  }
+
+  def yamlToJson(yamlString: String): ujson.Value = {
     try {
       val yaml =
         new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
       yaml.size match {
-        case 0 => "{}"
-        case 1 =>
-          yaml.head match {
-            case m: java.util.Map[?, ?] => new JSONObject(m).toString()
-            case l: java.util.List[?]   => new JSONArray(l).toString()
-            case _                      => new JSONArray(yaml.asJava).get(0).toString
+        case 0 => ujson.Obj()
+        case 1 => nodeToJson(yaml.head)
+        case _ =>
+          val buf = new mutable.ArrayBuffer[ujson.Value](yaml.size)
+          for (doc <- yaml) {
+            buf += nodeToJson(doc)
           }
-        case _ => new JSONArray(yaml.asJava).toString()
+          ujson.Arr(buf)
       }
     } catch {
+      case e: sjsonnet.Error => throw e
       case e: Exception =>
         Error.fail("Error converting YAML to JSON: " + e)
     }
