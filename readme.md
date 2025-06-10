@@ -69,11 +69,11 @@ $ node
     {}, // tlaVars
     "", // initial working directory
 
-    // import callback: receives a base directory and the imported path string,
-    // returns a tuple of the resolved file path and file contents or file contents resolve method
-    (wd, imported) => [wd + "/" + imported, "local bar = 123; bar + bar"],
-    // loader callback: receives the tuple from the import callback and returns the file contents
-    ([path, content]) => content
+    // resolver callback: receives a base directory and the imported path string,
+    // returns the resolved path
+    (wd, imported) => wd + "/" + imported,
+    // loader callback: receives the full path and returns the file contents
+    (path, binary) => "local bar = 123; bar + bar"
     )
 '246bar'
 ```

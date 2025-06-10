@@ -86,6 +86,7 @@ object sjsonnet extends VersionFileModule {
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def millSourcePath = super.millSourcePath / os.up
     def scalaJSVersion = "1.17.0"
+    def moduleKind = T { ModuleKind.CommonJSModule }
     def sources = T.sources(
       this.millSourcePath / "src",
       this.millSourcePath / "src-js",
