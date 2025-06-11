@@ -1574,10 +1574,14 @@ class Std(
           )
       lines.flatMap(Seq(_, "\n")).mkString
     },
-    builtin("escapeStringJson", "str_") { (pos, ev, str: String) =>
-      val out = new StringWriter()
-      BaseRenderer.escape(out, str, unicode = true)
-      out.toString
+    builtin("escapeStringJson", "str_") { (pos, ev, str: Val) =>
+      if (str.force.isInstanceOf[Val.Str]) {
+        Materializer.stringify(str)(ev)
+      } else {
+        val out = new StringWriter()
+        BaseRenderer.escape(out, Materializer.stringify(str)(ev), unicode = true)
+        out.toString
+      }
     },
     builtin("escapeStringPython", "str") { (pos, ev, str: String) =>
       val out = new StringWriter()

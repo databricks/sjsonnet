@@ -1,5 +1,2 @@
-testdata/number_leading_zero:1:2-4 Did not expect: (NUMBER, "42")
-
-042
-
-
+sjsonnet.ParseError: Expected numbers cannot start with a 0 digit:2:1, found ""
+    at .(number_leading_zero.jsonnet:2:1)

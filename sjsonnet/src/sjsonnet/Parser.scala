@@ -93,7 +93,13 @@ class Parser(
       ("." ~ CharsWhileIn("0-9")).? ~~
       (CharIn("eE") ~ CharIn("+\\-").? ~~ CharsWhileIn("0-9")).?
     ).!
-  ).map(s => Val.Num(s._1, s._2.toDouble))
+  ).flatMap(s => {
+    if (s._2.length > 1 && Character.isDigit(s._2.charAt(1)) && s._2.charAt(0) == '0') {
+      Fail.opaque("numbers cannot start with a 0 digit")
+    } else {
+      Pass(Val.Num(s._1, s._2.toDouble))
+    }
+  })
 
   def escape[$: P]: P[String] = P(escape0 | escape1)
   def escape0[$: P]: P[String] = P("\\" ~~ !"u" ~~ AnyChar.!).flatMapX {
@@ -196,7 +202,7 @@ class Parser(
   def function[$: P](pos: Position): P[Expr] =
     P("(" ~/ params ~ ")" ~ expr).map(t => Expr.Function(pos, t._1, t._2))
 
-  def ifElse[$: P](pos: Position): P[Expr] =
+  def ifElse[$: P]: P[Expr] =
     P(Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.orNull))
       .map { case (pos, cond, t, e) => Expr.IfElse(pos, cond, t, e) }
 
@@ -364,7 +370,7 @@ class Parser(
                 case "false"     => Pass(Val.False(pos))
                 case "self"      => Pass(Expr.Self(pos))
                 case "super"     => Pass(Expr.Super(pos))
-                case "if"        => Pass ~ ifElse(pos)
+                case "if"        => Pass ~ ifElse
                 case "function"  => Pass ~ function(pos)
                 case "importstr" => Pass ~ importStr(pos)
                 case "importbin" => Pass ~ importBin(pos)
@@ -383,7 +389,7 @@ class Parser(
 
   def objinside[$: P]: P[Expr.ObjBody] = P(
     Pos ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
-  ).flatMap { case t @ (pos, exprs, _) =>
+  ).flatMap { case t @ (_, exprs, _) =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
     exprs.foreach {
@@ -394,82 +400,97 @@ class Parser(
     }
     if (overlap == null) Pass(t)
     else Fail.opaque("no duplicate field: " + overlap)
-  }.map {
+  }.flatMapX {
     case (pos, exprs, None) =>
-      val binds = {
-        val b =
-          exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
-        val seen = collection.mutable.Set.empty[String]
-        var overlap: String = null
-        b.foreach {
-          case Expr.Bind(_, n, _, _) =>
-            if (seen(n)) overlap = n
-            else seen.add(n)
-          case null =>
-        }
-        if (overlap != null) Fail.opaque("no duplicate local: " + overlap)
-        if (b.isEmpty) null else b
+      val b =
+        exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+      val seen = collection.mutable.Set.empty[String]
+      var overlap: String = null
+      b.foreach {
+        case Expr.Bind(_, n, _, _) =>
+          if (seen(n)) overlap = n
+          else seen.add(n)
+        case null =>
       }
-      val fields = exprs.iterator
-        .filter(_.isInstanceOf[Expr.Member.Field])
-        .asInstanceOf[Iterator[Expr.Member.Field]]
-        .toArray
-      val asserts = {
-        val a = exprs.iterator
-          .filter(_.isInstanceOf[Expr.Member.AssertStmt])
-          .asInstanceOf[Iterator[Expr.Member.AssertStmt]]
+      if (overlap != null) {
+        Fail.opaque("no duplicate local: " + overlap)
+      } else {
+        val binds = if (b.isEmpty) null else b
+
+        val fields = exprs.iterator
+          .filter(_.isInstanceOf[Expr.Member.Field])
+          .asInstanceOf[Iterator[Expr.Member.Field]]
           .toArray
-        if (a.isEmpty) null else a
+        val asserts = {
+          val a = exprs.iterator
+            .filter(_.isInstanceOf[Expr.Member.AssertStmt])
+            .asInstanceOf[Iterator[Expr.Member.AssertStmt]]
+            .toArray
+          if (a.isEmpty) null else a
+        }
+        if (binds == null && asserts == null && fields.forall(_.isStatic))
+          Pass(Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings))
+        else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
       }
-      if (binds == null && asserts == null && fields.forall(_.isStatic))
-        Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
-      else Expr.ObjBody.MemberList(pos, binds, fields, asserts)
     case (pos, exprs, Some(comps)) =>
       val preLocals = exprs
         .takeWhile(_.isInstanceOf[Expr.Bind])
         .map(_.asInstanceOf[Expr.Bind])
-      val Expr.Member.Field(
-        offset,
-        Expr.FieldName.Dyn(lhs),
-        plus,
-        args,
-        Visibility.Normal,
-        rhsBody
-      ) =
-        exprs(preLocals.length): @unchecked
-      val rhs = if (args == null) {
-        rhsBody
-      } else {
-        Expr.Function(offset, args, rhsBody)
-      }
-      val postLocals = exprs
-        .drop(preLocals.length + 1)
-        .takeWhile(_.isInstanceOf[Expr.Bind])
-        .map(_.asInstanceOf[Expr.Bind])
+      if (preLocals.nonEmpty && exprs.length == preLocals.length) {
+        Fail.opaque("object comprehension must have a field")
+      } else
+        exprs(preLocals.length) match {
+          case Expr.Member.Field(
+                offset,
+                Expr.FieldName.Dyn(lhs),
+                plus,
+                args,
+                Visibility.Normal,
+                rhsBody
+              ) =>
+            val rhs = if (args == null) {
+              rhsBody
+            } else {
+              Expr.Function(offset, args, rhsBody)
+            }
+            val postLocals = exprs
+              .drop(preLocals.length + 1)
+              .takeWhile(_.isInstanceOf[Expr.Bind])
+              .map(_.asInstanceOf[Expr.Bind])
 
-      /*
-       * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
-       *
-       * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
-       * Otherwise the field value will be overriden by the multiple iterations of forspec
-       */
-      (lhs, comps) match {
-        case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _)) if values.length > 1 =>
-          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
-        case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
-          Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
-        case _ => // do nothing
-      }
-      Expr.ObjBody.ObjComp(
-        pos,
-        preLocals.toArray,
-        lhs,
-        rhs,
-        plus,
-        postLocals.toArray,
-        comps._1,
-        comps._2.toList
-      )
+            /*
+             * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
+             *
+             * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
+             * Otherwise the field value will be overriden by the multiple iterations of forspec
+             */
+            (lhs, comps) match {
+              case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _))
+                  if values.length > 1 =>
+                Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+              case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
+                Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+              case _ =>
+                Pass(
+                  Expr.ObjBody.ObjComp(
+                    pos,
+                    preLocals.toArray,
+                    lhs,
+                    rhs,
+                    plus,
+                    postLocals.toArray,
+                    comps._1,
+                    comps._2.toList
+                  )
+                )
+            }
+          case _: Expr.Member.AssertStmt =>
+            Fail.opaque("object comprehension cannot have asserts")
+          case _ =>
+            Fail.opaque(
+              "object comprehension must have a single field with a dynamic field name"
+            )
+        }
   }
 
   def member[$: P]: P[Expr.Member] = P(objlocal | "assert" ~~ break ~ assertStmt | field)
@@ -526,7 +547,7 @@ class Parser(
   def params[$: P]: P[Expr.Params] = P((id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".?).flatMapX { x =>
     val seen = collection.mutable.Set.empty[String]
     var overlap: String = null
-    for ((k, v) <- x) {
+    for ((k, _) <- x) {
       if (seen(k)) overlap = k
       else seen.add(k)
     }

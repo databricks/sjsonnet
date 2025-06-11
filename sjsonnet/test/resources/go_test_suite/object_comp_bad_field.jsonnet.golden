@@ -1,5 +1,2 @@
-testdata/object_comp_bad_field:1:9-12 Object comprehensions can only have [e] fields
-
-{ x: 42 for _ in [1] }
-
-
+sjsonnet.ParseError: Expected object comprehension must have a single field with a dynamic field name:1:22, found "}\n"
+    at .(object_comp_bad_field.jsonnet:1:22)

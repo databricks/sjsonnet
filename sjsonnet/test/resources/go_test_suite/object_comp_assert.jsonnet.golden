@@ -1,5 +1,2 @@
-testdata/object_comp_assert:1:32-35 Object comprehension cannot have asserts
-
-{ assert self.x == 5, ["x"]: 5 for i in [42] }
-
-
+sjsonnet.ParseError: Expected object comprehension cannot have asserts:1:46, found "}\n"
+    at .(object_comp_assert.jsonnet:1:46)
