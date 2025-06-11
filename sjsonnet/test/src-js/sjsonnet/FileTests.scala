@@ -7,9 +7,9 @@ object FileTests extends BaseFileTests {
     "stdlib.jsonnet",
     "regex.jsonnet",
     "dos_line_endings.jsonnet",
-    "recursive_function.jsonnet",
 
     // Stack size issues with the JS runner
+    "recursive_function.jsonnet",
     "error.array_recursive_manifest.jsonnet",
     "error.function_infinite_default.jsonnet",
     "error.obj_recursive.jsonnet",
@@ -23,16 +23,7 @@ object FileTests extends BaseFileTests {
   val goTestDataSkippedTests: Set[String] = Set(
     "bitwise_or9.jsonnet",
     "builtinChar6.jsonnet",
-    "builtin_escapeStringJson.jsonnet",
-    "builtin_manifestTomlEx.jsonnet",
     "escaped_fields.jsonnet",
-    "multi.jsonnet",
-    "multi_string_output.jsonnet",
-    "number_leading_zero.jsonnet",
-    "object_comp_assert.jsonnet",
-    "object_comp_bad_field.jsonnet",
-    "object_comp_bad_field2.jsonnet",
-    "object_comp_illegal.jsonnet",
     "pow6.jsonnet",
     "object_invariant_plus.jsonnet",
     "std.makeArray_recursive_evalutation_order_matters.jsonnet",
@@ -51,9 +42,10 @@ object FileTests extends BaseFileTests {
 
   val tests: Tests = Tests {
     test("test_suite") - {
-      val t = TestResources_test_suite.files.keys.toSeq.sorted
+      val t = TestResources_test_suite.files.keys.toSeq
         .filter(f => f.matches("[^/]+\\.jsonnet"))
         .filter(f => !skippedTests.contains(f))
+        .sorted
       assert(t.nonEmpty)
       t.foreach { file =>
         check(TestResources_test_suite.files, file, "test_suite")
@@ -61,9 +53,10 @@ object FileTests extends BaseFileTests {
     }
 
     test("go_test_suite") - {
-      val t = TestResources_go_test_suite.files.keys.toSeq.sorted
+      val t = TestResources_go_test_suite.files.keys.toSeq
         .filter(f => f.matches("[^/]+\\.jsonnet"))
         .filter(f => !goTestDataSkippedTests.contains(f))
+        .sorted
       assert(t.nonEmpty)
       t.foreach { file =>
         check(TestResources_go_test_suite.files, file, "go_test_suite")
