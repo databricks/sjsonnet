@@ -327,7 +327,7 @@ object SjsonnetMain {
           case arr: ujson.Arr =>
             writeToFile(config, wd) { writer =>
               arr.value.toSeq match {
-                case Nil => // donothing
+                case Nil         => // donothing
                 case Seq(single) =>
                   val renderer = rendererForConfig(writer, config, () => currentPos)
                   single.transform(renderer)

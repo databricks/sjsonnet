@@ -149,7 +149,7 @@ class Parser(
     SingleChar.flatMapX {
       case '\"' => doubleString
       case '\'' => singleString
-      case '@' =>
+      case '@'  =>
         SingleChar./.flatMapX {
           case '\"' => literalDoubleString
           case '\'' => literalSingleString
@@ -220,7 +220,7 @@ class Parser(
         var result = current
         while (
           remaining.headOption match {
-            case None => false
+            case None                     => false
             case Some((offset, op, next)) =>
               val prec: Int = precedence(op)
               if (prec < minPrec) false
@@ -290,7 +290,7 @@ class Parser(
           case '[' =>
             Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map {
               case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
-              case (start, ins) =>
+              case (start, ins)        =>
                 Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
             }
           case '(' =>
@@ -352,7 +352,7 @@ class Parser(
           case '('                   => Pass ~ expr ~ ")"
           case '\"'                  => doubleString.map(constructString(pos, _))
           case '\''                  => singleString.map(constructString(pos, _))
-          case '@' =>
+          case '@'                   =>
             SingleChar./.flatMapX {
               case '\"' => literalDoubleString.map(constructString(pos, _))
               case '\'' => literalSingleString.map(constructString(pos, _))

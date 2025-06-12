@@ -30,7 +30,7 @@ class Std(
     builtin("gzip", "v") { (_, _, v: Val) =>
       v match {
         case Val.Str(_, value) => Platform.gzipString(value)
-        case arr: Val.Arr =>
+        case arr: Val.Arr      =>
           Platform.gzipBytes(arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray)
         case x => Error.fail("Cannot gzip encode " + x.prettyName)
       }
@@ -48,7 +48,7 @@ class Std(
         }
         args(0) match {
           case Val.Str(_, value) => Platform.xzString(value, compressionLevel)
-          case arr: Val.Arr =>
+          case arr: Val.Arr      =>
             Platform.xzBytes(
               arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray,
               compressionLevel
@@ -744,7 +744,7 @@ class Std(
           var added = false
           while (i < arr.length) {
             arr.force(i) match {
-              case _: Val.Null =>
+              case _: Val.Null   =>
               case Val.Str(_, x) =>
                 if (added) b.append(s)
                 added = true
@@ -760,7 +760,7 @@ class Std(
           for (x <- arr) {
             x match {
               case Val.Null(_) => // do nothing
-              case v: Val.Arr =>
+              case v: Val.Arr  =>
                 if (added) out.appendAll(sep.asLazyArray)
                 added = true
                 out.appendAll(v.asLazyArray)
@@ -781,7 +781,7 @@ class Std(
           case str: Val.Str =>
             val secondArg = x.force match {
               case Val.Str(_, value) => value
-              case n =>
+              case n                 =>
                 Error.fail("std.member second argument must be a string, got " + n.prettyName)
             }
             str.value.contains(secondArg)
@@ -1466,7 +1466,7 @@ class Std(
               fres match {
                 case fstr: Val.Str => fstr.value
                 case _: Val.Null   => ""
-                case x =>
+                case x             =>
                   Error.fail(
                     "flatMap func must return string, got " + fres
                       .asInstanceOf[Val]
@@ -1690,7 +1690,7 @@ class Std(
       import scalatags.Text.all.{value => _, _}
       def rec(v: ujson.Value): Frag = {
         v match {
-          case ujson.Str(ss) => ss
+          case ujson.Str(ss)                                                         => ss
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children @ _*)) =>
             tag(t)(
               // TODO remove the `toSeq` once this is fixed in scala3
@@ -1717,7 +1717,7 @@ class Std(
     builtin("base64", "input") { (_, _, input: Val) =>
       val b: Array[Int] = input match {
         case Val.Str(_, value) => value.indices.map(value.codePointAt).toArray
-        case arr: Val.Arr =>
+        case arr: Val.Arr      =>
           if (!arr.forall(_.isInstanceOf[Val.Num])) {
             Error.fail("Expected an array of numbers or a string")
           }

@@ -75,7 +75,7 @@ object Platform {
           doc.asNode match {
             case Right(n)                          => buf += nodeToJson(n)
             case Left(e) if docs.head.trim.isEmpty =>
-            case Left(e) =>
+            case Left(e)                           =>
               Error.fail("Error converting YAML to JSON: " + e.getMessage)
           }
         }

@@ -20,7 +20,7 @@ abstract class Materializer {
   def apply0[T](v: Val, visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = try {
     v match {
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
-      case obj: Val.Obj =>
+      case obj: Val.Obj    =>
         storePos(obj.pos)
         obj.triggerAllAsserts(obj)
         val objVisitor = visitor.visitObject(obj.visibleKeyNames.length, jsonableKeys = true, -1)
@@ -44,7 +44,7 @@ abstract class Materializer {
         }
         objVisitor.visitEnd(-1)
       case Val.Num(pos, _) => storePos(pos); visitor.visitFloat64(v.asDouble, -1)
-      case xs: Val.Arr =>
+      case xs: Val.Arr     =>
         storePos(xs.pos)
         val arrVisitor = visitor.visitArray(xs.length, -1)
         var i = 0
@@ -57,7 +57,7 @@ abstract class Materializer {
       case Val.True(pos)  => storePos(pos); visitor.visitTrue(-1)
       case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
       case Val.Null(pos)  => storePos(pos); visitor.visitNull(-1)
-      case s: Val.Func =>
+      case s: Val.Func    =>
         Error.fail(
           "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
           v.pos
@@ -73,11 +73,11 @@ abstract class Materializer {
   }
 
   def reverse(pos: Position, v: ujson.Value): Val = v match {
-    case ujson.True   => Val.True(pos)
-    case ujson.False  => Val.False(pos)
-    case ujson.Null   => Val.Null(pos)
-    case ujson.Num(n) => Val.Num(pos, n)
-    case ujson.Str(s) => Val.Str(pos, s)
+    case ujson.True    => Val.True(pos)
+    case ujson.False   => Val.False(pos)
+    case ujson.Null    => Val.Null(pos)
+    case ujson.Num(n)  => Val.Num(pos, n)
+    case ujson.Str(s)  => Val.Str(pos, s)
     case ujson.Arr(xs) =>
       Val.Arr(pos, xs.map(x => new LazyWithComputeFunc(() => reverse(pos, x))).toArray[Lazy])
     case ujson.Obj(xs) =>
@@ -93,12 +93,12 @@ abstract class Materializer {
   }
 
   def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match {
-    case ujson.True    => Val.True(ev.emptyMaterializeFileScopePos)
-    case ujson.False   => Val.False(ev.emptyMaterializeFileScopePos)
-    case ujson.Null    => Val.Null(ev.emptyMaterializeFileScopePos)
-    case ujson.Num(n)  => Val.Num(ev.emptyMaterializeFileScopePos, n)
-    case ujson.Str(s)  => Val.Str(ev.emptyMaterializeFileScopePos, s)
-    case ujson.Arr(xs) => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
+    case ujson.True     => Val.True(ev.emptyMaterializeFileScopePos)
+    case ujson.False    => Val.False(ev.emptyMaterializeFileScopePos)
+    case ujson.Null     => Val.Null(ev.emptyMaterializeFileScopePos)
+    case ujson.Num(n)   => Val.Num(ev.emptyMaterializeFileScopePos, n)
+    case ujson.Str(s)   => Val.Str(ev.emptyMaterializeFileScopePos, s)
+    case ujson.Arr(xs)  => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
     case ujson.Obj(kvs) =>
       ObjBody.MemberList(
         ev.emptyMaterializeFileScopePos,

@@ -60,7 +60,7 @@ object Error {
 
   def withStackFrame[T](expr: Expr)(implicit
       evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error => throw e.addFrame(expr.pos, expr)
+    case e: Error    => throw e.addFrame(expr.pos, expr)
     case NonFatal(e) =>
       throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, expr)
   }

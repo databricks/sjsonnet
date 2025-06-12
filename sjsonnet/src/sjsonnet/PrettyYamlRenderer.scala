@@ -324,7 +324,7 @@ object PrettyYamlRenderer {
     def isBreakableChar(ch: Char, allowUnicode: Boolean) = {
       ch match {
         case '\"' | '\\' | '\u0085' | '\u2028' | '\u2029' | '\uFEFF' => true
-        case _ =>
+        case _                                                       =>
           val isNormalChar = '\u0020' <= ch && ch <= '\u007E'
           val isUnicodePrintableChar =
             '\u00A0' <= ch && ch <= '\uD7FF' || '\uE000' <= ch && ch <= '\uFFFD'
@@ -340,7 +340,7 @@ object PrettyYamlRenderer {
       case '\r' => "\\r"
       case '\"' => "\\\""
       case '\\' => "\\\\"
-      case _ =>
+      case _    =>
         if (ch <= '\u00FF') {
           "\\u" + hex((ch >> 4) & 15) + hex(ch & 15)
         } else if (ch <= '\uFFFF') {
@@ -404,7 +404,7 @@ object PrettyYamlRenderer {
         case (None, "")       => tokens.append(" ")
         case (None, v)        => tokens.append(v)
         case (Some(prev), "") => tokens(tokens.length - 1) += " "
-        case (Some(prev), v) =>
+        case (Some(prev), v)  =>
           if (prev.endsWith(" ")) tokens(tokens.length - 1) += " " + v
           else tokens.append(v)
       }

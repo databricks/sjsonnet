@@ -100,7 +100,7 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
       case Double.PositiveInfinity        => visitString("Infinity", -1)
       case Double.NegativeInfinity        => visitString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitString("NaN", -1)
-      case d =>
+      case d                              =>
         val i = d.toLong
         if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
         else super.visitFloat64(d, index)
@@ -144,7 +144,7 @@ object BaseRenderer {
         case '\n' => sb.append("\\n")
         case '\r' => sb.append("\\r")
         case '\t' => sb.append("\\t")
-        case c =>
+        case c    =>
           if (c < ' ' || (c > '~' && unicode)) {
             sb.append("\\u")
               .append(toHex((c >> 12) & 15))

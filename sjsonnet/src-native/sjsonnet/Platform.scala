@@ -48,7 +48,7 @@ object Platform {
             case v: BigDecimal => ujson.Num(v.toDouble)
             case v: BigInt     => ujson.Num(v.toDouble)
             case v: Short      => ujson.Num(v.toDouble)
-            case _ =>
+            case _             =>
               Error.fail(
                 "Unsupported YAML scalar type: " + v.getClass.getSimpleName + " with value: " + v
               )
@@ -95,7 +95,7 @@ object Platform {
           doc.asNode match {
             case Right(n)                          => buf += nodeToJson(n)
             case Left(e) if docs.head.trim.isEmpty =>
-            case Left(e) =>
+            case Left(e)                           =>
               Error.fail("Error converting YAML to JSON: " + e.getMessage)
           }
         }

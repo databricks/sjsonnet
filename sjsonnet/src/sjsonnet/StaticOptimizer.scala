@@ -50,10 +50,10 @@ class StaticOptimizer(
         case ScopedVal(_, _, idx)              => ValidId(pos, name, idx)
         case null if name == f"$$std"          => std
         case null if name == "std"             => std
-        case null =>
+        case null                              =>
           variableResolver(name) match {
             case Some(v) => v // additional variable resolution
-            case None =>
+            case None    =>
               StaticError.fail(
                 "Unknown variable: " + name,
                 e
@@ -171,7 +171,7 @@ class StaticOptimizer(
       tailstrict: Boolean): Expr = lhs match {
     case f: Val.Builtin =>
       rebind(args, names, f.params) match {
-        case null => null
+        case null    => null
         case newArgs =>
           tryStaticApply(pos, f, newArgs, tailstrict) match {
             case null =>
