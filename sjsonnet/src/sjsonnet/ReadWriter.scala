@@ -63,7 +63,7 @@ object ReadWriter {
   implicit object LiteralRead extends ReadWriter[Val.Literal] {
     def apply(t: Val): Val.Literal = t match {
       case literal: Val.Literal => literal
-      case other =>
+      case other                =>
         Error.fail("Wrong parameter type: expected Val.Literal" + ", got " + other.prettyName)
     }
 

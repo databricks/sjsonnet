@@ -108,7 +108,7 @@ class Interpreter(
       case ExternalVariable(ExternalVariableKind.Code, v: String)     => parseVar(s"$ctx-var $k", v)
       case ExternalVariable(ExternalVariableKind.Expr, v: Expr)       => v
       case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
-      case _ =>
+      case _                                                          =>
         throw new Error(s"Unsupported external variable kind: ${externalVariable.kind}", Nil, None)
     }
 
@@ -146,7 +146,7 @@ class Interpreter(
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)
     catch {
-      case e: Error => Left(e)
+      case e: Error    => Left(e)
       case NonFatal(e) =>
         Left(new Error("Internal error: " + e.toString, Nil, Some(e)))
     }

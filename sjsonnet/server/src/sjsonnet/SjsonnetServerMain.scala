@@ -131,7 +131,7 @@ class Server[T](
             )
 
             sockOpt match {
-              case None => running = false
+              case None       => running = false
               case Some(sock) =>
                 try {
                   handleRun(sock)
@@ -230,7 +230,7 @@ object Server {
   def tryLockBlock[T](lock: Lock)(t: => T): Option[T] = {
     lock.tryLock() match {
       case null => None
-      case l =>
+      case l    =>
         try Some(t)
         finally l.release()
     }

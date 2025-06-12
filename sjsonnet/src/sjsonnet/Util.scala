@@ -55,7 +55,7 @@ object Util {
       case Some(e) => if (e < 0) length + e else e
     }
     val step = _step match {
-      case None => 1
+      case None    => 1
       case Some(s) =>
         if (s < 0) {
           Error.fail(s"got [$start:$end:$s] but negative steps are not supported", pos)(ev)

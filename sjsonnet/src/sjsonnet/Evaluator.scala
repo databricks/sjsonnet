@@ -114,7 +114,7 @@ class Evaluator(
         while (i < bindings.length) {
           val b = bindings(i)
           newScope.bindings(base + i) = b.args match {
-            case null => visitAsLazy(b.rhs)(newScope)
+            case null    => visitAsLazy(b.rhs)(newScope)
             case argSpec =>
               new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
@@ -152,7 +152,7 @@ class Evaluator(
 
   def visitIfElse(e: IfElse)(implicit scope: ValScope): Val = {
     visitExpr(e.cond) match {
-      case Val.True(_) => visitExpr(e.`then`)
+      case Val.True(_)  => visitExpr(e.`then`)
       case Val.False(_) =>
         e.`else` match {
           case null => Val.Null(e.pos)
@@ -334,7 +334,7 @@ class Evaluator(
     if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
-        case msg =>
+        case msg  =>
           Error.fail("Assertion failed: " + materializeError(visitExpr(msg)), e)
       }
     }
@@ -439,11 +439,11 @@ class Evaluator(
 
   def visitOr(e: Or)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
-      case _: Val.True => Val.True(e.pos)
+      case _: Val.True  => Val.True(e.pos)
       case _: Val.False =>
         visitExpr(e.rhs) match {
           case b: Val.Bool => b
-          case unknown =>
+          case unknown     =>
             Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
         }
       case unknown =>
@@ -613,7 +613,7 @@ class Evaluator(
   def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope): String = {
     fieldName match {
       case FieldName.Fixed(s) => s
-      case FieldName.Dyn(k) =>
+      case FieldName.Dyn(k)   =>
         visitExpr(k) match {
           case Val.Str(_, k1) => k1
           case Val.Null(_)    => null
@@ -681,7 +681,7 @@ class Evaluator(
         if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
           a.msg match {
             case null => Error.fail("Assertion failed", a.value.pos, "Assert")
-            case msg =>
+            case msg  =>
               Error.fail(
                 "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
                 a.value.pos,
@@ -807,7 +807,7 @@ class Evaluator(
           s <- scopes
           e <- visitExpr(expr)(s) match {
             case a: Val.Arr => a.asLazyArray
-            case r =>
+            case r          =>
               Error.fail(
                 "In comprehension, can only iterate over array, not " + r.prettyName,
                 spec
@@ -821,7 +821,7 @@ class Evaluator(
         scopes.filter(visitExpr(expr)(_) match {
           case Val.True(_)  => true
           case Val.False(_) => false
-          case other =>
+          case other        =>
             Error.fail(
               "Condition must be boolean, got " + other.prettyName,
               spec
@@ -836,7 +836,7 @@ class Evaluator(
     case (x: Val.Num, y: Val.Num)   => x.asDouble.compareTo(y.asDouble)
     case (x: Val.Str, y: Val.Str)   => x.value.compareTo(y.value)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
-    case (x: Val.Arr, y: Val.Arr) =>
+    case (x: Val.Arr, y: Val.Arr)   =>
       val len = math.min(x.length, y.length)
       var i = 0
       while (i < len) {
@@ -852,7 +852,7 @@ class Evaluator(
     case _: Val.True  => y.isInstanceOf[Val.True]
     case _: Val.False => y.isInstanceOf[Val.False]
     case _: Val.Null  => y.isInstanceOf[Val.Null]
-    case x: Val.Str =>
+    case x: Val.Str   =>
       y match {
         case y: Val.Str => x.value == y.value
         case _          => false
@@ -925,13 +925,13 @@ class NewEvaluator(
       case ExprTags.UnaryOp       => visitUnaryOp(e.asInstanceOf[UnaryOp])
       case ExprTags.Apply1        => visitApply1(e.asInstanceOf[Apply1])
       case ExprTags.Lookup        => visitLookup(e.asInstanceOf[Lookup])
-      case ExprTags.Function =>
+      case ExprTags.Function      =>
         val f = e.asInstanceOf[Function]
         visitMethod(f.body, f.params, f.pos)
-      case ExprTags.LocalExpr => visitLocalExpr(e.asInstanceOf[LocalExpr])
-      case ExprTags.Apply     => visitApply(e.asInstanceOf[Apply])
-      case ExprTags.IfElse    => visitIfElse(e.asInstanceOf[IfElse])
-      case ExprTags.Apply3    => visitApply3(e.asInstanceOf[Apply3])
+      case ExprTags.LocalExpr            => visitLocalExpr(e.asInstanceOf[LocalExpr])
+      case ExprTags.Apply                => visitApply(e.asInstanceOf[Apply])
+      case ExprTags.IfElse               => visitIfElse(e.asInstanceOf[IfElse])
+      case ExprTags.Apply3               => visitApply3(e.asInstanceOf[Apply3])
       case ExprTags.`ObjBody.MemberList` =>
         val oml = e.asInstanceOf[ObjBody.MemberList]
         visitMemberList(oml.pos, oml, null)

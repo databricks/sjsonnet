@@ -109,7 +109,7 @@ object Format {
       var formatted = rawFormatted
       val cooked0 = formatted.conversion match {
         case '%' => widenRaw(formatted, "%")
-        case _ =>
+        case _   =>
           if (values.isInstanceOf[Val.Arr] && i >= values.cast[Val.Arr].length) {
             Error.fail(
               "Too few values to format: %d, expected at least %d".format(
@@ -122,7 +122,7 @@ object Format {
             case None =>
               (formatted.widthStar, formatted.precisionStar) match {
                 case (false, false) => values.cast[Val.Arr].force(i)
-                case (true, false) =>
+                case (true, false)  =>
                   val width = values.cast[Val.Arr].force(i)
                   if (!width.isInstanceOf[Val.Num]) {
                     Error.fail(
@@ -197,7 +197,7 @@ object Format {
                 case 'g'             => formatGeneric(formatted, s).toLowerCase
                 case 'G'             => formatGeneric(formatted, s)
                 case 'c'             => widenRaw(formatted, s.toChar.toString)
-                case 's' =>
+                case 's'             =>
                   if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
                   else widenRaw(formatted, s.toString)
                 case _ =>
@@ -216,7 +216,7 @@ object Format {
                 case 'G'             => formatGeneric(formatted, s.compareTo(false))
                 case 'c' => widenRaw(formatted, Character.forDigit(s.compareTo(false), 10).toString)
                 case 's' => widenRaw(formatted, s.toString)
-                case _ =>
+                case _   =>
                   Error.fail("Format required a %s at %d, got string".format(raw.prettyName, i))
               }
             case v => widenRaw(formatted, v.toString)
@@ -310,7 +310,7 @@ object Format {
 
   private def precisionPad(lhs: String, rhs: String, precision: Option[Int]): String = {
     precision match {
-      case None => rhs
+      case None    => rhs
       case Some(p) =>
         val shortage = p - rhs.length
         if (shortage > 0) "0" * shortage + rhs else rhs

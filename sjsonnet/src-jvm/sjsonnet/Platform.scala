@@ -80,7 +80,7 @@ object Platform {
     case v: BigDecimal => ujson.Num(v.toDouble)
     case v: BigInt     => ujson.Num(v.toDouble)
     case v: Short      => ujson.Num(v.toDouble)
-    case _ =>
+    case _             =>
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
@@ -100,7 +100,7 @@ object Platform {
       }
     } catch {
       case e: sjsonnet.Error => throw e
-      case e: Exception =>
+      case e: Exception      =>
         Error.fail("Error converting YAML to JSON: " + e)
     }
   }

@@ -94,7 +94,7 @@ object sjsonnet extends VersionFileModule {
     )
     def ivyDeps = super.ivyDeps() ++
       Agg(
-        ivy"org.virtuslab::scala-yaml::0.3.0",
+        ivy"org.virtuslab::scala-yaml::0.3.0"
       )
 
     object test extends ScalaJSTests with CrossTests {
@@ -105,14 +105,21 @@ object sjsonnet extends VersionFileModule {
       )
       def generatedSources = T {
         resources().map(_.path).flatMap { testSuite =>
-          val fileNames = os.walk(testSuite).filter(os.isFile).map { k =>
-            val name = k.relativeTo(testSuite).toString
-              .replaceAll("/", "_").replaceAll("\\.", "_").replaceAll("-", "_")
-            val values = Base64.getEncoder.encodeToString(os.read.bytes(k)).grouped(65535).toSeq
-            val fName = T.ctx().dest / s"${testSuite.last}_$name.scala"
-            os.write.over(
-              fName,
-              s"""package sjsonnet
+          val fileNames = os
+            .walk(testSuite)
+            .filter(os.isFile)
+            .map { k =>
+              val name = k
+                .relativeTo(testSuite)
+                .toString
+                .replaceAll("/", "_")
+                .replaceAll("\\.", "_")
+                .replaceAll("-", "_")
+              val values = Base64.getEncoder.encodeToString(os.read.bytes(k)).grouped(65535).toSeq
+              val fName = T.ctx().dest / s"${testSuite.last}_$name.scala"
+              os.write.over(
+                fName,
+                s"""package sjsonnet
                  |
                  |import java.util.Base64
                  |
@@ -123,20 +130,21 @@ object sjsonnet extends VersionFileModule {
                  |  def content() = Base64.getDecoder().decode(contentArr.mkString)
                  |}
                  |""".stripMargin
-            )
-            k -> fName
-          }.toMap
+              )
+              k -> fName
+            }
+            .toMap
 
           val testSuiteClassPath = T.ctx().dest / s"TestResources_${testSuite.last}.scala"
           os.write.over(
-              testSuiteClassPath,
-              s"""package sjsonnet
+            testSuiteClassPath,
+            s"""package sjsonnet
                  |
                  |object TestResources_${testSuite.last}{
                  |  val files: Map[String, () => Array[Byte]] = Map(
                  |""".stripMargin
           )
-          for ( (k, fName) <- fileNames) {
+          for ((k, fName) <- fileNames) {
             os.write.append(
               testSuiteClassPath,
               s"""    "${k.relativeTo(testSuite)}" -> ${fName.baseName}.content _,
@@ -172,12 +180,11 @@ object sjsonnet extends VersionFileModule {
     def ivyDeps = super.ivyDeps() ++
       Agg(
         ivy"com.github.lolgab::scala-native-crypto::0.2.0",
-        ivy"org.virtuslab::scala-yaml::0.3.0",
+        ivy"org.virtuslab::scala-yaml::0.3.0"
       )
 
     def nativeLinkingOptions = super.nativeLinkingOptions() ++
       Seq("-L/usr/local/opt/openssl@3/lib")
-
 
     def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
@@ -244,7 +251,9 @@ object sjsonnet extends VersionFileModule {
       override def prependShellScript = mill.util.Jvm.universalScript(
         shellCommands = {
           def java(mainClass: String) =
-            s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=${sjsonnet.currentVersion().toString} $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
+            s"""exec java -DSJSONNET_EXECUTABLE=$$0 -DSJSONNET_VERSION=${sjsonnet
+                .currentVersion()
+                .toString} $$JAVA_OPTS -cp $$0 $mainClass "$$@""""
 
           s"""case "$$1" in
               |  -i | --interactive )
@@ -257,7 +266,9 @@ object sjsonnet extends VersionFileModule {
         },
         cmdCommands = {
           def java(mainClass: String) =
-            s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=${sjsonnet.currentVersion().toString} %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
+            s"""java -DSJSONNET_EXECUTABLE=%~dpnx0  -DSJSONNET_VERSION=${sjsonnet
+                .currentVersion()
+                .toString} %JAVA_OPTS% -cp %~dpnx0 $mainClass %*"""
 
           s"""if "%1" == "-i" set _I_=true
               |if "%1" == "--interactive" set _I_=true

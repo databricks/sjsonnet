@@ -27,7 +27,7 @@ class OptimizerBenchmark {
         s,
         new Parser(p, mutable.HashMap.empty, mutable.HashMap.empty).document(_)
       ) match {
-        case Success(v, _) => v
+        case Success(v, _)               => v
         case f: fastparse.Parsed.Failure =>
           throw new Exception(s"Failed to parse $p: ${f.msg}")
       }
@@ -79,11 +79,11 @@ class OptimizerBenchmark {
       if (e.isInstanceOf[Val]) vals += 1
       else exprs += 1
       e match {
-        case _: Val.Arr => arrVals += 1
+        case _: Val.Arr  => arrVals += 1
         case a: Expr.Arr =>
           if (a.value.forall(_.isInstanceOf[Val])) staticArrExprs += 1
           else otherArrExprs += 1
-        case _: Val.Obj => staticObjs += 1
+        case _: Val.Obj                 => staticObjs += 1
         case e: Expr.ObjBody.MemberList =>
           if (e.binds == null && e.asserts == null && e.fields.forall(_.isStatic))
             missedStaticObjs += 1

@@ -54,7 +54,7 @@ object DecimalFormat {
         (precision, alternate) match {
           case (0, false) => prefix + "E" + expFrag
           case (0, true)  => prefix + ".E" + expFrag
-          case (_, _) =>
+          case (_, _)     =>
             val divided = number / Math.pow(10, (expNum - precision).toDouble)
             val scaledFrac = divided % Math.pow(10, precision)
             val frac = rightPad(Math.abs(Math.round(scaledFrac)), zeroes, precision)
