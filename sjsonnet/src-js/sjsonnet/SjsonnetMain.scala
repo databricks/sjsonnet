@@ -35,7 +35,7 @@ object SjsonnetMain {
           importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
             case s: String        => Some(StaticResolvedFile(s))
             case arr: Array[Byte] => Some(StaticBinaryResolvedFile(arr))
-            case _                => throw new js.JavaScriptException("Loader result must be string or byte array")
+            case _ => throw new js.JavaScriptException("Loader result must be string or byte array")
           }
       },
       parseCache = new DefaultParseCache,

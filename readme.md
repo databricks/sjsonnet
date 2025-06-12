@@ -55,15 +55,20 @@ $ ./sjsonnet.jar foo.jsonnet
 
 Or from Javascript:
 
+Since `0.5.3`, the output is a CommonJS module.
+
 ```javascript
-$ node
+const { SjsonnetMain } = require("./sjsonnet.js");
+// or
+import { SjsonnetMain } from "./sjsonnet";
 
-> require("./sjsonnet.js")
+console.log(
+  SjsonnetMain.interpret("local f = function(x) x * x; f(11)", {}, {}, "", (wd, imported) => null)
+);
+// => 121
 
-> SjsonnetMain.interpret("local f = function(x) x * x; f(11)", {}, {}, "", (wd, imported) => null)
-121
-
-> SjsonnetMain.interpret(
+console.log(
+  SjsonnetMain.interpret(
     "local f = import 'foo'; f + 'bar'", // code
     {}, // extVars
     {}, // tlaVars
@@ -74,8 +79,9 @@ $ node
     (wd, imported) => wd + "/" + imported,
     // loader callback: receives the full path and returns the file contents
     (path, binary) => "local bar = 123; bar + bar"
-    )
-'246bar'
+  )
+);
+// => '246bar'
 ```
 
 Note that since Javascript does not necessarily have access to the
