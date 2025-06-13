@@ -13,7 +13,7 @@ object SjsonnetMain {
       tlaVars: js.Any,
       wd0: String,
       importResolver: js.Function2[String, String, String],
-      importLoader: js.Function2[String, Boolean, Either[String, Array[Byte]]],
+      importLoader: js.Function2[String, Boolean, Any],
       preserveOrder: Boolean = false): js.Any = {
     val interp = new Interpreter(
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map {
@@ -33,8 +33,9 @@ object SjsonnetMain {
           }
         def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
           importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
-            case Left(s)    => Some(StaticResolvedFile(s))
-            case Right(arr) => Some(StaticBinaryResolvedFile(arr))
+            case s: String        => Some(StaticResolvedFile(s))
+            case arr: Array[Byte] => Some(StaticBinaryResolvedFile(arr))
+            case _ => throw new js.JavaScriptException("Loader result must be string or byte array")
           }
       },
       parseCache = new DefaultParseCache,
