@@ -206,7 +206,7 @@ object SjsonnetMain {
     splitMap(strs, v => ujson.write(v)) ++
     splitMap(strFiles, v => ujson.write(readPath(v))) ++
     splitMap(codes, identity) ++
-    splitMap(codeFiles, readPath)
+    splitMap(codeFiles, v => s"import @'${v.replace("'", "''")}'")
   }
 
   /**
