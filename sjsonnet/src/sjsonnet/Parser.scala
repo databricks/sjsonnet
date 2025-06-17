@@ -151,7 +151,7 @@ class Parser(
   def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
     ("||-" | "||").!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
     // Detect the new line separator
-    ("\r\n" | "\n").!.flatMapX { sep =>
+    ("\r\n" | "\n").!./.flatMapX { sep =>
       tripleBarStringLines(sep)
     } ~~ CharsWhileIn(" \t", 0) ~~ "|||"
   )
