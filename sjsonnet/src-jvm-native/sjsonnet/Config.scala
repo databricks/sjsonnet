@@ -161,14 +161,14 @@ final case class Config(
    * Returns the sequence of jpaths specified on the command line, ordered according to the flags.
    *
    * Historically, sjsonnet evaluated jpaths in left-to-right order, which is also the order of
-   * evaluation in the core. However, in gojsonnet, the arguments are prioritized left to right, and
+   * evaluation in the core. However, in gojsonnet, the arguments are prioritized right to left, and
    * the reverse-jpaths-priority flag was introduced for possible consistency across the two
    * implementations.
+   *
+   * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for details.
    */
   def getOrderedJpaths: Seq[String] = {
-    if (jpaths == null) {
-      null
-    } else if (reverseJpathsPriority.value) {
+    if (reverseJpathsPriority.value) {
       jpaths.reverse
     } else {
       jpaths
