@@ -165,7 +165,8 @@ final case class Config(
    * the reverse-jpaths-priority flag was introduced for possible consistency across the two
    * implementations.
    *
-   * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for details.
+   * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for
+   * details.
    */
   def getOrderedJpaths: Seq[String] = {
     if (reverseJpathsPriority.value) {
