@@ -126,25 +126,6 @@ class Parser(
   def literalSingleString[$: P]: P[Seq[String]] =
     P((CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'")
 
-  def tripleBarStringLines[$: P]: P[Seq[String]] = P(
-    tripleBarStringHead.flatMapX { case (pre, w, head) =>
-      tripleBarStringBody(w).map(pre ++ Seq(head, "\n") ++ _)
-    }
-  )
-
-  def maybeChompedTripleBarString[$: P]: P[Seq[String]] = tripleBarString.map {
-    case (true, lines) =>
-      Seq(lines.mkString.stripLineEnd)
-    case (false, lines) =>
-      lines
-  }
-
-  def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
-    ("||-" | "||").?.!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
-    "\n" ~~ tripleBarStringLines ~~ "\n" ~~
-    CharsWhileIn(" \t", 0) ~~ "|||"
-  )
-
   def string[$: P]: P[String] = P(
     SingleChar.flatMapX {
       case '\"' => doubleString
@@ -160,18 +141,37 @@ class Parser(
     }
   ).map(_.mkString)
 
-  def tripleBarStringHead[$: P]: P[(Seq[String], String, String)] = P(
-    (CharsWhileIn(" \t", 0) ~~ "\n".!).repX ~~
-    CharsWhileIn(" \t", 1).! ~~
-    CharsWhile(_ != '\n').!
+  def maybeChompedTripleBarString[$: P]: P[Seq[String]] = tripleBarString.map {
+    case (true, lines) =>
+      Seq(lines.mkString.stripLineEnd)
+    case (false, lines) =>
+      lines
+  }
+
+  def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
+    ("||-" | "||").!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
+    // Detect the new line separator
+    ("\r\n" | "\n").!.flatMapX { sep =>
+      tripleBarStringLines(sep)
+    } ~~ CharsWhileIn(" \t", 0) ~~ "|||"
   )
-  def tripleBarBlankHead[$: P]: P[String] =
-    P(CharsWhileIn(" \t", 0) ~~ &("\n").map(_ => "\n"))
 
-  def tripleBarBlank[$: P]: P[String] = P("\n" ~~ tripleBarBlankHead)
+  def tripleBarStringLines[$: P](sep: String): P[Seq[String]] = P(
+    // First, we skip an empty lines until we reach the first line with indentation.
+    // This will become the indentation for the rest of the block.
+    (sep.!.repX ~~ CharsWhileIn(" \t", 1).!).flatMapX { case (before, indent) =>
+      tripleBarStringBody(indent, sep).map(before ++ _)
+    }
+  )
 
-  def tripleBarStringBody[$: P](w: String): P[Seq[String]] = P(
-    (tripleBarBlank | "\n" ~~ w ~~ CharsWhile(_ != '\n').!.map(_ + "\n")).repX
+  def tripleBarStringBody[$: P](indent: String, sep: String): P[Seq[String]] = P(
+    // Because we already parsed the indentation, we special case the first line and only look for the content.
+    (CharsWhile(!sep.contains(_), 0) ~~ sep).!.flatMapX { firstLine =>
+      // That's the core of the parsing. Either we have an empty line or we have indentation + content + new line separator.
+      (sep.! | (indent.! ~~ (CharsWhile(!sep.contains(_), 0) ~~ sep).!).map(_._2)).repX.map {
+        rest => Seq(firstLine) ++ rest
+      }
+    }
   )
 
   def arr[$: P]: P[Expr] = P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody)

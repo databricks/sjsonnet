@@ -97,6 +97,9 @@ abstract class BaseFileTests extends TestSuite {
             println(res.left.getOrElse(""))
             assert(e.getMessage == goldenContent.stripLineEnd)
           }
+        case e: Throwable =>
+          println(stderr.toString)
+          throw e
       }
     }
   }
