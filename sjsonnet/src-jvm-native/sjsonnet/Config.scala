@@ -7,9 +7,10 @@ final case class Config(
     @arg(
       name = "jpath",
       short = 'J',
-      doc = "Specify an additional library search dir (left-most wins)"
+      doc =
+        "Specify an additional library search dir (left-most wins unless reverse-jpaths-priority is set)"
     )
-    jpaths: List[String] = Nil,
+    private val jpaths: List[String] = Nil,
     @arg(
       name = "debug-importer",
       doc = "Print some additional debugging information about the importer"
@@ -145,8 +146,33 @@ final case class Config(
     )
     throwErrorForInvalidSets: Flag = Flag(),
     @arg(
+      name = "reverse-jpaths-priority",
+      doc = """If set, reverses the import order of specified jpaths (so that the rightmost wins)"""
+    )
+    reverseJpathsPriority: Flag = Flag(),
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )
     file: String
-)
+) {
+
+  /**
+   * Returns the sequence of jpaths specified on the command line, ordered according to the flags.
+   *
+   * Historically, sjsonnet evaluated jpaths in left-to-right order, which is also the order of
+   * evaluation in the core. However, in gojsonnet, the arguments are prioritized right to left, and
+   * the reverse-jpaths-priority flag was introduced for possible consistency across the two
+   * implementations.
+   *
+   * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for
+   * details.
+   */
+  def getOrderedJpaths: Seq[String] = {
+    if (reverseJpathsPriority.value) {
+      jpaths.reverse
+    } else {
+      jpaths
+    }
+  }
+}

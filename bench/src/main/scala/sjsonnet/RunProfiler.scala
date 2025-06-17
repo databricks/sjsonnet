@@ -16,7 +16,7 @@ object RunProfiler extends App {
     Map.empty[String, String],
     OsPath(wd),
     importer = SjsonnetMain
-      .resolveImport(config.jpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
+      .resolveImport(config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
     parseCache = parseCache
   ) {
     override def createEvaluator(
