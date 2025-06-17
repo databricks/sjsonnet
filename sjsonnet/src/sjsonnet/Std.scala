@@ -2133,6 +2133,8 @@ class Std(
             indices.sortBy(i => keys(i).cast[Val.Str].asString)
           } else if (keyType == classOf[Val.Num]) {
             indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
+          } else if (keyType == classOf[Val.Arr]) {
+            indices.sortBy(i => keys(i).cast[Val.Arr])(ev.compare(_, _))
           } else {
             Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
           }
@@ -2150,6 +2152,8 @@ class Std(
             vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
           } else if (keyType == classOf[Val.Num]) {
             vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
+          } else if (keyType == classOf[Val.Arr]) {
+            vs.map(_.force.cast[Val.Arr]).sortBy(identity)(ev.compare(_, _))
           } else if (keyType == classOf[Val.Obj]) {
             Error.fail("Unable to sort array of objects without key function")
           } else {

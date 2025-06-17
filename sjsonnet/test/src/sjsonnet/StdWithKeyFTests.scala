@@ -54,6 +54,12 @@ object StdWithKeyFTests extends TestSuite {
       eval("""std.sort([1, 2, 3])""").toString() ==> """[1,2,3]"""
       eval("""std.sort([1,2,3], keyF=function(x) -x)""").toString() ==> """[3,2,1]"""
       eval("""std.sort([1,2,3], function(x) -x)""").toString() ==> """[3,2,1]"""
+      eval(
+        """std.sort([[1,'b'], [2], [1], [], [1,'a']])"""
+      ).toString() ==> """[[],[1],[1,"a"],[1,"b"],[2]]"""
+      eval(
+        """std.sort([{a:[2]},{a:[]},{a:[1]},{a:[1,'b']},{a:[1,'a']}], function(x) x.a)"""
+      ).toString() ==> """[{"a":[]},{"a":[1]},{"a":[1,"a"]},{"a":[1,"b"]},{"a":[2]}]"""
       assert(
         evalErr("""std.sort([1,2,3], keyF=function(x) error "foo")""").startsWith(
           "sjsonnet.Error: foo"
