@@ -143,7 +143,7 @@ class Parser(
 
   def maybeChompedTripleBarString[$: P]: P[Seq[String]] = tripleBarString.map {
     case (true, lines) =>
-      Seq(lines.mkString.stripLineEnd)
+      lines.dropRight(1) ++ Seq(lines.last.stripLineEnd)
     case (false, lines) =>
       lines
   }
@@ -151,7 +151,7 @@ class Parser(
   def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
     ("||-" | "||").!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
     // Detect the new line separator
-    ("\r\n" | "\n").!./.flatMapX { sep =>
+    ("\r\n" | "\n").opaque("|||-blocks require multiple lines").!./.flatMapX { sep =>
       tripleBarStringLines(sep)
     } ~~ CharsWhileIn(" \t", 0) ~~ "|||"
   )
@@ -159,18 +159,22 @@ class Parser(
   def tripleBarStringLines[$: P](sep: String): P[Seq[String]] = P(
     // First, we skip an empty lines until we reach the first line with indentation.
     // This will become the indentation for the rest of the block.
-    (sep.!.repX ~~ CharsWhileIn(" \t", 1).!).flatMapX { case (before, indent) =>
-      tripleBarStringBody(indent, sep).map(before ++ _)
-    }
+    (sep.!.repX ~~ CharsWhileIn(" \t", 1)
+      .opaque("|||-block line must either be an empty line or start with at least one whitespace")
+      .!)
+      .flatMapX { case (before, indent) =>
+        tripleBarStringBody(indent, sep).map(before ++ _)
+      }
   )
 
   def tripleBarStringBody[$: P](indent: String, sep: String): P[Seq[String]] = P(
     // Because we already parsed the indentation, we special case the first line and only look for the content.
     (CharsWhile(!sep.contains(_), 0) ~~ sep).!.flatMapX { firstLine =>
       // That's the core of the parsing. Either we have an empty line or we have indentation + content + new line separator.
-      (sep.! | (indent.! ~~ (CharsWhile(!sep.contains(_), 0) ~~ sep).!).map(_._2)).repX.map {
-        rest => Seq(firstLine) ++ rest
-      }
+      (sep.! | (indent.! ~~ (CharsWhile(!sep.contains(_), 0) ~~ sep).!).map(_._2))
+        .opaque("|||-block line must either be an empty line or start with at least one whitespace")
+        .repX
+        .map(Seq(firstLine) ++ _)
     }
   )
 
