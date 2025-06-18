@@ -148,23 +148,29 @@ class Parser(
       lines
   }
 
-  def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
-    ("||-" | "||").!.map(_.last == '-')./ ~~ CharsWhileIn(" \t", 0) ~~
-    // Detect the new line separator
-    ("\r\n" | "\n").opaque("|||-blocks require multiple lines").!./.flatMapX { sep =>
-      tripleBarStringLines(sep)
-    } ~~ CharsWhileIn(" \t", 0) ~~ "|||"
+  def tripleBarJunk[$: P]: P[Unit] = CharsWhileIn(" \t", 0)
+
+  def tripleBarIndent[$: P]: P[String] = P(
+    CharsWhileIn(" \t", 1)
+      .opaque("|||-block line must either be an empty line or start with at least one whitespace")
+      .!
   )
 
-  def tripleBarStringLines[$: P](sep: String): P[Seq[String]] = P(
+  def tripleBarString[$: P]: P[(Boolean, Seq[String])] = P(
+    ("||-" | "||").!.map(
+      _.last == '-'
+    )./ ~~ tripleBarJunk ~~ tripleBarStringLines ~~ tripleBarJunk ~~ "|||"
+  )
+
+  def tripleBarStringLines[$: P]: P[Seq[String]] = P(
     // First, we skip an empty lines until we reach the first line with indentation.
     // This will become the indentation for the rest of the block.
-    (sep.!.repX ~~ CharsWhileIn(" \t", 1)
-      .opaque("|||-block line must either be an empty line or start with at least one whitespace")
-      .!)
-      .flatMapX { case (before, indent) =>
-        tripleBarStringBody(indent, sep).map(before ++ _)
-      }
+    ("\r\n" | "\n").opaque("|||-blocks require multiple lines").!./.flatMapX { case sep =>
+      (sep.!.repX ~~ tripleBarIndent)
+        .flatMapX { case (before, indent) =>
+          tripleBarStringBody(indent, sep).map(before ++ _)
+        }
+    }
   )
 
   def tripleBarStringBody[$: P](indent: String, sep: String): P[Seq[String]] = P(

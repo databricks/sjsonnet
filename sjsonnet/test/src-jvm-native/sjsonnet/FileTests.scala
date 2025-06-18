@@ -4,7 +4,6 @@ import utest.*
 
 object FileTests extends BaseFileTests {
   val testDataSkippedTests: Set[String] = Set(
-//    "dos_line_endings.jsonnet",
     "regex_js.jsonnet",
     "stdlib_js.jsonnet"
   ) ++ (if (isScalaNative) {
