@@ -66,6 +66,7 @@ object Parser {
   def idStartChar(c: Char): Boolean = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
   private val emptyLazyArray = new Array[Lazy](0)
+  private val isSpaceOrTab: Char => Boolean = c => c == ' ' || c == '\t'
 }
 
 class Parser(
@@ -148,10 +149,10 @@ class Parser(
       lines
   }
 
-  def tripleBarJunk[$: P]: P[Unit] = CharsWhileIn(" \t", 0)
+  def tripleBarJunk[$: P]: P[Unit] = CharsWhile(isSpaceOrTab, 0)
 
   def tripleBarIndent[$: P]: P[String] = P(
-    CharsWhileIn(" \t", 1)
+    CharsWhile(isSpaceOrTab, 1)
       .opaque("|||-block line must either be an empty line or start with at least one whitespace")
       .!
   )
