@@ -1,15 +1,3 @@
-RUNTIME ERROR: xxx
--------------------------------------------------
-	testdata/tailstrict3:1:16-27	function <foo>
-
-local foo(x, y=error "xxx")=x;
-
--------------------------------------------------
-	testdata/tailstrict3:2:1-8	$
-
-foo(42) tailstrict
-
--------------------------------------------------
-	During evaluation	
-
-
+sjsonnet.Error: xxx
+    at [Error].(sjsonnet/test/resources/go_test_suite/tailstrict3.jsonnet:1:16)
+    at [Apply1].(sjsonnet/test/resources/go_test_suite/tailstrict3.jsonnet:2:4)

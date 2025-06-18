@@ -19,11 +19,7 @@ object FileTests extends BaseFileTests {
           Set.empty[String]
         })
   val goTestDataSkippedTests: Set[String] = Set(
-    "bitwise_or9.jsonnet",
-    "builtinChar6.jsonnet",
-    "pow6.jsonnet",
-    "object_invariant_plus.jsonnet",
-    "tailstrict3.jsonnet"
+    "object_invariant_plus.jsonnet"
   ) ++ (if (isScalaNative)
           Set(
             "stdlib_smoke_test.jsonnet",

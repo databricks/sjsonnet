@@ -526,7 +526,7 @@ object Val {
         case p    => p.fileScope
       }
       // println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
-      if (simple || tailstrictMode == TailstrictModeEnabled) {
+      if (simple) {
         if (tailstrictMode == TailstrictModeEnabled) {
           argsL.foreach(_.force)
         }
@@ -584,6 +584,9 @@ object Val {
               outerPos
             )
           }
+        }
+        if (tailstrictMode == TailstrictModeEnabled) {
+          argVals.foreach(_.force)
         }
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
