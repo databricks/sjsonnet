@@ -33,7 +33,10 @@ class MaterializerBenchmark {
       Map.empty[String, String],
       OsPath(wd),
       importer = SjsonnetMain
-        .resolveImport(config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
+        .resolveImport(
+          config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq,
+          None
+        ),
       parseCache = new DefaultParseCache
     )
     value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)

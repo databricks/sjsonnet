@@ -596,7 +596,7 @@ class Std(
       if (!Character.isValidCodePoint(c)) {
         Error.fail(s"Invalid unicode code point, got " + c)
       }
-      Val.Str(pos, c.toChar.toString)
+      Val.Str(pos, Character.toString(c))
     }
   }
 
