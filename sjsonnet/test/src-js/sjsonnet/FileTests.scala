@@ -6,7 +6,6 @@ object FileTests extends BaseFileTests {
   val skippedTests = Set(
     "stdlib.jsonnet",
     "regex.jsonnet",
-    "dos_line_endings.jsonnet",
 
     // Stack size issues with the JS runner
     "recursive_function.jsonnet",
@@ -23,10 +22,8 @@ object FileTests extends BaseFileTests {
   val goTestDataSkippedTests: Set[String] = Set(
     "bitwise_or9.jsonnet",
     "builtinChar6.jsonnet",
-    "escaped_fields.jsonnet",
     "pow6.jsonnet",
     "object_invariant_plus.jsonnet",
-    "std.makeArray_recursive_evalutation_order_matters.jsonnet",
     "tailstrict3.jsonnet",
     "stdlib_smoke_test.jsonnet",
     "builtinSha1.jsonnet",

@@ -4,7 +4,6 @@ import utest.*
 
 object FileTests extends BaseFileTests {
   val testDataSkippedTests: Set[String] = Set(
-    "dos_line_endings.jsonnet",
     "regex_js.jsonnet",
     "stdlib_js.jsonnet"
   ) ++ (if (isScalaNative) {
@@ -22,10 +21,8 @@ object FileTests extends BaseFileTests {
   val goTestDataSkippedTests: Set[String] = Set(
     "bitwise_or9.jsonnet",
     "builtinChar6.jsonnet",
-    "escaped_fields.jsonnet",
     "pow6.jsonnet",
     "object_invariant_plus.jsonnet",
-    "std.makeArray_recursive_evalutation_order_matters.jsonnet",
     "tailstrict3.jsonnet"
   ) ++ (if (isScalaNative)
           Set(
