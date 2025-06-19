@@ -38,7 +38,7 @@ object Platform {
         case Right(v) =>
           v match {
             case null | None   => ujson.Null
-            case v: String     => ujson.Str(v.replaceAll("\\\\n", "\n"))
+            case v: String     => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"")
             case v: Boolean    => ujson.Bool(v)
             case v: Byte       => ujson.Num(v.toDouble)
             case v: Int        => ujson.Num(v.toDouble)

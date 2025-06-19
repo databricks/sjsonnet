@@ -11,7 +11,7 @@ object Platform {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {
         case null          => ujson.Null
-        case v: String     => ujson.Str(v.replaceAll("\\\\n", "\n"))
+        case v: String     => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"")
         case v: Boolean    => ujson.Bool(v)
         case v: Int        => ujson.Num(v.toDouble)
         case v: Long       => ujson.Num(v.toDouble)
