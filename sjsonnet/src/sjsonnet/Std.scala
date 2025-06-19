@@ -610,23 +610,6 @@ class Std(
     }
   }
 
-  private object StrReplaceAll extends Val.Builtin3("strReplaceAll", "str", "from", "to") {
-    def evalRhs(str: Lazy, from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.force.asString.replaceAll(from.force.asString, to.force.asString))
-    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
-      args match {
-        case Array(str, from: Val.Str, to) =>
-          try { (new SpecFrom(from.value), Array(str, to)) }
-          catch { case _: Exception => null }
-        case _ => null
-      }
-    private class SpecFrom(from: String) extends Val.Builtin2("strReplaceAll", "str", "to") {
-      private val pattern = Platform.getPatternFromCache(from)
-      def evalRhs(str: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
-        Val.Str(pos, pattern.matcher(str.force.asString).replaceAll(to.force.asString))
-    }
-  }
-
   private object StripUtils {
     private def getLeadingPattern(chars: String): String = "^[" + Platform.regexQuote(chars) + "]+"
 
@@ -1517,7 +1500,6 @@ class Std(
     builtin(EndsWith),
     builtin(Char_),
     builtin(StrReplace),
-    builtin(StrReplaceAll),
     builtin(RStripChars),
     builtin(LStripChars),
     builtin(StripChars),
