@@ -19,14 +19,14 @@ object NativeGzipTests extends TestSuite {
 
   val tests: Tests = Tests {
     test("gzip") {
-      eval("""std.native('gzip')([1, 2])""", std=std) ==> ujson.Str(
+      eval("""std.native('gzip')([1, 2])""", std = std) ==> ujson.Str(
         if (isJava16OrLater)
           // https://bugs.openjdk.org/browse/JDK-8244706
           "H4sIAAAAAAAA/2NkAgCSQsy2AgAAAA=="
         else
           "H4sIAAAAAAAAAGNkAgCSQsy2AgAAAA=="
       )
-      eval("""std.native('gzip')("hi")""", std=std) ==> ujson.Str(
+      eval("""std.native('gzip')("hi")""", std = std) ==> ujson.Str(
         if (isJava16OrLater)
           // https://bugs.openjdk.org/browse/JDK-8244706
           "H4sIAAAAAAAA/8vIBACsKpPYAgAAAA=="

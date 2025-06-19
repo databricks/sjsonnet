@@ -6,7 +6,12 @@ object NativeXz {
   private val dummyPos: Position = new Position(null, 0)
 
   def functions: Map[String, Val.Builtin] = Map(
-    "xz" -> new Val.Builtin2("xz", "v", "compressionLevel", Array(Val.Null(dummyPos), Val.Null(dummyPos))){
+    "xz" -> new Val.Builtin2(
+      "xz",
+      "v",
+      "compressionLevel",
+      Array(Val.Null(dummyPos), Val.Null(dummyPos))
+    ) {
       override def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val = {
         val compressionLevel: Option[Int] = arg2.force match {
           case Val.Null(_) =>
@@ -20,10 +25,13 @@ object NativeXz {
         arg1.force match {
           case Val.Str(_, value) => Val.Str(pos, Platform.xzString(value, compressionLevel))
           case arr: Val.Arr      =>
-            Val.Str(pos, Platform.xzBytes(
-              arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray,
-              compressionLevel
-            ))
+            Val.Str(
+              pos,
+              Platform.xzBytes(
+                arr.iterator.map(_.cast[Val.Num].asInt.toByte).toArray,
+                compressionLevel
+              )
+            )
           case x => Error.fail("Cannot xz encode " + x.prettyName)
         }
       }

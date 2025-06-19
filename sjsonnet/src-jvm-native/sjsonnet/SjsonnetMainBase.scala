@@ -1,6 +1,13 @@
 package sjsonnet
 
-import java.io.{BufferedOutputStream, InputStream, OutputStreamWriter, PrintStream, StringWriter, Writer}
+import java.io.{
+  BufferedOutputStream,
+  InputStream,
+  OutputStreamWriter,
+  PrintStream,
+  StringWriter,
+  Writer
+}
 import java.nio.charset.StandardCharsets
 import java.nio.file.NoSuchFileException
 import scala.annotation.unused
