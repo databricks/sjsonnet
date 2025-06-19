@@ -19,12 +19,7 @@ object FileTests extends BaseFileTests {
         })
   val goTestDataSkippedTests: Set[String] = Set(
     "object_invariant_plus.jsonnet"
-  ) ++ (if (isScalaNative)
-          Set(
-            "stdlib_smoke_test.jsonnet",
-            "builtinSha3.jsonnet"
-          )
-        else Set.empty[String])
+  )
 
   val tests: Tests = Tests {
     test("test_suite") - {
