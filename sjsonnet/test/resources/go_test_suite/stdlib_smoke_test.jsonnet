@@ -5,6 +5,17 @@
 // Functions with optional arguments need two lines - one with none of the optional arguments
 // and the other with all of them.
 
+local assertClose(a, b) =
+  local err =
+    if b == 0 then
+      a - b
+    else
+      if a / b - 1 > 0 then a / b - 1 else 1 - a / b;
+  if err > 0.000005 then
+    error 'Assertion failed (error ' + err + '). ' + a + ' !~ ' + b
+  else
+    true;
+
 {
     // extVar and native are skipped here, because of the special setup required.
     // We also skip undocumented functions used in desugaring and std.trace.
@@ -51,9 +62,9 @@
     floor: std.floor(x=5),
     ceil: std.ceil(x=5),
     sqrt: std.sqrt(x=5),
-    sin: std.sin(x=5),
-    cos: std.cos(x=5),
-    tan: std.tan(x=5),
+    sin: assertClose(std.sin(x=5), -0.9589242746631385),
+    cos: assertClose(std.cos(x=5), 0.28366218546322625),
+    tan: assertClose(std.tan(x=5), -3.380515006246586),
     asin: std.asin(x=0.5),
     acos: std.acos(x=0.5),
     atan: std.atan(x=5),

@@ -181,7 +181,7 @@ object sjsonnet extends VersionFileModule {
     )
     def ivyDeps = super.ivyDeps() ++
       Agg(
-        ivy"com.github.lolgab::scala-native-crypto::0.2.0",
+        ivy"com.github.lolgab::scala-native-crypto::0.2.1",
         ivy"org.virtuslab::scala-yaml::0.3.0"
       )
 
