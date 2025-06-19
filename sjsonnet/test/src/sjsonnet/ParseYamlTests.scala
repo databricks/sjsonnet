@@ -19,7 +19,9 @@ object ParseYamlTests extends TestSuite {
       )
     }
     test {
-      eval("""std.parseYaml(@'{"a":"\"\\n\n\r\f\b\t""" + "\\u263A" + "\"}') {l: std.length(self.a)}") ==> ujson.Value(
+      eval(
+        """std.parseYaml(@'{"a":"\"\\n\n\r\f\b\t""" + "\\u263A" + "\"}') {l: std.length(self.a)}"
+      ) ==> ujson.Value(
         """{"a":"\"\\n\n\r\f\b\t""" + "\u263A" + """","l":9}""" // <doublequote> <backslash> <n> <\n> <\r> <\f> <\b> <\t> <smiley>
       )
     }

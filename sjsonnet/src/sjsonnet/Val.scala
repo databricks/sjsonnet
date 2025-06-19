@@ -118,7 +118,7 @@ object Val {
 
     def asPositiveInt: Int = {
       if (!value.isWhole || !value.isValidInt) {
-        Error.fail("index value is not a valid integer, got: %s".format(value.toString))
+        Error.fail("index value is not a valid integer")
       }
 
       if (value.toInt < 0) {
