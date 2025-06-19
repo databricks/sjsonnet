@@ -39,7 +39,7 @@ class MultiThreadedBenchmark {
       pool.submit {
         (() =>
           if (
-            SjsonnetMain.main0(
+            SjsonnetMainBase.main0(
               MainBenchmark.mainArgs,
               cache, // new DefaultParseCache
               System.in,

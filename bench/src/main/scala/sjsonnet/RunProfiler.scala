@@ -15,7 +15,7 @@ object RunProfiler extends App {
     Map.empty[String, String],
     Map.empty[String, String],
     OsPath(wd),
-    importer = SjsonnetMain
+    importer = SjsonnetMainBase
       .resolveImport(config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)).toIndexedSeq, None),
     parseCache = parseCache
   ) {

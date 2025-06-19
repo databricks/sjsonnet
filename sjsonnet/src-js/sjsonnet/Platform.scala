@@ -2,25 +2,11 @@ package sjsonnet
 
 import org.virtuslab.yaml.*
 
-import java.io.File
 import java.util
 import java.util.regex.Pattern
 import scala.collection.mutable
 
 object Platform {
-  def gzipBytes(s: Array[Byte]): String = {
-    throw new Exception("GZip not implemented in Scala.js")
-  }
-  def gzipString(s: String): String = {
-    throw new Exception("GZip not implemented in Scala.js")
-  }
-  def xzBytes(s: Array[Byte], compressionLevel: Option[Int]): String = {
-    throw new Exception("XZ not implemented in Scala.js")
-  }
-  def xzString(s: String, compressionLevel: Option[Int]): String = {
-    throw new Exception("XZ not implemented in Scala.js")
-  }
-
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {
@@ -97,9 +83,6 @@ object Platform {
   }
   def sha3(s: String): String = {
     throw new Exception("SHA3 not implemented in Scala.js")
-  }
-  def hashFile(file: File): String = {
-    throw new Exception("hashFile not implemented in Scala.js")
   }
 
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]

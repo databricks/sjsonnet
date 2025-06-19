@@ -80,7 +80,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
         scala.Console.withIn(stdin) {
           scala.Console.withOut(stdout) {
             scala.Console.withErr(stderr) {
-              sjsonnet.SjsonnetMain.main0(args, stateCache2, stdin, stdout, stderr, wd) == 0
+              sjsonnet.SjsonnetMainBase.main0(args, stateCache2, stdin, stdout, stderr, wd) == 0
             }
           }
         }

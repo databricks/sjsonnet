@@ -1,5 +1,7 @@
 package sjsonnet
 
+import sjsonnet.stdlib.NativeRegex
+
 import java.nio.charset.StandardCharsets
 import scala.scalajs.js
 import utest._
@@ -7,7 +9,7 @@ import utest._
 abstract class BaseFileTests extends TestSuite {
   private val stderr = new StringBuffer()
   private val std = new Std(
-    additionalNativeFunctions = Map(
+    nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
         override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
           Val.Str(
@@ -29,7 +31,7 @@ abstract class BaseFileTests extends TestSuite {
         override def evalRhs(ev: EvalScope, pos: Position): Val =
           throw new RuntimeException("native function panic")
       }
-    )
+    ) ++ NativeRegex.functions
   )
 
   def importResolver(
@@ -103,7 +105,7 @@ abstract class BaseFileTests extends TestSuite {
   }
 
   def check(files: Map[String, () => Array[Byte]], fileName: String, testSuite: String): Unit = {
-    println(s"Checking $fileName")
+    println(s"Checking $testSuite/$fileName")
     val goldenContent = if (files.contains(fileName + ".golden_js")) {
       new String(files(fileName + ".golden_js")(), StandardCharsets.UTF_8)
     } else {

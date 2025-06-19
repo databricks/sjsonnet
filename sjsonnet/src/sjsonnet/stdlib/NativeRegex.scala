@@ -1,9 +1,11 @@
-package sjsonnet
+
+package sjsonnet.stdlib
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Val.Obj
+import sjsonnet._
 
-object StdRegex {
+object NativeRegex {
   private final def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {
     val compiledPattern = Platform.getPatternFromCache(pattern)
     val matcher = compiledPattern.matcher(str)
