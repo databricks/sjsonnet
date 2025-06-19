@@ -8,7 +8,7 @@ object NativeGzipTests extends TestSuite {
   private val isScalaNative: Boolean = System.getenv("SCALANATIVE_THREAD_STACK_SIZE") != null
   private val javaVersion: Double =
     java.lang.Double.parseDouble(System.getProperty("java.specification.version"))
-  private val std = new Std(nativeFunctions = NativeGzip.functions)
+  private val std = new Std(nativeFunctions = Map() ++ new NativeGzip().functions)
 
   def isJava16OrLater: Boolean = {
     if (isScalaNative)

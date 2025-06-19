@@ -5,7 +5,7 @@ import sjsonnet.TestUtils.eval
 import utest.*
 
 object NativeXzTests extends TestSuite {
-  private val std = new Std(nativeFunctions = NativeXz.functions)
+  private val std = new Std(nativeFunctions = Map() ++ new NativeXz().functions)
 
   val tests: Tests = Tests {
     test("xz") {

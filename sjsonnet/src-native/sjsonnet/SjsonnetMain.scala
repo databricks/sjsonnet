@@ -12,7 +12,9 @@ object SjsonnetMain {
       System.err,
       os.pwd,
       None,
-      std = new Std(nativeFunctions = NativeGzip.functions ++ NativeRegex.functions).Std
+      std = new Std(nativeFunctions =
+        Map.from(new NativeGzip().functions ++ new NativeRegex().functions)
+      ).Std
     )
     System.exit(exitCode)
   }

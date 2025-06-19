@@ -31,7 +31,7 @@ abstract class BaseFileTests extends TestSuite {
         override def evalRhs(ev: EvalScope, pos: Position): Val =
           throw new RuntimeException("native function panic")
       }
-    ) ++ NativeRegex.functions
+    ) ++ new NativeRegex().functions
   )
 
   def importResolver(

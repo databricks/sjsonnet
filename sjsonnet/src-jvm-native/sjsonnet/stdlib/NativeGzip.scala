@@ -1,9 +1,12 @@
 package sjsonnet.stdlib
 
+import sjsonnet.functions.AbstractFunctionModule
 import sjsonnet.{Error, EvalScope, Lazy, Platform, Position, Val}
 
-object NativeGzip {
-  def functions: Map[String, Val.Builtin] = Map(
+class NativeGzip extends AbstractFunctionModule {
+  def name = "gzip"
+
+  val functions: Seq[(String, Val.Builtin)] = Seq(
     "gzip" -> new Val.Builtin1("gzip", "v") {
       override def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val = v.force match {
         case Val.Str(_, value) => Val.Str(pos, Platform.gzipString(value))

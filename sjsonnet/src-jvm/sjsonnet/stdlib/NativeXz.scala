@@ -1,11 +1,14 @@
 package sjsonnet.stdlib
 
+import sjsonnet.functions.AbstractFunctionModule
 import sjsonnet.{Error, EvalScope, Lazy, Platform, Position, Val}
 
-object NativeXz {
+class NativeXz extends AbstractFunctionModule {
+  def name = "xz"
+
   private val dummyPos: Position = new Position(null, 0)
 
-  def functions: Map[String, Val.Builtin] = Map(
+  val functions: Seq[(String, Val.Builtin)] = Seq(
     "xz" -> new Val.Builtin2(
       "xz",
       "v",
