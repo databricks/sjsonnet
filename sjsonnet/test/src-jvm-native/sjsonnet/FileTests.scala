@@ -3,20 +3,19 @@ package sjsonnet
 import utest.*
 
 object FileTests extends BaseFileTests {
-  val testDataSkippedTests: Set[String] = Set(
-    "stdlib_js.jsonnet"
-  ) ++ (if (isScalaNative) {
-          Set(
-            "error.obj_recursive_manifest.jsonnet",
-            "error.recursive_object_non_term.jsonnet",
-            "error.recursive_import.jsonnet",
-            "error.recursive_function_nonterm.jsonnet",
-            "error.function_infinite_default.jsonnet",
-            "error.obj_recursive.jsonnet"
-          )
-        } else {
-          Set.empty[String]
-        })
+  val testDataSkippedTests: Set[String] =
+    if (isScalaNative)
+      Set(
+        // These tests are skipped in Scala Native because we can't catch the stack overflow and recover.
+        "error.obj_recursive_manifest.jsonnet",
+        "error.recursive_object_non_term.jsonnet",
+        "error.recursive_import.jsonnet",
+        "error.recursive_function_nonterm.jsonnet",
+        "error.function_infinite_default.jsonnet",
+        "error.obj_recursive.jsonnet"
+      )
+    else Set.empty[String]
+
   val goTestDataSkippedTests: Set[String] = Set(
     "object_invariant_plus.jsonnet"
   )

@@ -56,7 +56,7 @@ local assertClose(a, b) =
     min: std.min(a=2, b=3),
     pow: std.pow(x=2, n=3),
     exp: std.exp(x=5),
-    log: std.log(x=5),
+    log: assertClose(std.log(x=5), 1.6094379124341003),
     exponent: std.exponent(x=5),
     mantissa: std.mantissa(x=5),
     floor: std.floor(x=5),
@@ -65,9 +65,9 @@ local assertClose(a, b) =
     sin: assertClose(std.sin(x=5), -0.9589242746631385),
     cos: assertClose(std.cos(x=5), 0.28366218546322625),
     tan: assertClose(std.tan(x=5), -3.380515006246586),
-    asin: std.asin(x=0.5),
-    acos: std.acos(x=0.5),
-    atan: std.atan(x=5),
+    asin: assertClose(std.asin(x=0.5), 0.5235987755982989),
+    acos: assertClose(std.acos(x=0.5), 1.0471975511965979),
+    atan: assertClose(std.atan(x=5), 1.373400766945016),
 
     // Assertions and debugging
     assertEqual: std.assertEqual(a="a", b="a"),

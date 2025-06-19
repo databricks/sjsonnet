@@ -4,23 +4,19 @@ import utest._
 
 object FileTests extends BaseFileTests {
   val skippedTests = Set(
-    "stdlib.jsonnet",
-
     // Stack size issues with the JS runner
     "recursive_function.jsonnet",
     "error.array_recursive_manifest.jsonnet",
-    "error.function_infinite_default.jsonnet",
-    "error.obj_recursive.jsonnet",
     "error.obj_recursive_manifest.jsonnet",
     "error.recursive_object_non_term.jsonnet",
     "error.recursive_import.jsonnet",
     "error.recursive_function_nonterm.jsonnet",
-    "error.array_large_index.jsonnet"
+    "error.function_infinite_default.jsonnet",
+    "error.obj_recursive.jsonnet"
   )
 
   val goTestDataSkippedTests: Set[String] = Set(
     "object_invariant_plus.jsonnet",
-    "stdlib_smoke_test.jsonnet",
     "builtinSha1.jsonnet",
     "builtinSha256.jsonnet",
     "builtinSha3.jsonnet",
@@ -29,7 +25,8 @@ object FileTests extends BaseFileTests {
     "std.md5_2.jsonnet",
     "std.md5_3.jsonnet",
     "std.md5_4.jsonnet",
-    "std.md5_5.jsonnet"
+    "std.md5_5.jsonnet",
+    "std.md5_6.jsonnet"
   )
 
   val tests: Tests = Tests {

@@ -1,3 +1,0 @@
-sjsonnet.Error: index value is not a valid integer, got: 1e+100
-    at [std.makeArray].(std.makeArray_noninteger_big.jsonnet:1:14)
-
