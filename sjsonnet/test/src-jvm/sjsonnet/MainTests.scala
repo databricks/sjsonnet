@@ -18,7 +18,7 @@ object MainTests extends TestSuite {
       val outF = File.createTempFile("sjsonnet", ".json")
       val out = new ByteArrayOutputStream()
       val pout = new PrintStream(out)
-      SjsonnetMain.main0(
+      SjsonnetMainBase.main0(
         Array(source.toString),
         new DefaultParseCache,
         System.in,
@@ -28,7 +28,7 @@ object MainTests extends TestSuite {
         None
       )
       pout.flush()
-      SjsonnetMain.main0(
+      SjsonnetMainBase.main0(
         Array("-o", outF.getAbsolutePath, source.toString),
         new DefaultParseCache,
         System.in,
@@ -163,7 +163,7 @@ object MainTests extends TestSuite {
     val perr = new PrintStream(err, true, "UTF-8")
     val out = new ByteArrayOutputStream()
     val pout = new PrintStream(out, true, "UTF-8")
-    val res = SjsonnetMain.main0(
+    val res = SjsonnetMainBase.main0(
       args.toArray.flatMap(_.value),
       new DefaultParseCache,
       System.in,

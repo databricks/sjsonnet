@@ -33,7 +33,7 @@ object MainBenchmark {
       Map.empty[String, String],
       Map.empty[String, String],
       OsPath(wd),
-      importer = SjsonnetMain
+      importer = SjsonnetMainBase
         .resolveImport(config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
       parseCache = parseCache
     )
@@ -65,7 +65,7 @@ class MainBenchmark {
   @Benchmark
   def main(bh: Blackhole): Unit = {
     bh.consume(
-      SjsonnetMain.main0(
+      SjsonnetMainBase.main0(
         MainBenchmark.mainArgs,
         new DefaultParseCache,
         System.in,
@@ -102,7 +102,7 @@ object MemoryBenchmark {
     } else {
       false
     }
-    SjsonnetMain.main0(
+    SjsonnetMainBase.main0(
       MainBenchmark.mainArgs,
       cache,
       System.in,

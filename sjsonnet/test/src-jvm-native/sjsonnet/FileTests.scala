@@ -4,7 +4,6 @@ import utest.*
 
 object FileTests extends BaseFileTests {
   val testDataSkippedTests: Set[String] = Set(
-    "regex_js.jsonnet",
     "stdlib_js.jsonnet"
   ) ++ (if (isScalaNative) {
           Set(
@@ -46,6 +45,15 @@ object FileTests extends BaseFileTests {
       assert(t.nonEmpty)
       t.foreach { file =>
         check(file, "go_test_suite")
+      }
+    }
+    test("new_test_suite") - {
+      val t = os
+        .list(testSuiteRoot / "new_test_suite")
+        .filter(f => f.ext == "jsonnet" && f.last.contains("jvm-native"))
+      assert(t.nonEmpty)
+      t.foreach { file =>
+        check(file, "new_test_suite")
       }
     }
   }

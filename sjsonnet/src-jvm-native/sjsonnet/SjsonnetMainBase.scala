@@ -13,7 +13,7 @@ import java.nio.file.NoSuchFileException
 import scala.annotation.unused
 import scala.util.Try
 
-object SjsonnetMain {
+object SjsonnetMainBase {
   def resolveImport(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
       allowedInputs: Option[Set[os.Path]] = None,
@@ -59,19 +59,6 @@ object SjsonnetMain {
         readPath(path, binaryData, debugImporter)
       }
     }
-
-  def main(args: Array[String]): Unit = {
-    val exitCode = main0(
-      args,
-      new DefaultParseCache,
-      System.in,
-      System.out,
-      System.err,
-      os.pwd,
-      None
-    )
-    System.exit(exitCode)
-  }
 
   def main0(
       args: Array[String],

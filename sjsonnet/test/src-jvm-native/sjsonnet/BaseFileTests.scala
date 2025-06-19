@@ -1,5 +1,6 @@
 package sjsonnet
 
+import sjsonnet.stdlib.NativeRegex
 import ujson.Value
 import utest.{TestSuite, assert}
 
@@ -8,7 +9,7 @@ abstract class BaseFileTests extends TestSuite {
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   private val stderr = new StringBuffer()
   private val std = new Std(
-    additionalNativeFunctions = Map(
+    nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
         override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
           Val.Str(
@@ -30,7 +31,7 @@ abstract class BaseFileTests extends TestSuite {
         override def evalRhs(ev: EvalScope, pos: Position): Val =
           throw new RuntimeException("native function panic")
       }
-    )
+    ) ++ new NativeRegex().functions
   )
 
   def eval(p: os.Path, testSuite: String): Either[String, Value] = {
@@ -50,7 +51,7 @@ abstract class BaseFileTests extends TestSuite {
       ),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
       OsPath(testSuiteRoot / testSuite),
-      importer = sjsonnet.SjsonnetMain.resolveImport(Array.empty[Path].toIndexedSeq),
+      importer = sjsonnet.SjsonnetMainBase.resolveImport(Array.empty[Path].toIndexedSeq),
       parseCache = new DefaultParseCache,
       logger = (isTrace: Boolean, msg: String) => {
         if (isTrace) {

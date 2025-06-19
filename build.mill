@@ -102,7 +102,8 @@ object sjsonnet extends VersionFileModule {
       def jsEnvConfig = JsEnvConfig.NodeJs(args = List("--stack-size=" + stackSizekBytes))
       def resources = T.sources(
         this.millSourcePath / "resources" / "test_suite",
-        this.millSourcePath / "resources" / "go_test_suite"
+        this.millSourcePath / "resources" / "go_test_suite",
+        this.millSourcePath / "resources" / "new_test_suite",
       )
       def generatedSources = T {
         resources().map(_.path).flatMap { testSuite =>

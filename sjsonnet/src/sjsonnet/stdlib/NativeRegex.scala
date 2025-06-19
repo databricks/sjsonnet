@@ -1,9 +1,13 @@
-package sjsonnet
+package sjsonnet.stdlib
 
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Val.Obj
+import sjsonnet._
+import sjsonnet.functions.AbstractFunctionModule
 
-object StdRegex {
+class NativeRegex extends AbstractFunctionModule {
+  def name = "regex"
+
   private final def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {
     val compiledPattern = Platform.getPatternFromCache(pattern)
     val matcher = compiledPattern.matcher(str)
@@ -39,7 +43,7 @@ object StdRegex {
     }
   }
 
-  def functions: Map[String, Val.Builtin] = Map(
+  val functions: Seq[(String, Val.Builtin)] = Seq(
     "regexPartialMatch" -> new Val.Builtin2("regexPartialMatch", "pattern", "str") {
       override def evalRhs(pattern: Lazy, str: Lazy, ev: EvalScope, pos: Position): Val = {
         regexPartialMatch(pos, pattern.force.asString, str.force.asString)

@@ -1,5 +1,7 @@
 package sjsonnet
 
+import sjsonnet.stdlib.NativeRegex
+
 import scala.collection.mutable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
@@ -39,7 +41,8 @@ object SjsonnetMain {
           }
       },
       parseCache = new DefaultParseCache,
-      new Settings(preserveOrder = preserveOrder)
+      settings = new Settings(preserveOrder = preserveOrder),
+      std = new Std(nativeFunctions = Map.from(new NativeRegex().functions)).Std
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match {
       case Left(msg) => throw new js.JavaScriptException(msg)

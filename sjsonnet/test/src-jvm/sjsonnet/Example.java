@@ -4,7 +4,7 @@ import scala.collection.immutable.Map$;
 
 public class Example {
     public void example(){
-        sjsonnet.SjsonnetMain.main0(
+        sjsonnet.SjsonnetMainBase.main0(
             new String[]{"foo.jsonnet"},
             new DefaultParseCache(),
             System.in,

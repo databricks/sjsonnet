@@ -5,7 +5,6 @@ import utest._
 object FileTests extends BaseFileTests {
   val skippedTests = Set(
     "stdlib.jsonnet",
-    "regex.jsonnet",
 
     // Stack size issues with the JS runner
     "recursive_function.jsonnet",
@@ -53,6 +52,16 @@ object FileTests extends BaseFileTests {
       assert(t.nonEmpty)
       t.foreach { file =>
         check(TestResources_go_test_suite.files, file, "go_test_suite")
+      }
+    }
+
+    test("new_test_suite") - {
+      val t = TestResources_new_test_suite.files.keys.toSeq
+        .filter(f => f.matches("[^/]+-js\\.jsonnet"))
+        .sorted
+      assert(t.nonEmpty)
+      t.foreach { file =>
+        check(TestResources_new_test_suite.files, file, "new_test_suite")
       }
     }
   }
