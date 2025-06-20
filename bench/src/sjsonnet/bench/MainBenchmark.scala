@@ -1,36 +1,36 @@
-package sjsonnet
+package sjsonnet.bench
+
+import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.*
+import sjsonnet.*
 
 import java.io.{OutputStream, PrintStream, StringWriter}
 import java.util.concurrent.TimeUnit
 
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra._
-
 object MainBenchmark {
-  val mainArgs = Array[String](
-    "../../universe/rulemanager/deploy/rulemanager.jsonnet",
-    // "../../universe/kubernetes/admission-controller/gatekeeper/deploy/gatekeeper.jsonnet",
-    "-J",
-    "../../universe",
-    "-J",
-    "../../universe/mt-shards/dev/az-westus-c2",
-    "-J",
-    "../../universe/bazel-bin",
+  private[bench] val testSuiteRoot: os.Path =
+    os.pwd / os.up / os.up / os.up / "sjsonnet" / "test" / "resources" / "test_suite"
+
+  private[bench] val mainArgs = Array[String](
+    "stdlib.jsonnet",
     "--ext-code",
-    "isKubecfg=false"
+    "var1=\"test\"",
+    "--ext-code",
+    "var2={\"x\": 1, \"y\": 2}"
   )
 
   def findFiles(): (IndexedSeq[(Path, String)], EvalScope) = {
     val parser = mainargs.ParserForClass[Config]
     val config = parser
       .constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None)
-      .getOrElse(???)
+      .toOption
+      .get
     val file = config.file
-    val wd = os.pwd
+    val wd = testSuiteRoot
     val path = OsPath(os.Path(file, wd))
     val parseCache = new DefaultParseCache
     val interp = new Interpreter(
-      Map.empty[String, String],
+      Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
       Map.empty[String, String],
       OsPath(wd),
       importer = SjsonnetMainBase
@@ -38,9 +38,14 @@ object MainBenchmark {
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)
-    interp
-      .interpret0(interp.resolver.read(path, binaryData = false).get.readString(), path, renderer)
-      .getOrElse(???)
+    val out = interp.interpret0(
+      interp.resolver.read(path, binaryData = false).get.readString(),
+      path,
+      renderer
+    )
+    if (out.isLeft) {
+      throw new RuntimeException(s"Error interpreting file $file: ${out.left}")
+    }
     (parseCache.keySet.toIndexedSeq, interp.evaluator)
   }
 
@@ -60,7 +65,7 @@ object MainBenchmark {
 @State(Scope.Benchmark)
 class MainBenchmark {
 
-  val dummyOut = MainBenchmark.createDummyOut
+  private val dummyOut = MainBenchmark.createDummyOut
 
   @Benchmark
   def main(bh: Blackhole): Unit = {
@@ -71,7 +76,7 @@ class MainBenchmark {
         System.in,
         dummyOut,
         System.err,
-        os.pwd,
+        MainBenchmark.testSuiteRoot,
         None
       )
     )
@@ -84,7 +89,7 @@ class MainBenchmark {
 // profiler.
 object MemoryBenchmark {
 
-  val dummyOut = MainBenchmark.createDummyOut
+  private val dummyOut = MainBenchmark.createDummyOut
 
   val cache = new DefaultParseCache
 
@@ -108,7 +113,7 @@ object MemoryBenchmark {
       System.in,
       dummyOut,
       System.err,
-      os.pwd,
+      MainBenchmark.testSuiteRoot,
       None
     )
     println("Pre-GC Stats")

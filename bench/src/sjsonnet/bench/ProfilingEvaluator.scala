@@ -1,7 +1,8 @@
-package sjsonnet
+package sjsonnet.bench
+
+import sjsonnet.*
 
 import java.util
-import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.language.existentials

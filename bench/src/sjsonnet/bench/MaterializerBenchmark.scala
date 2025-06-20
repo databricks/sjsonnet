@@ -1,11 +1,12 @@
-package sjsonnet
+package sjsonnet.bench
+
+import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.*
+import sjsonnet.*
+import ujson.JsVisitor
 
 import java.io.{StringWriter, Writer}
 import java.util.concurrent.TimeUnit
-
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra._
-import ujson.JsVisitor
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(2)
@@ -24,9 +25,10 @@ class MaterializerBenchmark {
     val parser = mainargs.ParserForClass[Config]
     val config = parser
       .constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None)
-      .getOrElse(???)
+      .toOption
+      .get
     val file = config.file
-    val wd = os.pwd
+    val wd = MainBenchmark.testSuiteRoot
     val path = os.Path(file, wd)
     this.interp = new Interpreter(
       Map.empty[String, String],
@@ -39,29 +41,20 @@ class MaterializerBenchmark {
         ),
       parseCache = new DefaultParseCache
     )
-    value = interp.evaluate(os.read(path), OsPath(path)).getOrElse(???)
-    assert(renderYaml() == oldRenderYaml())
+    value = interp.evaluate(os.read(path), OsPath(path)).toOption.get
     val r1 = render()
-    assert(r1 == oldRender())
     System.err.println("JSON length: " + r1.length)
-    assert(renderPython() == oldRenderPython())
   }
 
   @Benchmark def newRenderB(bh: Blackhole): Unit = bh.consume(render())
-  @Benchmark def oldRenderB(bh: Blackhole): Unit = bh.consume(oldRender())
   @Benchmark def newRenderPythonB(bh: Blackhole): Unit = bh.consume(renderPython())
-  @Benchmark def oldRenderPythonB(bh: Blackhole): Unit = bh.consume(oldRenderPython())
   @Benchmark def newRenderYamlB(bh: Blackhole): Unit = bh.consume(renderYaml())
-  @Benchmark def oldRenderYamlB(bh: Blackhole): Unit = bh.consume(oldRenderYaml())
 
   @Benchmark def renderPrettyYamlB(bh: Blackhole): Unit = bh.consume(renderPrettyYaml())
 
   private def render() = renderWith(new Renderer(_, indent = 3))
   private def renderPython() = renderWith(new PythonRenderer(_, indent = 3))
   private def renderYaml() = renderWith(new YamlRenderer(_, indent = 3))
-  private def oldRender() = renderWith(new OldRenderer(_, indent = 3))
-  private def oldRenderPython() = renderWith(new OldPythonRenderer(_, indent = 3))
-  private def oldRenderYaml() = renderWith(new OldYamlRenderer(_, indent = 3))
 
   private def renderPrettyYaml() = renderWith(
     new PrettyYamlRenderer(_, indent = 3, getCurrentPosition = () => null)

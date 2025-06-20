@@ -14,6 +14,11 @@ import contrib.jmh.JmhModule
 
 import java.util.Base64
 
+val scalaVersions: Seq[String] = Seq("3.3.6", "2.13.16")
+val jvmScalaVersions: Seq[String] = scalaVersions ++ Seq("2.12.20")
+val stackSize = "100m"
+val stackSizekBytes = 100 * 1024
+
 trait SjsonnetPublishModule extends PublishModule {
   def artifactName = "sjsonnet"
   def publishVersion = sjsonnet.currentVersion().toString
@@ -77,12 +82,14 @@ trait SjsonnetJvmNative extends ScalaModule {
   )
 }
 
-object sjsonnet extends VersionFileModule {
-  private val scalaVersions = Seq("3.3.6", "2.13.16")
-  private val jvmScalaVersions = scalaVersions ++ Seq("2.12.20")
-  private val stackSize = "100m"
-  private val stackSizekBytes = 100 * 1024
+object bench extends ScalaModule with JmhModule with ScalafmtModule {
+  def scalaVersion = scalaVersions.head
+  def moduleDeps = Seq(sjsonnet.jvm.crossModules.head)
+  def jmhCoreVersion = "1.37"
+  def scalacOptions = moduleDeps.head.scalacOptions
+}
 
+object sjsonnet extends VersionFileModule {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def millSourcePath = super.millSourcePath / os.up
@@ -282,18 +289,6 @@ object sjsonnet extends VersionFileModule {
         }
       )
       object test extends ScalaTests with TestModule.Junit4
-    }
-
-    object bench extends ScalaModule with JmhModule with SjsonnetJvmNative {
-      def scalaVersion = SjsonnnetJvmModule.this.crossValue
-      def moduleDeps = Seq(SjsonnnetJvmModule.this)
-      def jmhCoreVersion = "1.37"
-      def sources = T.sources(
-        this.millSourcePath / os.up / os.up / "bench" / "src",
-        this.millSourcePath / os.up / "test" / "src" / "sjsonnet" / "OldRenderer.scala",
-        this.millSourcePath / os.up / "test" / "src" / "sjsonnet" / "OldYamlRenderer.scala"
-      )
-      def scalacOptions = SjsonnnetJvmModule.this.scalacOptions
     }
   }
 }

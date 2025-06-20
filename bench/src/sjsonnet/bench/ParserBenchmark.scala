@@ -1,10 +1,11 @@
-package sjsonnet
+package sjsonnet.bench
 
-import java.util.concurrent.TimeUnit
 import fastparse.Parsed.Success
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.*
+import sjsonnet.{Parser, Path}
 
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 
 @BenchmarkMode(Array(Mode.AverageTime))
