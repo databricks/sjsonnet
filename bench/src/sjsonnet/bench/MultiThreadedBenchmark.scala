@@ -1,10 +1,10 @@
-package sjsonnet
+package sjsonnet.bench
+
+import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.*
+import sjsonnet.{Error, Expr, FileScope, ParseCache, Path, SjsonnetMainBase}
 
 import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
-
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra._
-
 import scala.collection.mutable
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -45,7 +45,7 @@ class MultiThreadedBenchmark {
               System.in,
               MainBenchmark.createDummyOut,
               System.err,
-              os.pwd,
+              MainBenchmark.testSuiteRoot,
               None
             ) != 0
           ) throw new Exception): Runnable

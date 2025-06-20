@@ -1,4 +1,6 @@
-package sjsonnet
+package sjsonnet.bench
+
+import sjsonnet.*
 
 import java.io.StringWriter
 
@@ -6,7 +8,8 @@ object RunProfiler extends App {
   val parser = mainargs.ParserForClass[Config]
   val config = parser
     .constructEither(MainBenchmark.mainArgs.toIndexedSeq, autoPrintHelpAndExit = None)
-    .getOrElse(???)
+    .toOption
+    .get
   val file = config.file
   val wd = os.pwd
   val path = OsPath(os.Path(file, wd))
@@ -32,7 +35,7 @@ object RunProfiler extends App {
     val renderer = new Renderer(new StringWriter, indent = 3)
     val start = interp.resolver.read(path, binaryData = false).get.readString()
     val t0 = System.nanoTime()
-    interp.interpret0(start, path, renderer).getOrElse(???)
+    interp.interpret0(start, path, renderer).toOption.get
     System.nanoTime() - t0
   }
 
@@ -44,7 +47,7 @@ object RunProfiler extends App {
   profiler.clear()
   val total = (for (i <- 1 to 5) yield run()).sum
 
-  val roots = parseCache.valuesIterator.map(_.getOrElse(???)).map(_._1).toSeq
+  val roots = parseCache.valuesIterator.map(_.toOption.get).map(_._1).toSeq
   roots.foreach(profiler.accumulate)
 
   println(s"\nTop 20 by time:")

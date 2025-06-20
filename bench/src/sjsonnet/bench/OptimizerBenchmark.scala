@@ -1,8 +1,9 @@
-package sjsonnet
+package sjsonnet.bench
 
 import fastparse.Parsed.Success
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.*
+import sjsonnet.*
 
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
@@ -74,7 +75,7 @@ class OptimizerBenchmark {
     val applyArities = new mutable.LongMap[Int]()
     val ifElseChains = new mutable.LongMap[Int]()
     val selectChains = new mutable.LongMap[Int]()
-    def transform(e: Expr) = {
+    def transform(e: Expr): Expr = {
       total += 1
       if (e.isInstanceOf[Val]) vals += 1
       else exprs += 1
@@ -131,7 +132,7 @@ class OptimizerBenchmark {
       case _: Expr.ValidId => 0
       case _               => -1
     }
-    override def toString = {
+    override def toString: String = {
       val arities = applyArities.toSeq.sortBy(_._1).map { case (a, b) => s"$a: $b" }.mkString(", ")
       val chains = ifElseChains.toSeq.sortBy(_._1).map { case (a, b) => s"$a: $b" }.mkString(", ")
       val selChains =
