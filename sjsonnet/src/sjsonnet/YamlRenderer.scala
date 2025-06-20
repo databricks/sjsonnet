@@ -78,10 +78,13 @@ class YamlRenderer(
 
   override def flushBuffer(): Unit = {
     if (newlineBuffered) {
-      // drop space between colon and newline
+      // drop space between colon/dash and newline
       elemBuilder.writeOutToIfLongerThan(_out, 0)
       if (outBuffer.length() > 1 && outBuffer.charAt(outBuffer.length() - 1) == ' ') {
-        outBuffer.setLength(outBuffer.length() - 1)
+        val ch = outBuffer.charAt(outBuffer.length() - 2)
+        if (ch == ':' || ch == '-') {
+          outBuffer.setLength(outBuffer.length() - 1)
+        }
       }
       YamlRenderer.writeIndentation(elemBuilder, indent * depth)
       flushCharBuilder()

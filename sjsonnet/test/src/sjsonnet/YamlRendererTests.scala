@@ -37,6 +37,12 @@ object YamlRendererTests extends TestSuite {
       """k0: "v0"
         |k1: "(\\d+)"""".stripMargin
     }
+    test("emptyLineIndent") {
+      ujson
+        .transform(ujson.Obj("k" -> "a\n\nb\n"), new YamlRenderer(quoteKeys = false))
+        .toString() ==>
+      "k: |\n  a\n  \n  b"
+    }
   }
 
 }
