@@ -42,8 +42,10 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
+  private val docSplitPattern = Pattern.compile("(^|\n)---\\s*(\n|$)")
+
   def yamlToJson(s: String): ujson.Value = {
-    val docs = s.split("---\\s*\n")
+    val docs = docSplitPattern.split(s, -1)
     docs.size match {
       case 0 => ujson.Obj()
       case 1 =>
