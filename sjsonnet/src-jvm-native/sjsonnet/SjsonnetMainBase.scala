@@ -41,7 +41,7 @@ object SjsonnetMainBase {
             }
             allowed
           })
-          .find(os.exists)
+          .find(f => os.exists(f) && !os.isDir(f))
           .orElse({
             if (debugImporter) {
               System.err.println(s"[import $importName] none of the candidates exist")
@@ -50,7 +50,9 @@ object SjsonnetMainBase {
           })
           .flatMap(p => {
             if (debugImporter) {
-              System.err.println(s"[import $importName] $p is selected as it exists")
+              System.err.println(
+                s"[import $importName] $p is selected as it exists and is not a directory"
+              )
             }
             Some(OsPath(p))
           })
@@ -353,7 +355,7 @@ object SjsonnetMainBase {
       binaryData: Boolean,
       debugImporter: Boolean = false): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
-    if (os.exists(osPath) && os.isFile(osPath)) {
+    if (os.exists(osPath) && !os.isDir(osPath)) {
       Some(
         new CachedResolvedFile(
           path.asInstanceOf[OsPath],
@@ -363,7 +365,7 @@ object SjsonnetMainBase {
       )
     } else {
       if (debugImporter) {
-        System.err.println(s"[read $path] file does not exist or is not a file")
+        System.err.println(s"[read $path] file does not exist or is a directory")
       }
       None
     }
