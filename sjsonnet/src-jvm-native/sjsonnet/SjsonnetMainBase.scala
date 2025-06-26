@@ -157,6 +157,11 @@ object SjsonnetMainBase {
     }
   }
 
+  private def expectString(v: ujson.Value) = v match {
+    case ujson.Str(s) => Right(s)
+    case _            => Left("expected string result, got: " + v.getClass)
+  }
+
   private def renderNormal(
       config: Config,
       interp: Interpreter,
@@ -164,12 +169,21 @@ object SjsonnetMainBase {
       path: os.Path,
       wd: os.Path,
       getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
-      val renderer = rendererForConfig(writer, config, getCurrentPosition)
-      val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-      if (config.yamlOut.value) writer.write('\n')
-      res
-    }
+    writeToFile(config, wd)(writer =>
+      if (config.expectString.value) {
+        val res = interp.interpret(jsonnetCode, OsPath(path)).flatMap(expectString)
+        res match {
+          case Right(s) => writer.write(s)
+          case _        =>
+        }
+        res
+      } else {
+        val renderer = rendererForConfig(writer, config, getCurrentPosition)
+        val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+        if (config.yamlOut.value) writer.write('\n')
+        res
+      }
+    )
   }
 
   private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
@@ -278,10 +292,7 @@ object SjsonnetMainBase {
                 for {
                   rendered <- {
                     if (config.expectString.value) {
-                      v match {
-                        case ujson.Str(s) => Right(s)
-                        case _            => Left("expected string result, got: " + v.getClass)
-                      }
+                      expectString(v)
                     } else {
                       val writer = new StringWriter()
                       val renderer = rendererForConfig(writer, config, () => currentPos)
