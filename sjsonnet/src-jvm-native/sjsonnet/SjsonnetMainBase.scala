@@ -203,13 +203,19 @@ object SjsonnetMainBase {
 
     def splitMap(s: Seq[String], f: String => String) =
       s.map(split).map { case (x, v) => (x, f(v)) }
-    def readPath(v: String) = os.read(os.Path(v, wd))
+    def readPath(v: String) =
+      if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString else os.read(os.Path(v, wd))
 
     Map() ++
     splitMap(strs, v => ujson.write(v)) ++
     splitMap(strFiles, v => ujson.write(readPath(v))) ++
     splitMap(codes, identity) ++
-    splitMap(codeFiles, v => s"import @'${v.replace("'", "''")}'")
+    splitMap(
+      codeFiles,
+      v =>
+        if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString
+        else s"import @'${v.replace("'", "''")}'"
+    )
   }
 
   /**
@@ -229,6 +235,10 @@ object SjsonnetMainBase {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
+      // TODO: Get rid of the /dev/stdin special-casing (everywhere!) once we use scala-native
+      // with https://github.com/scala-native/scala-native/issues/4384 fixed.
+      else if (file == "-" || file == "/dev/stdin")
+        (io.Source.stdin.mkString, wd / Util.wrapInLessThanGreaterThan("<stdin>"))
       else {
         val p = os.Path(file, wd)
         (os.read(p), p)
