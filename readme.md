@@ -256,9 +256,9 @@ programmatically via `new Interpreter(...).interpret(...)`.
 
 ## Publishing
 
-To publish the JVM version to Maven, make sure the version number in `build.sc` is correct, then run the following commands:
+To publish the JVM version to Maven, make sure the version number in `build.mill` is correct, then run the following commands:
 ```bash
-./mill -i mill.scalalib.PublishModule/publishAll \
-    --sonatypeCreds $SONATYPE_USER:$SONATYPE_PASSWORD --publishArtifacts "sjsonnet.jvm[_].__.publishArtifacts" --release true \
+./mill -i mill.scalalib.SonatypeCentralPublishModule/publishAll \                                                                                (master)
+    --username $SONATYPE_USER --password $SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts \
     --gpgArgs --passphrase=$GPG_PASSPHRASE,--batch,--yes,-a,-b,--pinentry-mode=loopback
 ```
