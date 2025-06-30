@@ -20,8 +20,8 @@ jobs:
           distribution: 'zulu'
       - name: Set up environment variables
         run: |
-          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
-          echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
+          echo "VERSION=$(cat sjsonnet/version)" >> $GITHUB_ENV
+          echo "SCALA_VERSION=3.3.6" >> $GITHUB_ENV
       - name: JAR Build
         run: ./mill "sjsonnet.jvm[$SCALA_VERSION].__.assembly"
       - name: JS Build
@@ -66,8 +66,8 @@ jobs:
           distribution: 'zulu'
       - name: Set up environment variables
         run: |
-          echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
-          echo "SCALA_VERSION=$(awk '{print $NF}' SCALA_VERSIONS | tail -1)" >> $GITHUB_ENV
+          echo "VERSION=$(cat sjsonnet/version)" >> $GITHUB_ENV
+          echo "SCALA_VERSION=3.3.6" >> $GITHUB_ENV
       - name: Native Binary Build
         run: ./mill "sjsonnet.native[$SCALA_VERSION].nativeLink"
       - name: Rename Artifacts
