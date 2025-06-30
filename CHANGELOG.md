@@ -1,4 +1,41 @@
-## 0.5.2 (Latest)
+## 0.5.3 (Latest)
+* chore: Extract Util#hashMapCapacity method. by @He-Pin in https://github.com/databricks/sjsonnet/pull/412
+* chore: Fix some IDE lint problems by @He-Pin in https://github.com/databricks/sjsonnet/pull/413
+* Add go-jsonnet test_suite to sjsonnet by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/417
+* Enable additional math tests cases by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/418
+* Add more test coverage for std.ExtVar. by @Danstahrm in https://github.com/databricks/sjsonnet/pull/402
+* Remove strictImport and duplicateKeysInComprehension flags. by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/419
+* Remove --no-static-error, --strict-inherited-assertions & --strict-set-operations by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/420
+* Remove SBT and consolidate build to mill by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/421
+* chore: Add missing version for maven in readme. by @He-Pin in https://github.com/databricks/sjsonnet/pull/423
+* chore: bump scala-native to 0.5.8 by @He-Pin in https://github.com/databricks/sjsonnet/pull/422
+* Implement md5/sha (except sha3) for the native build by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/424
+* Properly implement file hashing in scala native - using the built-in murmurhash by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/425
+* Add support for parseYaml in native and js by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/427
+* Additional fixes to the parser based on the go test suite by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/428
+* chore: bump scala fmt version to 3.9.7 by @He-Pin in https://github.com/databricks/sjsonnet/pull/429
+* Update ScalaJS entrypoint and documentation by @LaurelineSwissBorg in https://github.com/databricks/sjsonnet/pull/426
+* fix: Imports inside --tla-code-file,--ext-code-file. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/432
+* Add a flag to reverse the order of jpath entries. by @Danstahrm in https://github.com/databricks/sjsonnet/pull/400
+* fix: Support std.sort() on arrays of arrays. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/434
+* Fix ||| block parsing by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/433
+* chore: tweak tripleBar parsing. by @He-Pin in https://github.com/databricks/sjsonnet/pull/435
+* Fix additional discrepancies found when importing go-jsonnet tests. by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/436
+* chore: Add test for std.removeAt which should not modify the parameter. by @He-Pin in https://github.com/databricks/sjsonnet/pull/437
+* Remove std.strReplaceAll, which is not standard by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/440
+* add yaml tests added in go-jsonnet by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/441
+* Refactor std.native functions out of Std by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/442
+* fix: Handling of special characters in std.parseYaml(). by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/438
+* Remove last differences between jvm and native in regard to the go testsuite by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/443
+* Fix some additional discrepancies between the implementations by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/444
+* fix: Indentation of empty lines in YamlRenderer. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/445
+* Fix benchmark suite by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/446
+* fix(js,native): std.parseYaml() handling of "---". by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/447
+* fix(jvm): Let the importer read any path that exists and is not a directory. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/451
+* fix: Implement --string when --multi is not set. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/452
+* feat(jvm,native): Special-case "/dev/stdin" and "-" in TLAs, extVars, top-level file. by @rudo-thomas in https://github.com/databricks/sjsonnet/pull/449
+
+## 0.5.2
 * Fix readme to publish and allow for server/client to be pushed to maven by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/389
 * chore: Update readme for std library by @He-Pin in https://github.com/databricks/sjsonnet/pull/390
 * Add client/server to the build workflow by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/393
