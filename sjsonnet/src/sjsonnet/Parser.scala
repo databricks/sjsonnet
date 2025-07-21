@@ -94,7 +94,7 @@ class Parser(
       ("." ~ CharsWhileIn("0-9")).? ~~
       (CharIn("eE") ~ CharIn("+\\-").? ~~ CharsWhileIn("0-9")).?
     ).!
-  ).flatMap(s => {
+  ).flatMapX(s => {
     if (s._2.length > 1 && Character.isDigit(s._2.charAt(1)) && s._2.charAt(0) == '0') {
       Fail.opaque("numbers cannot start with a 0 digit")
     } else {
