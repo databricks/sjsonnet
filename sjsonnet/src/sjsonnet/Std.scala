@@ -854,7 +854,7 @@ class Std(
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
       try {
-        Val.Num(pos, str.force.asString.toInt.toDouble)
+        Val.Num(pos, str.force.asString.toLong.toDouble)
       } catch {
         case _: NumberFormatException =>
           Error.fail("Cannot parse '" + str.force.asString + "' as an integer in base 10")
