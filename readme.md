@@ -107,7 +107,7 @@ node --stack-size=100m
 
 ## Architecture
 
-Sjsonnet is implementated as an optimizing interpreter. There are roughly 4
+Sjsonnet is implemented as an optimizing interpreter. There are roughly 4
 phases:
 
 - `sjsonnet.Parser`: parses an input `String` into a `sjsonnet.Expr`, which is a
@@ -172,31 +172,6 @@ line which is run by all of these is defined in
 `MainBenchmark.mainArgs`. You need to change it to point to a suitable input
 before running a benchmark or the profiler.
 
-Benchmark example:
-
-```
-sbt bench/jmh:run -jvmArgs "-XX:+UseStringDeduplication" sjsonnet.MainBenchmark
-```
-
-Profiler:
-
-```
-sbt bench/run
-```
-
-There's also a benchmark for memory usage:
-
-Execute and print stats:
-```
-sbt 'set fork in run := true' 'set javaOptions in run ++= Seq("-Xmx6G", "-XX:+UseG1GC")' 'bench/runMain sjsonnet.MemoryBenchmark'
-```
-
-Execute and pause - this is useful if you want to attach a profiler after the run and deep dive the
-object utilization.
-```
-sbt 'set fork in run := true' 'set javaOptions in run ++= Seq("-Xmx6G", "-XX:+UseG1GC")' 'bench/runMain sjsonnet.MemoryBenchmark --pause'
-```
-
 ## Laziness
 
 The Jsonnet language is _lazy_: expressions don't get evaluated unless
@@ -258,7 +233,7 @@ programmatically via `new Interpreter(...).interpret(...)`.
 
 To publish the JVM version to Maven, make sure the version number in `build.mill` is correct, then run the following commands:
 ```bash
-./mill -i mill.scalalib.SonatypeCentralPublishModule/publishAll \                                                                                (master)
+./mill -i mill.scalalib.SonatypeCentralPublishModule/publishAll \
     --username $SONATYPE_USER --password $SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts \
     --gpgArgs --passphrase=$GPG_PASSPHRASE,--batch,--yes,-a,-b,--pinentry-mode=loopback
 ```
