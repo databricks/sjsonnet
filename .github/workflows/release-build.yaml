@@ -25,12 +25,12 @@ jobs:
       - name: JAR Build
         run: ./mill "sjsonnet.jvm[$SCALA_VERSION].__.assembly"
       - name: JS Build
-        run: ./mill "sjsonnet.js[$SCALA_VERSION].fullOpt"
+        run: ./mill "sjsonnet.js[$SCALA_VERSION].fullLinkJS"
       - name: Rename Artifacts
         run: |
           mkdir release
-          cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js ./release/sjsonnet-$VERSION.js
-          cp ./out/sjsonnet/js/$SCALA_VERSION/fullOpt.dest/out.js.map ./release/sjsonnet-$VERSION.js.map
+          cp ./out/sjsonnet/js/$SCALA_VERSION/fullLinkJS.dest/main.js ./release/sjsonnet-$VERSION.js
+          cp ./out/sjsonnet/js/$SCALA_VERSION/fullLinkJS.dest/main.js.map ./release/sjsonnet-$VERSION.js.map
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar ./release/sjsonnet-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/client/assembly.dest/out.jar ./release/sjsonnet-client-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/server/assembly.dest/out.jar ./release/sjsonnet-server-$VERSION.jar
