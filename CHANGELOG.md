@@ -1,4 +1,9 @@
-## 0.5.3 (Latest)
+## 0.5.4 (Latest)
+* Upgrade to mill 1.0.2
+* Fix parsing error with numbers causing whitespaces to be consumed. by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/457
+* Fix parseInt to properly understand longs by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/458
+
+## 0.5.3
 * chore: Extract Util#hashMapCapacity method. by @He-Pin in https://github.com/databricks/sjsonnet/pull/412
 * chore: Fix some IDE lint problems by @He-Pin in https://github.com/databricks/sjsonnet/pull/413
 * Add go-jsonnet test_suite to sjsonnet by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/417
