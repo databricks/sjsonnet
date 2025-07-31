@@ -130,17 +130,6 @@ final case class Config(
     )
     exec: Flag = Flag(),
     @arg(
-      name = "strict-inherited-assertions",
-      doc =
-        """Properly handle assertions defined in a Jsonnet dictionary that is extended more than once"""
-    )
-    strictInheritedAssertions: Flag = Flag(),
-    @arg(
-      name = "strict-set-operations",
-      doc = """Strict set operations"""
-    )
-    strictSetOperations: Flag = Flag(),
-    @arg(
       name = "throw-error-for-invalid-sets",
       doc = """Throw an error if a set operation is used on a non-set"""
     )
