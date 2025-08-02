@@ -48,7 +48,7 @@ class PrettyYamlRenderer(
     } else if (str == "\n") {
       out.append("|2+")
       saveCurrentPos()
-      if (bufferedComment != null) out.append(bufferedComment)
+      if (bufferedComment ne null) out.append(bufferedComment)
       bufferedComment = null
       out.append("\n")
     }
@@ -122,7 +122,7 @@ class PrettyYamlRenderer(
     mutable.HashMap.empty[Path, Array[Int]]
   def saveCurrentPos(): Unit = {
     val current = getCurrentPosition()
-    if (current != null) {
+    if (current ne null) {
       bufferedComment =
         " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
     }
@@ -150,7 +150,7 @@ class PrettyYamlRenderer(
   override def flushBuffer(): Unit = {
     if (newlineBuffered) {
       afterColon = false
-      if (bufferedComment != null) {
+      if (bufferedComment ne null) {
         out.append(bufferedComment)
         bufferedComment = null
       }
@@ -239,7 +239,7 @@ class PrettyYamlRenderer(
       flushBuffer()
       out.append(":")
       saveCurrentPos()
-      if (bufferedComment != null) {
+      if (bufferedComment ne null) {
         out.append(bufferedComment)
         bufferedComment = null
       }
@@ -355,7 +355,7 @@ object PrettyYamlRenderer {
           writeData(text.slice(start, end))
           start = end
         }
-        if (ch != null) {
+        if (ch ne null) {
           writeData(getEscapeSequenceForChar(ch))
           start = end + 1
         }

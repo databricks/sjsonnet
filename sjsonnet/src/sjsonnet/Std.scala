@@ -1236,7 +1236,7 @@ class Std(
             var outIdx = lKeys.length
             var j = 0
             while (j < rKeysCopy.length) {
-              if (rKeysCopy(j) != null) {
+              if (rKeysCopy(j) ne null) {
                 outArray(outIdx) = rKeysCopy(j)
                 outIdx += 1
               }
@@ -2056,7 +2056,7 @@ class Std(
         if ((keyF eq null) || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
       Val.Arr(
         pos,
-        if (keyFFunc != null) {
+        if (keyFFunc ne null) {
           val keys: Array[Val] = vs.map(v =>
             keyFFunc(Array(v.force), null, pos.noOffset)(ev, TailstrictModeDisabled).force
           )

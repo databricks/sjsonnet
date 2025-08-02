@@ -72,7 +72,7 @@ class ProfilingEvaluator(
       box.time += (System.nanoTime() - t0)
       box.count += 1
       parent = prevParent
-      if (parent != null) {
+      if (parent ne null) {
         parent.time -= (System.nanoTime() - pt0)
       }
     }
@@ -106,7 +106,7 @@ class ProfilingEvaluator(
           case s: Some[?]                       => s.collect { case ee: Expr => ee }
           case _                                => Nil
         }
-        .filter(_ != null)
+        .filter(_ ne null)
         .toSeq
     case _ => Nil
   }

@@ -63,13 +63,13 @@ class StaticOptimizer(
 
     case e @ Self(pos) =>
       scope.get("self") match {
-        case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
+        case ScopedVal(v, _, idx) if (v ne null) => ValidId(pos, "self", idx)
         case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
       }
 
     case e @ $(pos) =>
       scope.get("$") match {
-        case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
+        case ScopedVal(v, _, idx) if (v ne null) => ValidId(pos, "$", idx)
         case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
       }
 
@@ -90,8 +90,8 @@ class StaticOptimizer(
   private object ValidSuper {
     def unapply(s: Super): Option[(Position, Int)] =
       scope.get("self") match {
-        case ScopedVal(v, _, idx) if v != null => Some((s.pos, idx))
-        case _                                 => None
+        case ScopedVal(v, _, idx) if (v ne null) => Some((s.pos, idx))
+        case _                                   => None
       }
   }
 
@@ -152,7 +152,7 @@ class StaticOptimizer(
   }
 
   private def specializeApplyArity(a: Apply): Expr = {
-    if (a.namedNames != null) a
+    if (a.namedNames ne null) a
     else
       a.args.length match {
         case 0 => Apply0(a.pos, a.value, a.tailstrict)
@@ -219,16 +219,16 @@ class StaticOptimizer(
   private def rebind(args: Array[Expr], argNames: Array[String], params: Params): Array[Expr] = {
     if (args.length == params.names.length && (argNames eq null)) return args
     if (args.length > params.names.length) return null // too many args
-    val positional = if (argNames != null) args.length - argNames.length else args.length
+    val positional = if (argNames ne null) args.length - argNames.length else args.length
     val target = new Array[Expr](params.names.length)
     System.arraycopy(args, 0, target, 0, positional)
-    if (argNames != null) {
+    if (argNames ne null) {
       var i = 0
       var j = args.length - argNames.length
       while (i < argNames.length) {
         val pos = params.paramMap.getOrElse(argNames(i), -1)
         if (pos == -1) return null // unknown arg name
-        if (target(pos) != null) return null // duplicate arg
+        if (target(pos) ne null) return null // duplicate arg
         target(pos) = args(j)
         i += 1
         j += 1

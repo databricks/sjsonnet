@@ -24,8 +24,8 @@ class Evaluator(
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
 
-  def trace(e: String): Unit = if (logger != null) logger(true, e)
-  def warn(e: Error): Unit = if (logger != null) logger(false, Error.formatError(e))
+  def trace(e: String): Unit = if (logger ne null) logger(true, e)
+  def warn(e: Error): Unit = if (logger ne null) logger(false, Error.formatError(e))
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
@@ -700,7 +700,7 @@ class Evaluator(
       val newScope = scope.extendBy(by)
       newScope.bindings(scopeLen) = self
       newScope.bindings(scopeLen + 1) = sup
-      if (binds != null) {
+      if (binds ne null) {
         val arrF = newScope.bindings
         var i = 0
         var j = scopeLen + 2
@@ -723,10 +723,10 @@ class Evaluator(
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
-        if (k != null) {
+        if (k ne null) {
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              if (asserts != null) assertions(self)
+              if (asserts ne null) assertions(self)
               visitExpr(rhs)(makeNewScope(self, sup))
             }
           }
@@ -734,10 +734,10 @@ class Evaluator(
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
-        if (k != null) {
+        if (k ne null) {
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              if (asserts != null) assertions(self)
+              if (asserts ne null) assertions(self)
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             }
           }
@@ -755,7 +755,7 @@ class Evaluator(
       objPos,
       builder,
       false,
-      if (asserts != null) assertions else null,
+      if (asserts ne null) assertions else null,
       sup,
       valueCache
     )

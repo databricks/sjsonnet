@@ -57,6 +57,6 @@ class MultiThreadedBenchmark {
       catch { case e: Throwable => err = e }
     })
     pool.shutdown()
-    if (err != null) throw err
+    if (err ne null) throw err
   }
 }

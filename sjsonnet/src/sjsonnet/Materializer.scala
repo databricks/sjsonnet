@@ -34,7 +34,7 @@ abstract class Materializer {
             -1
           )
           if (sort) {
-            if (prevKey != null && k.compareTo(prevKey) <= 0)
+            if ((prevKey ne null) && k.compareTo(prevKey) <= 0)
               Error.fail(
                 s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""",
                 v.pos

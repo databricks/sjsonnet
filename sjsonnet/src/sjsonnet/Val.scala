@@ -29,7 +29,7 @@ abstract class Lazy {
 final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) extends Lazy {
   def compute(): Val = {
     val f = computeFunc
-    if (f != null) { // we won the race to initialize
+    if (f ne null) { // we won the race to initialize
       val result = f()
       cached = result
       computeFunc = null // allow closure to be GC'd
@@ -285,8 +285,8 @@ object Val {
     }
 
     @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
-      if (triggerAsserts != null) triggerAsserts(obj)
-      if (`super` != null) `super`.triggerAllAsserts(obj)
+      if (triggerAsserts ne null) triggerAsserts(obj)
+      if (`super` ne null) `super`.triggerAllAsserts(obj)
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
@@ -302,7 +302,7 @@ object Val {
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       if (static) mapping.putAll(allKeys)
       else {
-        if (`super` != null) `super`.gatherKeys(mapping)
+        if (`super` ne null) `super`.gatherKeys(mapping)
         getValue0.forEach { (k, m) =>
           val vis = m.visibility
           if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
@@ -323,26 +323,26 @@ object Val {
     }
 
     @inline def hasKeys: Boolean = {
-      val m = if (static || `super` != null) getAllKeys else value0
+      val m = if (static || (`super` ne null)) getAllKeys else value0
       !m.isEmpty
     }
 
     @inline def containsKey(k: String): Boolean = {
-      val m = if (static || `super` != null) getAllKeys else value0
+      val m = if (static || (`super` ne null)) getAllKeys else value0
       m.containsKey(k)
     }
 
     @inline def containsVisibleKey(k: String): Boolean = {
-      if (static || `super` != null) {
+      if (static || (`super` ne null)) {
         getAllKeys.get(k) == java.lang.Boolean.FALSE
       } else {
         val m = value0.get(k)
-        m != null && (m.visibility != Visibility.Hidden)
+        (m ne null) && (m.visibility != Visibility.Hidden)
       }
     }
 
     lazy val allKeyNames: Array[String] = {
-      val m = if (static || `super` != null) getAllKeys else value0
+      val m = if (static || (`super` ne null)) getAllKeys else value0
       m.keySet().toArray(new Array[String](m.size()))
     }
 
@@ -372,7 +372,7 @@ object Val {
       } else {
         val cacheKey = if (self eq this) k else (k, self)
         val cachedValue = valueCache.get(cacheKey)
-        if (cachedValue != null) {
+        if (cachedValue ne null) {
           cachedValue
         } else {
           valueRaw(k, self, pos, valueCache, cacheKey) match {
@@ -420,7 +420,7 @@ object Val {
         addKey: Any = null)(implicit evaluator: EvalScope): Val = {
       if (static) {
         val v = valueCache.get(k)
-        if (addTo != null && v != null) addTo.put(addKey, v)
+        if ((addTo ne null) && (v ne null)) addTo.put(addKey, v)
         v
       } else {
         val s = this.`super`
@@ -429,13 +429,13 @@ object Val {
             if (s eq null) null else s.valueRaw(k, self, pos, addTo, addKey)
           case m =>
             val vv = m.invoke(self, s, pos.fileScope, evaluator)
-            val v = if (s != null && m.add) {
+            val v = if ((s ne null) && m.add) {
               s.valueRaw(k, self, pos, null, null) match {
                 case null     => vv
                 case supValue => mergeMember(supValue, vv, pos)
               }
             } else vv
-            if (addTo != null && m.cached) addTo.put(addKey, v)
+            if ((addTo ne null) && m.cached) addTo.put(addKey, v)
             v
         }
       }
@@ -540,7 +540,7 @@ object Val {
         val argVals = newScope.bindings
         val posArgs = if (namedNames eq null) argsL.length else argsL.length - namedNames.length
         System.arraycopy(argsL, 0, argVals, base, posArgs)
-        if (namedNames != null) { // Add named args
+        if (namedNames ne null) { // Add named args
           var i = 0
           var j = posArgs
           while (i < namedNames.length) {
@@ -548,7 +548,7 @@ object Val {
               namedNames(i),
               Error.fail(s"Function has no parameter ${namedNames(i)}", outerPos)
             )
-            if (argVals(base + idx) != null)
+            if (argVals(base + idx) ne null)
               Error.fail(s"binding parameter a second time: ${namedNames(i)}", outerPos)
             argVals(base + idx) = argsL(j)
             i += 1
@@ -567,7 +567,7 @@ object Val {
           while (j < argVals.length) {
             if (argVals(j) eq null) {
               val default = params.defaultExprs(i)
-              if (default != null) {
+              if (default ne null) {
                 argVals(j) = new LazyWithComputeFunc(() => evalDefault(default, newScope, ev))
               } else {
                 if (missing eq null) missing = new ArrayBuffer
@@ -577,7 +577,7 @@ object Val {
             i += 1
             j += 1
           }
-          if (missing != null) {
+          if (missing ne null) {
             val plural = if (missing.size > 1) "s" else ""
             Error.fail(
               s"Function parameter$plural ${missing.mkString(", ")} not bound in call",

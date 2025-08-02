@@ -423,7 +423,7 @@ class Parser(
           else seen.add(n)
         case null =>
       }
-      if (overlap != null) {
+      if (overlap ne null) {
         Fail.opaque("no duplicate local: " + overlap)
       } else {
         val binds = if (b.isEmpty) null else b
