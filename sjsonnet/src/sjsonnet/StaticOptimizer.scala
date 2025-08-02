@@ -80,7 +80,7 @@ class StaticOptimizer(
       Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
     case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-      if (binds == null && asserts == null && fields.forall(_.isStatic))
+      if ((binds eq null) && (asserts eq null) && fields.forall(_.isStatic))
         Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
       else m
 
@@ -217,7 +217,7 @@ class StaticOptimizer(
   }
 
   private def rebind(args: Array[Expr], argNames: Array[String], params: Params): Array[Expr] = {
-    if (args.length == params.names.length && argNames == null) return args
+    if (args.length == params.names.length && (argNames eq null)) return args
     if (args.length > params.names.length) return null // too many args
     val positional = if (argNames != null) args.length - argNames.length else args.length
     val target = new Array[Expr](params.names.length)
@@ -236,7 +236,7 @@ class StaticOptimizer(
     }
     var i = positional
     while (i < target.length) {
-      if (target(i) == null) {
+      if (target(i) eq null) {
         params.defaultExprs(i) match {
           case v: Val with Expr => target(i) = v
           case _                => return null // no default or non-constant

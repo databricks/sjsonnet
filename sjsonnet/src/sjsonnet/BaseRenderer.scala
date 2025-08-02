@@ -112,7 +112,7 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
 
   def visitString(s: CharSequence, index: Int): T = {
     flushBuffer()
-    if (s == null) out.append("null")
+    if (s eq null) out.append("null")
     else BaseRenderer.escape(out, s, escapeUnicode)
 
     out

@@ -24,7 +24,7 @@ trait Expr {
 }
 object Expr {
   private final def arrStr(a: Array[?]): String = {
-    if (a == null) "null" else a.mkString("[", ", ", "]")
+    if (a eq null) "null" else a.mkString("[", ", ", "]")
   }
 
   final case class Self(pos: Position) extends Expr {
@@ -76,7 +76,7 @@ object Expr {
         rhs: Expr)
         extends Member {
       def isStatic: Boolean = fieldName
-        .isInstanceOf[FieldName.Fixed] && !plus && args == null && sep == Visibility.Normal && rhs
+        .isInstanceOf[FieldName.Fixed] && !plus && (args eq null) && sep == Visibility.Normal && rhs
         .isInstanceOf[Val.Literal]
     }
     final case class AssertStmt(value: Expr, msg: Expr) extends Member

@@ -409,7 +409,7 @@ class Parser(
         else seen.add(n)
       case _ =>
     }
-    if (overlap == null) Pass(t)
+    if (overlap eq null) Pass(t)
     else Fail.opaque("no duplicate field: " + overlap)
   }.flatMapX {
     case (pos, exprs, None) =>
@@ -439,7 +439,7 @@ class Parser(
             .toArray
           if (a.isEmpty) null else a
         }
-        if (binds == null && asserts == null && fields.forall(_.isStatic))
+        if ((binds eq null) && (asserts eq null) && fields.forall(_.isStatic))
           Pass(Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings))
         else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
       }
@@ -459,7 +459,7 @@ class Parser(
                 Visibility.Normal,
                 rhsBody
               ) =>
-            val rhs = if (args == null) {
+            val rhs = if (args eq null) {
               rhsBody
             } else {
               Expr.Function(offset, args, rhsBody)
@@ -562,7 +562,7 @@ class Parser(
       if (seen(k)) overlap = k
       else seen.add(k)
     }
-    if (overlap == null) {
+    if (overlap eq null) {
       val names = x.map(_._1).toArray[String]
       val exprs = x.map(_._2.orNull).toArray[Expr]
       Pass(Expr.Params(names, exprs))
@@ -605,7 +605,7 @@ final class Position(val fileScope: FileScope, val offset: Int) {
     case _           => false
   }
   override def toString: String = {
-    val name = if (fileScope == null) "null" else fileScope.currentFileLastPathElement
+    val name = if (fileScope eq null) "null" else fileScope.currentFileLastPathElement
     s"Position($name, $offset)"
   }
 }
@@ -615,6 +615,6 @@ final class Position(val fileScope: FileScope, val offset: Int) {
  * Jsonnet file. Contains the current file path.
  */
 class FileScope(val currentFile: Path) {
-  lazy val currentFileLastPathElement: String = if (currentFile == null) null else currentFile.last
+  lazy val currentFileLastPathElement: String = if (currentFile eq null) null else currentFile.last
   val noOffsetPos: Position = new Position(this, -1)
 }

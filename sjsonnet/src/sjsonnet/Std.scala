@@ -1151,7 +1151,7 @@ class Std(
             val rValue = if (r.containsVisibleKey(key)) r.valueRaw(key, r, pos)(ev) else null
             if (!rValue.isInstanceOf[Val.Null]) { // if we are not removing the key
               if (l.containsVisibleKey(key)) {
-                if (rValue == null) {
+                if (rValue eq null) {
                   // Preserve the LHS/target value:
                   kvs(kvsIdx) = (key, createLazyMember(l.valueRaw(key, l, pos)(ev)))
                 } else {
@@ -2053,7 +2053,7 @@ class Std(
       arr
     } else {
       val keyFFunc =
-        if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
+        if ((keyF eq null) || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
       Val.Arr(
         pos,
         if (keyFFunc != null) {

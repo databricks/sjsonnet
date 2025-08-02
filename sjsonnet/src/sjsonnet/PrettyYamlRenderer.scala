@@ -71,7 +71,7 @@ class PrettyYamlRenderer(
         out,
         depth,
         indent,
-        if (bufferedComment == null) "" else bufferedComment
+        if (bufferedComment eq null) "" else bufferedComment
       )
       bufferedComment = null
     }
@@ -350,7 +350,7 @@ object PrettyYamlRenderer {
 
     while (end <= text.length) {
       val ch: Character = if (end < text.length) text(end) else null
-      if (ch == null || isBreakableChar(ch, allowUnicode)) {
+      if ((ch eq null) || isBreakableChar(ch, allowUnicode)) {
         if (start < end) {
           writeData(text.slice(start, end))
           start = end

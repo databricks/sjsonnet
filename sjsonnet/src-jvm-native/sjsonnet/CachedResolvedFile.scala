@@ -61,7 +61,7 @@ class CachedResolvedFile(
    * that reads from memory.
    */
   def getParserInput(): ParserInput = {
-    if (resolvedImportContent == null) {
+    if (resolvedImportContent eq null) {
       FileParserInput(jFile)
     } else {
       resolvedImportContent.getParserInput()
@@ -69,7 +69,7 @@ class CachedResolvedFile(
   }
 
   override def readString(): String = {
-    if (resolvedImportContent == null) {
+    if (resolvedImportContent eq null) {
       // If the file is too large, then we will just read it from disk
       readString(jFile)
     } else {
@@ -79,7 +79,7 @@ class CachedResolvedFile(
   }
 
   override def contentHash(): String = {
-    if (resolvedImportContent == null) {
+    if (resolvedImportContent eq null) {
       // If the file is too large, then we will just read it from disk
       Platform.hashFile(jFile)
     } else {
@@ -88,7 +88,7 @@ class CachedResolvedFile(
   }
 
   override def readRawBytes(): Array[Byte] = {
-    if (resolvedImportContent == null) {
+    if (resolvedImportContent eq null) {
       // If the file is too large, then we will just read it from disk
       readRawBytes(jFile)
     } else {

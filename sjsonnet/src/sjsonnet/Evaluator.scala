@@ -106,7 +106,7 @@ class Evaluator(
   def visitLocalExpr(e: LocalExpr)(implicit scope: ValScope): Val = {
     val bindings = e.bindings
     val s =
-      if (bindings == null) scope
+      if (bindings eq null) scope
       else {
         val base = scope.length
         val newScope = scope.extendBy(bindings.length)
@@ -136,7 +136,7 @@ class Evaluator(
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
-    if (sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
+    if (sup eq null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
     else sup.value(e.name, e.pos, scope.bindings(e.selfIdx).asInstanceOf[Val.Obj])
   }
 
@@ -388,7 +388,7 @@ class Evaluator(
   def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
     var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
-    if (sup == null) sup = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
+    if (sup eq null) sup = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
     sup.value(key.value, e.pos)
   }
 
@@ -453,7 +453,7 @@ class Evaluator(
 
   def visitInSuper(e: InSuper)(implicit scope: ValScope): Val.Bool = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
-    if (sup == null) Val.False(e.pos)
+    if (sup eq null) Val.False(e.pos)
     else {
       val key = visitExpr(e.value).cast[Val.Str]
       Val.bool(e.pos, sup.containsKey(key.value))
@@ -696,7 +696,7 @@ class Evaluator(
     def createNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       val scopeLen = scope.length
       val binds = e.binds
-      val by = if (binds == null) 2 else 2 + binds.length
+      val by = if (binds eq null) 2 else 2 + binds.length
       val newScope = scope.extendBy(by)
       newScope.bindings(scopeLen) = self
       newScope.bindings(scopeLen + 1) = sup
@@ -746,7 +746,7 @@ class Evaluator(
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
-    val valueCache = if (sup == null) {
+    val valueCache = if (sup eq null) {
       Val.Obj.getEmptyValueCacheForObjWithoutSuper(fields.length)
     } else {
       new java.util.HashMap[Any, Val]()
@@ -790,7 +790,7 @@ class Evaluator(
         case x           => fieldNameTypeError(x, e.pos)
       }
     }
-    val valueCache = if (sup == null) {
+    val valueCache = if (sup eq null) {
       Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
     } else {
       new java.util.HashMap[Any, Val]()

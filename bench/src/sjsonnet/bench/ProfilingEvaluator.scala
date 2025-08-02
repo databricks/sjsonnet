@@ -54,7 +54,7 @@ class ProfilingEvaluator(
 
   private def getOrCreate(e: Expr): ExprBox = {
     var box = data.get(e)
-    if (box == null) {
+    if (box eq null) {
       box = new ExprBox(e)
       data.put(e, box)
     }
@@ -112,7 +112,7 @@ class ProfilingEvaluator(
   }
 
   private def getChildren(p: Expr.Params): Seq[Expr] =
-    if (p == null || p.defaultExprs == null) Nil else p.defaultExprs.toSeq
+    if ((p eq null) || (p.defaultExprs eq null)) Nil else p.defaultExprs.toSeq
 
   private def getChildren(b: Expr.Bind): Seq[Expr] =
     getChildren(b.args) :+ b.rhs

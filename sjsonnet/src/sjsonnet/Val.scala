@@ -18,7 +18,7 @@ abstract class Lazy {
   protected var cached: Val = _
   def compute(): Val
   final def force: Val = {
-    if (cached == null) cached = compute()
+    if (cached eq null) cached = compute()
     cached
   }
 }
@@ -273,7 +273,7 @@ object Val {
       // value0 is always defined for non-static objects, so if we're computing it here
       // then that implies that the object is static and therefore valueCache should be
       // pre-populated and all members should be visible and constant.
-      if (value0 == null) {
+      if (value0 eq null) {
         val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
         allKeys.forEach { (k, _) =>
           value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
@@ -313,7 +313,7 @@ object Val {
     }
 
     private def getAllKeys = {
-      if (allKeys == null) {
+      if (allKeys eq null) {
         val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
         gatherKeys(allKeys)
         // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
@@ -351,7 +351,7 @@ object Val {
         allKeyNames
       } else {
         val buf = new mutable.ArrayBuilder.ofRef[String]
-        if (`super` == null) {
+        if (`super` eq null) {
           // This size hint is based on an optimistic assumption that most fields are visible,
           // avoiding re-sizing or trimming the buffer in the common case:
           buf.sizeHint(value0.size())
@@ -426,7 +426,7 @@ object Val {
         val s = this.`super`
         getValue0.get(k) match {
           case null =>
-            if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+            if (s eq null) null else s.valueRaw(k, self, pos, addTo, addKey)
           case m =>
             val vv = m.invoke(self, s, pos.fileScope, evaluator)
             val v = if (s != null && m.add) {
@@ -520,7 +520,7 @@ object Val {
     def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
-      val simple = namedNames == null && params.names.length == argsL.length
+      val simple = (namedNames eq null) && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match {
         case null => outerPos.fileScope
         case p    => p.fileScope
@@ -538,7 +538,7 @@ object Val {
         val base = defSiteValScope.length
         val newScope = defSiteValScope.extendBy(newScopeLen)
         val argVals = newScope.bindings
-        val posArgs = if (namedNames == null) argsL.length else argsL.length - namedNames.length
+        val posArgs = if (namedNames eq null) argsL.length else argsL.length - namedNames.length
         System.arraycopy(argsL, 0, argVals, base, posArgs)
         if (namedNames != null) { // Add named args
           var i = 0
@@ -565,12 +565,12 @@ object Val {
           var i = posArgs
           var j = base + posArgs
           while (j < argVals.length) {
-            if (argVals(j) == null) {
+            if (argVals(j) eq null) {
               val default = params.defaultExprs(i)
               if (default != null) {
                 argVals(j) = new LazyWithComputeFunc(() => evalDefault(default, newScope, ev))
               } else {
-                if (missing == null) missing = new ArrayBuffer
+                if (missing eq null) missing = new ArrayBuffer
                 missing.+=(params.names(i))
               }
             }
@@ -666,7 +666,7 @@ object Val {
       extends Func(
         null,
         ValScope.empty,
-        Params(paramNames, if (defaults == null) new Array[Expr](paramNames.length) else defaults)
+        Params(paramNames, if (defaults eq null) new Array[Expr](paramNames.length) else defaults)
       ) {
 
     override final def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val =
@@ -733,7 +733,7 @@ object Val {
   }
 
   abstract class Builtin0(fn: String, def1: Expr = null)
-      extends Builtin(fn: String, Array.empty, if (def1 == null) null else Array(def1)) {
+      extends Builtin(fn: String, Array.empty, if (def1 eq null) null else Array(def1)) {
     final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(ev, pos)
 
@@ -743,13 +743,13 @@ object Val {
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 0)
+      if ((namedNames eq null) && argVals.length == 0)
         evalRhs(ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
   abstract class Builtin1(fn: String, pn1: String, def1: Expr = null)
-      extends Builtin(fn: String, Array(pn1), if (def1 == null) null else Array(def1)) {
+      extends Builtin(fn: String, Array(pn1), if (def1 eq null) null else Array(def1)) {
     final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
       evalRhs(args(0).force, ev, pos)
 
@@ -759,7 +759,7 @@ object Val {
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
+      if ((namedNames eq null) && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
@@ -774,7 +774,7 @@ object Val {
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 2)
+      if ((namedNames eq null) && argVals.length == 2)
         evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
@@ -801,7 +801,7 @@ object Val {
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 3)
+      if ((namedNames eq null) && argVals.length == 3)
         evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
@@ -823,7 +823,7 @@ object Val {
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 4)
+      if ((namedNames eq null) && argVals.length == 4)
         evalRhs(
           argVals(0).force,
           argVals(1).force,
