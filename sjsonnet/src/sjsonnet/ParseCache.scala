@@ -9,6 +9,21 @@ trait ParseCache {
       defaultValue: => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)]
 }
 
+object ParseCache {
+
+  /**
+   * An empty parse cache that always returns the default value. This is useful for cases where no
+   * caching is desired, such as in tests or when the cache is not needed.
+   */
+  val EmptyCache = new ParseCache {
+    final override def getOrElseUpdate(
+        key: (Path, String),
+        defaultValue: => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)] = {
+      defaultValue
+    }
+  }
+}
+
 // A default implementation based on a mutable HashMap. This implementation is not thread-safe.
 class DefaultParseCache extends ParseCache {
   val cache =
