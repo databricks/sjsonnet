@@ -26,7 +26,7 @@ class MultiThreadedBenchmark {
           key: (Path, String),
           defaultValue: => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)] = {
         var v = map.synchronized(map.getOrElse(key, null))
-        if (v == null) {
+        if (v eq null) {
           v = defaultValue
           map.synchronized(map.put(key, v))
         }
@@ -57,6 +57,6 @@ class MultiThreadedBenchmark {
       catch { case e: Throwable => err = e }
     })
     pool.shutdown()
-    if (err != null) throw err
+    if (err ne null) throw err
   }
 }

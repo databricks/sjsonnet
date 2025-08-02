@@ -189,7 +189,7 @@ class Interpreter(
 
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
     val m =
-      if (storePos == null) Materializer
+      if (storePos eq null) Materializer
       else
         new Materializer {
           override def storePos(pos: Position): Unit = self.storePos(pos)

@@ -27,7 +27,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
   }
 
   def extendSimple(newBindingsV: Array[? <: Lazy]): ValScope = {
-    if (newBindingsV == null || newBindingsV.length == 0) this
+    if ((newBindingsV eq null) || newBindingsV.length == 0) this
     else {
       val b = util.Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
       System.arraycopy(newBindingsV, 0, b, bindings.length, newBindingsV.length)

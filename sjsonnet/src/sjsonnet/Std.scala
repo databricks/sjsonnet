@@ -1151,7 +1151,7 @@ class Std(
             val rValue = if (r.containsVisibleKey(key)) r.valueRaw(key, r, pos)(ev) else null
             if (!rValue.isInstanceOf[Val.Null]) { // if we are not removing the key
               if (l.containsVisibleKey(key)) {
-                if (rValue == null) {
+                if (rValue eq null) {
                   // Preserve the LHS/target value:
                   kvs(kvsIdx) = (key, createLazyMember(l.valueRaw(key, l, pos)(ev)))
                 } else {
@@ -1236,7 +1236,7 @@ class Std(
             var outIdx = lKeys.length
             var j = 0
             while (j < rKeysCopy.length) {
-              if (rKeysCopy(j) != null) {
+              if (rKeysCopy(j) ne null) {
                 outArray(outIdx) = rKeysCopy(j)
                 outIdx += 1
               }
@@ -2053,10 +2053,10 @@ class Std(
       arr
     } else {
       val keyFFunc =
-        if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
+        if ((keyF eq null) || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
       Val.Arr(
         pos,
-        if (keyFFunc != null) {
+        if (keyFFunc ne null) {
           val keys: Array[Val] = vs.map(v =>
             keyFFunc(Array(v.force), null, pos.noOffset)(ev, TailstrictModeDisabled).force
           )

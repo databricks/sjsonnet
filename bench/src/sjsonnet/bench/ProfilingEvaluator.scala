@@ -54,7 +54,7 @@ class ProfilingEvaluator(
 
   private def getOrCreate(e: Expr): ExprBox = {
     var box = data.get(e)
-    if (box == null) {
+    if (box eq null) {
       box = new ExprBox(e)
       data.put(e, box)
     }
@@ -72,7 +72,7 @@ class ProfilingEvaluator(
       box.time += (System.nanoTime() - t0)
       box.count += 1
       parent = prevParent
-      if (parent != null) {
+      if (parent ne null) {
         parent.time -= (System.nanoTime() - pt0)
       }
     }
@@ -106,13 +106,13 @@ class ProfilingEvaluator(
           case s: Some[?]                       => s.collect { case ee: Expr => ee }
           case _                                => Nil
         }
-        .filter(_ != null)
+        .filter(_ ne null)
         .toSeq
     case _ => Nil
   }
 
   private def getChildren(p: Expr.Params): Seq[Expr] =
-    if (p == null || p.defaultExprs == null) Nil else p.defaultExprs.toSeq
+    if ((p eq null) || (p.defaultExprs eq null)) Nil else p.defaultExprs.toSeq
 
   private def getChildren(b: Expr.Bind): Seq[Expr] =
     getChildren(b.args) :+ b.rhs

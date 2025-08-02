@@ -16,11 +16,11 @@ class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Thro
 
   def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
     if (stack.isEmpty || alwaysAddPos(expr)) {
-      val exprErrorString = if (expr == null) null else expr.exprErrorString
+      val exprErrorString = if (expr eq null) null else expr.exprErrorString
       val newFrame = new Error.Frame(pos, exprErrorString)
       stack match {
         case s :: ss if s.pos == pos =>
-          if (s.exprErrorString == null && exprErrorString != null) copy(stack = newFrame :: ss)
+          if ((s.exprErrorString eq null) && (exprErrorString ne null)) copy(stack = newFrame :: ss)
           else this
         case _ => copy(stack = newFrame :: stack)
       }
@@ -46,7 +46,7 @@ class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Thro
 object Error {
   final class Frame(val pos: Position, val exprErrorString: String)(implicit ev: EvalErrorScope) {
     val ste: StackTraceElement = {
-      val cl = if (exprErrorString == null) "" else s"[$exprErrorString]"
+      val cl = if (exprErrorString eq null) "" else s"[$exprErrorString]"
       val (frameFile, frameLine) = ev.prettyIndex(pos) match {
         case None              => (pos.currentFile.relativeToString(ev.wd) + " offset", pos.offset)
         case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col)
