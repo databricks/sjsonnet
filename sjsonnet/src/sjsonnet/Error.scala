@@ -74,12 +74,15 @@ object Error {
   def fail(msg: String): Nothing =
     throw new Error(msg)
 
-  def formatError(e: Error): String = {
+  def formatError(e: Throwable): String = {
     val s = new StringWriter()
     val p = new PrintWriter(s)
-    e.printStackTrace(p)
-    p.close()
-    s.toString.replace("\t", "    ")
+    try {
+      e.printStackTrace(p)
+      s.toString.replace("\t", "    ")
+    } finally {
+      p.close()
+    }
   }
 }
 
