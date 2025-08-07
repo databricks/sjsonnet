@@ -284,7 +284,11 @@ object Val {
       value0
     }
 
-    @tailrec def triggerAllAsserts(obj: Val.Obj): Unit = {
+    def triggerAllAsserts(): Unit = {
+      triggerAllAsserts(this)
+    }
+
+    @tailrec private def triggerAllAsserts(obj: Val.Obj): Unit = {
       if (triggerAsserts != null) triggerAsserts(obj)
       if (`super` != null) `super`.triggerAllAsserts(obj)
     }

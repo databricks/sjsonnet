@@ -726,7 +726,7 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              self.triggerAllAsserts(self)
+              self.triggerAllAsserts()
               visitExpr(rhs)(makeNewScope(self, sup))
             }
           }
@@ -737,7 +737,7 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              self.triggerAllAsserts(self)
+              self.triggerAllAsserts()
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             }
           }
@@ -882,8 +882,8 @@ class Evaluator(
           val k2 = y.visibleKeyNames
           val k1len = k1.length
           if (k1len != k2.length) return false
-          x.triggerAllAsserts(x)
-          y.triggerAllAsserts(y)
+          x.triggerAllAsserts()
+          y.triggerAllAsserts()
           var i = 0
           while (i < k1len) {
             val k = k1(i)
