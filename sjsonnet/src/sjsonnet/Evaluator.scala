@@ -721,7 +721,6 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              self.triggerAllAsserts()
               visitExpr(rhs)(makeNewScope(self, sup))
             }
           }
@@ -732,7 +731,6 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              self.triggerAllAsserts()
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             }
           }

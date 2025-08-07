@@ -437,6 +437,7 @@ object Val {
           case null =>
             if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
           case m =>
+            self.triggerAllAsserts()
             val vv = m.invoke(self, s, pos.fileScope, evaluator)
             val v = if (s != null && m.add) {
               s.valueRaw(k, self, pos, null, null) match {
