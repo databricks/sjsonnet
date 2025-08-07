@@ -692,6 +692,20 @@ object EvaluatorTests extends TestSuite {
           "sjsonnet.Error: Assertion failed"
         )
       )
+      // Both own and inherited assertions are evaluated:
+      test - assert(
+        evalErr("{assert false} + {assert true}", useNewEvaluator = useNewEvaluator).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      // Accessing an object member should trigger computation of that object's own
+      // assertions plus any inherited assertions, even if the accessed member happens
+      // to be a constant.
+      test - assert(
+        evalErr("({assert false} + {x: 2}).x", useNewEvaluator = useNewEvaluator).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
       test - {
         val problematicStrictInheritedAssertionsSnippet =
           """local template = { assert self.flag };
