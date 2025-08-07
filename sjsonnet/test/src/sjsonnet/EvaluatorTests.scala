@@ -706,6 +706,11 @@ object EvaluatorTests extends TestSuite {
           "sjsonnet.Error: Assertion failed"
         )
       )
+      test - assert(
+        evalErr("({assert false} + {f(x): x}).f(1)", useNewEvaluator = useNewEvaluator).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
       test - {
         val problematicStrictInheritedAssertionsSnippet =
           """local template = { assert self.flag };
