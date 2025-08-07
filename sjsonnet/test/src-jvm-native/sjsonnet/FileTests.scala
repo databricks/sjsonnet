@@ -16,9 +16,7 @@ object FileTests extends BaseFileTests {
       )
     else Set.empty[String]
 
-  val goTestDataSkippedTests: Set[String] = Set(
-    "object_invariant_plus.jsonnet"
-  )
+  val goTestDataSkippedTests: Set[String] = Set.empty
 
   val tests: Tests = Tests {
     test("test_suite") - {
