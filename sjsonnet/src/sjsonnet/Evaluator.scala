@@ -666,14 +666,9 @@ class Evaluator(
       } else createNewScope(self, sup)
     }
 
-    // We need to avoid asserting the same object more than once to prevent
-    // infinite recursion, but the previous implementation had the `asserting`
-    // flag kept under the object's *instantiation* rather than under the
-    // object itself. That means that objects that are instantiated once then
-    // extended multiple times would only trigger the assertions once, rather
-    // than once per extension.
-    def assertions(self: Val.Obj): Unit = if (!self.asserting) {
-      self.asserting = true
+    // Trigger an object's own assertions. This defines a closure which is
+    // invoked from within Val.Obj; it should not be called directly.
+    def triggerAsserts(self: Val.Obj): Unit = {
       val newScope: ValScope = makeNewScope(self, self.getSuper)
       var i = 0
       while (i < asserts.length) {
@@ -755,7 +750,7 @@ class Evaluator(
       objPos,
       builder,
       false,
-      if (asserts != null) assertions else null,
+      if (asserts != null) triggerAsserts else null,
       sup,
       valueCache
     )

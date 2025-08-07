@@ -265,7 +265,7 @@ object Val {
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
       extends Literal
       with Expr.ObjBody {
-    var asserting: Boolean = false
+    private var asserting: Boolean = false
 
     def getSuper: Obj = `super`
 
@@ -285,7 +285,12 @@ object Val {
     }
 
     def triggerAllAsserts(): Unit = {
-      triggerAllAsserts(this)
+      // We need to avoid asserting the same object more than once to prevent
+      // infinite recursion
+      if (!asserting) {
+        asserting = true
+        triggerAllAsserts(this)
+      }
     }
 
     @tailrec private def triggerAllAsserts(obj: Val.Obj): Unit = {
