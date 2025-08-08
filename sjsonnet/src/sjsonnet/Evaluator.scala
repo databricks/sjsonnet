@@ -668,8 +668,8 @@ class Evaluator(
 
     // Trigger an object's own assertions. This defines a closure which is
     // invoked from within Val.Obj; it should not be called directly.
-    def triggerAsserts(self: Val.Obj): Unit = {
-      val newScope: ValScope = makeNewScope(self, self.getSuper)
+    def triggerAsserts(self: Val.Obj, sup: Val.Obj): Unit = {
+      val newScope: ValScope = makeNewScope(self, sup)
       var i = 0
       while (i < asserts.length) {
         val a = asserts(i)

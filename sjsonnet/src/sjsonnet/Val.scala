@@ -243,7 +243,7 @@ object Val {
    * @param static
    *   true if this object is static, false otherwise.
    * @param triggerAsserts
-   *   callback to evaluate assertions defined in the object.
+   *   callback to evaluate assertions defined in the object. Parameters are (self, super).
    * @param `super`
    *   the super object, or null if there is no super object.
    * @param valueCache
@@ -259,7 +259,7 @@ object Val {
       val pos: Position,
       private var value0: util.LinkedHashMap[String, Obj.Member],
       static: Boolean,
-      triggerAsserts: Val.Obj => Unit,
+      triggerAsserts: (Val.Obj, Val.Obj) => Unit,
       `super`: Obj,
       valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
@@ -289,13 +289,15 @@ object Val {
       // infinite recursion
       if (!asserting) {
         asserting = true
-        triggerAllAsserts(this)
+        triggerAllAsserts(this, `super`)
       }
     }
 
-    @tailrec private def triggerAllAsserts(obj: Val.Obj): Unit = {
-      if (triggerAsserts != null) triggerAsserts(obj)
-      if (`super` != null) `super`.triggerAllAsserts(obj)
+    // As we walk up the superclass hierarchy, the `self` binding is unchanged
+    // but `super` climbs up the hierarchy as well.
+    @tailrec private def triggerAllAsserts(obj: Val.Obj, sup: Val.Obj): Unit = {
+      if (triggerAsserts != null) triggerAsserts(obj, sup)
+      if (sup != null) sup.triggerAllAsserts(obj, sup.getSuper)
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
