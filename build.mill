@@ -116,7 +116,7 @@ object sjsonnet extends VersionFileModule {
       def resources = Task.Sources(
         this.moduleDir / "resources" / "test_suite",
         this.moduleDir / "resources" / "go_test_suite",
-        this.moduleDir / "resources" / "new_test_suite",
+        this.moduleDir / "resources" / "new_test_suite"
       )
       def sources = Task.Sources(sourceDirs.map(d => this.moduleDir / d)*)
       def generatedSources = Task {
