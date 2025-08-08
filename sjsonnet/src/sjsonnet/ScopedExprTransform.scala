@@ -68,7 +68,7 @@ class ScopedExprTransform extends ExprTransform {
   override def transformBind(b: Bind): Bind = {
     val args = b.args
     val rhs = b.rhs
-    nestedNames(if (args == null) null else args.names) {
+    nestedNames(if (args eq null) null else args.names) {
       val args2 = transformParams(args)
       val rhs2 = transform(rhs)
       if ((args2 eq args) && (rhs2 eq rhs)) b
@@ -90,7 +90,7 @@ class ScopedExprTransform extends ExprTransform {
       val z2 = transform(z)
       if ((y2 eq y) && (z2 eq z)) f else f.copy(args = y2, rhs = z2)
     }
-    if (f.args == null) g
+    if (f.args eq null) g
     else nestedNames(f.args.names)(g)
   }
 
@@ -128,18 +128,18 @@ class ScopedExprTransform extends ExprTransform {
 
   protected def nestedConsecutiveBindings[T](a: Array[Bind])(f: => Bind => Bind)(
       g: => T): (Array[Bind], T) = {
-    if (a == null || a.length == 0) (a, g)
+    if ((a eq null) || a.length == 0) (a, g)
     else {
       val oldScope = scope
       try {
         val mappings = a.zipWithIndex.map { case (b, idx) =>
-          (b.name, ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
+          (b.name, ScopedVal(if (b.args eq null) b.rhs else b, scope, scope.size + idx))
         }
         scope = new Scope(oldScope.mappings ++ mappings, oldScope.size + a.length)
         var changed = false
         val a2 = a.zipWithIndex.map { case (b, idx) =>
           val b2 = f(b)
-          val sv = mappings(idx)._2.copy(v = if (b2.args == null) b2.rhs else b2)
+          val sv = mappings(idx)._2.copy(v = if (b2.args eq null) b2.rhs else b2)
           scope = new Scope(scope.mappings.updated(b.name, sv), scope.size)
           if (b2 ne b) changed = true
           b2
@@ -150,11 +150,11 @@ class ScopedExprTransform extends ExprTransform {
   }
 
   protected def nestedBindings[T](a: Array[Bind])(f: => T): T = {
-    if (a == null || a.length == 0) f
+    if ((a eq null) || a.length == 0) f
     else {
       val newm = a.zipWithIndex.map { case (b, idx) =>
         // println(s"Binding ${b.name} to ${scope.size + idx}")
-        (b.name, ScopedVal(if (b.args == null) b.rhs else b, scope, scope.size + idx))
+        (b.name, ScopedVal(if (b.args eq null) b.rhs else b, scope, scope.size + idx))
       }
       nestedNew(new Scope(scope.mappings ++ newm, scope.size + a.length))(f)
     }
@@ -174,7 +174,7 @@ class ScopedExprTransform extends ExprTransform {
     nestedObject(self0, super0)(nestedBindings(a)(f))
 
   protected def nestedNames[T](a: Array[String])(f: => T): T = {
-    if (a == null || a.length == 0) f
+    if ((a eq null) || a.length == 0) f
     else {
       val newm = a.zipWithIndex.map { case (n, idx) =>
         (n, ScopedVal(dynamicExpr, scope, scope.size + idx))

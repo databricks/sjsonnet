@@ -18,7 +18,7 @@ class TomlRenderer(
     }
 
     override def visitString(s: CharSequence, index: Int): StringWriter = {
-      if (s == null) visitNull(index)
+      if (s eq null) visitNull(index)
       else {
         out.write(TomlRenderer.escapeKey(s.toString))
         out
@@ -47,7 +47,7 @@ class TomlRenderer(
   }
 
   override def visitString(s: CharSequence, index: Int): StringWriter = {
-    if (s == null) {
+    if (s eq null) {
       visitNull(index)
     } else {
       val charBuilder = new CharBuilder()

@@ -86,11 +86,11 @@ class OptimizerBenchmark {
           else otherArrExprs += 1
         case _: Val.Obj                 => staticObjs += 1
         case e: Expr.ObjBody.MemberList =>
-          if (e.binds == null && e.asserts == null && e.fields.forall(_.isStatic))
+          if ((e.binds eq null) && (e.asserts eq null) && e.fields.forall(_.isStatic))
             missedStaticObjs += 1
           else otherObjs += 1
         case e: Expr.Apply =>
-          if (e.namedNames == null) {
+          if (e.namedNames eq null) {
             applies += 1
             val a = e.args.length
             applyArities.put(a.toLong, applyArities.getOrElse(a.toLong, 0) + 1)

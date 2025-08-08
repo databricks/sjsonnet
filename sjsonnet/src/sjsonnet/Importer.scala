@@ -190,7 +190,7 @@ class CachedImporter(parent: Importer) extends Importer {
 
   def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = cache.get(path) match {
     case s @ Some(x) =>
-      if (x == null) None else s
+      if (x eq null) None else s
     case None =>
       val x = parent.read(path, binaryData)
       cache.put(path, x.orNull)

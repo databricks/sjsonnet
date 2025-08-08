@@ -207,9 +207,9 @@ abstract class ExprTransform {
     transformGenericArr(a)((transform(_)).asInstanceOf[T => T])
 
   protected def transformParams(p: Params): Params = {
-    if (p == null) return null
+    if (p eq null) return null
     val defs = p.defaultExprs
-    if (defs == null) p
+    if (defs eq null) p
     else {
       val defs2 = transformArr(defs)
       if (defs2 eq defs) p
@@ -281,7 +281,7 @@ abstract class ExprTransform {
   }
 
   protected def transformGenericArr[T <: AnyRef](a: Array[T])(f: T => T): Array[T] = {
-    if (a == null) return null
+    if (a eq null) return null
     var i = 0
     while (i < a.length) {
       val x1 = a(i)

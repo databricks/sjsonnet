@@ -48,7 +48,7 @@ class PrettyYamlRenderer(
     } else if (str == "\n") {
       out.append("|2+")
       saveCurrentPos()
-      if (bufferedComment != null) out.append(bufferedComment)
+      if (bufferedComment ne null) out.append(bufferedComment)
       bufferedComment = null
       out.append("\n")
     }
@@ -71,7 +71,7 @@ class PrettyYamlRenderer(
         out,
         depth,
         indent,
-        if (bufferedComment == null) "" else bufferedComment
+        if (bufferedComment eq null) "" else bufferedComment
       )
       bufferedComment = null
     }
@@ -122,7 +122,7 @@ class PrettyYamlRenderer(
     mutable.HashMap.empty[Path, Array[Int]]
   def saveCurrentPos(): Unit = {
     val current = getCurrentPosition()
-    if (current != null) {
+    if (current ne null) {
       bufferedComment =
         " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
     }
@@ -150,7 +150,7 @@ class PrettyYamlRenderer(
   override def flushBuffer(): Unit = {
     if (newlineBuffered) {
       afterColon = false
-      if (bufferedComment != null) {
+      if (bufferedComment ne null) {
         out.append(bufferedComment)
         bufferedComment = null
       }
@@ -239,7 +239,7 @@ class PrettyYamlRenderer(
       flushBuffer()
       out.append(":")
       saveCurrentPos()
-      if (bufferedComment != null) {
+      if (bufferedComment ne null) {
         out.append(bufferedComment)
         bufferedComment = null
       }
@@ -350,12 +350,12 @@ object PrettyYamlRenderer {
 
     while (end <= text.length) {
       val ch: Character = if (end < text.length) text(end) else null
-      if (ch == null || isBreakableChar(ch, allowUnicode)) {
+      if ((ch eq null) || isBreakableChar(ch, allowUnicode)) {
         if (start < end) {
           writeData(text.slice(start, end))
           start = end
         }
-        if (ch != null) {
+        if (ch ne null) {
           writeData(getEscapeSequenceForChar(ch))
           start = end + 1
         }
