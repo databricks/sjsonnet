@@ -265,7 +265,7 @@ object Val {
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
       extends Literal
       with Expr.ObjBody {
-    private var asserting: Boolean = false
+    private[this] var asserting: Boolean = false
 
     def getSuper: Obj = `super`
 
