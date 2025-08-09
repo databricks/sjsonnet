@@ -16,7 +16,6 @@ object FileTests extends BaseFileTests {
   )
 
   val goTestDataSkippedTests: Set[String] = Set(
-    "object_invariant_plus.jsonnet",
     "builtinSha1.jsonnet",
     "builtinSha256.jsonnet",
     "builtinSha3.jsonnet",

@@ -666,15 +666,10 @@ class Evaluator(
       } else createNewScope(self, sup)
     }
 
-    // We need to avoid asserting the same object more than once to prevent
-    // infinite recursion, but the previous implementation had the `asserting`
-    // flag kept under the object's *instantiation* rather than under the
-    // object itself. That means that objects that are instantiated once then
-    // extended multiple times would only trigger the assertions once, rather
-    // than once per extension.
-    def assertions(self: Val.Obj): Unit = if (!self.asserting) {
-      self.asserting = true
-      val newScope: ValScope = makeNewScope(self, self.getSuper)
+    // Trigger an object's own assertions. This defines a closure which is
+    // invoked from within Val.Obj; it should not be called directly.
+    def triggerAsserts(self: Val.Obj, sup: Val.Obj): Unit = {
+      val newScope: ValScope = makeNewScope(self, sup)
       var i = 0
       while (i < asserts.length) {
         val a = asserts(i)
@@ -726,7 +721,6 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              if (asserts != null) assertions(self)
               visitExpr(rhs)(makeNewScope(self, sup))
             }
           }
@@ -737,7 +731,6 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              if (asserts != null) assertions(self)
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             }
           }
@@ -755,7 +748,7 @@ class Evaluator(
       objPos,
       builder,
       false,
-      if (asserts != null) assertions else null,
+      if (asserts != null) triggerAsserts else null,
       sup,
       valueCache
     )
@@ -882,8 +875,8 @@ class Evaluator(
           val k2 = y.visibleKeyNames
           val k1len = k1.length
           if (k1len != k2.length) return false
-          x.triggerAllAsserts(x)
-          y.triggerAllAsserts(y)
+          x.triggerAllAsserts()
+          y.triggerAllAsserts()
           var i = 0
           while (i < k1len) {
             val k = k1(i)
