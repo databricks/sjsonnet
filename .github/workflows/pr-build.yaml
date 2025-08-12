@@ -20,6 +20,7 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           distribution: 'zulu'
+          cache: sbt
       - uses: sbt/setup-sbt@v1
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
@@ -27,3 +28,9 @@ jobs:
         run: ./mill _.${{ matrix.lang }}[_].__.compile
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill _.${{ matrix.lang }}[_].__.test
+      - name: Compile with sbt
+        if: ${{ matrix.lang == 'jvm' }}
+        run: sbt compile bench/compile bench/jmh:compile
+      - name: Run sbt tests
+        if: ${{ matrix.lang == 'jvm' }}
+        run: sbt test
