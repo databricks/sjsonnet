@@ -643,6 +643,45 @@ object EvaluatorTests extends TestSuite {
       eval("""local f=null; f == null""", useNewEvaluator = useNewEvaluator) ==> ujson.True
     }
 
+    test("dynamicDuplicateFields") {
+      // Object evaluation should fail if the object contains duplicate field names.
+      // This is a regression test for duplicate detection when one or more of the
+      // duplicate field names is dynamically computed via a field name expression.
+
+      // Cases where StaticOptimizer replaces the dynamic field names with fixed ones:
+      test - (evalErr("""{ ["k"]: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
+      """sjsonnet.Error: Duplicate key k in evaluated object.
+          |at .(:1:13)""".stripMargin)
+
+      test - (evalErr("""{ k: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
+      """sjsonnet.Error: Duplicate key k in evaluated object.
+          |at .(:1:9)""".stripMargin)
+
+      test - (evalErr("""{ ["k"]: 1, k: 2 }""", useNewEvaluator = useNewEvaluator) ==>
+      """sjsonnet.Error: Duplicate key k in evaluated object.
+          |at .(:1:13)""".stripMargin)
+
+      // Test that lazy evaluation is preserved - duplicate fields should only error when accessed
+      test - (eval(
+        """{x: { ["k"]: 1, ["k"]: 2 }, y:1 }.y""",
+        useNewEvaluator = useNewEvaluator
+      ) ==> ujson.Num(1))
+
+      // But accessing the problematic field should still error
+      test - (evalErr(
+        """{x: { ["k"]: 1, ["k"]: 2 }, y:1 }.x""",
+        useNewEvaluator = useNewEvaluator
+      ) ==>
+      """sjsonnet.Error: Duplicate key k in evaluated object.
+          |at .(:1:17)
+          |at [Select x].(:1:34)""".stripMargin)
+
+      // Non-StaticOptimizable case:
+      test - (evalErr("""{ k: 1, ["k" + ""]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
+      """sjsonnet.Error: Duplicate key k in evaluated object.
+          |at .(:1:9)""".stripMargin)
+    }
+
     test("identifierStartsWithKeyword") {
       for (keyword <- Parser.keywords) {
         eval(
