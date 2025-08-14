@@ -80,7 +80,19 @@ class StaticOptimizer(
       Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
 
     case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-      if (binds == null && asserts == null && fields.forall(_.isStatic))
+      // If static optimization has constant-folded originally-dynamic field names
+      // into fixed names, it's possible that we might now have duplicate names.
+      // In that case, we keep the object as a MemberList and leave it to the
+      // Evaluator to throw an error if/when the object is evaluated (in order
+      // to preserve proper laziness semantics).
+      def allFieldsStaticAndUniquelyNamed: Boolean = {
+        val seen = collection.mutable.Set.empty[String]
+        fields.forall { f =>
+          f.isStatic && seen.add(f.fieldName.asInstanceOf[FieldName.Fixed].value)
+        }
+      }
+
+      if (binds == null && asserts == null && allFieldsStaticAndUniquelyNamed)
         Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
       else m
 
