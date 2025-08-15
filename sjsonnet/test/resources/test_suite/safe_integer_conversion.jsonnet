@@ -25,7 +25,7 @@ std.assertEqual(min_safe >> 1, -4503599627370496) &&  // -2^52
 
 // Cannot left shift 2^53 without potential overflow/loss of precision issues
 // depending on the shift amount, but can shift smaller numbers up to it.
-// (2^52) left shift by 1 bit (result is 2^53)
+// (2^52-1) left shift by 1 bit (result is 2^53-2)
 std.assertEqual(4503599627370495 << 1, max_safe - 1) &&
 // (-(2^52-1)) left shift by 1 bit (result is -(2^53-2))
 std.assertEqual((-4503599627370495) << 1, min_safe + 1) &&
