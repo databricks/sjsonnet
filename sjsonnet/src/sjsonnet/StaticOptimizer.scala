@@ -86,7 +86,7 @@ class StaticOptimizer(
       // Evaluator to throw an error if/when the object is evaluated (in order
       // to preserve proper laziness semantics).
       def allFieldsStaticAndUniquelyNamed: Boolean = {
-        val seen = collection.mutable.Set.empty[String]
+        val seen = mutable.Set.empty[String]
         fields.forall { f =>
           f.isStatic && seen.add(f.fieldName.asInstanceOf[FieldName.Fixed].value)
         }
