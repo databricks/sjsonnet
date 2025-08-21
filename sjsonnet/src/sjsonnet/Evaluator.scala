@@ -724,7 +724,10 @@ class Evaluator(
               visitExpr(rhs)(makeNewScope(self, sup))
             }
           }
-          builder.put(k, v)
+          val previousValue = builder.put(k, v)
+          if (previousValue != null) {
+            Error.fail(s"Duplicate key $k in evaluated object.", offset)
+          }
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -734,7 +737,10 @@ class Evaluator(
               visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
             }
           }
-          builder.put(k, v)
+          val previousValue = builder.put(k, v)
+          if (previousValue != null) {
+            Error.fail(s"Duplicate key $k in evaluated object.", offset)
+          }
         }
       case _ =>
         Error.fail("This case should never be hit", objPos)
@@ -762,8 +768,7 @@ class Evaluator(
     for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
       visitExpr(e.key)(s) match {
         case Val.Str(_, k) =>
-          val prev_length = builder.size()
-          builder.put(
+          val previousValue = builder.put(
             k,
             new Val.Obj.Member(e.plus, Visibility.Normal) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
@@ -776,7 +781,7 @@ class Evaluator(
               }
             }
           )
-          if (prev_length == builder.size()) {
+          if (previousValue != null) {
             Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
           }
         case Val.Null(_) => // do nothing
