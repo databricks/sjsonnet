@@ -1,4 +1,4 @@
-//| mill-version: 1.0.2
+//| mill-version: 1.0.3-jvm
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
@@ -201,8 +201,9 @@ object sjsonnet extends VersionFileModule {
         mvn"org.virtuslab::scala-yaml::0.3.0"
       )
 
-    def nativeLinkingOptions = super.nativeLinkingOptions() ++
-      Seq("-L/usr/local/opt/openssl@3/lib")
+    val osName = System.getProperty("os.name").toLowerCase
+
+    def nativeLinkingOptions = super.nativeLinkingOptions() ++ (if (osName == "linux") Seq("-static") else Seq())
 
     def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
