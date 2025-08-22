@@ -1724,8 +1724,8 @@ class Std(
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
-        val a = toSetArr(args, 0, pos, ev)
-        val b = toSetArr(args, 1, pos, ev)
+        val a = toArrOrString(args(0), pos, ev)
+        val b = toArrOrString(args(1), pos, ev)
 
         val out = new mutable.ArrayBuffer[Lazy]
 
