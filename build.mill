@@ -203,7 +203,8 @@ object sjsonnet extends VersionFileModule {
 
     val osName = System.getProperty("os.name").toLowerCase
 
-    def nativeLinkingOptions = super.nativeLinkingOptions() ++ (if (osName == "linux") Seq("-static") else Seq())
+    def nativeLinkingOptions =
+      super.nativeLinkingOptions() ++ (if (osName == "linux") Seq("-static") else Seq())
 
     def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
