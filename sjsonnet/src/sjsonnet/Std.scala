@@ -1707,8 +1707,8 @@ class Std(
     builtin(Set_),
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
-        val a = toSetArr(args, 0, pos, ev)
-        val b = toSetArr(args, 1, pos, ev)
+        val a = toArrOrString(args(0), pos, ev)
+        val b = toArrOrString(args(1), pos, ev)
         if (a.isEmpty) {
           uniqArr(pos, ev, sortArr(pos, ev, args(1), args(2)), args(2))
         } else if (b.isEmpty) {
@@ -1947,13 +1947,6 @@ class Std(
     },
     builtin(Native)
   )
-
-  private def toSetArr(args: Array[Val], idx: Int, pos: Position, ev: EvalScope) = {
-    args(idx) match {
-      case arr: Val.Arr => arr.asLazyArray
-      case _            => Error.fail(f"Argument $idx must be an array", pos)(ev)
-    }
-  }
 
   private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
     arg match {
