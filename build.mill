@@ -14,6 +14,7 @@ import scalanativelib.api._
 import scalajslib.api._
 import scalafmt._
 import javalib.api.JvmWorkerUtil
+import javalib.NativeImageModule
 import contrib.versionfile.VersionFileModule
 import contrib.jmh.JmhModule
 
@@ -305,5 +306,24 @@ object sjsonnet extends VersionFileModule {
       )
       object test extends ScalaTests with TestModule.Junit4
     }
+  }
+
+  object graal extends NativeImageModule {
+    def finalMainClass = jvm(scalaVersions(0)).mainClass().get
+    def runClasspath = Seq()
+    def jvmId = "graalvm-community:21.0.2"
+    def localBinName = "sjsonnet-native"
+    def nativeImageClasspath = Seq(jvm(scalaVersions(0)).assembly())
+    def nativeImageOptions = super.nativeImageOptions() ++ Seq(
+      "--no-fallback",
+      "-O3",
+      "-R:MaxHeapSize=2G",
+      "-march=native",
+      "--strict-image-heap",
+      "--initialize-at-build-time",
+      "--initialize-at-run-time=os.package$",
+      "--install-exit-handlers",
+      "-H:+ReportExceptionStackTraces",
+    )
   }
 }
