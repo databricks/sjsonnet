@@ -320,6 +320,7 @@ object sjsonnet extends VersionFileModule {
       "-march=native",
       "--strict-image-heap",
       "--initialize-at-build-time",
+      "--initialize-at-run-time=os.package$",
       "--install-exit-handlers",
       "-H:+ReportExceptionStackTraces",
     )

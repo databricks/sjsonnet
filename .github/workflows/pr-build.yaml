@@ -34,6 +34,6 @@ jobs:
       - name: Run sbt tests
         if: ${{ matrix.lang == 'jvm' }}
         run: sbt test
-      - name: Compile Native Image with GraalVM 21
+      - name: Run Native Image Test Suites
         if: ${{ (matrix.lang == 'jvm') && (matrix.java == '21') }}
-        run: ./mill sjsonnet.graal.nativeImage
+        run: sjsonnet/test/graalvm/run_test_suites.py
