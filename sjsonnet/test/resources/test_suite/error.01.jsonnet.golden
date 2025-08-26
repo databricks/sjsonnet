@@ -1,6 +1,6 @@
 sjsonnet.Error: foo
-    at [Error].(sjsonnet/test/resources/test_suite/error.01.jsonnet:17:29)
-    at [Apply1].(sjsonnet/test/resources/test_suite/error.01.jsonnet:18:36)
-    at [Apply1].(sjsonnet/test/resources/test_suite/error.01.jsonnet:19:35)
-    at [Apply1].(sjsonnet/test/resources/test_suite/error.01.jsonnet:20:7)
+    at [Error].(error.01.jsonnet:17:29)
+    at [Apply1].(error.01.jsonnet:18:36)
+    at [Apply1].(error.01.jsonnet:19:35)
+    at [Apply1].(error.01.jsonnet:20:7)
 

@@ -1,3 +1,3 @@
 sjsonnet.ParseError: Expected ";":2:1, found ""
-    at .(sjsonnet/test/resources/go_test_suite/static_error_eof.jsonnet:2:1)
+    at .(static_error_eof.jsonnet:2:1)
 

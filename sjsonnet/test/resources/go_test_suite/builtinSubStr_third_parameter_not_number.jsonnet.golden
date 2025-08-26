@@ -1,2 +1,2 @@
 sjsonnet.Error: Expected a number for len in substr, got string
-    at [std.substr].(sjsonnet/test/resources/go_test_suite/builtinSubStr_third_parameter_not_number.jsonnet:1:11)
+    at [std.substr].(builtinSubStr_third_parameter_not_number.jsonnet:1:11)

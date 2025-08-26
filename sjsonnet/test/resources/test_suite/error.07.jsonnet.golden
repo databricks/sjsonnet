@@ -1,7 +1,7 @@
 sjsonnet.Error: sarcasm
-    at [Error].(sjsonnet/test/resources/test_suite/error.07.jsonnet:18:31)
-    at [Lookup].(sjsonnet/test/resources/test_suite/error.07.jsonnet:17:32)
-    at [Apply1].(sjsonnet/test/resources/test_suite/error.07.jsonnet:18:20)
-    at [ValidId toxic].(sjsonnet/test/resources/test_suite/error.07.jsonnet:19:1)
-    at [BinaryOp +].(sjsonnet/test/resources/test_suite/error.07.jsonnet:19:7)
+    at [Error].(error.07.jsonnet:18:31)
+    at [Lookup].(error.07.jsonnet:17:32)
+    at [Apply1].(error.07.jsonnet:18:20)
+    at [ValidId toxic].(error.07.jsonnet:19:1)
+    at [BinaryOp +].(error.07.jsonnet:19:7)
 

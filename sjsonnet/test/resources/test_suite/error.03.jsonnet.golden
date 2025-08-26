@@ -1,4 +1,4 @@
 sjsonnet.Error: foo
-    at [Error].(sjsonnet/test/resources/test_suite/error.03.jsonnet:17:21)
-    at [Select x].(sjsonnet/test/resources/test_suite/error.03.jsonnet:18:7)
+    at [Error].(error.03.jsonnet:17:21)
+    at [Select x].(error.03.jsonnet:18:7)
 

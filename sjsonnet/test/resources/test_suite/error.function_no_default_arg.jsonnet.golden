@@ -1,2 +1,2 @@
 sjsonnet.Error: Function parameter b not bound in call
-	at .(sjsonnet/test/resources/test_suite/error.function_no_default_arg.jsonnet:17:1)
+	at .(error.function_no_default_arg.jsonnet:17:1)

@@ -1,4 +1,4 @@
 sjsonnet.Error: foobar
-    at [Error].(sjsonnet/test/resources/test_suite/error.inside_equals_object.jsonnet:18:22)
-    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.inside_equals_object.jsonnet:19:3)
+    at [Error].(error.inside_equals_object.jsonnet:18:22)
+    at [BinaryOp ==].(error.inside_equals_object.jsonnet:19:3)
 

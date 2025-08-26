@@ -170,7 +170,6 @@ abstract class BaseFileTests extends TestSuite {
       goldenContent: String,
       testSuite: String): Unit = {
     val expected = goldenContent
-      .replaceAll(f"\\(sjsonnet/test/resources/$testSuite/", "(")
       .replaceAll("    at", "  at")
       .strip()
 

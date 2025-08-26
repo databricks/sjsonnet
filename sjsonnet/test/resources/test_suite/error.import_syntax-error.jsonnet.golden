@@ -1,4 +1,4 @@
 sjsonnet.ParseError: Expected "\"":2:1, found ""
-    at .(sjsonnet/test/resources/test_suite/lib/syntax_error.jsonnet:2:1)
-    at [Import].(sjsonnet/test/resources/test_suite/error.import_syntax-error.jsonnet:1:1)
+    at .(lib/syntax_error.jsonnet:2:1)
+    at [Import].(error.import_syntax-error.jsonnet:1:1)
 

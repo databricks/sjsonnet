@@ -1,4 +1,4 @@
 sjsonnet.Error: xxx
-    at [Error].(sjsonnet/test/resources/go_test_suite/error_in_object_local.jsonnet:1:20)
-    at [Apply1].(sjsonnet/test/resources/go_test_suite/error_in_object_local.jsonnet:1:39)
+    at [Error].(error_in_object_local.jsonnet:1:20)
+    at [Apply1].(error_in_object_local.jsonnet:1:39)
 

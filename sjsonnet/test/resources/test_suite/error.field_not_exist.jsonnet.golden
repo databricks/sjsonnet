@@ -1,3 +1,3 @@
 sjsonnet.Error: Field does not exist: y
-    at [Select y].(sjsonnet/test/resources/test_suite/error.field_not_exist.jsonnet:17:9)
+    at [Select y].(error.field_not_exist.jsonnet:17:9)
 

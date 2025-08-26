@@ -1,5 +1,5 @@
 sjsonnet.Error: Assertion failed
-    at [Assert].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:25)
-    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:38)
-    at [And].(sjsonnet/test/resources/test_suite/error.obj_assert.fail1.jsonnet:20:50)
+    at [Assert].(error.obj_assert.fail1.jsonnet:20:25)
+    at [BinaryOp ==].(error.obj_assert.fail1.jsonnet:20:38)
+    at [And].(error.obj_assert.fail1.jsonnet:20:50)
 
