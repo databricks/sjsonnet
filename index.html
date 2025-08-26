@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Micro:bit LED Speed Control</title>
+</head>
+<body>
+  <h1>LED Fade Speed Control</h1>
+  <button id="connect">Connect to micro:bit</button>
+  <br><br>
+  <label>Speed (ms per step):</label>
+  <input type="range" id="speed" min="10" max="500" value="50">
+  <span id="value">50</span> ms
+
+  <script>
+    let port, writer;
+
+    async function connect() {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      writer = port.writable.getWriter();
+    }
+
+    document.getElementById("connect").addEventListener("click", connect);
+
+    document.getElementById("speed").addEventListener("input", async (e) => {
+      let val = e.target.value;
+      document.getElementById("value").textContent = val;
+      if (writer) {
+        let data = new TextEncoder().encode(val + "\n");
+        await writer.write(data);
+      }
+    });
+  </script>
+</body>
+</html>
