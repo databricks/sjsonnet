@@ -63,7 +63,8 @@ class Interpreter(
     importer,
     parseCache,
     internedStrings,
-    internedStaticFieldSets
+    internedStaticFieldSets,
+    settings
   ) {
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
       handleException(

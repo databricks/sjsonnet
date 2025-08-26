@@ -15,19 +15,6 @@ import scala.collection.mutable
 
 object Parser {
 
-  /**
-   * Maximum recursion depth for parsing to prevent stack overflow from deeply nested structures.
-   * This is especially important when parsing deeply nested structures that could lead to excessive
-   * recursion in the parser functions.
-   */
-  private val MAX_PARSER_DEPTH = 1000
-
-  private def checkParseDepth(currentDepth: Int): Unit = {
-    if (currentDepth > MAX_PARSER_DEPTH) {
-      throw new Exception(s"Parsing exceeded maximum recursion depth of $MAX_PARSER_DEPTH")
-    }
-  }
-
   private def precedence(op: String): Int = {
     if (op.length == 1) {
       (op.charAt(0): @switch) match {
@@ -89,10 +76,19 @@ class Parser(
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
       java.util.LinkedHashMap[String, java.lang.Boolean]
-    ]) {
+    ],
+    settings: Settings = Settings.default) {
   import Parser._
 
   private val fileScope = new FileScope(currentFile)
+
+  private def checkParseDepth(currentDepth: Int): Unit = {
+    if (currentDepth > settings.maxParserRecursionDepth) {
+      throw new Exception(
+        s"Parsing exceeded maximum recursion depth of ${settings.maxParserRecursionDepth}"
+      )
+    }
+  }
 
   def Pos[$: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
@@ -202,19 +198,19 @@ class Parser(
   def arr[$: P]: P[Expr] = arr(0)
 
   def arr[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody(currentDepth + 1))
   }
   def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = compSuffix(0)
 
   def compSuffix[$: P](currentDepth: Int): P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(forspec(currentDepth + 1) ~ compspec(currentDepth + 1)).map(Left(_))
   }
   def arrBody[$: P]: P[Expr] = arrBody(0)
 
   def arrBody[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos ~~ expr(currentDepth + 1) ~
       (compSuffix(currentDepth + 1) | "," ~ (compSuffix(currentDepth + 1) | (expr(currentDepth + 1)
@@ -237,21 +233,21 @@ class Parser(
   }
 
   def assertExpr[$: P](pos: Position, currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(assertStmt(currentDepth + 1) ~ ";" ~ expr(currentDepth + 1)).map(t =>
       Expr.AssertExpr(pos, t._1, t._2)
     )
   }
 
   def function[$: P](pos: Position, currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P("(" ~/ params(currentDepth + 1) ~ ")" ~ expr(currentDepth + 1)).map(t =>
       Expr.Function(pos, t._1, t._2)
     )
   }
 
   def ifElse[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos ~~ expr(currentDepth + 1) ~ "then" ~~ break ~ expr(
         currentDepth + 1
@@ -261,7 +257,7 @@ class Parser(
   }
 
   def localExpr[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos ~~ bind(currentDepth + 1)
         .rep(min = 1, sep = ","./)
@@ -272,7 +268,7 @@ class Parser(
   def expr[$: P]: P[Expr] = expr(0)
 
   def expr[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P("" ~ expr1(currentDepth) ~ (Pos ~~ binaryop ~/ expr1(currentDepth)).rep ~ "").map {
       case (pre, fs) =>
         var remaining = fs
@@ -342,7 +338,7 @@ class Parser(
   def expr1[$: P]: P[Expr] = expr1(0)
 
   def expr1[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(expr2(currentDepth + 1) ~ exprSuffix2(currentDepth + 1).rep).map { case (pre, fs) =>
       fs.foldLeft(pre) { case (p, f) => f(p) }
     }
@@ -351,7 +347,7 @@ class Parser(
   def exprSuffix2[$: P]: P[Expr => Expr] = exprSuffix2(0)
 
   def exprSuffix2[$: P](currentDepth: Int): P[Expr => Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos.flatMapX { i =>
         CharIn(".[({")./.!.map(_(0)).flatMapX { c =>
@@ -384,26 +380,44 @@ class Parser(
   }
 
   def local[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(localExpr(currentDepth + 1))
   }
-  def importStr[$: P](pos: Position): P[Expr.ImportStr] = P(importExpr.map(Expr.ImportStr(pos, _)))
-  def importBin[$: P](pos: Position): P[Expr.ImportBin] = P(importExpr.map(Expr.ImportBin(pos, _)))
-  def `import`[$: P](pos: Position): P[Expr.Import] = P(importExpr.map(Expr.Import(pos, _)))
+  def importStr[$: P](pos: Position): P[Expr.ImportStr] = importStr(pos, 0)
+  def importBin[$: P](pos: Position): P[Expr.ImportBin] = importBin(pos, 0)
+  def `import`[$: P](pos: Position): P[Expr.Import] = `import`(pos, 0)
+
+  def importStr[$: P](pos: Position, currentDepth: Int): P[Expr.ImportStr] = {
+    checkParseDepth(currentDepth)
+    P(importExpr(currentDepth + 1).map(Expr.ImportStr(pos, _)))
+  }
+  def importBin[$: P](pos: Position, currentDepth: Int): P[Expr.ImportBin] = {
+    checkParseDepth(currentDepth)
+    P(importExpr(currentDepth + 1).map(Expr.ImportBin(pos, _)))
+  }
+  def `import`[$: P](pos: Position, currentDepth: Int): P[Expr.Import] = {
+    checkParseDepth(currentDepth)
+    P(importExpr(currentDepth + 1).map(Expr.Import(pos, _)))
+  }
   def error[$: P](pos: Position, currentDepth: Int): P[Expr.Error] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(expr(currentDepth + 1).map(Expr.Error(pos, _)))
   }
 
-  def importExpr[$: P]: P[String] = P(
-    expr.flatMap {
-      case Val.Str(_, s) => Pass(s)
-      case _             => Fail.opaque("string literal (computed imports are not allowed)")
-    }
-  )
+  def importExpr[$: P]: P[String] = importExpr(0)
+
+  def importExpr[$: P](currentDepth: Int): P[String] = {
+    checkParseDepth(currentDepth)
+    P(
+      expr(currentDepth + 1).flatMap {
+        case Val.Str(_, s) => Pass(s)
+        case _             => Fail.opaque("string literal (computed imports are not allowed)")
+      }
+    )
+  }
 
   def unaryOpExpr[$: P](pos: Position, op: Char, currentDepth: Int): P[Expr.UnaryOp] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       expr1(currentDepth + 1).map { e =>
         def k2 = (op: @switch) match {
@@ -427,7 +441,7 @@ class Parser(
   def expr2[$: P]: P[Expr] = expr2(0)
 
   def expr2[$: P](currentDepth: Int): P[Expr] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos.flatMapX { pos =>
         SingleChar.flatMapX { c =>
@@ -458,9 +472,9 @@ class Parser(
                   case "super"     => Pass(Expr.Super(pos))
                   case "if"        => Pass ~ ifElse(currentDepth + 1)
                   case "function"  => Pass ~ function(pos, currentDepth + 1)
-                  case "importstr" => Pass ~ importStr(pos)
-                  case "importbin" => Pass ~ importBin(pos)
-                  case "import"    => Pass ~ `import`(pos)
+                  case "importstr" => Pass ~ importStr(pos, currentDepth + 1)
+                  case "importbin" => Pass ~ importBin(pos, currentDepth + 1)
+                  case "import"    => Pass ~ `import`(pos, currentDepth + 1)
                   case "error"     => Pass ~ error(pos, currentDepth + 1)
                   case "assert"    => Pass ~ assertExpr(pos, currentDepth + 1)
                   case "local"     => Pass ~ local(currentDepth + 1)
@@ -477,7 +491,7 @@ class Parser(
   def objinside[$: P]: P[Expr.ObjBody] = objinside(0)
 
   def objinside[$: P](currentDepth: Int): P[Expr.ObjBody] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos ~ member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
         currentDepth + 1
@@ -590,7 +604,7 @@ class Parser(
   def member[$: P]: P[Expr.Member] = member(0)
 
   def member[$: P](currentDepth: Int): P[Expr.Member] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       objlocal(currentDepth + 1) | "assert" ~~ break ~ assertStmt(currentDepth + 1) | field(
         currentDepth + 1
@@ -600,7 +614,7 @@ class Parser(
   def field[$: P]: P[Expr.Member.Field] = field(0)
 
   def field[$: P](currentDepth: Int): P[Expr.Member.Field] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       (Pos ~~ fieldname(currentDepth + 1) ~/ "+".!.? ~ ("(" ~ params(
         currentDepth + 1
@@ -617,19 +631,19 @@ class Parser(
   def objlocal[$: P]: P[Expr.Bind] = objlocal(0)
 
   def objlocal[$: P](currentDepth: Int): P[Expr.Bind] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P("local" ~~ break ~/ bind(currentDepth + 1))
   }
   def compspec[$: P]: P[Seq[Expr.CompSpec]] = compspec(0)
 
   def compspec[$: P](currentDepth: Int): P[Seq[Expr.CompSpec]] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P((forspec(currentDepth + 1) | ifspec(currentDepth + 1)).rep)
   }
   def forspec[$: P]: P[Expr.ForSpec] = forspec(0)
 
   def forspec[$: P](currentDepth: Int): P[Expr.ForSpec] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr(currentDepth + 1)).map {
       case (pos, name, cond) =>
         Expr.ForSpec(pos, name, cond)
@@ -638,7 +652,7 @@ class Parser(
   def ifspec[$: P]: P[Expr.IfSpec] = ifspec(0)
 
   def ifspec[$: P](currentDepth: Int): P[Expr.IfSpec] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(Pos ~~ "if" ~~ break ~/ expr(currentDepth + 1)).map { case (pos, cond) =>
       Expr.IfSpec(pos, cond)
     }
@@ -646,7 +660,7 @@ class Parser(
   def fieldname[$: P]: P[Expr.FieldName] = fieldname(0)
 
   def fieldname[$: P](currentDepth: Int): P[Expr.FieldName] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       id.map(Expr.FieldName.Fixed.apply) |
       string.map(Expr.FieldName.Fixed.apply) |
@@ -656,7 +670,7 @@ class Parser(
   def assertStmt[$: P]: P[Expr.Member.AssertStmt] = assertStmt(0)
 
   def assertStmt[$: P](currentDepth: Int): P[Expr.Member.AssertStmt] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(expr(currentDepth + 1) ~ (":" ~ expr(currentDepth + 1)).?.map(_.orNull)).map {
       case (value, msg) =>
         Expr.Member.AssertStmt(value, msg)
@@ -666,7 +680,7 @@ class Parser(
   def bind[$: P]: P[Expr.Bind] = bind(0)
 
   def bind[$: P](currentDepth: Int): P[Expr.Bind] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(
       Pos ~~ id ~ ("(" ~/ params(currentDepth + 1).? ~ ")").?.map(_.flatten)
         .map(_.orNull) ~ "=" ~ expr(currentDepth + 1)
@@ -677,7 +691,7 @@ class Parser(
   def args[$: P]: P[(Array[Expr], Array[String])] = args(0)
 
   def args[$: P](currentDepth: Int): P[(Array[Expr], Array[String])] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P(((id ~ "=" ~ !"=").? ~ expr(currentDepth + 1)).rep(sep = ",") ~ ",".?).flatMapX { x =>
       if (
         x.sliding(2).exists {
@@ -697,7 +711,7 @@ class Parser(
   def params[$: P]: P[Expr.Params] = params(0)
 
   def params[$: P](currentDepth: Int): P[Expr.Params] = {
-    Parser.checkParseDepth(currentDepth)
+    checkParseDepth(currentDepth)
     P((id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".?).flatMapX { x =>
       val seen = collection.mutable.Set.empty[String]
       var overlap: String = null
