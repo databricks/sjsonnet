@@ -106,7 +106,7 @@ abstract class BaseFileTests extends TestSuite {
   }
 
   private def checkError(fileName: os.Path, goldenContent: String, testSuite: String): Unit = {
-    val expected = goldenContent.replaceAll(s"\\(sjsonnet/test/resources/$testSuite/", "(").strip()
+    val expected = goldenContent.strip()
 
     var res: Either[String, Value] = Right(null)
     try {

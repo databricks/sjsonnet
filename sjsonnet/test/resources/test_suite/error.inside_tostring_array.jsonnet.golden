@@ -1,4 +1,4 @@
 sjsonnet.Error: foobar
-    at [Error].(sjsonnet/test/resources/test_suite/error.inside_tostring_array.jsonnet:17:8)
-    at [BinaryOp +].(sjsonnet/test/resources/test_suite/error.inside_tostring_array.jsonnet:17:24)
+    at [Error].(error.inside_tostring_array.jsonnet:17:8)
+    at [BinaryOp +].(error.inside_tostring_array.jsonnet:17:24)
 

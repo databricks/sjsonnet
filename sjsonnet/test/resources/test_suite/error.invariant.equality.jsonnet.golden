@@ -1,4 +1,4 @@
 sjsonnet.Error: Assertion failed
-    at [Assert].(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:10)
-    at [BinaryOp ==].(sjsonnet/test/resources/test_suite/error.invariant.equality.jsonnet:17:24)
+    at [Assert].(error.invariant.equality.jsonnet:17:10)
+    at [BinaryOp ==].(error.invariant.equality.jsonnet:17:24)
 

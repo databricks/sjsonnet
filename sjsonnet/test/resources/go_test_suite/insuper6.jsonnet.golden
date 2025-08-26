@@ -1,3 +1,3 @@
 sjsonnet.StaticError: Unknown variable: undeclared
-    at [Id undeclared].(sjsonnet/test/resources/go_test_suite/insuper6.jsonnet:1:10)
+    at [Id undeclared].(insuper6.jsonnet:1:10)
 

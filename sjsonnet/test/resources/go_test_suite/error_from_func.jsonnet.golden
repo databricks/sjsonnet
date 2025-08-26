@@ -1,4 +1,4 @@
 sjsonnet.Error: xxx
-    at [Error].(sjsonnet/test/resources/go_test_suite/error_from_func.jsonnet:1:25)
-    at [Apply1].(sjsonnet/test/resources/go_test_suite/error_from_func.jsonnet:1:37)
+    at [Error].(error_from_func.jsonnet:1:25)
+    at [Apply1].(error_from_func.jsonnet:1:37)
 

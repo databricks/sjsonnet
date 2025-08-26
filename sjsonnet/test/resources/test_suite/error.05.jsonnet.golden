@@ -1,3 +1,3 @@
 sjsonnet.Error: foo
-    at [Error].(sjsonnet/test/resources/test_suite/error.05.jsonnet:17:21)
+    at [Error].(error.05.jsonnet:17:21)
 

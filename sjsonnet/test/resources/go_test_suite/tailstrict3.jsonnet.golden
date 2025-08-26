@@ -1,3 +1,3 @@
 sjsonnet.Error: xxx
-    at [Error].(sjsonnet/test/resources/go_test_suite/tailstrict3.jsonnet:1:16)
-    at [Apply1].(sjsonnet/test/resources/go_test_suite/tailstrict3.jsonnet:2:4)
+    at [Error].(tailstrict3.jsonnet:1:16)
+    at [Apply1].(tailstrict3.jsonnet:2:4)

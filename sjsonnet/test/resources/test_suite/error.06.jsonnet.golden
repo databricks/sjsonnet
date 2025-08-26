@@ -1,6 +1,6 @@
 sjsonnet.Error: division by zero
-    at [BinaryOp /].(sjsonnet/test/resources/test_suite/error.06.jsonnet:17:15)
-    at [ValidId err].(sjsonnet/test/resources/test_suite/error.06.jsonnet:18:22)
-    at [Apply0].(sjsonnet/test/resources/test_suite/error.06.jsonnet:19:2)
-    at [BinaryOp +].(sjsonnet/test/resources/test_suite/error.06.jsonnet:19:5)
+    at [BinaryOp /].(error.06.jsonnet:17:15)
+    at [ValidId err].(error.06.jsonnet:18:22)
+    at [Apply0].(error.06.jsonnet:19:2)
+    at [BinaryOp +].(error.06.jsonnet:19:5)
 
