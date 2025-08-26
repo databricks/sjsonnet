@@ -272,7 +272,8 @@ class Parser(
     P("" ~ expr1(currentDepth) ~ (Pos ~~ binaryop ~/ expr1(currentDepth)).rep ~ "").map {
       case (pre, fs) =>
         var remaining = fs
-        def climb(minPrec: Int, current: Expr): Expr = {
+        def climb(minPrec: Int, current: Expr, climbDepth: Int): Expr = {
+          checkParseDepth(climbDepth)
           var result = current
           while (
             remaining.headOption match {
@@ -282,7 +283,7 @@ class Parser(
                 if (prec < minPrec) false
                 else {
                   remaining = remaining.tail
-                  val rhs = climb(prec + 1, next)
+                  val rhs = climb(prec + 1, next, climbDepth + 1)
                   val op1 = if (op.length == 1) {
                     (op.charAt(0): @switch) match {
                       case '|' => Expr.BinaryOp.OP_|
@@ -331,7 +332,7 @@ class Parser(
           result
         }
 
-        climb(0, pre)
+        climb(0, pre, currentDepth + 1)
     }
   }
 
