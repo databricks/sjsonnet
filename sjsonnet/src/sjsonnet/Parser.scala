@@ -267,7 +267,6 @@ class Parser(
       case (pre, fs) =>
         var remaining = fs
         def climb(minPrec: Int, current: Expr, climbDepth: Int): Expr = {
-          checkParseDepth(climbDepth)
           var result = current
           while (
             remaining.headOption match {
@@ -476,7 +475,6 @@ class Parser(
   def objinside[$: P]: P[Expr.ObjBody] = objinside(0)
 
   def objinside[$: P](currentDepth: Int): P[Expr.ObjBody] = {
-    checkParseDepth(currentDepth)
     P(
       Pos ~ member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
         currentDepth + 1
