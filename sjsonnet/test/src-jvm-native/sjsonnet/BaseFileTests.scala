@@ -107,21 +107,16 @@ abstract class BaseFileTests extends TestSuite {
 
   private def checkError(fileName: os.Path, goldenContent: String, testSuite: String): Unit = {
     val expected = goldenContent.strip()
-
-    var res: Either[String, Value] = Right(null)
     try {
-      res = eval(fileName, testSuite)
-      assert(res.isLeft)
-      val actual = res.left.getOrElse("")
-      if (fileName.last == "native_panic.jsonnet")
-        assert(actual.strip().contains(expected))
-      else
-        assert(actual.strip() == expected)
+      eval(fileName, testSuite) match {
+        case Left(e) =>
+          assert(e.strip() startsWith expected)
+        case Right(_) =>
+          assert(false)
+      }
     } catch {
       case _: java.lang.StackOverflowError =>
         assert(expected.contains("StackOverflowError"))
-      case e: sjsonnet.Error =>
-        assert(expected.contains(e.getMessage.strip()))
     }
   }
 

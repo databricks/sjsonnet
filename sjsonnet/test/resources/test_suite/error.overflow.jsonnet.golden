@@ -1,3 +1,2 @@
-sjsonnet.Error: overflow
-    at [BinaryOp *].(error.overflow.jsonnet:17:7)
-
+sjsonnet.ParseError: Expected finite number required:17:6, found "\n"
+    at .(error.overflow.jsonnet:17:6)

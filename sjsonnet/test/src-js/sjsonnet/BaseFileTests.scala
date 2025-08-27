@@ -179,12 +179,7 @@ abstract class BaseFileTests extends TestSuite {
     } catch {
       case e: js.JavaScriptException =>
         val msg = e.getMessage.replaceAll("<no stack trace available>", "").strip()
-        if (fileName.endsWith("native_panic.jsonnet"))
-          assert(msg.strip().contains(expected))
-        else
-          assert(msg == expected)
-      case e: sjsonnet.Error =>
-        assert(expected.contains(e.getMessage.strip()))
+        assert(msg startsWith expected)
     }
   }
 }

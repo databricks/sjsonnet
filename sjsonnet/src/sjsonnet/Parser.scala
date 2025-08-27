@@ -98,7 +98,12 @@ class Parser(
     if (s._2.length > 1 && Character.isDigit(s._2.charAt(1)) && s._2.charAt(0) == '0') {
       Fail.opaque("numbers cannot start with a 0 digit")
     } else {
-      Pass(Val.Num(s._1, s._2.toDouble))
+      val v = s._2.toDouble
+      if (v.isInfinite) {
+        Fail.opaque("finite number required")
+      } else {
+        Pass(Val.Num(s._1, v))
+      }
     }
   })
 

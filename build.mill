@@ -202,8 +202,6 @@ object sjsonnet extends VersionFileModule {
         mvn"org.virtuslab::scala-yaml::0.3.0"
       )
 
-    val osName = System.getProperty("os.name").toLowerCase
-
     def releaseMode = ReleaseMode.ReleaseFull
     def nativeLTO = LTO.Full
     def nativeMultithreading = None
