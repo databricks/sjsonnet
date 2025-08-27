@@ -155,11 +155,8 @@ class Interpreter(
   def evaluate(txt: String, path: Path): Either[Error, Val] = {
     val resolvedImport = StaticResolvedFile(txt)
     resolver.cache(path) = resolvedImport
-    for {
-      res <- resolver.parse(path, resolvedImport)(evaluator)
-      (parsed, _) = res
-      res0 <- handleException(evaluator.visitExpr(parsed)(ValScope.empty))
-      res = res0 match {
+    resolver.parse(path, resolvedImport)(evaluator) flatMap { case (expr, _) =>
+      handleException(evaluator.visitExpr(expr)(ValScope.empty)) flatMap {
         case f: Val.Func =>
           val defaults2 = f.params.defaultExprs.clone()
           val tlaExpressions = collection.mutable.Set.empty[Expr]
@@ -173,18 +170,20 @@ class Interpreter(
             }
             i += 1
           }
-          new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
+          val out = new Val.Func(f.pos, f.defSiteValScope, Params(f.params.names, defaults2)) {
             def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
               f.evalRhs(vs, es, fs, pos)
+
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
               evaluator.visitExpr(expr)(
                 if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs
               )
             }
-          }.apply0(f.pos)(evaluator, TailstrictModeDisabled)
-        case x => x
+          }
+          handleException(out.apply0(f.pos)(evaluator, TailstrictModeDisabled))
+        case x => Right(x)
       }
-    } yield res
+    }
   }
 
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
