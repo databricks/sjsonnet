@@ -1,7 +1,58 @@
 # Sjsonnet
-A Scala implementation of the [Jsonnet](https://jsonnet.org/) configuration language, running on JVM, Scala Native and JavaScript.
+A Scala implementation of the [Jsonnet](https://jsonnet.org/) configuration language, running on JVM, GraalVM, Scala Native and JavaScript.
 
-## Usage
+## Usage as a CLI
+We release standalone executables JARs, Scala Native and GraalVM in the [github release page](https://github.com/databricks/sjsonnet/releases):
+
+```bash
+$ chmod +x sjsonnet.jar
+
+$ ./sjsonnet.jar
+Missing argument: file <str>
+Expected Signature: Sjsonnet
+usage: sjsonnet [sjsonnet-options] script-file
+  -A --tla-str <str>              <var>[=<val>] Provide top-level arguments as string. 'If <val> is
+                                  omitted, get from environment var <var>
+  -J --jpath <str>                Specify an additional library search dir (left-most wins unless
+                                  reverse-jpaths-priority is set)
+  -S --string                     Expect a string, manifest as plain text
+  -V --ext-str <str>              <var>[=<val>] Provide 'external' variable as string. 'If <val> is
+                                  omitted, get from environment var <var>
+  -V --ext-code <str>             <var>[=<code>] Provide 'external' variable as Jsonnet code. If
+                                  <code> is omitted, get from environment var <var>
+  -V --tla-code <str>             <var>[=<val>] Provide top-level arguments as Jsonnet code. 'If
+                                  <val> is omitted, get from environment var <var>
+  -c --create-output-dirs         Automatically creates all parent directories for files
+  --debug-importer                Print some additional debugging information about the importer
+  -e --exec                       Evaluate the given string as Jsonnet rather than treating it as a
+                                  file name
+  --ext-code-file <str>           <var>=<file> Provide 'external' variable as Jsonnet code from the
+                                  file
+  --ext-str-file <str>            <var>=<file> Provide 'external' variable as string from the file
+  --fatal-warnings                Fail if any warnings were emitted
+  file <str>                      The jsonnet file you wish to evaluate
+  -m --multi <str>                Write multiple files to the directory, list files on stdout
+  -n --indent <int>               How much to indent your output JSON
+  -o --output-file <str>          Write to the output file rather than stdout
+  -p --preserve-order             Preserves order of keys in the resulting JSON
+  --reverse-jpaths-priority       If set, reverses the import order of specified jpaths (so that the
+                                  rightmost wins)
+  --strict                        Enforce some additional syntax limitations
+  --throw-error-for-invalid-sets  Throw an error if a set operation is used on a non-set
+  --tla-code-file <str>           <var>=<file> Provide top-level arguments variable as Jsonnet code
+                                  from the file
+  --tla-str-file <str>            <var>=<file> Provide top-level arguments variable as string from
+                                  the file
+  -y --yaml-stream                Write output as a YAML stream of JSON documents
+  --yaml-debug                    Generate source line comments in the output YAML doc to make it
+                                  easier to figure out where values come from.
+  --yaml-out                      Write output as a YAML document
+
+$ ./sjsonnet.jar foo.jsonnet
+```
+
+
+## Usage as a library
 
 Sjsonnet can be used from Java and Scala:
 
@@ -35,22 +86,6 @@ sjsonnet.SjsonnetMain.main0(
     os.pwd, // working directory
     None
 );
-```
-
-As a standalone executable assembly from the [github release page](https://github.com/databricks/sjsonnet/releases):
-```bash
-$ chmod +x sjsonnet.jar
-
-$ ./sjsonnet.jar
-error: Need to pass in a jsonnet file to evaluate
-usage: sjsonnet [sjsonnet-options] script-file
-
-  -n, --indent       How much to indent your output JSON
-  -J, --jpath        Specify an additional library search dir (left-most wins)
-  -o, --output-file  Write to the output file rather than stdout
-  ...
-
-$ ./sjsonnet.jar foo.jsonnet
 ```
 
 Or from Javascript:

@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: 'zulu'
       - name: Set up environment variables
         run: |
@@ -70,10 +70,13 @@ jobs:
           echo "SCALA_VERSION=3.3.6" >> $GITHUB_ENV
       - name: Native Binary Build
         run: ./mill "sjsonnet.native[$SCALA_VERSION].nativeLink"
+      - name: GraalVM Binary Build
+        run: ./mill "sjsonnet.graal.nativeImage"
       - name: Rename Artifacts
         run: |
           mkdir release
           cp ./out/sjsonnet/native/$SCALA_VERSION/nativeLink.dest/out ./release/sjsonnet-$VERSION-${{ matrix.platform.name }}
+          cp ./out/sjsonnet/graal/nativeImage.dest/native-executable ./release/sjsonnet-graalvm-$VERSION-${{ matrix.platform.name }}
       - uses: actions/upload-artifact@v4
         name: Upload Native Binary
         with:
