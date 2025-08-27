@@ -1,4 +1,12 @@
-## 0.5.4 (Latest)
+## 0.5.5 (Latest)
+* Fix multiple assertion related bugs (inheritance, binding of super in inherited assertions, and timing of evaluation) by @JoshRosen in https://github.com/databricks/sjsonnet/pull/468
+* Fix detection of duplicate fields with dynamic field name expressions by @JoshRosen in https://github.com/databricks/sjsonnet/pull/470
+* chore: Make std.setInter accepts str. by @He-Pin in https://github.com/databricks/sjsonnet/pull/472
+* chore: Make std.setDiff accepts str. by @He-Pin in https://github.com/databricks/sjsonnet/pull/478
+* chore: Make std.setUnion accept str. by @He-Pin in https://github.com/databricks/sjsonnet/pull/480
+* Add graalvm build and test suite - experimental by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/482
+
+## 0.5.4
 * Upgrade to mill 1.0.2
 * Fix parsing error with numbers causing whitespaces to be consumed. by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/457
 * Fix parseInt to properly understand longs by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/458
