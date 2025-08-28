@@ -313,7 +313,6 @@ object sjsonnet extends VersionFileModule {
       "--no-fallback",
       "-O3",
       "-R:MaxHeapSize=2G",
-      "-march=native",
       "--strict-image-heap",
       "--initialize-at-build-time",
       "--initialize-at-run-time=os.package$",
