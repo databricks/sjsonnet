@@ -317,7 +317,7 @@ object sjsonnet extends VersionFileModule {
       "--initialize-at-build-time",
       "--initialize-at-run-time=os.package$",
       "--install-exit-handlers",
-      "-H:+ReportExceptionStackTraces",
+      "-H:+ReportExceptionStackTraces"
     )
   }
 }
