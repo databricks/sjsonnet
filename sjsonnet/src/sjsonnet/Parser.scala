@@ -14,6 +14,7 @@ import scala.collection.mutable
  */
 
 object Parser {
+
   private def precedence(op: String): Int = {
     if (op.length == 1) {
       (op.charAt(0): @switch) match {
@@ -75,10 +76,19 @@ class Parser(
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
       java.util.LinkedHashMap[String, java.lang.Boolean]
-    ]) {
+    ],
+    settings: Settings = Settings.default) {
   import Parser._
 
   private val fileScope = new FileScope(currentFile)
+
+  private def checkParseDepth(currentDepth: Int): Unit = {
+    if (currentDepth > settings.maxParserRecursionDepth) {
+      throw new ParseError(
+        s"Parsing exceeded maximum recursion depth of ${settings.maxParserRecursionDepth}"
+      )
+    }
+  }
 
   def Pos[$: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
 
@@ -190,166 +200,226 @@ class Parser(
     }
   )
 
-  def arr[$: P]: P[Expr] = P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody)
-  def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] =
-    P(forspec ~ compspec).map(Left(_))
-  def arrBody[$: P]: P[Expr] = P(
-    Pos ~~ expr ~
-    (compSuffix | "," ~ (compSuffix | (expr.rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
-  ).map {
-    case (offset, first: Val, None)        => Val.Arr(offset, Array(first))
-    case (offset, first, None)             => Expr.Arr(offset, Array(first))
-    case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
-    case (offset, first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
-      val a = new Array[Lazy](rest.length + 1)
-      a(0) = first
-      var i = 1
-      rest.foreach { v =>
-        a(i) = v.asInstanceOf[Val]
-        i += 1
-      }
-      Val.Arr(offset, a)
-    case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
+  def arr[$: P]: P[Expr] = arr(0)
+
+  def arr[$: P](currentDepth: Int): P[Expr] = {
+    checkParseDepth(currentDepth)
+    P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody(currentDepth + 1))
   }
+  def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = compSuffix(0)
 
-  def assertExpr[$: P](pos: Position): P[Expr] =
-    P(assertStmt ~ ";" ~ expr).map(t => Expr.AssertExpr(pos, t._1, t._2))
+  def compSuffix[$: P](currentDepth: Int): P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = {
+    P(forspec(currentDepth + 1) ~ compspec(currentDepth + 1)).map(Left(_))
+  }
+  def arrBody[$: P]: P[Expr] = arrBody(0)
 
-  def function[$: P](pos: Position): P[Expr] =
-    P("(" ~/ params ~ ")" ~ expr).map(t => Expr.Function(pos, t._1, t._2))
-
-  def ifElse[$: P]: P[Expr] =
-    P(Pos ~~ expr ~ "then" ~~ break ~ expr ~ ("else" ~~ break ~ expr).?.map(_.orNull))
-      .map { case (pos, cond, t, e) => Expr.IfElse(pos, cond, t, e) }
-
-  def localExpr[$: P]: P[Expr] =
+  def arrBody[$: P](currentDepth: Int): P[Expr] = {
     P(
-      Pos ~~ bind
-        .rep(min = 1, sep = ","./)
-        .map(s => if (s.isEmpty) null else s.toArray) ~ ";" ~ expr
-    ).map { case (pos, bind, ret) => Expr.LocalExpr(pos, bind, ret) }
-
-  def expr[$: P]: P[Expr] =
-    P("" ~ expr1 ~ (Pos ~~ binaryop ~/ expr1).rep ~ "").map { case (pre, fs) =>
-      var remaining = fs
-      def climb(minPrec: Int, current: Expr): Expr = {
-        var result = current
-        while (
-          remaining.headOption match {
-            case None                     => false
-            case Some((offset, op, next)) =>
-              val prec: Int = precedence(op)
-              if (prec < minPrec) false
-              else {
-                remaining = remaining.tail
-                val rhs = climb(prec + 1, next)
-                val op1 = if (op.length == 1) {
-                  (op.charAt(0): @switch) match {
-                    case '|' => Expr.BinaryOp.OP_|
-                    case '^' => Expr.BinaryOp.OP_^
-                    case '&' => Expr.BinaryOp.OP_&
-                    case '<' => Expr.BinaryOp.OP_<
-                    case '>' => Expr.BinaryOp.OP_>
-                    case '+' => Expr.BinaryOp.OP_+
-                    case '-' => Expr.BinaryOp.OP_-
-                    case '*' => Expr.BinaryOp.OP_*
-                    case '/' => Expr.BinaryOp.OP_/
-                    case '%' => Expr.BinaryOp.OP_%
-                    case _   => throw new IllegalArgumentException("Unknown operator: " + op)
-                  }
-                } else
-                  op match {
-                    case "*"  => Expr.BinaryOp.OP_*
-                    case "/"  => Expr.BinaryOp.OP_/
-                    case "%"  => Expr.BinaryOp.OP_%
-                    case "+"  => Expr.BinaryOp.OP_+
-                    case "-"  => Expr.BinaryOp.OP_-
-                    case "<<" => Expr.BinaryOp.OP_<<
-                    case ">>" => Expr.BinaryOp.OP_>>
-                    case "<"  => Expr.BinaryOp.OP_<
-                    case ">"  => Expr.BinaryOp.OP_>
-                    case "<=" => Expr.BinaryOp.OP_<=
-                    case ">=" => Expr.BinaryOp.OP_>=
-                    case "in" => Expr.BinaryOp.OP_in
-                    case "==" => Expr.BinaryOp.OP_==
-                    case "!=" => Expr.BinaryOp.OP_!=
-                    case "&"  => Expr.BinaryOp.OP_&
-                    case "^"  => Expr.BinaryOp.OP_^
-                    case "|"  => Expr.BinaryOp.OP_|
-                    case "&&" => Expr.BinaryOp.OP_&&
-                    case "||" => Expr.BinaryOp.OP_||
-                  }
-                result = op1 match {
-                  case Expr.BinaryOp.OP_&& => Expr.And(offset, result, rhs)
-                  case Expr.BinaryOp.OP_|| => Expr.Or(offset, result, rhs)
-                  case _                   => Expr.BinaryOp(offset, result, op1, rhs)
-                }
-                true
-              }
-          }
-        ) ()
-        result
-      }
-
-      climb(0, pre)
+      Pos ~~ expr(currentDepth + 1) ~
+      (compSuffix(currentDepth + 1) | "," ~ (compSuffix(currentDepth + 1) | (expr(currentDepth + 1)
+        .rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
+    ).map {
+      case (offset, first: Val, None)        => Val.Arr(offset, Array(first))
+      case (offset, first, None)             => Expr.Arr(offset, Array(first))
+      case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
+      case (offset, first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
+        val a = new Array[Lazy](rest.length + 1)
+        a(0) = first
+        var i = 1
+        rest.foreach { v =>
+          a(i) = v.asInstanceOf[Val]
+          i += 1
+        }
+        Val.Arr(offset, a)
+      case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
     }
-
-  def expr1[$: P]: P[Expr] = P(expr2 ~ exprSuffix2.rep).map { case (pre, fs) =>
-    fs.foldLeft(pre) { case (p, f) => f(p) }
   }
 
-  def exprSuffix2[$: P]: P[Expr => Expr] = P(
-    Pos.flatMapX { i =>
-      CharIn(".[({")./.!.map(_(0)).flatMapX { c =>
-        (c: @switch) match {
-          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
-          case '[' =>
-            Pass ~ (expr.? ~ (":" ~ expr.?).rep ~ "]").map {
-              case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
-              case (start, ins)        =>
-                Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
+  def assertExpr[$: P](pos: Position, currentDepth: Int): P[Expr] = {
+    P(assertStmt(currentDepth + 1) ~ ";" ~ expr(currentDepth + 1)).map(t =>
+      Expr.AssertExpr(pos, t._1, t._2)
+    )
+  }
+
+  def function[$: P](pos: Position, currentDepth: Int): P[Expr] = {
+    P("(" ~/ params(currentDepth + 1) ~ ")" ~ expr(currentDepth + 1)).map(t =>
+      Expr.Function(pos, t._1, t._2)
+    )
+  }
+
+  def ifElse[$: P](currentDepth: Int): P[Expr] = {
+    P(
+      Pos ~~ expr(currentDepth + 1) ~ "then" ~~ break ~ expr(
+        currentDepth + 1
+      ) ~ ("else" ~~ break ~ expr(currentDepth + 1)).?.map(_.orNull)
+    )
+      .map { case (pos, cond, t, e) => Expr.IfElse(pos, cond, t, e) }
+  }
+
+  def localExpr[$: P](currentDepth: Int): P[Expr] = {
+    P(
+      Pos ~~ bind(currentDepth + 1)
+        .rep(min = 1, sep = ","./)
+        .map(s => if (s.isEmpty) null else s.toArray) ~ ";" ~ expr(currentDepth + 1)
+    ).map { case (pos, bind, ret) => Expr.LocalExpr(pos, bind, ret) }
+  }
+
+  def expr[$: P]: P[Expr] = expr(0)
+
+  def expr[$: P](currentDepth: Int): P[Expr] = {
+    checkParseDepth(currentDepth)
+    P("" ~ expr1(currentDepth) ~ (Pos ~~ binaryop ~/ expr1(currentDepth)).rep ~ "").map {
+      case (pre, fs) =>
+        var remaining = fs
+        def climb(minPrec: Int, current: Expr, climbDepth: Int): Expr = {
+          var result = current
+          while (
+            remaining.headOption match {
+              case None                     => false
+              case Some((offset, op, next)) =>
+                val prec: Int = precedence(op)
+                if (prec < minPrec) false
+                else {
+                  remaining = remaining.tail
+                  val rhs = climb(prec + 1, next, climbDepth + 1)
+                  val op1 = if (op.length == 1) {
+                    (op.charAt(0): @switch) match {
+                      case '|' => Expr.BinaryOp.OP_|
+                      case '^' => Expr.BinaryOp.OP_^
+                      case '&' => Expr.BinaryOp.OP_&
+                      case '<' => Expr.BinaryOp.OP_<
+                      case '>' => Expr.BinaryOp.OP_>
+                      case '+' => Expr.BinaryOp.OP_+
+                      case '-' => Expr.BinaryOp.OP_-
+                      case '*' => Expr.BinaryOp.OP_*
+                      case '/' => Expr.BinaryOp.OP_/
+                      case '%' => Expr.BinaryOp.OP_%
+                      case _   => throw new IllegalArgumentException("Unknown operator: " + op)
+                    }
+                  } else
+                    op match {
+                      case "*"  => Expr.BinaryOp.OP_*
+                      case "/"  => Expr.BinaryOp.OP_/
+                      case "%"  => Expr.BinaryOp.OP_%
+                      case "+"  => Expr.BinaryOp.OP_+
+                      case "-"  => Expr.BinaryOp.OP_-
+                      case "<<" => Expr.BinaryOp.OP_<<
+                      case ">>" => Expr.BinaryOp.OP_>>
+                      case "<"  => Expr.BinaryOp.OP_<
+                      case ">"  => Expr.BinaryOp.OP_>
+                      case "<=" => Expr.BinaryOp.OP_<=
+                      case ">=" => Expr.BinaryOp.OP_>=
+                      case "in" => Expr.BinaryOp.OP_in
+                      case "==" => Expr.BinaryOp.OP_==
+                      case "!=" => Expr.BinaryOp.OP_!=
+                      case "&"  => Expr.BinaryOp.OP_&
+                      case "^"  => Expr.BinaryOp.OP_^
+                      case "|"  => Expr.BinaryOp.OP_|
+                      case "&&" => Expr.BinaryOp.OP_&&
+                      case "||" => Expr.BinaryOp.OP_||
+                    }
+                  result = op1 match {
+                    case Expr.BinaryOp.OP_&& => Expr.And(offset, result, rhs)
+                    case Expr.BinaryOp.OP_|| => Expr.Or(offset, result, rhs)
+                    case _                   => Expr.BinaryOp(offset, result, op1, rhs)
+                  }
+                  true
+                }
             }
-          case '(' =>
-            Pass ~ (args ~ ")" ~ "tailstrict".!.?).map { case (args, namedNames, tailstrict) =>
-              Expr.Apply(
-                i,
-                _: Expr,
-                args,
-                if (namedNames.length == 0) null else namedNames,
-                tailstrict.nonEmpty
-              )
-            }
-          case '{' => Pass ~ (objinside ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
-          case _   => Fail
+          ) ()
+          result
+        }
+
+        climb(0, pre, currentDepth + 1)
+    }
+  }
+
+  def expr1[$: P]: P[Expr] = expr1(0)
+
+  def expr1[$: P](currentDepth: Int): P[Expr] = {
+    P(expr2(currentDepth + 1) ~ exprSuffix2(currentDepth + 1).rep).map { case (pre, fs) =>
+      fs.foldLeft(pre) { case (p, f) => f(p) }
+    }
+  }
+
+  def exprSuffix2[$: P]: P[Expr => Expr] = exprSuffix2(0)
+
+  def exprSuffix2[$: P](currentDepth: Int): P[Expr => Expr] = {
+    P(
+      Pos.flatMapX { i =>
+        CharIn(".[({")./.!.map(_(0)).flatMapX { c =>
+          (c: @switch) match {
+            case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
+            case '[' =>
+              Pass ~ (expr(currentDepth + 1).? ~ (":" ~ expr(currentDepth + 1).?).rep ~ "]").map {
+                case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
+                case (start, ins)        =>
+                  Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
+              }
+            case '(' =>
+              Pass ~ (args(currentDepth + 1) ~ ")" ~ "tailstrict".!.?).map {
+                case (args, namedNames, tailstrict) =>
+                  Expr.Apply(
+                    i,
+                    _: Expr,
+                    args,
+                    if (namedNames.length == 0) null else namedNames,
+                    tailstrict.nonEmpty
+                  )
+              }
+            case '{' =>
+              Pass ~ (objinside(currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
+            case _ => Fail
+          }
         }
       }
-    }
-  )
+    )
+  }
 
-  def local[$: P]: P[Expr] = P(localExpr)
-  def importStr[$: P](pos: Position): P[Expr.ImportStr] = P(importExpr.map(Expr.ImportStr(pos, _)))
-  def importBin[$: P](pos: Position): P[Expr.ImportBin] = P(importExpr.map(Expr.ImportBin(pos, _)))
-  def `import`[$: P](pos: Position): P[Expr.Import] = P(importExpr.map(Expr.Import(pos, _)))
-  def error[$: P](pos: Position): P[Expr.Error] = P(expr.map(Expr.Error(pos, _)))
+  def local[$: P](currentDepth: Int): P[Expr] = {
+    P(localExpr(currentDepth + 1))
+  }
+  def importStr[$: P](pos: Position): P[Expr.ImportStr] = importStr(pos, 0)
+  def importBin[$: P](pos: Position): P[Expr.ImportBin] = importBin(pos, 0)
+  def `import`[$: P](pos: Position): P[Expr.Import] = `import`(pos, 0)
 
-  def importExpr[$: P]: P[String] = P(
-    expr.flatMap {
-      case Val.Str(_, s) => Pass(s)
-      case _             => Fail.opaque("string literal (computed imports are not allowed)")
-    }
-  )
+  def importStr[$: P](pos: Position, currentDepth: Int): P[Expr.ImportStr] = {
+    P(importExpr(currentDepth + 1).map(Expr.ImportStr(pos, _)))
+  }
+  def importBin[$: P](pos: Position, currentDepth: Int): P[Expr.ImportBin] = {
+    P(importExpr(currentDepth + 1).map(Expr.ImportBin(pos, _)))
+  }
+  def `import`[$: P](pos: Position, currentDepth: Int): P[Expr.Import] = {
+    P(importExpr(currentDepth + 1).map(Expr.Import(pos, _)))
+  }
+  def error[$: P](pos: Position, currentDepth: Int): P[Expr.Error] = {
+    P(expr(currentDepth + 1).map(Expr.Error(pos, _)))
+  }
 
-  def unaryOpExpr[$: P](pos: Position, op: Char): P[Expr.UnaryOp] = P(
-    expr1.map { e =>
-      def k2 = (op: @switch) match {
-        case '+' => Expr.UnaryOp.OP_+
-        case '-' => Expr.UnaryOp.OP_-
-        case '~' => Expr.UnaryOp.OP_~
-        case '!' => Expr.UnaryOp.OP_!
+  def importExpr[$: P]: P[String] = importExpr(0)
+
+  def importExpr[$: P](currentDepth: Int): P[String] = {
+    P(
+      expr(currentDepth + 1).flatMap {
+        case Val.Str(_, s) => Pass(s)
+        case _             => Fail.opaque("string literal (computed imports are not allowed)")
       }
-      Expr.UnaryOp(pos, k2, e)
-    }
-  )
+    )
+  }
+
+  def unaryOpExpr[$: P](pos: Position, op: Char, currentDepth: Int): P[Expr.UnaryOp] = {
+    P(
+      expr1(currentDepth + 1).map { e =>
+        def k2 = (op: @switch) match {
+          case '+' => Expr.UnaryOp.OP_+
+          case '-' => Expr.UnaryOp.OP_-
+          case '~' => Expr.UnaryOp.OP_~
+          case '!' => Expr.UnaryOp.OP_!
+        }
+        Expr.UnaryOp(pos, k2, e)
+      }
+    )
+  }
 
   def constructString(pos: Position, lines: Seq[String]): Val.Str = {
     val s = lines.mkString
@@ -358,194 +428,249 @@ class Parser(
   }
 
   // Any `expr` that isn't naively left-recursive
-  def expr2[$: P]: P[Expr] = P(
-    Pos.flatMapX { pos =>
-      SingleChar.flatMapX { c =>
-        (c: @switch) match {
-          case '{'                   => Pass ~ objinside ~ "}"
-          case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c)
-          case '['                   => Pass ~ arr ~ "]"
-          case '('                   => Pass ~ expr ~ ")"
-          case '\"'                  => doubleString.map(constructString(pos, _))
-          case '\''                  => singleString.map(constructString(pos, _))
-          case '@'                   =>
-            SingleChar./.flatMapX {
-              case '\"' => literalDoubleString.map(constructString(pos, _))
-              case '\'' => literalSingleString.map(constructString(pos, _))
-              case _    => Fail
-            }
-          case '|' => maybeChompedTripleBarString.map(constructString(pos, _))
-          case '$' => Pass(Expr.$(pos))
-          case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-            P.current.index = pos.offset; number
-          case x =>
-            if (idStartChar(x)) CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
-              "" + x + y match {
-                case "null"      => Pass(Val.Null(pos))
-                case "true"      => Pass(Val.True(pos))
-                case "false"     => Pass(Val.False(pos))
-                case "self"      => Pass(Expr.Self(pos))
-                case "super"     => Pass(Expr.Super(pos))
-                case "if"        => Pass ~ ifElse
-                case "function"  => Pass ~ function(pos)
-                case "importstr" => Pass ~ importStr(pos)
-                case "importbin" => Pass ~ importBin(pos)
-                case "import"    => Pass ~ `import`(pos)
-                case "error"     => Pass ~ error(pos)
-                case "assert"    => Pass ~ assertExpr(pos)
-                case "local"     => Pass ~ local
-                case x           => Pass(Expr.Id(pos, x))
+  def expr2[$: P]: P[Expr] = expr2(0)
+
+  def expr2[$: P](currentDepth: Int): P[Expr] = {
+    P(
+      Pos.flatMapX { pos =>
+        SingleChar.flatMapX { c =>
+          (c: @switch) match {
+            case '{'                   => Pass ~ objinside(currentDepth + 1) ~ "}"
+            case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c, currentDepth + 1)
+            case '['                   => Pass ~ arr(currentDepth + 1) ~ "]"
+            case '('                   => Pass ~ expr(currentDepth + 1) ~ ")"
+            case '\"'                  => doubleString.map(constructString(pos, _))
+            case '\''                  => singleString.map(constructString(pos, _))
+            case '@'                   =>
+              SingleChar./.flatMapX {
+                case '\"' => literalDoubleString.map(constructString(pos, _))
+                case '\'' => literalSingleString.map(constructString(pos, _))
+                case _    => Fail
               }
-            }
-            else Fail
+            case '|' => maybeChompedTripleBarString.map(constructString(pos, _))
+            case '$' => Pass(Expr.$(pos))
+            case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
+              P.current.index = pos.offset; number
+            case x =>
+              if (idStartChar(x)) CharsWhileIn("_a-zA-Z0-9", 0).!.flatMapX { y =>
+                "" + x + y match {
+                  case "null"      => Pass(Val.Null(pos))
+                  case "true"      => Pass(Val.True(pos))
+                  case "false"     => Pass(Val.False(pos))
+                  case "self"      => Pass(Expr.Self(pos))
+                  case "super"     => Pass(Expr.Super(pos))
+                  case "if"        => Pass ~ ifElse(currentDepth + 1)
+                  case "function"  => Pass ~ function(pos, currentDepth + 1)
+                  case "importstr" => Pass ~ importStr(pos, currentDepth + 1)
+                  case "importbin" => Pass ~ importBin(pos, currentDepth + 1)
+                  case "import"    => Pass ~ `import`(pos, currentDepth + 1)
+                  case "error"     => Pass ~ error(pos, currentDepth + 1)
+                  case "assert"    => Pass ~ assertExpr(pos, currentDepth + 1)
+                  case "local"     => Pass ~ local(currentDepth + 1)
+                  case x           => Pass(Expr.Id(pos, x))
+                }
+              }
+              else Fail
+          }
         }
       }
-    }
-  )
-
-  def objinside[$: P]: P[Expr.ObjBody] = P(
-    Pos ~ member.rep(sep = ",") ~ ",".? ~ (forspec ~ compspec).?
-  ).flatMap { case t @ (_, exprs, _) =>
-    val seen = collection.mutable.Set.empty[String]
-    var overlap: String = null
-    exprs.foreach {
-      case Expr.Member.Field(_, Expr.FieldName.Fixed(n), _, _, _, _) =>
-        if (seen(n)) overlap = n
-        else seen.add(n)
-      case _ =>
-    }
-    if (overlap == null) Pass(t)
-    else Fail.opaque("no duplicate field: " + overlap)
-  }.flatMapX {
-    case (pos, exprs, None) =>
-      val b =
-        exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
-      val seen = collection.mutable.Set.empty[String]
-      var overlap: String = null
-      b.foreach {
-        case Expr.Bind(_, n, _, _) =>
-          if (seen(n)) overlap = n
-          else seen.add(n)
-        case null =>
-      }
-      if (overlap != null) {
-        Fail.opaque("no duplicate local: " + overlap)
-      } else {
-        val binds = if (b.isEmpty) null else b
-
-        val fields = exprs.iterator
-          .filter(_.isInstanceOf[Expr.Member.Field])
-          .asInstanceOf[Iterator[Expr.Member.Field]]
-          .toArray
-        val asserts = {
-          val a = exprs.iterator
-            .filter(_.isInstanceOf[Expr.Member.AssertStmt])
-            .asInstanceOf[Iterator[Expr.Member.AssertStmt]]
-            .toArray
-          if (a.isEmpty) null else a
-        }
-        if (binds == null && asserts == null && fields.forall(_.isStatic))
-          Pass(Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings))
-        else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
-      }
-    case (pos, exprs, Some(comps)) =>
-      val preLocals = exprs
-        .takeWhile(_.isInstanceOf[Expr.Bind])
-        .map(_.asInstanceOf[Expr.Bind])
-      if (preLocals.nonEmpty && exprs.length == preLocals.length) {
-        Fail.opaque("object comprehension must have a field")
-      } else
-        exprs(preLocals.length) match {
-          case Expr.Member.Field(
-                offset,
-                Expr.FieldName.Dyn(lhs),
-                plus,
-                args,
-                Visibility.Normal,
-                rhsBody
-              ) =>
-            val rhs = if (args == null) {
-              rhsBody
-            } else {
-              Expr.Function(offset, args, rhsBody)
-            }
-            val postLocals = exprs
-              .drop(preLocals.length + 1)
-              .takeWhile(_.isInstanceOf[Expr.Bind])
-              .map(_.asInstanceOf[Expr.Bind])
-
-            /*
-             * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
-             *
-             * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
-             * Otherwise the field value will be overriden by the multiple iterations of forspec
-             */
-            (lhs, comps) match {
-              case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _))
-                  if values.length > 1 =>
-                Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
-              case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
-                Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
-              case _ =>
-                Pass(
-                  Expr.ObjBody.ObjComp(
-                    pos,
-                    preLocals.toArray,
-                    lhs,
-                    rhs,
-                    plus,
-                    postLocals.toArray,
-                    comps._1,
-                    comps._2.toList
-                  )
-                )
-            }
-          case _: Expr.Member.AssertStmt =>
-            Fail.opaque("object comprehension cannot have asserts")
-          case _ =>
-            Fail.opaque(
-              "object comprehension must have a single field with a dynamic field name"
-            )
-        }
+    )
   }
 
-  def member[$: P]: P[Expr.Member] = P(objlocal | "assert" ~~ break ~ assertStmt | field)
-  def field[$: P]: P[Expr.Member.Field] = P(
-    (Pos ~~ fieldname ~/ "+".!.? ~ ("(" ~ params ~ ")").? ~ fieldKeySep ~/ expr).map {
-      case (pos, name, plus, p, h2, e) =>
-        Expr.Member.Field(pos, name, plus.nonEmpty, p.orNull, h2, e)
+  def objinside[$: P]: P[Expr.ObjBody] = objinside(0)
+
+  def objinside[$: P](currentDepth: Int): P[Expr.ObjBody] = {
+    P(
+      Pos ~ member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
+        currentDepth + 1
+      )).?
+    ).flatMap { case t @ (_, exprs, _) =>
+      val seen = collection.mutable.Set.empty[String]
+      var overlap: String = null
+      exprs.foreach {
+        case Expr.Member.Field(_, Expr.FieldName.Fixed(n), _, _, _, _) =>
+          if (seen(n)) overlap = n
+          else seen.add(n)
+        case _ =>
+      }
+      if (overlap == null) Pass(t)
+      else Fail.opaque("no duplicate field: " + overlap)
+    }.flatMapX {
+      case (pos, exprs, None) =>
+        val b =
+          exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+        val seen = collection.mutable.Set.empty[String]
+        var overlap: String = null
+        b.foreach {
+          case Expr.Bind(_, n, _, _) =>
+            if (seen(n)) overlap = n
+            else seen.add(n)
+          case null =>
+        }
+        if (overlap != null) {
+          Fail.opaque("no duplicate local: " + overlap)
+        } else {
+          val binds = if (b.isEmpty) null else b
+
+          val fields = exprs.iterator
+            .filter(_.isInstanceOf[Expr.Member.Field])
+            .asInstanceOf[Iterator[Expr.Member.Field]]
+            .toArray
+          val asserts = {
+            val a = exprs.iterator
+              .filter(_.isInstanceOf[Expr.Member.AssertStmt])
+              .asInstanceOf[Iterator[Expr.Member.AssertStmt]]
+              .toArray
+            if (a.isEmpty) null else a
+          }
+          if (binds == null && asserts == null && fields.forall(_.isStatic))
+            Pass(Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings))
+          else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
+        }
+      case (pos, exprs, Some(comps)) =>
+        val preLocals = exprs
+          .takeWhile(_.isInstanceOf[Expr.Bind])
+          .map(_.asInstanceOf[Expr.Bind])
+        if (preLocals.nonEmpty && exprs.length == preLocals.length) {
+          Fail.opaque("object comprehension must have a field")
+        } else
+          exprs(preLocals.length) match {
+            case Expr.Member.Field(
+                  offset,
+                  Expr.FieldName.Dyn(lhs),
+                  plus,
+                  args,
+                  Visibility.Normal,
+                  rhsBody
+                ) =>
+              val rhs = if (args == null) {
+                rhsBody
+              } else {
+                Expr.Function(offset, args, rhsBody)
+              }
+              val postLocals = exprs
+                .drop(preLocals.length + 1)
+                .takeWhile(_.isInstanceOf[Expr.Bind])
+                .map(_.asInstanceOf[Expr.Bind])
+
+              /*
+               * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
+               *
+             * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
+               * Otherwise the field value will be overriden by the multiple iterations of forspec
+               */
+              (lhs, comps) match {
+                case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _))
+                    if values.length > 1 =>
+                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+                case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
+                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+                case _ =>
+                  Pass(
+                    Expr.ObjBody.ObjComp(
+                      pos,
+                      preLocals.toArray,
+                      lhs,
+                      rhs,
+                      plus,
+                      postLocals.toArray,
+                      comps._1,
+                      comps._2.toList
+                    )
+                  )
+              }
+            case _: Expr.Member.AssertStmt =>
+              Fail.opaque("object comprehension cannot have asserts")
+            case _ =>
+              Fail.opaque(
+                "object comprehension must have a single field with a dynamic field name"
+              )
+          }
     }
-  )
+  }
+
+  def member[$: P]: P[Expr.Member] = member(0)
+
+  def member[$: P](currentDepth: Int): P[Expr.Member] = {
+    P(
+      objlocal(currentDepth + 1) | "assert" ~~ break ~ assertStmt(currentDepth + 1) | field(
+        currentDepth + 1
+      )
+    )
+  }
+  def field[$: P]: P[Expr.Member.Field] = field(0)
+
+  def field[$: P](currentDepth: Int): P[Expr.Member.Field] = {
+    P(
+      (Pos ~~ fieldname(currentDepth + 1) ~/ "+".!.? ~ ("(" ~ params(
+        currentDepth + 1
+      ) ~ ")").? ~ fieldKeySep ~/ expr(currentDepth + 1)).map { case (pos, name, plus, p, h2, e) =>
+        Expr.Member.Field(pos, name, plus.nonEmpty, p.orNull, h2, e)
+      }
+    )
+  }
   def fieldKeySep[$: P]: P[Visibility] = P(StringIn(":::", "::", ":")).!.map {
     case ":"   => Visibility.Normal
     case "::"  => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
-  def objlocal[$: P]: P[Expr.Bind] = P("local" ~~ break ~/ bind)
-  def compspec[$: P]: P[Seq[Expr.CompSpec]] = P((forspec | ifspec).rep)
-  def forspec[$: P]: P[Expr.ForSpec] =
-    P(Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr).map { case (pos, name, cond) =>
-      Expr.ForSpec(pos, name, cond)
-    }
-  def ifspec[$: P]: P[Expr.IfSpec] = P(Pos ~~ "if" ~~ break ~/ expr).map { case (pos, cond) =>
-    Expr.IfSpec(pos, cond)
+  def objlocal[$: P]: P[Expr.Bind] = objlocal(0)
+
+  def objlocal[$: P](currentDepth: Int): P[Expr.Bind] = {
+    P("local" ~~ break ~/ bind(currentDepth + 1))
   }
-  def fieldname[$: P]: P[Expr.FieldName] = P(
-    id.map(Expr.FieldName.Fixed.apply) |
-    string.map(Expr.FieldName.Fixed.apply) |
-    "[" ~ expr.map(Expr.FieldName.Dyn.apply) ~ "]"
-  )
-  def assertStmt[$: P]: P[Expr.Member.AssertStmt] =
-    P(expr ~ (":" ~ expr).?.map(_.orNull)).map { case (value, msg) =>
-      Expr.Member.AssertStmt(value, msg)
+  def compspec[$: P]: P[Seq[Expr.CompSpec]] = compspec(0)
+
+  def compspec[$: P](currentDepth: Int): P[Seq[Expr.CompSpec]] = {
+    P((forspec(currentDepth + 1) | ifspec(currentDepth + 1)).rep)
+  }
+  def forspec[$: P]: P[Expr.ForSpec] = forspec(0)
+
+  def forspec[$: P](currentDepth: Int): P[Expr.ForSpec] = {
+    P(Pos ~~ "for" ~~ break ~/ id ~ "in" ~~ break ~ expr(currentDepth + 1)).map {
+      case (pos, name, cond) =>
+        Expr.ForSpec(pos, name, cond)
     }
+  }
+  def ifspec[$: P]: P[Expr.IfSpec] = ifspec(0)
 
-  def bind[$: P]: P[Expr.Bind] =
-    P(Pos ~~ id ~ ("(" ~/ params.? ~ ")").?.map(_.flatten).map(_.orNull) ~ "=" ~ expr)
+  def ifspec[$: P](currentDepth: Int): P[Expr.IfSpec] = {
+    P(Pos ~~ "if" ~~ break ~/ expr(currentDepth + 1)).map { case (pos, cond) =>
+      Expr.IfSpec(pos, cond)
+    }
+  }
+  def fieldname[$: P]: P[Expr.FieldName] = fieldname(0)
+
+  def fieldname[$: P](currentDepth: Int): P[Expr.FieldName] = {
+    P(
+      id.map(Expr.FieldName.Fixed.apply) |
+      string.map(Expr.FieldName.Fixed.apply) |
+      "[" ~ expr(currentDepth + 1).map(Expr.FieldName.Dyn.apply) ~ "]"
+    )
+  }
+  def assertStmt[$: P]: P[Expr.Member.AssertStmt] = assertStmt(0)
+
+  def assertStmt[$: P](currentDepth: Int): P[Expr.Member.AssertStmt] = {
+    P(expr(currentDepth + 1) ~ (":" ~ expr(currentDepth + 1)).?.map(_.orNull)).map {
+      case (value, msg) =>
+        Expr.Member.AssertStmt(value, msg)
+    }
+  }
+
+  def bind[$: P]: P[Expr.Bind] = bind(0)
+
+  def bind[$: P](currentDepth: Int): P[Expr.Bind] = {
+    P(
+      Pos ~~ id ~ ("(" ~/ params(currentDepth + 1).? ~ ")").?.map(_.flatten)
+        .map(_.orNull) ~ "=" ~ expr(currentDepth + 1)
+    )
       .map { case (pos, name, args, rhs) => Expr.Bind(pos, name, args, rhs) }
+  }
 
-  def args[$: P]: P[(Array[Expr], Array[String])] =
-    P(((id ~ "=" ~ !"=").? ~ expr).rep(sep = ",") ~ ",".?).flatMapX { x =>
+  def args[$: P]: P[(Array[Expr], Array[String])] = args(0)
+
+  def args[$: P](currentDepth: Int): P[(Array[Expr], Array[String])] = {
+    P(((id ~ "=" ~ !"=").? ~ expr(currentDepth + 1)).rep(sep = ",") ~ ",".?).flatMapX { x =>
       if (
         x.sliding(2).exists {
           case Seq(l, r) => l._1.isDefined && r._1.isEmpty
@@ -559,20 +684,24 @@ class Parser(
         Pass((args, namedNames))
       }
     }
+  }
 
-  def params[$: P]: P[Expr.Params] = P((id ~ ("=" ~ expr).?).rep(sep = ",") ~ ",".?).flatMapX { x =>
-    val seen = collection.mutable.Set.empty[String]
-    var overlap: String = null
-    for ((k, _) <- x) {
-      if (seen(k)) overlap = k
-      else seen.add(k)
+  def params[$: P]: P[Expr.Params] = params(0)
+
+  def params[$: P](currentDepth: Int): P[Expr.Params] = {
+    P((id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".?).flatMapX { x =>
+      val seen = collection.mutable.Set.empty[String]
+      var overlap: String = null
+      for ((k, _) <- x) {
+        if (seen(k)) overlap = k
+        else seen.add(k)
+      }
+      if (overlap == null) {
+        val names = x.map(_._1).toArray[String]
+        val exprs = x.map(_._2.orNull).toArray[Expr]
+        Pass(Expr.Params(names, exprs))
+      } else Fail.opaque("no duplicate parameter: " + overlap)
     }
-    if (overlap == null) {
-      val names = x.map(_._1).toArray[String]
-      val exprs = x.map(_._2.orNull).toArray[Expr]
-      Pass(Expr.Params(names, exprs))
-    } else Fail.opaque("no duplicate parameter: " + overlap)
-
   }
 
   def binaryop[$: P]: P[String] = P(

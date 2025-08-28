@@ -140,6 +140,12 @@ final case class Config(
     )
     reverseJpathsPriority: Flag = Flag(),
     @arg(
+      name = "max-parser-recursion-depth",
+      doc =
+        "Set maximum parser recursion depth to prevent stack overflow from deeply nested structures"
+    )
+    maxParserRecursionDepth: Int = 1000,
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )
