@@ -1,4 +1,7 @@
-## 0.5.5 (Latest)
+## 0.5.5.1 (Latest)
+* Re-enable handling of unicode strings in std.base64
+
+## 0.5.5
 * Fix multiple assertion related bugs (inheritance, binding of super in inherited assertions, and timing of evaluation) by @JoshRosen in https://github.com/databricks/sjsonnet/pull/468
 * Fix detection of duplicate fields with dynamic field name expressions by @JoshRosen in https://github.com/databricks/sjsonnet/pull/470
 * chore: Make std.setInter accepts str. by @He-Pin in https://github.com/databricks/sjsonnet/pull/472
