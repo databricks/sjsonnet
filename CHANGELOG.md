@@ -1,4 +1,4 @@
-## 0.5.5.1 (Latest)
+## 0.5.6 (Latest)
 * Re-enable handling of unicode strings in std.base64
 
 ## 0.5.5
