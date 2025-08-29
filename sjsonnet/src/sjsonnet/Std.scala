@@ -1661,24 +1661,27 @@ class Std(
       rec(Materializer(value)(ev)).render
     },
     builtin("base64", "input") { (_, _, input: Val) =>
-      val b: Array[Int] = input match {
-        case Val.Str(_, value) => value.indices.map(value.codePointAt).toArray
-        case arr: Val.Arr      =>
-          if (!arr.forall(_.isInstanceOf[Val.Num])) {
-            Error.fail("Expected an array of numbers or a string")
+      input match {
+        case Val.Str(_, value) =>
+          Base64.getEncoder.encodeToString(value.getBytes("UTF-8"))
+        case arr: Val.Arr =>
+          val byteArr = new Array[Byte](arr.length)
+          for (i <- 0 until arr.length) {
+            val v = arr.force(i)
+            if (!v.isInstanceOf[Val.Num]) {
+              Error.fail(f"Expected an array of numbers, got a ${v.prettyName} at position $i")
+            }
+            val vInt = v.asInt
+            if (vInt < 0 || vInt > 255) {
+              Error.fail(
+                f"Found an invalid codepoint value at position $i (must be 0 <= X <= 255), got $vInt"
+              )
+            }
+            byteArr(i) = vInt.toByte
           }
-          arr.iterator.map(_.cast[Val.Num].asInt).toArray
+          Base64.getEncoder.encodeToString(byteArr)
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
-
-      for (i <- b) {
-        if (i < 0 || i > 255) {
-          Error.fail(
-            f"Found an invalid codepoint value in the ${input.prettyName} (must be 0 <= X <= 255), got $i"
-          )
-        }
-      }
-      Base64.getEncoder.encodeToString(b.map(_.toByte))
     },
     builtin("base64Decode", "str") { (_, _, str: String) =>
       try {

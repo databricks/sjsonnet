@@ -137,6 +137,9 @@ class GoTestSuite(BaseGraalVMTestSuite):
       "native7",
       "native_error",
       "native_panic",
+
+      # We support base64 of unicode strings
+      "builtinBase64_string_high_codepoint",
     ]
     
     # Find all .jsonnet files in the test directory
