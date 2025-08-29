@@ -1471,16 +1471,21 @@ class Std(
     builtin(Member),
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
       val res: Val = what match {
-        case str: Val.Str =>
-          val builder = new StringBuilder
-          for (i <- 1 to count) {
-            builder.append(str.value)
+        case Val.Str(_, str) =>
+          val builder = new StringBuilder(str.length * count)
+          var i = 0
+          while (i < count) {
+            builder.append(str)
+            i += 1
           }
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
-          val out = new mutable.ArrayBuffer[Lazy]
-          for (i <- 1 to count) {
-            out.appendAll(a.asLazyArray)
+          val lazyArray = a.asLazyArray
+          val out = new mutable.ArrayBuffer[Lazy](lazyArray.length * count)
+          var i = 0
+          while (i < count) {
+            out.appendAll(lazyArray)
+            i += 1
           }
           Val.Arr(pos, out.toArray)
         case x => Error.fail("std.repeat first argument must be an array or a string")
@@ -1666,7 +1671,8 @@ class Std(
           Base64.getEncoder.encodeToString(value.getBytes("UTF-8"))
         case arr: Val.Arr =>
           val byteArr = new Array[Byte](arr.length)
-          for (i <- 0 until arr.length) {
+          var i = 0
+          while (i < arr.length) {
             val v = arr.force(i)
             if (!v.isInstanceOf[Val.Num]) {
               Error.fail(f"Expected an array of numbers, got a ${v.prettyName} at position $i")
@@ -1678,6 +1684,7 @@ class Std(
               )
             }
             byteArr(i) = vInt.toByte
+            i += 1
           }
           Base64.getEncoder.encodeToString(byteArr)
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
