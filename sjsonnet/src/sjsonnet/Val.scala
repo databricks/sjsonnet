@@ -148,7 +148,7 @@ object Val {
     }
   }
 
-  case class Arr(pos: Position, private val value: Array[? <: Lazy]) extends Literal {
+  final case class Arr(pos: Position, private val value: Array[? <: Lazy]) extends Literal {
     def prettyName = "array"
 
     override def asArr: Arr = this
