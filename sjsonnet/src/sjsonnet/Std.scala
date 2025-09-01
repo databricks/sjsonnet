@@ -535,9 +535,18 @@ class Std(
         case v: Val.Num => v.asPositiveInt
         case _ => Error.fail("Expected a number for len in substr, got " + len.force.prettyName)
       }
-      val safeOffset = math.min(offset, str.length)
-      val safeLength = math.min(length, str.length - safeOffset)
-      Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
+
+      val unicodeLength = str.codePointCount(0, str.length)
+      val safeOffset = math.min(offset, unicodeLength)
+      val safeLength = math.min(length, unicodeLength - safeOffset)
+
+      if (safeLength <= 0) {
+        Val.Str(pos, "")
+      } else {
+        val (startUtf16, endUtf16) =
+          Util.codePointOffsetsToStringIndices(str, safeOffset, safeOffset + safeLength)
+        Val.Str(pos, str.substring(startUtf16, endUtf16))
+      }
     }
   }
 

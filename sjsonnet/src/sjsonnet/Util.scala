@@ -17,7 +17,7 @@ object Util {
     s"${line + 1}:${col + 1}"
   }
 
-  def sliceArr[T: scala.reflect.ClassTag](
+  private def sliceArr[T: scala.reflect.ClassTag](
       arr: Array[T],
       start: Int,
       end: Int,
@@ -41,7 +41,7 @@ object Util {
       _end: Option[Int],
       _step: Option[Int]): Val = {
     def length0(e: Val): Int = e match {
-      case Val.Str(_, s) => s.length
+      case Val.Str(_, s) => s.codePointCount(0, s.length)
       case a: Val.Arr    => a.length
       case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)(ev)
     }
@@ -72,26 +72,74 @@ object Util {
     res: Val
   }
 
-  def sliceArr[T: scala.reflect.ClassTag](
-      arr: Array[T],
-      start: Option[Int],
-      end: Option[Int],
-      step: Option[Int]): Array[T] = {
-    sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
+  /**
+   * Converts Unicode codepoint positions to Java String indices. For example, the string "🌍!" has
+   * a length of 3 UTF-16 code units, but only 2 Unicode codepoints, so this function would map the
+   * range (0, 2) to (0, 3).
+   */
+  def codePointOffsetsToStringIndices(
+      s: String,
+      startCodePointOffset: Int,
+      endCodePointOffset: Int): (Int, Int) = {
+    val unicodeLength = s.codePointCount(0, s.length)
+    val safeStart = math.max(0, math.min(startCodePointOffset, unicodeLength))
+    val safeEnd = math.max(safeStart, math.min(endCodePointOffset, unicodeLength))
+
+    if (safeStart == safeEnd) {
+      val utf16Pos = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
+      (utf16Pos, utf16Pos)
+    } else {
+      val startUtf16 = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
+      val endUtf16 = s.offsetByCodePoints(startUtf16, safeEnd - safeStart)
+      (startUtf16, endUtf16)
+    }
   }
-  def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
-    if (start >= end || start >= s.length) {
+
+  private def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
+    val unicodeLength = s.codePointCount(0, s.length)
+    if (start >= end || start >= unicodeLength) {
       ""
-    } else
+    } else {
       step match {
-        case 1 => s.slice(start, end)
+        case 1 =>
+          val (startUtf16, endUtf16) = codePointOffsetsToStringIndices(s, start, end)
+          s.substring(startUtf16, endUtf16)
         case _ =>
-          val range = start until end by step
-          new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
+          val result = new java.lang.StringBuilder()
+          var sIdx = 0
+          var codepointIndex = 0
+
+          // Skip to start codepoint position
+          while (sIdx < s.length && codepointIndex < start) {
+            val cp = s.codePointAt(sIdx)
+            sIdx += java.lang.Character.charCount(cp)
+            codepointIndex += 1
+          }
+
+          // Collect every `step`th codepoint until `end`
+          var rel = 0 // relative index from start
+          while (sIdx < s.length && codepointIndex < end) {
+            val c = s.charAt(sIdx)
+            if (java.lang.Character.isSurrogate(c)) {
+              // Handle surrogate pair
+              val cp = s.codePointAt(sIdx)
+              if (rel % step == 0) {
+                result.append(java.lang.Character.toChars(cp))
+              }
+              sIdx += java.lang.Character.charCount(cp)
+            } else {
+              // Single char, non-surrogate
+              if (rel % step == 0) {
+                result.append(c)
+              }
+              sIdx += 1
+            }
+            codepointIndex += 1
+            rel += 1
+          }
+          result.toString
       }
-  }
-  def sliceStr(s: String, start: Option[Int], end: Option[Int], step: Option[Int]): String = {
-    sliceStr(s, start.getOrElse(0), end.getOrElse(s.length), step.getOrElse(1))
+    }
   }
 
   val isWindows: Boolean = {
