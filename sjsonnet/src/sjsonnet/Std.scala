@@ -2113,13 +2113,16 @@ class Std(
   }
 
   def stringChars(pos: Position, str: String): Val.Arr = {
-    val a = new Array[Lazy](str.length)
+    val chars = new Array[Lazy](str.codePointCount(0, str.length))
+    var charIndex = 0
     var i = 0
-    while (i < a.length) {
-      a(i) = Val.Str(pos, String.valueOf(str.charAt(i)))
-      i += 1
+    while (i < str.length) {
+      val codePoint = str.codePointAt(i)
+      chars(charIndex) = Val.Str(pos, new String(Character.toChars(codePoint)))
+      i += Character.charCount(codePoint)
+      charIndex += 1
     }
-    Val.Arr(pos, a)
+    Val.Arr(pos, chars)
   }
 
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
