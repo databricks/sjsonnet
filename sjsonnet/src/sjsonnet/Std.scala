@@ -51,7 +51,7 @@ class Std(
       Val.Num(
         pos,
         x.force match {
-          case Val.Str(_, s) => s.length
+          case Val.Str(_, s) => s.codePointCount(0, s.length)
           case a: Val.Arr    => a.length
           case o: Val.Obj    => o.visibleKeyNames.length
           case o: Val.Func   => o.params.names.length
