@@ -97,12 +97,14 @@ class Std(
   }
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = if (
-      str.force.asString.length != 1 || str.force.asString.codePointCount(0, 1) > 1
-    ) {
-      Error.fail("expected a single character string, got " + str.force.asString)
-    } else {
-      Val.Num(pos, str.force.asString.codePointAt(0).toDouble)
+    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
+      val s = str.force.asString
+      val codePointCount = s.codePointCount(0, s.length)
+      if (codePointCount != 1) {
+        Error.fail("expected a single character string, got " + s)
+      } else {
+        Val.Num(pos, s.codePointAt(0).toDouble)
+      }
     }
   }
 
