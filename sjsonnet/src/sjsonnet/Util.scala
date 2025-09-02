@@ -142,6 +142,47 @@ object Util {
     }
   }
 
+  /**
+   * Compares two strings by Unicode codepoint values rather than UTF-16 code units.
+   * This ensures that strings with characters above U+FFFF (which require surrogate pairs
+   * in UTF-16) are compared correctly according to their Unicode codepoint values.
+   */
+  def compareStringsByCodepoint(s1: String, s2: String): Int = {
+    val n1 = s1.length
+    val n2 = s2.length
+    var i1 = 0
+    var i2 = 0
+    while (i1 < n1 && i2 < n2) {
+      val c1 = s1.charAt(i1)
+      val c2 = s2.charAt(i2)
+      val c1Sur = java.lang.Character.isSurrogate(c1)
+      val c2Sur = java.lang.Character.isSurrogate(c2)
+
+      if (!c1Sur && !c2Sur) {
+        // Both are non-surrogates, compare directly
+        if (c1 != c2) return java.lang.Character.compare(c1, c2)
+        i1 += 1
+        i2 += 1
+      } else {
+        // At least one is a surrogate, use full codepoint logic
+        val cp1 = s1.codePointAt(i1)
+        val cp2 = s2.codePointAt(i2)
+        if (cp1 != cp2) return java.lang.Integer.compare(cp1, cp2)
+        i1 += java.lang.Character.charCount(cp1)
+        i2 += java.lang.Character.charCount(cp2)
+      }
+    }
+    if (i1 < n1) 1 else if (i2 < n2) -1 else 0
+  }
+
+  /**
+   * A reusable Ordering[String] that compares by Unicode codepoint values.
+   * Use this in place of default `.sorted` when ordering should be codepoint-aware.
+   */
+  val CodepointStringOrdering: Ordering[String] = new Ordering[String] {
+    override def compare(x: String, y: String): Int = compareStringsByCodepoint(x, y)
+  }
+
   val isWindows: Boolean = {
     // This is normally non-null on the JVM, but it might be null in ScalaJS hence the Option:
     Option(System.getProperty("os.name")).exists(_.toLowerCase.startsWith("windows"))

@@ -1042,7 +1042,7 @@ class Std(
         indexedPath: Seq[String])(implicit ev: EvalScope): StringWriter = {
       val (sections, nonSections) =
         v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
-      for (k <- nonSections.sorted) {
+      for (k <- nonSections.sorted(Util.CodepointStringOrdering)) {
         out.write(cumulatedIndent)
         out.write(TomlRenderer.escapeKey(k))
         out.write(" = ")
@@ -1052,7 +1052,7 @@ class Std(
       }
       out.write('\n')
 
-      for (k <- sections.sorted) {
+      for (k <- sections.sorted(Util.CodepointStringOrdering)) {
         val v0 = v.value(k, v.pos, v)(ev)
         if (isTableArray(v0)) {
           for (i <- 0 until v0.asArr.length) {
@@ -2078,7 +2078,7 @@ class Std(
           val indices = Array.range(0, vs.length)
 
           val sortedIndices = if (keyType == classOf[Val.Str]) {
-            indices.sortBy(i => keys(i).cast[Val.Str].asString)
+            indices.sortBy(i => keys(i).cast[Val.Str].asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
             indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
           } else if (keyType == classOf[Val.Arr]) {
@@ -2097,7 +2097,7 @@ class Std(
             Error.fail("Cannot sort with values that are not all the same type")
 
           if (keyType == classOf[Val.Str]) {
-            vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
+            vs.map(_.force.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
             vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
           } else if (keyType == classOf[Val.Arr]) {
@@ -2132,7 +2132,7 @@ class Std(
     maybeSortKeys(ev, v1.allKeyNames)
 
   @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
-    if (ev.settings.preserveOrder) keys else keys.sorted
+    if (ev.settings.preserveOrder) keys else keys.sorted(Util.CodepointStringOrdering)
 
   def getObjValuesFromKeys(
       pos: Position,
