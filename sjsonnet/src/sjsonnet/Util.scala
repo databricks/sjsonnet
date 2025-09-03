@@ -112,7 +112,7 @@ object Util {
           // Skip to start codepoint position
           while (sIdx < s.length && codepointIndex < start) {
             val cp = s.codePointAt(sIdx)
-            sIdx += java.lang.Character.charCount(cp)
+            sIdx += Character.charCount(cp)
             codepointIndex += 1
           }
 
@@ -120,13 +120,13 @@ object Util {
           var rel = 0 // relative index from start
           while (sIdx < s.length && codepointIndex < end) {
             val c = s.charAt(sIdx)
-            if (java.lang.Character.isSurrogate(c)) {
+            if (Character.isSurrogate(c)) {
               // Handle surrogate pair
               val cp = s.codePointAt(sIdx)
               if (rel % step == 0) {
-                result.append(java.lang.Character.toChars(cp))
+                result.append(Character.toString(cp))
               }
-              sIdx += java.lang.Character.charCount(cp)
+              sIdx += Character.charCount(cp)
             } else {
               // Single char, non-surrogate
               if (rel % step == 0) {
@@ -155,21 +155,21 @@ object Util {
     while (i1 < n1 && i2 < n2) {
       val c1 = s1.charAt(i1)
       val c2 = s2.charAt(i2)
-      val c1Sur = java.lang.Character.isSurrogate(c1)
-      val c2Sur = java.lang.Character.isSurrogate(c2)
+      val c1Sur = Character.isSurrogate(c1)
+      val c2Sur = Character.isSurrogate(c2)
 
       if (!c1Sur && !c2Sur) {
         // Both are non-surrogates, compare directly
-        if (c1 != c2) return java.lang.Character.compare(c1, c2)
+        if (c1 != c2) return Character.compare(c1, c2)
         i1 += 1
         i2 += 1
       } else {
         // At least one is a surrogate, use full codepoint logic
         val cp1 = s1.codePointAt(i1)
         val cp2 = s2.codePointAt(i2)
-        if (cp1 != cp2) return java.lang.Integer.compare(cp1, cp2)
-        i1 += java.lang.Character.charCount(cp1)
-        i2 += java.lang.Character.charCount(cp2)
+        if (cp1 != cp2) return Integer.compare(cp1, cp2)
+        i1 += Character.charCount(cp1)
+        i2 += Character.charCount(cp2)
       }
     }
     if (i1 < n1) 1 else if (i2 < n2) -1 else 0

@@ -2118,7 +2118,7 @@ class Std(
     var i = 0
     while (i < str.length) {
       val codePoint = str.codePointAt(i)
-      chars(charIndex) = Val.Str(pos, new String(Character.toChars(codePoint)))
+      chars(charIndex) = Val.Str(pos, Character.toString(codePoint))
       i += Character.charCount(codePoint)
       charIndex += 1
     }
