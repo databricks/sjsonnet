@@ -115,7 +115,7 @@ object UnicodeHandlingTests extends TestSuite {
       // Comprehensive test of ALL comparison operators with the critical UTF-16 vs Unicode boundary case
       // This ensures mutation testing catches bugs in any specific comparison implementation
 
-      val maxBmp = "'\\uFFFF'"      // U+FFFF (max Basic Multilingual Plane)
+      val maxBmp = "'\\uFFFF'" // U+FFFF (max Basic Multilingual Plane)
       val minSupplementary = "'\\uD800\\uDC00'" // U+10000 (min Supplementary Plane)
 
       // All comparison operators must use Unicode codepoint ordering
@@ -146,9 +146,13 @@ object UnicodeHandlingTests extends TestSuite {
       eval(s"$maxBmp != $maxBmp") ==> ujson.Bool(false)
 
       // Array sorting must also use codepoint ordering
-      eval(s"std.sort([$minSupplementary, $maxBmp, 'Z', 'A'])") ==> ujson.Arr("A", "Z", "\uFFFF", "\uD800\uDC00")
+      eval(s"std.sort([$minSupplementary, $maxBmp, 'Z', 'A'])") ==> ujson.Arr(
+        "A",
+        "Z",
+        "\uFFFF",
+        "\uD800\uDC00"
+      )
     }
-
 
     test("objectFieldOrdering") {
       // Test object field ordering with the critical UTF-16 vs Unicode boundary case
@@ -164,11 +168,11 @@ object UnicodeHandlingTests extends TestSuite {
 
       // JSON manifest should maintain the same ordering
       eval(s"std.manifestJsonMinified($testObject)") ==>
-        ujson.Str("{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}")
+      ujson.Str("{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}")
 
       // TOML manifest should also use codepoint ordering (with escaped Unicode)
       eval(s"std.manifestTomlEx($testObject, '  ')") ==>
-        ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
+      ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
     }
 
     test("flatMap") {
@@ -183,12 +187,14 @@ object UnicodeHandlingTests extends TestSuite {
 
       // Critical test: surrogate pair boundary case
       // U+FFFF followed by U+10000 (which needs surrogate pair)
-      eval("std.flatMap(function(x) x + '-', '\\uFFFF\\uD800\\uDC00')") ==> ujson.Str("\uFFFF-\uD800\uDC00-")
+      eval("std.flatMap(function(x) x + '-', '\\uFFFF\\uD800\\uDC00')") ==> ujson.Str(
+        "\uFFFF-\uD800\uDC00-"
+      )
 
       // Test consistency with std.map behavior
       val testStr = "'A🌍B'";
       eval(s"std.length(std.flatMap(function(x) x, $testStr))") ==>
-        eval(s"std.length(std.map(function(x) x, $testStr))")
+      eval(s"std.length(std.map(function(x) x, $testStr))")
 
       // Test with function that returns null (should be converted to empty string)
       eval("std.flatMap(function(x) if x == '🌍' then null else x, 'A🌍B')") ==> ujson.Str("AB")
@@ -232,7 +238,9 @@ object UnicodeHandlingTests extends TestSuite {
       val testString = "'Hello 🌍 World'";
       val searchPattern = "'🌍'";
       // This verifies that the index returned by findSubstr works with substr to extract the same pattern
-      eval(s"std.substr($testString, std.findSubstr($searchPattern, $testString)[0], std.length($searchPattern))") ==> ujson.Str("🌍")
+      eval(
+        s"std.substr($testString, std.findSubstr($searchPattern, $testString)[0], std.length($searchPattern))"
+      ) ==> ujson.Str("🌍")
     }
   }
 }

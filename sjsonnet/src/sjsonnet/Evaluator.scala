@@ -524,7 +524,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_< =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, Util.compareStringsByCodepoint(l, r) < 0)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) < 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) < 0)
           case _                              => fail()
@@ -532,7 +533,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_> =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, Util.compareStringsByCodepoint(l, r) > 0)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) > 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) > 0)
           case _                              => fail()
@@ -540,7 +542,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_<= =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, Util.compareStringsByCodepoint(l, r) <= 0)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) <= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) <= 0)
           case _                              => fail()
@@ -548,7 +551,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_>= =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, Util.compareStringsByCodepoint(l, r) >= 0)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) >= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) >= 0)
           case _                              => fail()

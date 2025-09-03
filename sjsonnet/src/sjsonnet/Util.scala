@@ -143,9 +143,9 @@ object Util {
   }
 
   /**
-   * Compares two strings by Unicode codepoint values rather than UTF-16 code units.
-   * This ensures that strings with characters above U+FFFF (which require surrogate pairs
-   * in UTF-16) are compared correctly according to their Unicode codepoint values.
+   * Compares two strings by Unicode codepoint values rather than UTF-16 code units. This ensures
+   * that strings with characters above U+FFFF (which require surrogate pairs in UTF-16) are
+   * compared correctly according to their Unicode codepoint values.
    */
   def compareStringsByCodepoint(s1: String, s2: String): Int = {
     val n1 = s1.length
@@ -176,8 +176,8 @@ object Util {
   }
 
   /**
-   * A reusable Ordering[String] that compares by Unicode codepoint values.
-   * Use this in place of default `.sorted` when ordering should be codepoint-aware.
+   * A reusable Ordering[String] that compares by Unicode codepoint values. Use this in place of
+   * default `.sorted` when ordering should be codepoint-aware.
    */
   val CodepointStringOrdering: Ordering[String] = new Ordering[String] {
     override def compare(x: String, y: String): Int = compareStringsByCodepoint(x, y)
