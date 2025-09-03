@@ -17,7 +17,7 @@ object Util {
     s"${line + 1}:${col + 1}"
   }
 
-  def sliceArr[T: scala.reflect.ClassTag](
+  private def sliceArr[T: scala.reflect.ClassTag](
       arr: Array[T],
       start: Int,
       end: Int,
@@ -41,7 +41,7 @@ object Util {
       _end: Option[Int],
       _step: Option[Int]): Val = {
     def length0(e: Val): Int = e match {
-      case Val.Str(_, s) => s.length
+      case Val.Str(_, s) => s.codePointCount(0, s.length)
       case a: Val.Arr    => a.length
       case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)(ev)
     }
@@ -72,26 +72,115 @@ object Util {
     res: Val
   }
 
-  def sliceArr[T: scala.reflect.ClassTag](
-      arr: Array[T],
-      start: Option[Int],
-      end: Option[Int],
-      step: Option[Int]): Array[T] = {
-    sliceArr(arr, start.getOrElse(0), end.getOrElse(arr.length), step.getOrElse(1))
+  /**
+   * Converts Unicode codepoint positions to Java String indices. For example, the string "🌍!" has
+   * a length of 3 UTF-16 code units, but only 2 Unicode codepoints, so this function would map the
+   * range (0, 2) to (0, 3).
+   */
+  def codePointOffsetsToStringIndices(
+      s: String,
+      startCodePointOffset: Int,
+      endCodePointOffset: Int): (Int, Int) = {
+    val unicodeLength = s.codePointCount(0, s.length)
+    val safeStart = math.max(0, math.min(startCodePointOffset, unicodeLength))
+    val safeEnd = math.max(safeStart, math.min(endCodePointOffset, unicodeLength))
+
+    if (safeStart == safeEnd) {
+      val utf16Pos = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
+      (utf16Pos, utf16Pos)
+    } else {
+      val startUtf16 = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
+      val endUtf16 = s.offsetByCodePoints(startUtf16, safeEnd - safeStart)
+      (startUtf16, endUtf16)
+    }
   }
-  def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
-    if (start >= end || start >= s.length) {
+
+  private def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
+    val unicodeLength = s.codePointCount(0, s.length)
+    if (start >= end || start >= unicodeLength) {
       ""
-    } else
+    } else {
       step match {
-        case 1 => s.slice(start, end)
+        case 1 =>
+          val (startUtf16, endUtf16) = codePointOffsetsToStringIndices(s, start, end)
+          s.substring(startUtf16, endUtf16)
         case _ =>
-          val range = start until end by step
-          new String(range.dropWhile(_ < 0).takeWhile(_ < s.length).map(s).toArray)
+          val result = new java.lang.StringBuilder()
+          var sIdx = 0
+          var codepointIndex = 0
+
+          // Skip to start codepoint position
+          while (sIdx < s.length && codepointIndex < start) {
+            val cp = s.codePointAt(sIdx)
+            sIdx += Character.charCount(cp)
+            codepointIndex += 1
+          }
+
+          // Collect every `step`th codepoint until `end`
+          var rel = 0 // relative index from start
+          while (sIdx < s.length && codepointIndex < end) {
+            val c = s.charAt(sIdx)
+            if (Character.isSurrogate(c)) {
+              // Handle surrogate pair
+              val cp = s.codePointAt(sIdx)
+              if (rel % step == 0) {
+                result.append(Character.toString(cp))
+              }
+              sIdx += Character.charCount(cp)
+            } else {
+              // Single char, non-surrogate
+              if (rel % step == 0) {
+                result.append(c)
+              }
+              sIdx += 1
+            }
+            codepointIndex += 1
+            rel += 1
+          }
+          result.toString
       }
+    }
   }
-  def sliceStr(s: String, start: Option[Int], end: Option[Int], step: Option[Int]): String = {
-    sliceStr(s, start.getOrElse(0), end.getOrElse(s.length), step.getOrElse(1))
+
+  /**
+   * Compares two strings by Unicode codepoint values rather than UTF-16 code units. This ensures
+   * that strings with characters above U+FFFF (which require surrogate pairs in UTF-16) are
+   * compared correctly according to their Unicode codepoint values.
+   */
+  def compareStringsByCodepoint(s1: String, s2: String): Int = {
+    val n1 = s1.length
+    val n2 = s2.length
+    var i1 = 0
+    var i2 = 0
+    while (i1 < n1 && i2 < n2) {
+      val c1 = s1.charAt(i1)
+      val c2 = s2.charAt(i2)
+      val c1Sur = Character.isSurrogate(c1)
+      val c2Sur = Character.isSurrogate(c2)
+
+      if (!c1Sur && !c2Sur) {
+        // Both are non-surrogates, compare directly
+        if (c1 != c2) return Character.compare(c1, c2)
+        i1 += 1
+        i2 += 1
+      } else {
+        // At least one is a surrogate, use full codepoint logic
+        val cp1 = s1.codePointAt(i1)
+        val cp2 = s2.codePointAt(i2)
+        if (cp1 != cp2) return Integer.compare(cp1, cp2)
+        i1 += Character.charCount(cp1)
+        i2 += Character.charCount(cp2)
+      }
+    }
+    if (i1 < n1) 1 else if (i2 < n2) -1 else 0
+  }
+
+  /**
+   * A reusable Ordering[String] that compares by Unicode codepoint values. Use this in place of
+   * default `.sorted` when ordering should be codepoint-aware.
+   */
+  val CodepointStringOrdering: Ordering[String] = new Ordering[String] {
+    override def compare(x: String, y: String): Int = compareStringsByCodepoint(x, y)
   }
 
   val isWindows: Boolean = {
