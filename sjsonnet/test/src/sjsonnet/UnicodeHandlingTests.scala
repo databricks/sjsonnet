@@ -170,5 +170,69 @@ object UnicodeHandlingTests extends TestSuite {
       eval(s"std.manifestTomlEx($testObject, '  ')") ==>
         ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
     }
+
+    test("flatMap") {
+      // Test that std.flatMap now uses code point semantics like std.map
+      // This tests the consistency fix for flatMap on strings
+
+      // Basic ASCII test
+      eval("std.flatMap(function(x) x + x, 'ABC')") ==> ujson.Str("AABBCC")
+
+      // Unicode emoji test - should handle each emoji as a single character
+      eval("std.flatMap(function(x) x + '!', '🌍🚀')") ==> ujson.Str("🌍!🚀!")
+
+      // Critical test: surrogate pair boundary case
+      // U+FFFF followed by U+10000 (which needs surrogate pair)
+      eval("std.flatMap(function(x) x + '-', '\\uFFFF\\uD800\\uDC00')") ==> ujson.Str("\uFFFF-\uD800\uDC00-")
+
+      // Test consistency with std.map behavior
+      val testStr = "'A🌍B'";
+      eval(s"std.length(std.flatMap(function(x) x, $testStr))") ==>
+        eval(s"std.length(std.map(function(x) x, $testStr))")
+
+      // Test with function that returns null (should be converted to empty string)
+      eval("std.flatMap(function(x) if x == '🌍' then null else x, 'A🌍B')") ==> ujson.Str("AB")
+
+      // Array flatMap should still work (unchanged behavior)
+      eval("std.flatMap(function(x) [x, x], [1, 2])") ==> ujson.Arr(1, 1, 2, 2)
+    }
+
+    test("findSubstr") {
+      // Test that std.findSubstr now returns code point offsets instead of code unit positions
+      // This tests the consistency fix for findSubstr indices
+
+      // Basic ASCII test - should be unchanged
+      eval("std.findSubstr('l', 'hello')") ==> ujson.Arr(2, 3)
+      eval("std.findSubstr('o', 'hello world')") ==> ujson.Arr(4, 7)
+
+      // Test with Unicode emojis - positions should be in code points
+      eval("std.findSubstr('🌍', 'Hello 🌍 World')") ==> ujson.Arr(6)
+      eval("std.findSubstr('o', 'Hello 🌍 World')") ==> ujson.Arr(4, 9)
+
+      // Critical test: surrogate pair boundary case
+      // The string "A\uFFFF\uD800\uDC00B" has:
+      // - 'A' at code point 0
+      // - U+FFFF at code point 1
+      // - U+10000 (\uD800\uDC00) at code point 2
+      // - 'B' at code point 3
+      eval("std.findSubstr('\\uFFFF', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(1)
+      eval("std.findSubstr('\\uD800\\uDC00', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(2)
+      eval("std.findSubstr('B', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(3)
+
+      // Test with pattern that spans multiple code points
+      eval("std.findSubstr('🌍🚀', '🌍🚀 and more 🌍🚀')") ==> ujson.Arr(0, 12)
+
+      // Empty pattern should return empty array
+      eval("std.findSubstr('', 'test')") ==> ujson.Arr()
+
+      // Non-existent pattern should return empty array
+      eval("std.findSubstr('xyz', 'hello world')") ==> ujson.Arr()
+
+      // Consistency check: positions returned by findSubstr should work with substr
+      val testString = "'Hello 🌍 World'";
+      val searchPattern = "'🌍'";
+      // This verifies that the index returned by findSubstr works with substr to extract the same pattern
+      eval(s"std.substr($testString, std.findSubstr($searchPattern, $testString)[0], std.length($searchPattern))") ==> ujson.Str("🌍")
+    }
   }
 }

@@ -1416,10 +1416,13 @@ class Std(
           Val.Arr(pos, arrResults)
 
         case s: Val.Str =>
-          val builder = new StringBuilder()
-          for (c: Char <- s.value) {
+          val builder = new java.lang.StringBuilder()
+          var i = 0
+          while (i < s.value.length) {
+            val codePoint = s.value.codePointAt(i)
+            val codepointStr = Character.toString(codePoint)
             val fres =
-              func.apply1(Val.Str(pos, c.toString), pos.noOffset)(ev, TailstrictModeDisabled)
+              func.apply1(Val.Str(pos, codepointStr), pos.noOffset)(ev, TailstrictModeDisabled)
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
@@ -1433,6 +1436,7 @@ class Std(
                   )
               }
             )
+            i += Character.charCount(codePoint)
           }
           Val.Str(pos, builder.toString)
         case _ => Error.fail("Argument must be either array or string")
@@ -1462,8 +1466,17 @@ class Std(
         if (matchIndex == -1) Val.Arr(pos, emptyLazyArray)
         else {
           val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
+
+          // Compute codepoint indices incrementally, avoiding an O(n) calculation for each match.
+          var prevCharIndex = 0
+          var prevCodePointIndex = 0
+
           while (0 <= matchIndex && matchIndex < str.length) {
-            indices.+=(Val.Num(pos, matchIndex))
+            val codePointIndex = prevCodePointIndex + str.codePointCount(prevCharIndex, matchIndex)
+            indices.+=(Val.Num(pos, codePointIndex))
+
+            prevCharIndex = matchIndex
+            prevCodePointIndex = codePointIndex
             matchIndex = str.indexOf(pat, matchIndex + 1)
           }
           Val.Arr(pos, indices.result())
