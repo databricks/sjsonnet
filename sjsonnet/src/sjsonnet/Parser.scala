@@ -117,7 +117,7 @@ class Parser(
     }
   })
 
-  def escape[$: P]: P[String] = P(escape0 | escape1)
+  def escape[$: P]: P[String] = P(escape0 | unicodeEscape)
   def escape0[$: P]: P[String] = P("\\" ~~ !"u" ~~ AnyChar.!).flatMapX {
     case "\"" => Pass("\"")
     case "'"  => Pass("\'")
@@ -130,9 +130,79 @@ class Parser(
     case "t"  => Pass("\t")
     case s    => Fail.opaque(f"Unknown escape sequence in string literal: $s")
   }
-  def escape1[$: P]: P[String] = P("\\u" ~~ CharIn("0-9a-fA-F").repX(min = 4, max = 4).!).map { s =>
-    Integer.parseInt(s, 16).toChar.toString
+
+  /**
+   * {{{
+   *   HEXDIG              = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
+   * }}}
+   */
+  private def isHexDig(c: Char): Boolean = (c: @switch) match {
+    case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'A' | 'B' | 'C' | 'D' | 'E' |
+        'F' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' =>
+      true
+    case _ => false
   }
+
+  /**
+   * {{{
+   * non-surrogate       = ((DIGIT / "A"/"B"/"C" / "E"/"F") 3HEXDIG) /
+   *                       ("D" %x30-37 2HEXDIG )
+   * }}}
+   */
+  private def `non-surrogate`[$: P]: P[String] =
+    P("\\u" ~~/ SingleChar.flatMapX { c =>
+      (c: @switch) match {
+        case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'A' | 'B' | 'C' | 'E' |
+            'F' =>
+          Pass ~~ CharPred(isHexDig).repX(min = 3, max = 3)
+        case 'D' =>
+          Pass ~~ CharIn("0-7") ~~ CharPred(isHexDig).repX(min = 2, max = 2)
+        case _ => Fail.opaque("invalid non-surrogate")
+      }
+    }.!)
+
+  private def `surrogate-pair`[$: P]: P[(String, String)] =
+    P(("\\u" ~~/ `high-surrogate`.!) ~~ ("\\u" ~~/ `low-surrogate`.!))
+
+  /**
+   * {{{
+   * high-surrogate      = "D" ("8"/"9"/"A"/"B") 2HEXDIG
+   * }}}
+   */
+  private def `high-surrogate`[$: P]: P[Unit] =
+    P("D" ~~ ("8" | "9" | "A" | "B") ~~ CharPred(isHexDig).repX(min = 2, max = 2))
+
+  /**
+   * {{{
+   * low-surrogate       = "D" ("C"/"D"/"E"/"F") 2HEXDIG
+   * }}}
+   */
+  private def `low-surrogate`[$: P]: P[Unit] =
+    P("D" ~~ ("C" | "D" | "E" | "F") ~~ CharPred(isHexDig).repX(min = 2, max = 2))
+
+  /**
+   * {{{
+   * hexchar             = non-surrogate /
+   *                       (high-surrogate "\" %x75 low-surrogate)
+   * non-surrogate       = ((DIGIT / "A"/"B"/"C" / "E"/"F") 3HEXDIG) /
+   *                       ("D" %x30-37 2HEXDIG )
+   * high-surrogate      = "D" ("8"/"9"/"A"/"B") 2HEXDIG
+   * low-surrogate       = "D" ("C"/"D"/"E"/"F") 2HEXDIG
+   *
+   * HEXDIG              = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
+   * }}}
+   */
+  private def unicodeEscape[$: P]: P[String] =
+    P(NoCut(`non-surrogate`) | NoCut(`surrogate-pair`)).map {
+      case (high: String, low: String) =>
+        // NODE: jsonnet support control characters
+        val highSurrogate = Integer.parseInt(high, 16).toChar
+        val lowSurrogate = Integer.parseInt(low, 16).toChar
+        new String(Array[Int](Character.toCodePoint(highSurrogate, lowSurrogate)), 0, 1)
+      case str: String => Integer.parseInt(str, 16).toChar.toString
+      case _           => throw new IllegalArgumentException("Invalid unicode escape")
+    }
+
   def doubleString[$: P]: P[Seq[String]] =
     P((CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"")
   def singleString[$: P]: P[Seq[String]] =
