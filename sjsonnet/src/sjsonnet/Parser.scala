@@ -153,9 +153,9 @@ class Parser(
     P("\\u" ~~/ SingleChar.flatMapX { c =>
       (c: @switch) match {
         case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'A' | 'B' | 'C' | 'E' |
-            'F' =>
+            'F' | 'a' | 'b' | 'c' | 'e' | 'f' =>
           Pass ~~ CharPred(isHexDig).repX(min = 3, max = 3)
-        case 'D' =>
+        case 'D' | 'd' =>
           Pass ~~ CharIn("0-7") ~~ CharPred(isHexDig).repX(min = 2, max = 2)
         case _ => Fail.opaque("invalid non-surrogate")
       }
@@ -170,7 +170,10 @@ class Parser(
    * }}}
    */
   private def `high-surrogate`[$: P]: P[Unit] =
-    P("D" ~~ ("8" | "9" | "A" | "B") ~~ CharPred(isHexDig).repX(min = 2, max = 2))
+    P(
+      CharIn("Dd") ~~ CharIn("89ABab") ~~ CharPred(isHexDig)
+        .repX(min = 2, max = 2)
+    )
 
   /**
    * {{{
@@ -178,7 +181,10 @@ class Parser(
    * }}}
    */
   private def `low-surrogate`[$: P]: P[Unit] =
-    P("D" ~~ ("C" | "D" | "E" | "F") ~~ CharPred(isHexDig).repX(min = 2, max = 2))
+    P(
+      CharIn("Dd") ~~ CharIn("CDEFcdef") ~~ CharPred(isHexDig)
+        .repX(min = 2, max = 2)
+    )
 
   /**
    * {{{
