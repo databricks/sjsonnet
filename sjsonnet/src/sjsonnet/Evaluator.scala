@@ -374,12 +374,13 @@ class Evaluator(
         v.force(int)
       case (v: Val.Str, i: Val.Num) =>
         val int = i.asPositiveInt
-        if (v.value.isEmpty) Error.fail("string bounds error: string is empty", pos)
-        val unicodeLength = v.value.codePointCount(0, v.value.length)
+        val str = v.value
+        if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
+        val unicodeLength = str.codePointCount(0, str.length)
         if (int >= unicodeLength)
           Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
-        val (startUtf16, endUtf16) = Util.codePointOffsetsToStringIndices(v.value, int, int + 1)
-        Val.Str(pos, v.value.substring(startUtf16, endUtf16))
+        val (startUtf16, endUtf16) = Util.codePointOffsetsToStringIndices(str, int, int + 1)
+        Val.Str(pos, str.substring(startUtf16, endUtf16))
       case (v: Val.Obj, i: Val.Str) =>
         v.value(i.value, pos)
       case (lhs, rhs) =>
