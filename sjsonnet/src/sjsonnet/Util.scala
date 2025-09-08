@@ -105,7 +105,8 @@ object Util {
           val (startUtf16, endUtf16) = codePointOffsetsToStringIndices(s, start, end)
           s.substring(startUtf16, endUtf16)
         case _ =>
-          val result = new java.lang.StringBuilder()
+          val result = new java.lang.StringBuilder(
+            math.min(s.length, ((end - start) + step - 1) / step))
           var sIdx = 0
           var codepointIndex = 0
 
@@ -118,19 +119,22 @@ object Util {
 
           // Collect every `step`th codepoint until `end`
           var rel = 0 // relative index from start
+          var nextInclude = 0 // next relative index to include
           while (sIdx < s.length && codepointIndex < end) {
             val c = s.charAt(sIdx)
             if (Character.isSurrogate(c)) {
-              // Handle surrogate pair
+              // Handle surrogate pair (or unpaired surrogates)
               val cp = s.codePointAt(sIdx)
-              if (rel % step == 0) {
+              if (rel == nextInclude) {
                 result.append(Character.toString(cp))
+                nextInclude += step
               }
               sIdx += Character.charCount(cp)
             } else {
               // Single char, non-surrogate
-              if (rel % step == 0) {
+              if (rel == nextInclude) {
                 result.append(c)
+                nextInclude += step
               }
               sIdx += 1
             }
