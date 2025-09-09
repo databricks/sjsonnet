@@ -379,7 +379,8 @@ class Evaluator(
         val unicodeLength = str.codePointCount(0, str.length)
         if (int >= unicodeLength)
           Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
-        val (startUtf16, endUtf16) = Util.codePointOffsetsToStringIndices(str, int, int + 1)
+        val startUtf16 = if (int == 0) 0 else str.offsetByCodePoints(0, int)
+        val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
         Val.Str(pos, str.substring(startUtf16, endUtf16))
       case (v: Val.Obj, i: Val.Str) =>
         v.value(i.value, pos)

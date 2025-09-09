@@ -543,8 +543,8 @@ class Std(
       if (safeLength <= 0) {
         Val.Str(pos, "")
       } else {
-        val (startUtf16, endUtf16) =
-          Util.codePointOffsetsToStringIndices(str, safeOffset, safeOffset + safeLength)
+        val startUtf16 = if (safeOffset == 0) 0 else str.offsetByCodePoints(0, safeOffset)
+        val endUtf16 = str.offsetByCodePoints(startUtf16, safeLength)
         Val.Str(pos, str.substring(startUtf16, endUtf16))
       }
     }

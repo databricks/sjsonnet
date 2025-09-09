@@ -72,29 +72,6 @@ object Util {
     res: Val
   }
 
-  /**
-   * Converts Unicode codepoint positions to Java String indices. For example, the string "🌍!" has
-   * a length of 3 UTF-16 code units, but only 2 Unicode codepoints, so this function would map the
-   * range (0, 2) to (0, 3).
-   */
-  def codePointOffsetsToStringIndices(
-      s: String,
-      startCodePointOffset: Int,
-      endCodePointOffset: Int): (Int, Int) = {
-    val unicodeLength = s.codePointCount(0, s.length)
-    val safeStart = math.max(0, math.min(startCodePointOffset, unicodeLength))
-    val safeEnd = math.max(safeStart, math.min(endCodePointOffset, unicodeLength))
-
-    if (safeStart == safeEnd) {
-      val utf16Pos = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
-      (utf16Pos, utf16Pos)
-    } else {
-      val startUtf16 = if (safeStart == 0) 0 else s.offsetByCodePoints(0, safeStart)
-      val endUtf16 = s.offsetByCodePoints(startUtf16, safeEnd - safeStart)
-      (startUtf16, endUtf16)
-    }
-  }
-
   private def sliceStr(s: String, start: Int, end: Int, step: Int): String = {
     val unicodeLength = s.codePointCount(0, s.length)
     if (start >= end || start >= unicodeLength) {
@@ -102,7 +79,11 @@ object Util {
     } else {
       step match {
         case 1 =>
-          val (startUtf16, endUtf16) = codePointOffsetsToStringIndices(s, start, end)
+          // Preconditions: start >= 0, start < end, start < unicodeLength
+          val safeEnd = math.min(end, unicodeLength)
+          val sliceLength = safeEnd - start
+          val startUtf16 = if (start == 0) 0 else s.offsetByCodePoints(0, start)
+          val endUtf16 = s.offsetByCodePoints(startUtf16, sliceLength)
           s.substring(startUtf16, endUtf16)
         case _ =>
           val result =
