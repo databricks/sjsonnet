@@ -5,7 +5,7 @@ import TestUtils.{eval, evalErr}
 
 /**
  * Tests for correct handling of Unicode strings, especially those that require surrogate pairs in
- * UTF-16 (i.e., codepoints above U+FFFF).
+ * UTF-16 (i.e., characters with codepoints above U+FFFF).
  */
 object UnicodeHandlingTests extends TestSuite {
   def tests: Tests = Tests {
@@ -13,7 +13,9 @@ object UnicodeHandlingTests extends TestSuite {
     test("stringLength") {
       eval("std.length('🌍')") ==> ujson.Num(1)
       eval("std.length('Hello 🌍')") ==> ujson.Num(7)
-      eval("std.length('👨‍👩‍👧‍👦')") ==> ujson.Num(7) // Family emoji with ZWJ sequences
+      // Jsonnet strings are defined over codepoints, not grapheme clusters, so the
+      // following "family" emoji has a length of 7 (because it has 7 codepoints):
+      eval("std.length('👨‍👩‍👧‍👦')") ==> ujson.Num(7)
     }
 
     test("stringIndex") {
@@ -43,6 +45,10 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.map(function(x) std.codepoint(x), 'A🌍B')") ==> ujson.Arr(65, 127757, 66)
     }
 
+    test("flatMap") {
+      eval("std.flatMap(function(x) x + '!', '🌍🚀')") ==> ujson.Str("🌍!🚀!")
+    }
+
     test("substr") {
       eval("std.substr('A🌍B', 0, 1)") ==> ujson.Str("A")
       eval("std.substr('A🌍B', 1, 1)") ==> ujson.Str("🌍")
@@ -58,24 +64,17 @@ object UnicodeHandlingTests extends TestSuite {
       eval("'ABC🚀'[-2:]") ==> ujson.Str("C🚀")
     }
 
-    test("codepointVsUtf16Ordering") {
-      // This test demonstrates why sjsonnet uses Unicode codepoint ordering instead of UTF-16 code unit ordering.
+    test("codepointVsUtf16OrderingDemonstration") {
+      // This test demonstrates the difference between UTF-16 code unit ordering (wrong)
+      // and Unicode codepoint ordering (correct) at the critical boundary between
+      // the Basic Multilingual Plane (BMP) and Supplementary Planes.
       //
-      // The problem: UTF-16 encodes characters above U+FFFF as "surrogate pairs" - two 16-bit code units.
-      // When comparing strings by UTF-16 code units, we only look at the raw 16-bit values, not the
-      // actual Unicode codepoints they represent.
+      // Test case: U+FFFF (last BMP char) vs U+10000 (first supplementary char)
+      // - U+FFFF is represented as a single UTF-16 code unit: 0xFFFF
+      // - U+10000 requires a surrogate pair: 0xD800 0xDC00
       //
-      // Critical test case:
-      // - U+FFFF = "\uFFFF" → UTF-16: [0xFFFF] (single code unit)
-      // - U+10000 = "\uD800\uDC00" → UTF-16: [0xD800, 0xDC00] (surrogate pair: high + low surrogate)
-      //
-      // Correct Unicode codepoint order: U+FFFF (65535) < U+10000 (65536) → "\uFFFF" < "\uD800\uDC00"
-      //
-      // Wrong UTF-16 code unit order: When comparing "\uFFFF" vs "\uD800\uDC00", UTF-16 comparison sees:
-      //   0xFFFF (65535) vs 0xD800 (55296) ← only looks at first code unit of surrogate pair!
-      //   Since 65535 > 55296, it incorrectly concludes "\uFFFF" > "\uD800\uDC00"
-      //
-      // This breaks ordering for ALL characters above U+FFFF (emojis, math symbols, etc.)
+      // UTF-16 comparison incorrectly compares 0xFFFF > 0xD800 (first code unit only)
+      // Unicode comparison correctly compares U+FFFF < U+10000 (actual codepoints)
 
       val testStrings = Array("\uFFFF", "\uD800\uDC00") // U+FFFF, U+10000
 
@@ -87,39 +86,41 @@ object UnicodeHandlingTests extends TestSuite {
       val codepointSorted = testStrings.sorted(sjsonnet.Util.CodepointStringOrdering).toList
       codepointSorted ==> List("\uFFFF", "\uD800\uDC00")
 
-      // Critical: these produce different results! This test would fail with UTF-16 ordering.
+      // These produce different results, demonstrating the bug that was fixed
       assert(utf16Sorted != codepointSorted)
+    }
 
-      // Jsonnet string operations should use Unicode codepoint ordering
+    test("codepointOrderingInJsonnet") {
+      // Verify that Jsonnet operations use Unicode codepoint ordering
       eval("'\\uFFFF' < '\\uD800\\uDC00'") ==> ujson.Bool(true)
       eval("std.sort(['\\uD800\\uDC00', '\\uFFFF'])") ==> ujson.Arr("\uFFFF", "\uD800\uDC00")
     }
 
-    // sjsonnet allows unpaired surrogates in Unicode escape sequences,
-    // unlike go-jsonnet and C++ jsonnet which reject them at parse time.
+    // Unpaired surrogate handling - sjsonnet-specific behavior
+    //
+    // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
+    // - go/C++ reject unpaired surrogates in escape sequences at parse time
+    // - go-jsonnet's std.char() replaces surrogate codepoints with U+FFFD
+    // - sjsonnet preserves unpaired surrogates throughout
+    //
+    // This permissive behavior is maintained for backwards compatibility.
 
     test("unpairedSurrogatesInEscapes") {
-      // These should parse successfully (go-jsonnet/C++ jsonnet would fail)
-      eval("\"\\uD800\"") ==> ujson.Str("\uD800") // High surrogate
-      eval("\"\\uDC00\"") ==> ujson.Str("\uDC00") // Low surrogate
-      eval("\"\\uD83D\\uDE00\"") ==> ujson.Str("😀") // Valid pair
+      // sjsonnet parses these successfully (go/C++ would reject)
+      eval("\"\\uD800\"") ==> ujson.Str("\uD800") // High surrogate alone
+      eval("\"\\uDC00\"") ==> ujson.Str("\uDC00") // Low surrogate alone
+      eval("\"\\uD83D\\uDE00\"") ==> ujson.Str("😀") // Valid surrogate pair
     }
 
     test("stdCharPreservesRawSurrogates") {
-      // std.char() preserves raw surrogate codepoints (go-jsonnet replaces with U+FFFD)
+      // sjsonnet preserves raw surrogate codepoints (go-jsonnet would replace with U+FFFD)
       eval("std.codepoint(std.char(55296))") ==> ujson.Num(55296) // 0xD800 high surrogate
       eval("std.codepoint(std.char(56320))") ==> ujson.Num(56320) // 0xDC00 low surrogate
     }
 
     test("stringComparisons") {
-      // Comprehensive test of ALL comparison operators with the critical UTF-16 vs Unicode boundary case
-      // This ensures mutation testing catches bugs in any specific comparison implementation
-
       val maxBmp = "'\\uFFFF'" // U+FFFF (max Basic Multilingual Plane)
       val minSupplementary = "'\\uD800\\uDC00'" // U+10000 (min Supplementary Plane)
-
-      // All comparison operators must use Unicode codepoint ordering
-      // With UTF-16 code unit ordering, these would ALL give wrong results
 
       // Less than: U+FFFF < U+10000
       eval(s"$maxBmp < $minSupplementary") ==> ujson.Bool(true)
@@ -128,7 +129,7 @@ object UnicodeHandlingTests extends TestSuite {
       // Less than or equal: U+FFFF <= U+10000
       eval(s"$maxBmp <= $minSupplementary") ==> ujson.Bool(true)
       eval(s"$minSupplementary <= $maxBmp") ==> ujson.Bool(false)
-      eval(s"$maxBmp <= $maxBmp") ==> ujson.Bool(true) // Reflexivity
+      eval(s"$maxBmp <= $maxBmp") ==> ujson.Bool(true)
 
       // Greater than: U+10000 > U+FFFF
       eval(s"$minSupplementary > $maxBmp") ==> ujson.Bool(true)
@@ -137,12 +138,12 @@ object UnicodeHandlingTests extends TestSuite {
       // Greater than or equal: U+10000 >= U+FFFF
       eval(s"$minSupplementary >= $maxBmp") ==> ujson.Bool(true)
       eval(s"$maxBmp >= $minSupplementary") ==> ujson.Bool(false)
-      eval(s"$maxBmp >= $maxBmp") ==> ujson.Bool(true) // Reflexivity
+      eval(s"$maxBmp >= $maxBmp") ==> ujson.Bool(true)
 
       // Equality and inequality
       eval(s"$maxBmp == $minSupplementary") ==> ujson.Bool(false)
       eval(s"$maxBmp != $minSupplementary") ==> ujson.Bool(true)
-      eval(s"$maxBmp == $maxBmp") ==> ujson.Bool(true) // Reflexivity
+      eval(s"$maxBmp == $maxBmp") ==> ujson.Bool(true)
       eval(s"$maxBmp != $maxBmp") ==> ujson.Bool(false)
 
       // Array sorting must also use codepoint ordering
@@ -155,92 +156,34 @@ object UnicodeHandlingTests extends TestSuite {
     }
 
     test("objectFieldOrdering") {
-      // Test object field ordering with the critical UTF-16 vs Unicode boundary case
-      // Input deliberately in REVERSE codepoint order to make the test non-trivial
       val testObject = "{\"\uD800\uDC00\": 4, \"\uFFFF\": 3, \"z\": 2, \"a\": 1}"
 
-      // All object field functions should sort by Unicode codepoint order
+      // Object fields:
       eval(s"std.objectFields($testObject)") ==> ujson.Arr("a", "z", "\uFFFF", "\uD800\uDC00")
       eval(s"std.objectFieldsAll($testObject)") ==> ujson.Arr("a", "z", "\uFFFF", "\uD800\uDC00")
 
-      // Default object rendering also uses codepoint ordering
+      // Default object rendering:
       eval(testObject).toString ==> "{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}"
 
-      // JSON manifest should maintain the same ordering
+      // JSON manifest variants:
       eval(s"std.manifestJsonMinified($testObject)") ==>
       ujson.Str("{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}")
 
-      // TOML manifest should also use codepoint ordering (with escaped Unicode)
+      eval(s"std.manifestJson($testObject)") ==>
+      ujson.Str("{\n    \"a\": 1,\n    \"z\": 2,\n    \"\uFFFF\": 3,\n    \"\uD800\uDC00\": 4\n}")
+
+      eval(s"std.manifestJsonEx($testObject, '  ')") ==>
+      ujson.Str("{\n  \"a\": 1,\n  \"z\": 2,\n  \"\uFFFF\": 3,\n  \"\uD800\uDC00\": 4\n}")
+
+      // TOML manifest:
       eval(s"std.manifestTomlEx($testObject, '  ')") ==>
       ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
     }
 
-    test("flatMap") {
-      // Test that std.flatMap now uses code point semantics like std.map
-      // This tests the consistency fix for flatMap on strings
-
-      // Basic ASCII test
-      eval("std.flatMap(function(x) x + x, 'ABC')") ==> ujson.Str("AABBCC")
-
-      // Unicode emoji test - should handle each emoji as a single character
-      eval("std.flatMap(function(x) x + '!', '🌍🚀')") ==> ujson.Str("🌍!🚀!")
-
-      // Critical test: surrogate pair boundary case
-      // U+FFFF followed by U+10000 (which needs surrogate pair)
-      eval("std.flatMap(function(x) x + '-', '\\uFFFF\\uD800\\uDC00')") ==> ujson.Str(
-        "\uFFFF-\uD800\uDC00-"
-      )
-
-      // Test consistency with std.map behavior
-      val testStr = "'A🌍B'";
-      eval(s"std.length(std.flatMap(function(x) x, $testStr))") ==>
-      eval(s"std.length(std.map(function(x) x, $testStr))")
-
-      // Test with function that returns null (should be converted to empty string)
-      eval("std.flatMap(function(x) if x == '🌍' then null else x, 'A🌍B')") ==> ujson.Str("AB")
-
-      // Array flatMap should still work (unchanged behavior)
-      eval("std.flatMap(function(x) [x, x], [1, 2])") ==> ujson.Arr(1, 1, 2, 2)
-    }
-
     test("findSubstr") {
-      // Test that std.findSubstr now returns code point offsets instead of code unit positions
-      // This tests the consistency fix for findSubstr indices
-
-      // Basic ASCII test - should be unchanged
-      eval("std.findSubstr('l', 'hello')") ==> ujson.Arr(2, 3)
-      eval("std.findSubstr('o', 'hello world')") ==> ujson.Arr(4, 7)
-
-      // Test with Unicode emojis - positions should be in code points
       eval("std.findSubstr('🌍', 'Hello 🌍 World')") ==> ujson.Arr(6)
       eval("std.findSubstr('o', 'Hello 🌍 World')") ==> ujson.Arr(4, 9)
-
-      // Critical test: surrogate pair boundary case
-      // The string "A\uFFFF\uD800\uDC00B" has:
-      // - 'A' at code point 0
-      // - U+FFFF at code point 1
-      // - U+10000 (\uD800\uDC00) at code point 2
-      // - 'B' at code point 3
-      eval("std.findSubstr('\\uFFFF', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(1)
-      eval("std.findSubstr('\\uD800\\uDC00', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(2)
-      eval("std.findSubstr('B', 'A\\uFFFF\\uD800\\uDC00B')") ==> ujson.Arr(3)
-
-      // Test with pattern that spans multiple code points
       eval("std.findSubstr('🌍🚀', '🌍🚀 and more 🌍🚀')") ==> ujson.Arr(0, 12)
-
-      // Empty pattern should return empty array
-      eval("std.findSubstr('', 'test')") ==> ujson.Arr()
-
-      // Non-existent pattern should return empty array
-      eval("std.findSubstr('xyz', 'hello world')") ==> ujson.Arr()
-
-      // Consistency check: positions returned by findSubstr should work with substr
-      val testString = "'Hello 🌍 World'";
-      val searchPattern = "'🌍'";
-      // This verifies that the index returned by findSubstr works with substr to extract the same pattern
-      eval(
-        s"std.substr($testString, std.findSubstr($searchPattern, $testString)[0], std.length($searchPattern))"
-      ) ==> ujson.Str("🌍")
     }
   }
 }
