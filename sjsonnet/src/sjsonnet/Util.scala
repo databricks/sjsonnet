@@ -105,8 +105,8 @@ object Util {
           val (startUtf16, endUtf16) = codePointOffsetsToStringIndices(s, start, end)
           s.substring(startUtf16, endUtf16)
         case _ =>
-          val result = new java.lang.StringBuilder(
-            math.min(s.length, ((end - start) + step - 1) / step))
+          val result =
+            new java.lang.StringBuilder(math.min(s.length, ((end - start) + step - 1) / step))
           var sIdx = 0
           var codepointIndex = 0
 
