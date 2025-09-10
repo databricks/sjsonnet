@@ -907,7 +907,7 @@ class NewEvaluator(
     extends Evaluator(r, e, w, s, wa) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
-    (e._tag: @switch) match {
+    (e.tag: @switch) match {
       case ExprTags.ValidId       => visitValidId(e.asInstanceOf[ValidId])
       case ExprTags.BinaryOp      => visitBinaryOp(e.asInstanceOf[BinaryOp])
       case ExprTags.Select        => visitSelect(e.asInstanceOf[Select])
@@ -955,7 +955,7 @@ class NewEvaluator(
     Error.withStackFrame(e)
   }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
-  override def visitInvalid(e: Expr): Nothing = (e._tag: @switch) match {
+  override def visitInvalid(e: Expr): Nothing = (e.tag: @switch) match {
     case ExprTags.Id =>
       val id = e.asInstanceOf[Id]
       Error.fail("Unknown variable: " + id.name, id.pos)

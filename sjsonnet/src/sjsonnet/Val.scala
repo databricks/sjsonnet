@@ -87,7 +87,7 @@ object Val {
   private val DOUBLE_MIN_SAFE_INTEGER = -((1L << 53) - 1)
 
   abstract class Literal extends Val with Expr {
-    final override private[sjsonnet] val _tag = ExprTags.`Val.Literal`
+    final override private[sjsonnet] def tag = ExprTags.`Val.Literal`
   }
   abstract class Bool extends Literal {
     override def asBoolean: Boolean = this.isInstanceOf[True]
@@ -517,7 +517,7 @@ object Val {
   abstract class Func(val pos: Position, val defSiteValScope: ValScope, val params: Params)
       extends Val
       with Expr {
-    final override private[sjsonnet] val _tag = ExprTags.`Val.Func`
+    final override private[sjsonnet] def tag = ExprTags.`Val.Func`
 
     def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val
 
