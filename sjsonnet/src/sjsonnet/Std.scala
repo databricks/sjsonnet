@@ -51,7 +51,7 @@ class Std(
       Val.Num(
         pos,
         x.force match {
-          case Val.Str(_, s) => s.length
+          case Val.Str(_, s) => s.codePointCount(0, s.length)
           case a: Val.Arr    => a.length
           case o: Val.Obj    => o.visibleKeyNames.length
           case o: Val.Func   => o.params.names.length
@@ -97,12 +97,14 @@ class Std(
   }
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = if (
-      str.force.asString.length != 1 || str.force.asString.codePointCount(0, 1) > 1
-    ) {
-      Error.fail("expected a single character string, got " + str.force.asString)
-    } else {
-      Val.Num(pos, str.force.asString.codePointAt(0).toDouble)
+    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
+      val s = str.force.asString
+      val codePointCount = s.codePointCount(0, s.length)
+      if (codePointCount != 1) {
+        Error.fail("expected a single character string, got " + s)
+      } else {
+        Val.Num(pos, s.codePointAt(0).toDouble)
+      }
     }
   }
 
@@ -533,9 +535,18 @@ class Std(
         case v: Val.Num => v.asPositiveInt
         case _ => Error.fail("Expected a number for len in substr, got " + len.force.prettyName)
       }
-      val safeOffset = math.min(offset, str.length)
-      val safeLength = math.min(length, str.length - safeOffset)
-      Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
+
+      val unicodeLength = str.codePointCount(0, str.length)
+      val safeOffset = math.min(offset, unicodeLength)
+      val safeLength = math.min(length, unicodeLength - safeOffset)
+
+      if (safeLength <= 0) {
+        Val.Str(pos, "")
+      } else {
+        val startUtf16 = if (safeOffset == 0) 0 else str.offsetByCodePoints(0, safeOffset)
+        val endUtf16 = str.offsetByCodePoints(startUtf16, safeLength)
+        Val.Str(pos, str.substring(startUtf16, endUtf16))
+      }
     }
   }
 
@@ -1031,7 +1042,7 @@ class Std(
         indexedPath: Seq[String])(implicit ev: EvalScope): StringWriter = {
       val (sections, nonSections) =
         v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
-      for (k <- nonSections.sorted) {
+      for (k <- nonSections.sorted(Util.CodepointStringOrdering)) {
         out.write(cumulatedIndent)
         out.write(TomlRenderer.escapeKey(k))
         out.write(" = ")
@@ -1041,7 +1052,7 @@ class Std(
       }
       out.write('\n')
 
-      for (k <- sections.sorted) {
+      for (k <- sections.sorted(Util.CodepointStringOrdering)) {
         val v0 = v.value(k, v.pos, v)(ev)
         if (isTableArray(v0)) {
           for (i <- 0 until v0.asArr.length) {
@@ -1405,10 +1416,13 @@ class Std(
           Val.Arr(pos, arrResults)
 
         case s: Val.Str =>
-          val builder = new StringBuilder()
-          for (c: Char <- s.value) {
+          val builder = new java.lang.StringBuilder()
+          var i = 0
+          while (i < s.value.length) {
+            val codePoint = s.value.codePointAt(i)
+            val codepointStr = Character.toString(codePoint)
             val fres =
-              func.apply1(Val.Str(pos, c.toString), pos.noOffset)(ev, TailstrictModeDisabled)
+              func.apply1(Val.Str(pos, codepointStr), pos.noOffset)(ev, TailstrictModeDisabled)
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.value
@@ -1422,6 +1436,7 @@ class Std(
                   )
               }
             )
+            i += Character.charCount(codePoint)
           }
           Val.Str(pos, builder.toString)
         case _ => Error.fail("Argument must be either array or string")
@@ -1451,8 +1466,17 @@ class Std(
         if (matchIndex == -1) Val.Arr(pos, emptyLazyArray)
         else {
           val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
+
+          // Compute codepoint indices incrementally, avoiding an O(n) calculation for each match.
+          var prevCharIndex = 0
+          var prevCodePointIndex = 0
+
           while (0 <= matchIndex && matchIndex < str.length) {
-            indices.+=(Val.Num(pos, matchIndex))
+            val codePointIndex = prevCodePointIndex + str.codePointCount(prevCharIndex, matchIndex)
+            indices.+=(Val.Num(pos, codePointIndex))
+
+            prevCharIndex = matchIndex
+            prevCodePointIndex = codePointIndex
             matchIndex = str.indexOf(pat, matchIndex + 1)
           }
           Val.Arr(pos, indices.result())
@@ -2074,7 +2098,7 @@ class Std(
           val indices = Array.range(0, vs.length)
 
           val sortedIndices = if (keyType == classOf[Val.Str]) {
-            indices.sortBy(i => keys(i).cast[Val.Str].asString)
+            indices.sortBy(i => keys(i).cast[Val.Str].asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
             indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
           } else if (keyType == classOf[Val.Arr]) {
@@ -2093,7 +2117,7 @@ class Std(
             Error.fail("Cannot sort with values that are not all the same type")
 
           if (keyType == classOf[Val.Str]) {
-            vs.map(_.force.cast[Val.Str]).sortBy(_.asString)
+            vs.map(_.force.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
             vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
           } else if (keyType == classOf[Val.Arr]) {
@@ -2109,13 +2133,16 @@ class Std(
   }
 
   def stringChars(pos: Position, str: String): Val.Arr = {
-    val a = new Array[Lazy](str.length)
+    val chars = new Array[Lazy](str.codePointCount(0, str.length))
+    var charIndex = 0
     var i = 0
-    while (i < a.length) {
-      a(i) = Val.Str(pos, String.valueOf(str.charAt(i)))
-      i += 1
+    while (i < str.length) {
+      val codePoint = str.codePointAt(i)
+      chars(charIndex) = Val.Str(pos, Character.toString(codePoint))
+      i += Character.charCount(codePoint)
+      charIndex += 1
     }
-    Val.Arr(pos, a)
+    Val.Arr(pos, chars)
   }
 
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
@@ -2125,7 +2152,7 @@ class Std(
     maybeSortKeys(ev, v1.allKeyNames)
 
   @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
-    if (ev.settings.preserveOrder) keys else keys.sorted
+    if (ev.settings.preserveOrder) keys else keys.sorted(Util.CodepointStringOrdering)
 
   def getObjValuesFromKeys(
       pos: Position,
