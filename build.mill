@@ -1,4 +1,4 @@
-//| mill-version: 1.0.4-jvm
+//| mill-version: 1.0.5-jvm
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
