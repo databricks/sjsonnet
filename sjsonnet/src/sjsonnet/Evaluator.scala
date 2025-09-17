@@ -374,10 +374,14 @@ class Evaluator(
         v.force(int)
       case (v: Val.Str, i: Val.Num) =>
         val int = i.asPositiveInt
-        if (v.value.isEmpty) Error.fail("string bounds error: string is empty", pos)
-        if (int >= v.value.length)
-          Error.fail(s"string bounds error: $int not within [0, ${v.value.length})", pos)
-        Val.Str(pos, new String(Array(v.value(int))))
+        val str = v.value
+        if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
+        val unicodeLength = str.codePointCount(0, str.length)
+        if (int >= unicodeLength)
+          Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
+        val startUtf16 = if (int == 0) 0 else str.offsetByCodePoints(0, int)
+        val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
+        Val.Str(pos, str.substring(startUtf16, endUtf16))
       case (v: Val.Obj, i: Val.Str) =>
         v.value(i.value, pos)
       case (lhs, rhs) =>
@@ -522,7 +526,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_< =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l < r)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) < 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) < 0)
           case _                              => fail()
@@ -530,7 +535,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_> =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l > r)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) > 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) > 0)
           case _                              => fail()
@@ -538,7 +544,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_<= =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l <= r)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) <= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) <= 0)
           case _                              => fail()
@@ -546,7 +553,8 @@ class Evaluator(
 
       case Expr.BinaryOp.OP_>= =>
         (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) => Val.bool(pos, l >= r)
+          case (Val.Str(_, l), Val.Str(_, r)) =>
+            Val.bool(pos, Util.compareStringsByCodepoint(l, r) >= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) >= 0)
           case _                              => fail()
@@ -832,7 +840,7 @@ class Evaluator(
   def compare(x: Val, y: Val): Int = (x, y) match {
     case (_: Val.Null, _: Val.Null) => 0
     case (x: Val.Num, y: Val.Num)   => x.asDouble.compareTo(y.asDouble)
-    case (x: Val.Str, y: Val.Str)   => x.value.compareTo(y.value)
+    case (x: Val.Str, y: Val.Str)   => Util.compareStringsByCodepoint(x.value, y.value)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
     case (x: Val.Arr, y: Val.Arr)   =>
       val len = math.min(x.length, y.length)
