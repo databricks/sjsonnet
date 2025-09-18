@@ -64,6 +64,19 @@ object UnicodeHandlingTests extends TestSuite {
       eval("'ABC🚀'[-2:]") ==> ujson.Str("C🚀")
     }
 
+    test("unicodeEscapeSequences") {
+      // Test basic Unicode escapes
+      eval("\"\\u0041\"") ==> ujson.Str("A")
+      eval("\"\\u0048\\u0065\\u006C\\u006C\\u006F\"") ==> ujson.Str("Hello")
+
+      // Test surrogate pair handling - new parser correctly handles these
+      eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
+      eval("\"\\uD83D\\uDE80\"") ==> ujson.Str("🚀") // Rocket emoji
+
+      // Test non-surrogate high Unicode codepoints
+      eval("\"\\uFFFF\"") ==> ujson.Str("\uFFFF")
+    }
+
     test("codepointVsUtf16OrderingDemonstration") {
       // This test demonstrates the difference between UTF-16 code unit ordering (wrong)
       // and Unicode codepoint ordering (correct) at the critical boundary between
@@ -96,26 +109,55 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.sort(['\\uD800\\uDC00', '\\uFFFF'])") ==> ujson.Arr("\uFFFF", "\uD800\uDC00")
     }
 
-    // Unpaired surrogate handling - sjsonnet-specific behavior
-    //
-    // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
-    // - go/C++ reject unpaired surrogates in escape sequences at parse time
-    // - go-jsonnet's std.char() replaces surrogate codepoints with U+FFFD
-    // - sjsonnet preserves unpaired surrogates throughout
-    //
-    // This permissive behavior is maintained for backwards compatibility.
+    // Updated surrogate handling tests - new parser correctly handles surrogate pairs
+    test("surrogateParHandling") {
+      // Valid surrogate pairs are now correctly parsed
+      eval("\"\\uD83D\\uDE00\"") ==> ujson.Str("😀") // Valid surrogate pair (grinning face)
+      eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
 
-    test("unpairedSurrogatesInEscapes") {
-      // sjsonnet parses these successfully (go/C++ would reject)
-      eval("\"\\uD800\"") ==> ujson.Str("\uD800") // High surrogate alone
-      eval("\"\\uDC00\"") ==> ujson.Str("\uDC00") // Low surrogate alone
-      eval("\"\\uD83D\\uDE00\"") ==> ujson.Str("😀") // Valid surrogate pair
+      // Test that the parser correctly converts surrogate pairs to proper Unicode characters
+      eval("std.codepoint(\"\\uD83C\\uDF0D\")") ==> ujson.Num(127757) // Earth emoji codepoint
     }
 
-    test("stdCharPreservesRawSurrogates") {
-      // sjsonnet preserves raw surrogate codepoints (go-jsonnet would replace with U+FFFD)
-      eval("std.codepoint(std.char(55296))") ==> ujson.Num(55296) // 0xD800 high surrogate
-      eval("std.codepoint(std.char(56320))") ==> ujson.Num(56320) // 0xDC00 low surrogate
+    test("invalidSurrogateHandling") {
+      // Test parser's behavior with invalid surrogate sequences
+      // High surrogate not followed by low surrogate - should be handled according to parser logic
+      evalErr("\"\\uD800\"").contains("Expected") // Unpaired high surrogate
+      evalErr("\"\\uD8FF\"").contains("Expected") // Another high surrogate
+      evalErr("\"\\uDBFF\"").contains("Expected") // Max high surrogate
+
+      // Low surrogate without preceding high surrogate
+      evalErr("\"\\uDC00\"").contains("Expected") // Unpaired low surrogate
+      evalErr("\"\\uDFFF\"").contains("Expected") // Max low surrogate
+
+      // High surrogate followed by non-low surrogate
+      evalErr("\"\\uD800\\u0041\"").contains("Expected") // High + ASCII
+      evalErr("\"\\uD800\\uFFFF\"").contains("Expected") // High + BMP
+      evalErr("\"\\uD800\\uD801\"").contains("Expected") // High + High
+
+      // Low surrogate preceded by non-high surrogate
+      evalErr("\"\\u0041\\uDC00\"").contains("Expected") // ASCII + Low
+      evalErr("\"\\uFFFF\\uDC00\"").contains("Expected") // BMP + Low
+
+      // Multiple invalid surrogates
+      evalErr("\"\\uD800\\uD801\\uDC00\"").contains("Expected") // High + High + Low
+      evalErr("\"\\uDC00\\uDC01\"").contains("Expected") // Low + Low
+
+      // Mixed valid and invalid in same string
+      evalErr("\"\\uD83C\\uDF0D\\uD800\"").contains("Expected") // Valid pair + unpaired high
+      evalErr("\"\\uD800\\uD83C\\uDF0D\"").contains("Expected") // Unpaired high + valid pair
+
+      // Note: The new parser's unicode handling is more strict about surrogate pairs
+    }
+
+    test("stdCharHandling") {
+      // Test std.char with valid codepoints including those requiring surrogate pairs
+      eval("std.char(127757)") ==> ujson.Str("🌍") // Earth emoji
+      eval("std.char(128640)") ==> ujson.Str("🚀") // Rocket emoji
+
+      // Test with BMP characters
+      eval("std.char(65)") ==> ujson.Str("A")
+      eval("std.char(65535)") ==> ujson.Str("\uFFFF") // Max BMP character
     }
 
     test("stringComparisons") {
@@ -167,23 +209,32 @@ object UnicodeHandlingTests extends TestSuite {
 
       // JSON manifest variants:
       eval(s"std.manifestJsonMinified($testObject)") ==>
-      ujson.Str("{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}")
+        ujson.Str("{\"a\":1,\"z\":2,\"\uFFFF\":3,\"\uD800\uDC00\":4}")
 
       eval(s"std.manifestJson($testObject)") ==>
-      ujson.Str("{\n    \"a\": 1,\n    \"z\": 2,\n    \"\uFFFF\": 3,\n    \"\uD800\uDC00\": 4\n}")
+        ujson.Str("{\n    \"a\": 1,\n    \"z\": 2,\n    \"\uFFFF\": 3,\n    \"\uD800\uDC00\": 4\n}")
 
       eval(s"std.manifestJsonEx($testObject, '  ')") ==>
-      ujson.Str("{\n  \"a\": 1,\n  \"z\": 2,\n  \"\uFFFF\": 3,\n  \"\uD800\uDC00\": 4\n}")
+        ujson.Str("{\n  \"a\": 1,\n  \"z\": 2,\n  \"\uFFFF\": 3,\n  \"\uD800\uDC00\": 4\n}")
 
       // TOML manifest:
       eval(s"std.manifestTomlEx($testObject, '  ')") ==>
-      ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
+        ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
     }
 
     test("findSubstr") {
       eval("std.findSubstr('🌍', 'Hello 🌍 World')") ==> ujson.Arr(6)
       eval("std.findSubstr('o', 'Hello 🌍 World')") ==> ujson.Arr(4, 9)
       eval("std.findSubstr('🌍🚀', '🌍🚀 and more 🌍🚀')") ==> ujson.Arr(0, 12)
+    }
+
+    test("mixedUnicodeAndAscii") {
+      // Test mixing ASCII and Unicode characters
+      eval("'Hello ' + '🌍' + ' World'") ==> ujson.Str("Hello 🌍 World")
+      eval("std.length('ASCII🌍混合')") ==> ujson.Num(8)
+      eval("'ASCII🌍混合'[5]") ==> ujson.Str("🌍")
+      eval("'ASCII🌍混合'[6]") ==> ujson.Str("混")
+      eval("'ASCII🌍混合'[7]") ==> ujson.Str("合")
     }
   }
 }
