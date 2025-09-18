@@ -78,6 +78,7 @@ class Parser(
       java.util.LinkedHashMap[String, java.lang.Boolean]
     ],
     settings: Settings = Settings.default) {
+
   import Parser._
 
   private val fileScope = new FileScope(currentFile)
@@ -201,20 +202,23 @@ class Parser(
   private def unicodeEscape[$: P]: P[String] =
     P(NoCut(`non-surrogate`) | NoCut(`surrogate-pair`)).map {
       case (high: String, low: String) =>
-        // NODE: jsonnet support control characters
+        // NOTE: jsonnet support control characters
         val highSurrogate = Integer.parseInt(high, 16).toChar
         val lowSurrogate = Integer.parseInt(low, 16).toChar
         new String(Array[Int](Character.toCodePoint(highSurrogate, lowSurrogate)), 0, 1)
       case str: String => Integer.parseInt(str, 16).toChar.toString
-      case _           => throw new IllegalArgumentException("Invalid unicode escape")
+      case _ => throw new IllegalArgumentException("Compiler exhaustiveness check pleaser")
     }
 
   def doubleString[$: P]: P[Seq[String]] =
     P((CharsWhile(x => x != '"' && x != '\\').! | escape).repX ~~ "\"")
+
   def singleString[$: P]: P[Seq[String]] =
     P((CharsWhile(x => x != '\'' && x != '\\').! | escape).repX ~~ "'")
+
   def literalDoubleString[$: P]: P[Seq[String]] =
     P((CharsWhile(_ != '"').! | "\"\"".!.map(_ => "\"")).repX ~~ "\"")
+
   def literalSingleString[$: P]: P[Seq[String]] =
     P((CharsWhile(_ != '\'').! | "''".!.map(_ => "'")).repX ~~ "'")
 
@@ -282,11 +286,13 @@ class Parser(
     checkParseDepth(currentDepth)
     P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody(currentDepth + 1))
   }
+
   def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = compSuffix(0)
 
   def compSuffix[$: P](currentDepth: Int): P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = {
     P(forspec(currentDepth + 1) ~ compspec(currentDepth + 1)).map(Left(_))
   }
+
   def arrBody[$: P]: P[Expr] = arrBody(0)
 
   def arrBody[$: P](currentDepth: Int): P[Expr] = {
@@ -347,6 +353,7 @@ class Parser(
     P("" ~ expr1(currentDepth) ~ (Pos ~~ binaryop ~/ expr1(currentDepth)).rep ~ "").map {
       case (pre, fs) =>
         var remaining = fs
+
         def climb(minPrec: Int, current: Expr, climbDepth: Int): Expr = {
           var result = current
           while (
@@ -455,19 +462,25 @@ class Parser(
   def local[$: P](currentDepth: Int): P[Expr] = {
     P(localExpr(currentDepth + 1))
   }
+
   def importStr[$: P](pos: Position): P[Expr.ImportStr] = importStr(pos, 0)
+
   def importBin[$: P](pos: Position): P[Expr.ImportBin] = importBin(pos, 0)
+
   def `import`[$: P](pos: Position): P[Expr.Import] = `import`(pos, 0)
 
   def importStr[$: P](pos: Position, currentDepth: Int): P[Expr.ImportStr] = {
     P(importExpr(currentDepth + 1).map(Expr.ImportStr(pos, _)))
   }
+
   def importBin[$: P](pos: Position, currentDepth: Int): P[Expr.ImportBin] = {
     P(importExpr(currentDepth + 1).map(Expr.ImportBin(pos, _)))
   }
+
   def `import`[$: P](pos: Position, currentDepth: Int): P[Expr.Import] = {
     P(importExpr(currentDepth + 1).map(Expr.Import(pos, _)))
   }
+
   def error[$: P](pos: Position, currentDepth: Int): P[Expr.Error] = {
     P(expr(currentDepth + 1).map(Expr.Error(pos, _)))
   }
@@ -492,6 +505,7 @@ class Parser(
           case '~' => Expr.UnaryOp.OP_~
           case '!' => Expr.UnaryOp.OP_!
         }
+
         Expr.UnaryOp(pos, k2, e)
       }
     )
@@ -674,6 +688,7 @@ class Parser(
       )
     )
   }
+
   def field[$: P]: P[Expr.Member.Field] = field(0)
 
   def field[$: P](currentDepth: Int): P[Expr.Member.Field] = {
@@ -685,21 +700,25 @@ class Parser(
       }
     )
   }
+
   def fieldKeySep[$: P]: P[Visibility] = P(StringIn(":::", "::", ":")).!.map {
     case ":"   => Visibility.Normal
     case "::"  => Visibility.Hidden
     case ":::" => Visibility.Unhide
   }
+
   def objlocal[$: P]: P[Expr.Bind] = objlocal(0)
 
   def objlocal[$: P](currentDepth: Int): P[Expr.Bind] = {
     P("local" ~~ break ~/ bind(currentDepth + 1))
   }
+
   def compspec[$: P]: P[Seq[Expr.CompSpec]] = compspec(0)
 
   def compspec[$: P](currentDepth: Int): P[Seq[Expr.CompSpec]] = {
     P((forspec(currentDepth + 1) | ifspec(currentDepth + 1)).rep)
   }
+
   def forspec[$: P]: P[Expr.ForSpec] = forspec(0)
 
   def forspec[$: P](currentDepth: Int): P[Expr.ForSpec] = {
@@ -708,6 +727,7 @@ class Parser(
         Expr.ForSpec(pos, name, cond)
     }
   }
+
   def ifspec[$: P]: P[Expr.IfSpec] = ifspec(0)
 
   def ifspec[$: P](currentDepth: Int): P[Expr.IfSpec] = {
@@ -715,6 +735,7 @@ class Parser(
       Expr.IfSpec(pos, cond)
     }
   }
+
   def fieldname[$: P]: P[Expr.FieldName] = fieldname(0)
 
   def fieldname[$: P](currentDepth: Int): P[Expr.FieldName] = {
@@ -724,6 +745,7 @@ class Parser(
       "[" ~ expr(currentDepth + 1).map(Expr.FieldName.Dyn.apply) ~ "]"
     )
   }
+
   def assertStmt[$: P]: P[Expr.Member.AssertStmt] = assertStmt(0)
 
   def assertStmt[$: P](currentDepth: Int): P[Expr.Member.AssertStmt] = {
@@ -809,11 +831,14 @@ class Parser(
 
 final class Position(val fileScope: FileScope, val offset: Int) {
   def currentFile: Path = fileScope.currentFile
+
   def noOffset: Position = fileScope.noOffsetPos
+
   override def equals(o: Any): Boolean = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset
     case _           => false
   }
+
   override def toString: String = {
     val name = if (fileScope == null) "null" else fileScope.currentFileLastPathElement
     s"Position($name, $offset)"

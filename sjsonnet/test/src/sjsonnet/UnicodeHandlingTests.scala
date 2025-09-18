@@ -64,6 +64,19 @@ object UnicodeHandlingTests extends TestSuite {
       eval("'ABC🚀'[-2:]") ==> ujson.Str("C🚀")
     }
 
+    test("unicodeEscapeSequences") {
+      // Test basic Unicode escapes
+      eval("\"\\u0041\"") ==> ujson.Str("A")
+      eval("\"\\u0048\\u0065\\u006C\\u006C\\u006F\"") ==> ujson.Str("Hello")
+
+      // Test surrogate pair handling - new parser correctly handles these
+      eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
+      eval("\"\\uD83D\\uDE80\"") ==> ujson.Str("🚀") // Rocket emoji
+
+      // Test non-surrogate high Unicode codepoints
+      eval("\"\\uFFFF\"") ==> ujson.Str("\uFFFF")
+    }
+
     test("codepointVsUtf16OrderingDemonstration") {
       // This test demonstrates the difference between UTF-16 code unit ordering (wrong)
       // and Unicode codepoint ordering (correct) at the critical boundary between
@@ -101,21 +114,65 @@ object UnicodeHandlingTests extends TestSuite {
     // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
     // - go/C++ reject unpaired surrogates in escape sequences at parse time
     // - go-jsonnet's std.char() replaces surrogate codepoints with U+FFFD
-    // - sjsonnet preserves unpaired surrogates throughout
+    // - sjsonnet was preserving unpaired surrogates throughout
     //
-    // This permissive behavior is maintained for backwards compatibility.
+    // sjsonnet now reject these to align with go-jsonet/ c++ jsonnet
+    //
 
     test("unpairedSurrogatesInEscapes") {
-      // sjsonnet parses these successfully (go/C++ would reject)
-      eval("\"\\uD800\"") ==> ujson.Str("\uD800") // High surrogate alone
-      eval("\"\\uDC00\"") ==> ujson.Str("\uDC00") // Low surrogate alone
+      // sjsonnet was parses these successfully (go/C++ would reject)
+      // the new behavior will reject thesee too
+      evalErr("\"\\uD800\"").contains("Expected") // High surrogate alone
+      evalErr("\"\\uDC00\"").contains("Expected") // Low surrogate alone
       eval("\"\\uD83D\\uDE00\"") ==> ujson.Str("😀") // Valid surrogate pair
+      eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
     }
 
     test("stdCharPreservesRawSurrogates") {
       // sjsonnet preserves raw surrogate codepoints (go-jsonnet would replace with U+FFFD)
       eval("std.codepoint(std.char(55296))") ==> ujson.Num(55296) // 0xD800 high surrogate
       eval("std.codepoint(std.char(56320))") ==> ujson.Num(56320) // 0xDC00 low surrogate
+    }
+
+    test("invalidSurrogateHandling") {
+      // Test parser's behavior with invalid surrogate sequences
+      // High surrogate not followed by low surrogate - should be handled according to parser logic
+      evalErr("\"\\uD800\"").contains("Expected") // Unpaired high surrogate
+      evalErr("\"\\uD8FF\"").contains("Expected") // Another high surrogate
+      evalErr("\"\\uDBFF\"").contains("Expected") // Max high surrogate
+
+      // Low surrogate without preceding high surrogate
+      evalErr("\"\\uDC00\"").contains("Expected") // Unpaired low surrogate
+      evalErr("\"\\uDFFF\"").contains("Expected") // Max low surrogate
+
+      // High surrogate followed by non-low surrogate
+      evalErr("\"\\uD800\\u0041\"").contains("Expected") // High + ASCII
+      evalErr("\"\\uD800\\uFFFF\"").contains("Expected") // High + BMP
+      evalErr("\"\\uD800\\uD801\"").contains("Expected") // High + High
+
+      // Low surrogate preceded by non-high surrogate
+      evalErr("\"\\u0041\\uDC00\"").contains("Expected") // ASCII + Low
+      evalErr("\"\\uFFFF\\uDC00\"").contains("Expected") // BMP + Low
+
+      // Multiple invalid surrogates
+      evalErr("\"\\uD800\\uD801\\uDC00\"").contains("Expected") // High + High + Low
+      evalErr("\"\\uDC00\\uDC01\"").contains("Expected") // Low + Low
+
+      // Mixed valid and invalid in same string
+      evalErr("\"\\uD83C\\uDF0D\\uD800\"").contains("Expected") // Valid pair + unpaired high
+      evalErr("\"\\uD800\\uD83C\\uDF0D\"").contains("Expected") // Unpaired high + valid pair
+
+      // Note: The new parser's unicode handling is more strict about surrogate pairs
+    }
+
+    test("stdCharHandling") {
+      // Test std.char with valid codepoints including those requiring surrogate pairs
+      eval("std.char(127757)") ==> ujson.Str("🌍") // Earth emoji
+      eval("std.char(128640)") ==> ujson.Str("🚀") // Rocket emoji
+
+      // Test with BMP characters
+      eval("std.char(65)") ==> ujson.Str("A")
+      eval("std.char(65535)") ==> ujson.Str("\uFFFF") // Max BMP character
     }
 
     test("stringComparisons") {
