@@ -201,12 +201,12 @@ class Parser(
   private def unicodeEscape[$: P]: P[String] =
     P(NoCut(`non-surrogate`) | NoCut(`surrogate-pair`)).map {
       case (high: String, low: String) =>
-        // NODE: jsonnet support control characters
+        // NOTE: jsonnet support control characters
         val highSurrogate = Integer.parseInt(high, 16).toChar
         val lowSurrogate = Integer.parseInt(low, 16).toChar
         new String(Array[Int](Character.toCodePoint(highSurrogate, lowSurrogate)), 0, 1)
       case str: String => Integer.parseInt(str, 16).toChar.toString
-      case _           => throw new IllegalArgumentException("Invalid unicode escape")
+      case _ => throw new IllegalArgumentException("Compiler exhaustiveness check pleaser")
     }
 
   def doubleString[$: P]: P[Seq[String]] =
