@@ -81,7 +81,15 @@ abstract class Materializer {
     case ujson.Num(n)  => Val.Num(pos, n)
     case ujson.Str(s)  => Val.Str(pos, s)
     case ujson.Arr(xs) =>
-      Val.Arr(pos, xs.map(x => new LazyWithComputeFunc(() => reverse(pos, x))).toArray[Lazy])
+      val len = xs.length
+      val res = new Array[Lazy](len)
+      var i = 0
+      while (i < len) {
+        val x = xs(i)
+        res(i) = new LazyWithComputeFunc(() => reverse(pos, x))
+        i += 1
+      }
+      Val.Arr(pos, res)
     case ujson.Obj(xs) =>
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for (x <- xs) {
@@ -95,25 +103,38 @@ abstract class Materializer {
   }
 
   def toExpr(v: ujson.Value)(implicit ev: EvalScope): Expr = v match {
-    case ujson.True     => Val.True(ev.emptyMaterializeFileScopePos)
-    case ujson.False    => Val.False(ev.emptyMaterializeFileScopePos)
-    case ujson.Null     => Val.Null(ev.emptyMaterializeFileScopePos)
-    case ujson.Num(n)   => Val.Num(ev.emptyMaterializeFileScopePos, n)
-    case ujson.Str(s)   => Val.Str(ev.emptyMaterializeFileScopePos, s)
-    case ujson.Arr(xs)  => Expr.Arr(ev.emptyMaterializeFileScopePos, xs.map(toExpr).toArray[Expr])
+    case ujson.True    => Val.True(ev.emptyMaterializeFileScopePos)
+    case ujson.False   => Val.False(ev.emptyMaterializeFileScopePos)
+    case ujson.Null    => Val.Null(ev.emptyMaterializeFileScopePos)
+    case ujson.Num(n)  => Val.Num(ev.emptyMaterializeFileScopePos, n)
+    case ujson.Str(s)  => Val.Str(ev.emptyMaterializeFileScopePos, s)
+    case ujson.Arr(xs) =>
+      val len = xs.length
+      val res = new Array[Expr](len)
+      var i = 0
+      while (i < len) {
+        res(i) = toExpr(xs(i))
+        i += 1
+      }
+      Expr.Arr(ev.emptyMaterializeFileScopePos, res)
     case ujson.Obj(kvs) =>
+      val members = new Array[Member.Field](kvs.size)
+      var i = 0
+      for ((k, v) <- kvs) {
+        members(i) = Member.Field(
+          ev.emptyMaterializeFileScopePos,
+          FieldName.Fixed(k),
+          plus = false,
+          null,
+          Visibility.Normal,
+          toExpr(v)
+        )
+        i += 1
+      }
       ObjBody.MemberList(
         ev.emptyMaterializeFileScopePos,
         null,
-        for ((k, v) <- kvs.toArray)
-          yield Member.Field(
-            ev.emptyMaterializeFileScopePos,
-            FieldName.Fixed(k),
-            plus = false,
-            null,
-            Visibility.Normal,
-            toExpr(v)
-          ),
+        members,
         null
       )
   }
