@@ -43,7 +43,7 @@ object ExtFunctionNamespaceTest extends TestSuite with FunctionModule {
     interpreter.interpret(s, DummyPath("(memory)")) ==> Right(expected)
 
   def tests: Tests = Tests {
-    "test objectReplaceKey in ext namespace" - {
+    test("test objectReplaceKey in ext namespace") {
       check(
         s"""
            |local obj = {"a": 1, "b": 2};
