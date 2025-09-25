@@ -45,8 +45,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   def crossValue: String
   def mvnDeps = Seq(
     mvn"com.lihaoyi::fastparse::3.1.1",
-    mvn"com.lihaoyi::pprint::0.9.0",
-    mvn"com.lihaoyi::ujson::4.1.0",
+    mvn"com.lihaoyi::pprint::0.9.3",
+    mvn"com.lihaoyi::ujson::4.3.2",
     mvn"com.lihaoyi::scalatags::0.13.1",
     mvn"org.scala-lang.modules::scala-collection-compat::2.13.0"
   )
@@ -75,7 +75,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
-    def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.8.5")
+    def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.1")
     def testSandboxWorkingDir = false
   }
 }
@@ -98,7 +98,7 @@ object sjsonnet extends VersionFileModule {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.17.0"
+    def scalaJSVersion = "1.20.1"
     def moduleKind = Task { ModuleKind.CommonJSModule }
     val sourceDirs = Seq(
       "src",

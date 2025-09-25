@@ -7,7 +7,7 @@ object NonBooleanExprTests extends TestSuite {
     test("nonBooleanExpr") {
       eval("local boo(x) = true; [x for x in [1,2,3] if boo(x)]").toString() ==> "[1,2,3]"
       eval("[x for x in [1,2,3] if x < 0]").toString() ==> "[]"
-      val ex = intercept[Exception] {
+      val ex = assertThrows[Exception] {
         eval("[x for x in [1,2,3] if 'a']")
       }
       assert(ex.getMessage.contains("Condition must be boolean, got string"))

@@ -303,7 +303,7 @@ object EvaluatorTests extends TestSuite {
           """(({a: 1}{b: 2, f: super.a}){c: super.f}).c""",
           useNewEvaluator = useNewEvaluator
         ) ==> ujson.Num(1)
-        val ex = intercept[Exception] {
+        val ex = assertThrows[Exception] {
           eval("""(({a: 1}{b: 2, f: super.b}){c: super.f}).c""", useNewEvaluator = useNewEvaluator)
         }
         assert(ex.getMessage.contains("Field does not exist: b"))
@@ -440,7 +440,7 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.Str("[2, 1, 0]")
     }
     test("unboundParam") {
-      val ex = intercept[Exception] {
+      val ex = assertThrows[Exception] {
         eval(
           """local newParams(x, y) = {
             |  x: x,
@@ -460,7 +460,7 @@ object EvaluatorTests extends TestSuite {
     }
 
     test("invalidParam") {
-      val ex = intercept[Exception] {
+      val ex = assertThrows[Exception] {
         eval(
           """local Person(name='Alice') = {
             |  name: name,
@@ -543,10 +543,10 @@ object EvaluatorTests extends TestSuite {
         .Str("Hello World!")
     }
     test("binaryOps") {
-      val ex = intercept[Exception](eval("1 && 2", useNewEvaluator = useNewEvaluator))
+      val ex = assertThrows[Exception](eval("1 && 2", useNewEvaluator = useNewEvaluator))
       assert(ex.getMessage.contains("binary operator && does not operate on numbers."))
 
-      val ex2 = intercept[Exception](eval("1 || 2", useNewEvaluator = useNewEvaluator))
+      val ex2 = assertThrows[Exception](eval("1 || 2", useNewEvaluator = useNewEvaluator))
       assert(ex2.getMessage.contains("binary operator || does not operate on numbers."))
     }
     test("stdToString") {

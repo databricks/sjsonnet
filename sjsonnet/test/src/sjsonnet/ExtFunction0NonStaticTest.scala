@@ -42,7 +42,7 @@ object ExtFunction0NonStaticTest extends TestSuite with FunctionModule {
   }
 
   def tests: Tests = Tests {
-    "test uuid function in ext namespace" - {
+    test("test uuid function in ext namespace") {
       check(s"""
                |local sayHello = ext.sayHello;
                |sayHello()

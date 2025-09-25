@@ -21,7 +21,7 @@ object NativeXzTests extends TestSuite {
       eval("""std.native('xz')("hi", compressionLevel = 1)""", std = std) ==> ujson.Str(
         "/Td6WFoAAATm1rRGAgAhARAAAACocI6GAQABaGkAAAD+qTgRvMqlSAABGgLcLqV+H7bzfQEAAAAABFla"
       )
-      val ex = intercept[Exception] {
+      val ex = assertThrows[Exception] {
         // Compression level 10 is invalid
         eval("""std.native('xz')("hi", 10)""", std = std)
       }

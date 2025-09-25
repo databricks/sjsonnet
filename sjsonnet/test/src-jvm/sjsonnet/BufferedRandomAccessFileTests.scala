@@ -36,7 +36,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
 
       // Boundary conditions
       assert(bufferedFile.readChar(testContent.length - 1) == '.')
-      intercept[IndexOutOfBoundsException] {
+      assertThrows[IndexOutOfBoundsException] {
         bufferedFile.readChar(testContent.length)
       }
 
@@ -59,7 +59,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
       // Boundary conditions
       assert(bufferedFile.readString(testContent.length - 5, testContent.length) == "File.")
       assert(bufferedFile.readString(0, testContent.length) == testContent)
-      intercept[IndexOutOfBoundsException] {
+      assertThrows[IndexOutOfBoundsException] {
         bufferedFile.readString(0, testContent.length + 1)
       }
 
@@ -104,13 +104,13 @@ object BufferedRandomAccessFileTests extends TestSuite {
       val bufferedFile = new BufferedRandomAccessFile(tempFile.getAbsolutePath, 10)
 
       // Test reading with invalid indices
-      intercept[java.io.IOException] {
+      assertThrows[java.io.IOException] {
         bufferedFile.readChar(-1)
       }
-      intercept[java.io.IOException] {
+      assertThrows[java.io.IOException] {
         bufferedFile.readString(-1, 2)
       }
-      intercept[IndexOutOfBoundsException] {
+      assertThrows[IndexOutOfBoundsException] {
         bufferedFile.readString(2, 1) // 'from' is greater than 'until'
       }
 
@@ -162,7 +162,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
 
     test("invalidFile") {
       // Attempting to create a BufferedRandomAccessFile with a non-existent file
-      intercept[Exception] {
+      assertThrows[Exception] {
         val invalidFile = new BufferedRandomAccessFile("nonexistent.txt", 10)
         invalidFile.close()
       }
@@ -224,7 +224,7 @@ object BufferedRandomAccessFileTests extends TestSuite {
       bufferedFile.close()
 
       // Attempt to read after closing the file
-      intercept[Exception] {
+      assertThrows[Exception] {
         bufferedFile.readChar(0)
       }
     }
