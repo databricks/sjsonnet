@@ -12,9 +12,9 @@ object SjsonnetMain {
       System.err,
       os.pwd,
       None,
-      std = new Std(nativeFunctions =
+      std = new sjsonnet.stdlib.StdLibModule(nativeFunctions =
         Map.from(new NativeGzip().functions ++ new NativeRegex().functions)
-      ).Std
+      ).module
     )
     System.exit(exitCode)
   }

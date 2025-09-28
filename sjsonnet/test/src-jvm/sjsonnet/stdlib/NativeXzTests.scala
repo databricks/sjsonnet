@@ -1,11 +1,11 @@
 package sjsonnet.stdlib
 
-import sjsonnet.Std
 import sjsonnet.TestUtils.eval
 import utest.*
 
 object NativeXzTests extends TestSuite {
-  private val std = new Std(nativeFunctions = Map() ++ new NativeXz().functions)
+  private val std =
+    new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map() ++ new NativeXz().functions)
 
   val tests: Tests = Tests {
     test("xz") {
