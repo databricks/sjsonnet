@@ -71,7 +71,7 @@ object SjsonnetMainBase {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]] = None,
       importer: Option[(Path, String) => Option[os.Path]] = None,
-      std: Val.Obj = new Std().Std): Int = {
+      std: Val.Obj = new sjsonnet.stdlib.StdLibModule().module): Int = {
 
     var hasWarnings = false
     def warn(isTrace: Boolean, msg: String): Unit = {

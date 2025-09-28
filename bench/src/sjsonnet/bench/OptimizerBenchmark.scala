@@ -39,7 +39,7 @@ class OptimizerBenchmark {
         new StaticOptimizer(
           ev,
           _ => None,
-          new Std().Std,
+          new sjsonnet.stdlib.StdLibModule().module,
           mutable.HashMap.empty,
           mutable.HashMap.empty
         ).optimize(expr),
@@ -61,7 +61,7 @@ class OptimizerBenchmark {
         new StaticOptimizer(
           ev,
           _ => None,
-          new Std().Std,
+          new sjsonnet.stdlib.StdLibModule().module,
           mutable.HashMap.empty,
           mutable.HashMap.empty
         ).optimize(expr)

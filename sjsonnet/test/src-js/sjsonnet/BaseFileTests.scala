@@ -8,7 +8,7 @@ import utest._
 
 abstract class BaseFileTests extends TestSuite {
   private val stderr = new StringBuffer()
-  private val std = new Std(
+  private val std = new sjsonnet.stdlib.StdLibModule(
     nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
         override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
@@ -114,7 +114,7 @@ abstract class BaseFileTests extends TestSuite {
       },
       parseCache = new DefaultParseCache,
       settings = new Settings(),
-      std = std.Std
+      std = std.module
     )
 
     interp.interpret0(

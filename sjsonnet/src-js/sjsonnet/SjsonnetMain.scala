@@ -42,7 +42,9 @@ object SjsonnetMain {
       },
       parseCache = new DefaultParseCache,
       settings = new Settings(preserveOrder = preserveOrder),
-      std = new Std(nativeFunctions = Map.from(new NativeRegex().functions)).Std
+      std = new sjsonnet.stdlib.StdLibModule(nativeFunctions =
+        Map.from(new NativeRegex().functions)
+      ).module
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match {
       case Left(msg) => throw new js.JavaScriptException(msg)
