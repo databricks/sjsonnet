@@ -3,7 +3,7 @@ package sjsonnet.stdlib
 import sjsonnet.functions.AbstractFunctionModule
 import sjsonnet.{Error, EvalScope, Lazy, Platform, Position, Val}
 
-class NativeGzip extends AbstractFunctionModule {
+object NativeGzip extends AbstractFunctionModule {
   def name = "gzip"
 
   val functions: Seq[(String, Val.Builtin)] = Seq(

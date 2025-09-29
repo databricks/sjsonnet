@@ -31,7 +31,7 @@ class Interpreter(
       settings: Settings = Settings.default,
       storePos: Position => Unit = null,
       logger: (Boolean, String) => Unit = null,
-      std: Val.Obj = new sjsonnet.stdlib.StdLibModule().module,
+      std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
       variableResolver: String => Option[Expr] = _ => None) =
     this(
       key => extVars.get(key).map(ExternalVariable.code),

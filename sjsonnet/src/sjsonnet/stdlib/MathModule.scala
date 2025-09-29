@@ -3,7 +3,7 @@ package sjsonnet.stdlib
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-class MathModule extends AbstractFunctionModule {
+object MathModule extends AbstractFunctionModule {
   def name = "math"
 
   val functions: Seq[(String, Val.Func)] = Seq(

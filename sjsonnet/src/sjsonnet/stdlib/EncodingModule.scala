@@ -5,7 +5,7 @@ import sjsonnet.functions.AbstractFunctionModule
 
 import java.util.Base64
 
-class EncodingModule extends AbstractFunctionModule {
+object EncodingModule extends AbstractFunctionModule {
   def name = "encoding"
 
   private object MD5 extends Val.Builtin1("md5", "s") {

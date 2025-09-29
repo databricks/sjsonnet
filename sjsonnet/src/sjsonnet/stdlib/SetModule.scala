@@ -6,7 +6,7 @@ import sjsonnet.functions.AbstractFunctionModule
 import scala.collection.mutable
 import scala.collection.Searching.*
 
-class SetModule extends AbstractFunctionModule {
+object SetModule extends AbstractFunctionModule {
   def name = "set"
 
   private val dummyPos: Position = new Position(null, 0)

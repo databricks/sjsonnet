@@ -6,7 +6,7 @@ import sjsonnet.functions.AbstractFunctionModule
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.collection.mutable
 
-class StringModule extends AbstractFunctionModule {
+object StringModule extends AbstractFunctionModule {
   def name = "string"
 
   private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")

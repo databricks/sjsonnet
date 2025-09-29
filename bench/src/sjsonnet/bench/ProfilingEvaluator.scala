@@ -176,7 +176,7 @@ class ProfilingEvaluator(
 
   def builtins(): Seq[BuiltinBox] = {
     val names = new util.IdentityHashMap[Val.Func, String]()
-    new sjsonnet.stdlib.StdLibModule().functions.foreachEntry((n, f) => names.put(f, n))
+    sjsonnet.stdlib.StdLibModule.Default.functions.foreachEntry((n, f) => names.put(f, n))
     val m = new mutable.HashMap[String, BuiltinBox]
     def add(b: ExprBox, func: Val.Builtin): Unit = {
       val n = names.getOrDefault(func, func.functionName)

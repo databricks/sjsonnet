@@ -5,7 +5,7 @@ import utest.*
 
 object NativeXzTests extends TestSuite {
   private val std =
-    new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map() ++ new NativeXz().functions)
+    new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map() ++ NativeXz.functions)
 
   val tests: Tests = Tests {
     test("xz") {

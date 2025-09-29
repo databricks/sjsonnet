@@ -5,7 +5,7 @@ import sjsonnet.functions.AbstractFunctionModule
 
 import scala.collection.mutable
 
-class ArrayModule extends AbstractFunctionModule {
+object ArrayModule extends AbstractFunctionModule {
   def name = "array"
 
   private val dummyPos: Position = new Position(null, 0)

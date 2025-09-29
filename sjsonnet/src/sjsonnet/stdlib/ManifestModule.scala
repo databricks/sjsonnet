@@ -6,7 +6,7 @@ import sjsonnet.functions.AbstractFunctionModule
 import java.io.StringWriter
 import scala.collection.mutable
 
-class ManifestModule extends AbstractFunctionModule {
+object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
   private val dummyPos: Position = new Position(null, 0)

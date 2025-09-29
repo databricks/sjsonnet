@@ -8,7 +8,7 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
-      std: sjsonnet.stdlib.StdLibModule = new sjsonnet.stdlib.StdLibModule())
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default)
       : Either[String, Value] = {
     new Interpreter(
       Map(),
@@ -31,7 +31,7 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
-      std: sjsonnet.stdlib.StdLibModule = new sjsonnet.stdlib.StdLibModule()): Value = {
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): Value = {
     eval0(
       s,
       preserveOrder,
@@ -49,7 +49,7 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
-      std: sjsonnet.stdlib.StdLibModule = new sjsonnet.stdlib.StdLibModule()): String = {
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): String = {
     eval0(
       s,
       preserveOrder,
