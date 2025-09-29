@@ -3,7 +3,7 @@ package sjsonnet.stdlib
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-class TypeModule extends AbstractFunctionModule {
+object TypeModule extends AbstractFunctionModule {
   def name = "type"
 
   private object IsString extends Val.Builtin1("isString", "v") {

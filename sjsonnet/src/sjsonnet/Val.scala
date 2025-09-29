@@ -218,6 +218,14 @@ object Val {
       new Obj(pos, m, false, null, null)
     }
 
+    def mk(pos: Position, sizeHint: Int, membersArray: Iterable[(String, Obj.Member)]*): Obj = {
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](sizeHint)
+      for (members <- membersArray; (k, v) <- members) {
+        m.put(k, v)
+      }
+      new Obj(pos, m, false, null, null)
+    }
+
     def mk(pos: Position, members: Array[(String, Obj.Member)]): Obj = {
       val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](members.length)
       var i = 0

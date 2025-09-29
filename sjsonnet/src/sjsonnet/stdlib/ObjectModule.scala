@@ -4,7 +4,7 @@ import sjsonnet._
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.functions.AbstractFunctionModule
 
-class ObjectModule extends AbstractFunctionModule {
+object ObjectModule extends AbstractFunctionModule {
   def name = "object"
 
   private val dummyPos: Position = new Position(null, 0)

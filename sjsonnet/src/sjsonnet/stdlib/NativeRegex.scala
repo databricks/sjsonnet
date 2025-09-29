@@ -5,7 +5,7 @@ import sjsonnet.Val.Obj
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-class NativeRegex extends AbstractFunctionModule {
+object NativeRegex extends AbstractFunctionModule {
   def name = "regex"
 
   private final def regexPartialMatch(pos: Position, pattern: String, str: String): Val = {

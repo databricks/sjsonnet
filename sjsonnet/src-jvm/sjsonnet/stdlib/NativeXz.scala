@@ -3,7 +3,7 @@ package sjsonnet.stdlib
 import sjsonnet.functions.AbstractFunctionModule
 import sjsonnet.{Error, EvalScope, Lazy, Platform, Position, Val}
 
-class NativeXz extends AbstractFunctionModule {
+object NativeXz extends AbstractFunctionModule {
   def name = "xz"
 
   private val dummyPos: Position = new Position(null, 0)

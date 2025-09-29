@@ -31,7 +31,7 @@ abstract class BaseFileTests extends TestSuite {
         override def evalRhs(ev: EvalScope, pos: Position): Val =
           throw new RuntimeException("native function panic")
       }
-    ) ++ new NativeRegex().functions
+    ) ++ NativeRegex.functions
   )
 
   def eval(p: os.Path, testSuite: String): Either[String, Value] = {

@@ -13,7 +13,7 @@ object SjsonnetMain {
       os.pwd,
       None,
       std = new sjsonnet.stdlib.StdLibModule(nativeFunctions =
-        Map() ++ new NativeXz().functions ++ new NativeGzip().functions ++ new NativeRegex().functions
+        Map() ++ NativeXz.functions ++ NativeGzip.functions ++ NativeRegex.functions
       ).module
     )
     System.exit(exitCode)

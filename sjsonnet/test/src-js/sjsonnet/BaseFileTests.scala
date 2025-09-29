@@ -31,7 +31,7 @@ abstract class BaseFileTests extends TestSuite {
         override def evalRhs(ev: EvalScope, pos: Position): Val =
           throw new RuntimeException("native function panic")
       }
-    ) ++ new NativeRegex().functions,
+    ) ++ NativeRegex.functions,
     additionalStdFunctions = Map(
       // Scala.js does not support md5, for now, so we stub it out for the various smoke tests.
       "md5" -> new Val.Builtin1("md5", "s") {
