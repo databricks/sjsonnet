@@ -20,7 +20,7 @@ import contrib.jmh.JmhModule
 
 import java.util.Base64
 
-val scalaVersions: Seq[String] = Seq("3.3.6", "2.13.16")
+val scalaVersions: Seq[String] = Seq("3.3.6", "2.13.17")
 val jvmScalaVersions: Seq[String] = scalaVersions ++ Seq("2.12.20")
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
