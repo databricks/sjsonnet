@@ -63,7 +63,7 @@ object ParserTests extends TestSuite {
               |a: x,
               |}""".stripMargin).toString ==> (ObjBody
         .MemberList(
-          pos(2),
+          pos(0),
           Array(Bind(pos(8), "x", null, Num(pos(12), 1))),
           Array(
             Member
