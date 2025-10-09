@@ -59,7 +59,7 @@ class Interpreter(
 
   val varResolver: CachedResolver = createResolver(createVarParseCache)
 
-  private def createResolver(parseCache: ParseCache) = new CachedResolver(
+  protected def createResolver(parseCache: ParseCache) = new CachedResolver(
     importer,
     parseCache,
     internedStrings,

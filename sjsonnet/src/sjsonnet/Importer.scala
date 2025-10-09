@@ -215,7 +215,7 @@ class CachedResolver(
       (path, content.contentHash()), {
         val parsed = fastparse.parse(
           content.getParserInput(),
-          new Parser(path, internedStrings, internedStaticFieldSets, settings).document(_)
+          parser(path).document(_)
         ) match {
           case f @ Parsed.Failure(_, _, _) =>
             val traced = f.trace()
@@ -229,4 +229,8 @@ class CachedResolver(
   }
 
   def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))
+
+  protected def parser(path: Path): Parser = {
+    new Parser(path, internedStrings, internedStaticFieldSets, settings)
+  }
 }
