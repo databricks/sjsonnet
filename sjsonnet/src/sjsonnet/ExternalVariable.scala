@@ -44,6 +44,9 @@ object ExternalVariableKind {
   }
 }
 
+/**
+ * ExternalVariable represents an external variable with its kind and value.
+ */
 final case class ExternalVariable[T](kind: ExternalVariableKind[T], value: T) {
   override def toString: String = s"ExternalVariable($kind, $value)"
 }
