@@ -280,11 +280,11 @@ class Parser(
     }
   )
 
-  def arr[$: P]: P[Expr] = arr(0)
+  def arr[$: P](pos: Position): P[Expr] = arr(pos, 0)
 
-  def arr[$: P](currentDepth: Int): P[Expr] = {
+  def arr[$: P](pos: Position, currentDepth: Int): P[Expr] = {
     checkParseDepth(currentDepth)
-    P((Pos ~~ &("]")).map(Val.Arr(_, emptyLazyArray)) | arrBody(currentDepth + 1))
+    P(&("]").map(_ => Val.Arr(pos, emptyLazyArray)) | arrBody(pos, currentDepth + 1))
   }
 
   def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = compSuffix(0)
@@ -293,18 +293,18 @@ class Parser(
     P(forspec(currentDepth + 1) ~ compspec(currentDepth + 1)).map(Left(_))
   }
 
-  def arrBody[$: P]: P[Expr] = arrBody(0)
+  def arrBody[$: P](pos: Position): P[Expr] = arrBody(pos, 0)
 
-  def arrBody[$: P](currentDepth: Int): P[Expr] = {
+  def arrBody[$: P](offset: Position, currentDepth: Int): P[Expr] = {
     P(
-      Pos ~~ expr(currentDepth + 1) ~
+      expr(currentDepth + 1) ~
       (compSuffix(currentDepth + 1) | "," ~ (compSuffix(currentDepth + 1) | (expr(currentDepth + 1)
         .rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
     ).map {
-      case (offset, first: Val, None)        => Val.Arr(offset, Array(first))
-      case (offset, first, None)             => Expr.Arr(offset, Array(first))
-      case (offset, first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
-      case (offset, first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
+      case (first: Val, None)        => Val.Arr(offset, Array(first))
+      case (first, None)             => Expr.Arr(offset, Array(first))
+      case (first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
+      case (first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
         val a = new Array[Lazy](rest.length + 1)
         a(0) = first
         var i = 1
@@ -313,7 +313,7 @@ class Parser(
           i += 1
         }
         Val.Arr(offset, a)
-      case (offset, first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
+      case (first, Some(Right(rest))) => Expr.Arr(offset, Array(first) ++ rest)
     }
   }
 
@@ -329,13 +329,13 @@ class Parser(
     )
   }
 
-  def ifElse[$: P](currentDepth: Int): P[Expr] = {
+  def ifElse[$: P](pos: Position, currentDepth: Int): P[Expr] = {
     P(
-      Pos ~~ expr(currentDepth + 1) ~ "then" ~~ break ~ expr(
+      expr(currentDepth + 1) ~ "then" ~~ break ~ expr(
         currentDepth + 1
       ) ~ ("else" ~~ break ~ expr(currentDepth + 1)).?.map(_.orNull)
     )
-      .map { case (pos, cond, t, e) => Expr.IfElse(pos, cond, t, e) }
+      .map { case (cond, t, e) => Expr.IfElse(pos, cond, t, e) }
   }
 
   def localExpr[$: P](currentDepth: Int): P[Expr] = {
@@ -451,7 +451,7 @@ class Parser(
                   )
               }
             case '{' =>
-              Pass ~ (objinside(currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
+              Pass ~ (objinside(i, currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
             case _ => Fail
           }
         }
@@ -525,9 +525,9 @@ class Parser(
       Pos.flatMapX { pos =>
         SingleChar.flatMapX { c =>
           (c: @switch) match {
-            case '{'                   => Pass ~ objinside(currentDepth + 1) ~ "}"
+            case '{'                   => Pass ~ objinside(pos, currentDepth + 1) ~ "}"
             case '+' | '-' | '~' | '!' => Pass ~ unaryOpExpr(pos, c, currentDepth + 1)
-            case '['                   => Pass ~ arr(currentDepth + 1) ~ "]"
+            case '['                   => Pass ~ arr(pos, currentDepth + 1) ~ "]"
             case '('                   => Pass ~ expr(currentDepth + 1) ~ ")"
             case '\"'                  => doubleString.map(constructString(pos, _))
             case '\''                  => singleString.map(constructString(pos, _))
@@ -549,7 +549,7 @@ class Parser(
                   case "false"     => Pass(Val.False(pos))
                   case "self"      => Pass(Expr.Self(pos))
                   case "super"     => Pass(Expr.Super(pos))
-                  case "if"        => Pass ~ ifElse(currentDepth + 1)
+                  case "if"        => Pass ~ ifElse(pos, currentDepth + 1)
                   case "function"  => Pass ~ function(pos, currentDepth + 1)
                   case "importstr" => Pass ~ importStr(pos, currentDepth + 1)
                   case "importbin" => Pass ~ importBin(pos, currentDepth + 1)
@@ -567,14 +567,14 @@ class Parser(
     )
   }
 
-  def objinside[$: P]: P[Expr.ObjBody] = objinside(0)
+  def objinside[$: P](pos: Position): P[Expr.ObjBody] = objinside(pos, 0)
 
-  def objinside[$: P](currentDepth: Int): P[Expr.ObjBody] = {
+  def objinside[$: P](pos: Position, currentDepth: Int): P[Expr.ObjBody] = {
     P(
-      Pos ~ member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
+      member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
         currentDepth + 1
       )).?
-    ).flatMap { case t @ (_, exprs, _) =>
+    ).flatMap { case t @ (exprs, _) =>
       val seen = collection.mutable.Set.empty[String]
       var overlap: String = null
       exprs.foreach {
@@ -586,7 +586,7 @@ class Parser(
       if (overlap == null) Pass(t)
       else Fail.opaque("no duplicate field: " + overlap)
     }.flatMapX {
-      case (pos, exprs, None) =>
+      case (exprs, None) =>
         val b =
           exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
         val seen = collection.mutable.Set.empty[String]
@@ -617,7 +617,7 @@ class Parser(
             Pass(Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings))
           else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
         }
-      case (pos, exprs, Some(comps)) =>
+      case (exprs, Some(comps)) =>
         val preLocals = exprs
           .takeWhile(_.isInstanceOf[Expr.Bind])
           .map(_.asInstanceOf[Expr.Bind])

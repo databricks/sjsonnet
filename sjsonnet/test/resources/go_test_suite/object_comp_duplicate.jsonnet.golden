@@ -1,3 +1,3 @@
 sjsonnet.Error: Duplicate key x in evaluated object comprehension.
-    at .(object_comp_duplicate.jsonnet:1:3)
+    at .(object_comp_duplicate.jsonnet:1:1)
 

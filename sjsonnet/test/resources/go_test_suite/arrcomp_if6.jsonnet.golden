@@ -1,4 +1,4 @@
 sjsonnet.Error: x
     at [Error].(arrcomp_if6.jsonnet:1:20)
-    at [Comp].(arrcomp_if6.jsonnet:1:2)
+    at [Comp].(arrcomp_if6.jsonnet:1:1)
 
