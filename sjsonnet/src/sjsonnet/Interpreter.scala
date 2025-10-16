@@ -8,6 +8,31 @@ import scala.util.control.NonFatal
 /**
  * Wraps all the machinery of evaluating Jsonnet source code, from parsing to evaluation to
  * materialization, into a convenient wrapper class.
+ *
+ * @param queryExtVar
+ *   A function that, given a variable name, returns an optional external variable definition for
+ *   it.
+ * @param queryTlaVar
+ *   A function that, given a variable name, returns an optional top-level argument definition for
+ *   it.
+ * @param wd
+ *   The working directory for relative imports.
+ * @param importer
+ *   The importer to use for imports.
+ * @param parseCache
+ *   A cache for parsed files, which should be thread-safe.
+ * @param settings
+ *   Settings for the interpreter.
+ * @param storePos
+ *   An optional function to store positions of values.
+ * @param logger
+ *   An optional logger function that takes a boolean indicating whether it's a trace message and
+ *   the message itself.
+ * @param std
+ *   The standard library object to use.
+ * @param variableResolver
+ *   A function that, given a variable name, returns an optional expression for it. This is an
+ *   extension point for custom variable resolution.
  */
 class Interpreter(
     queryExtVar: String => Option[ExternalVariable[?]],
