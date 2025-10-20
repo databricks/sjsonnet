@@ -215,7 +215,7 @@ class CachedResolver(
       (path, content.contentHash()), {
         val parsed = fastparse.parse(
           content.getParserInput(),
-          new Parser(path, internedStrings, internedStaticFieldSets, settings).document(_)
+          parser(path).document(_)
         ) match {
           case f @ Parsed.Failure(_, _, _) =>
             val traced = f.trace()
@@ -229,4 +229,17 @@ class CachedResolver(
   }
 
   def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))
+
+  /**
+   * Creates a parser instance for the given path. This method can be overridden to provide custom
+   * parsing behavior.
+   *
+   * @param path
+   *   The path to the file being parsed
+   * @return
+   *   A Parser instance that will be used to parse the file
+   */
+  protected def parser(path: Path): Parser = {
+    new Parser(path, internedStrings, internedStaticFieldSets, settings)
+  }
 }

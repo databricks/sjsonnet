@@ -84,7 +84,16 @@ class Interpreter(
 
   val varResolver: CachedResolver = createResolver(createVarParseCache)
 
-  private def createResolver(parseCache: ParseCache) = new CachedResolver(
+  /**
+   * Creates a resolver to handle parsing and pre-processing of Jsonnet code. This method can be
+   * overridden to customize the resolution process.
+   *
+   * @param parseCache
+   *   The cache to store parsed expressions
+   * @return
+   *   A CachedResolver instance that will handle resolution
+   */
+  protected def createResolver(parseCache: ParseCache): CachedResolver = new CachedResolver(
     importer,
     parseCache,
     internedStrings,
