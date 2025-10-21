@@ -1,6 +1,7 @@
 package sjsonnet
 
 import java.util
+import scala.collection.immutable.IntMap
 
 /**
  * [[Expr]]s are the parsed syntax trees of a Jsonnet program. They model the program mostly
@@ -96,7 +97,7 @@ object Expr {
     final val OP_- = 1
     final val OP_~ = 2
     final val OP_+ = 3
-    private val names = Map(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
+    private val names = IntMap(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
   final case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr {
@@ -129,7 +130,7 @@ object Expr {
     final val OP_| = 16
     final val OP_&& = 17
     final val OP_|| = 18
-    private val names = Map(
+    private val names = IntMap(
       OP_* -> "*",
       OP_/ -> "/",
       OP_% -> "%",
