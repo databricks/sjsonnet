@@ -667,9 +667,12 @@ class Evaluator(
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       if ((sup eq null) && (self eq cachedObj)) {
-        cachedSimpleScope.getOrElse {
-          cachedSimpleScope = Some(createNewScope(self, sup))
-          cachedSimpleScope.get
+        cachedSimpleScope match {
+          case Some(s) => s
+          case None    =>
+            val newScope = createNewScope(self, sup)
+            cachedSimpleScope = Some(newScope)
+            newScope
         }
       } else createNewScope(self, sup)
     }
