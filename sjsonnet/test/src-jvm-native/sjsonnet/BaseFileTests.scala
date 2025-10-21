@@ -83,7 +83,7 @@ abstract class BaseFileTests extends TestSuite {
     } else {
       val res = eval(fileName, testSuite)
       try {
-        val expected = ujson.read(goldenContent)
+        val expected = ujson.read(goldenContent, false)
         assert(res == Right(expected))
         assert(stderr.toString.isEmpty)
       } catch {

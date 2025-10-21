@@ -10,13 +10,13 @@ object Platform {
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {
-        case null          => ujson.Null
-        case v: String     => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"")
-        case v: Boolean    => ujson.Bool(v)
-        case v: Int        => ujson.Num(v.toDouble)
-        case v: Long       => ujson.Num(v.toDouble)
-        case v: Double     => ujson.Num(v)
-        case v: Float      => ujson.Num(v.toDouble)
+        case null       => ujson.Null
+        case v: String  => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
+        case v: Boolean => ujson.Bool(v)
+        case v: Int     => ujson.Num(v.toDouble)
+        case v: Long    => ujson.Num(v.toDouble)
+        case v: Double  => ujson.Num(v)
+        case v: Float   => ujson.Num(v.toDouble)
         case v: BigDecimal => ujson.Num(v.toDouble)
         case v: BigInt     => ujson.Num(v.toDouble)
         case v: Short      => ujson.Num(v.toDouble)

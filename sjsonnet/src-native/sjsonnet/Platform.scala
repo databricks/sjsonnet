@@ -37,8 +37,9 @@ object Platform {
       YamlDecoder.forAny.construct(node) match {
         case Right(v) =>
           v match {
-            case null | None   => ujson.Null
-            case v: String     => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"")
+            case null | None => ujson.Null
+            case v: String   =>
+              ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
             case v: Boolean    => ujson.Bool(v)
             case v: Byte       => ujson.Num(v.toDouble)
             case v: Int        => ujson.Num(v.toDouble)
