@@ -807,20 +807,27 @@ class Evaluator(
   @tailrec
   final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match {
     case (spec @ ForSpec(_, name, expr)) :: rest =>
-      visitComp(
-        rest,
-        for {
-          s <- scopes
-          e <- visitExpr(expr)(s) match {
-            case a: Val.Arr => a.asLazyArray
-            case r          =>
-              Error.fail(
-                "In comprehension, can only iterate over array, not " + r.prettyName,
-                spec
-              )
-          }
-        } yield s.extendSimple(e)
-      )
+      val newScopes = collection.mutable.ArrayBuilder.make[ValScope]
+      var i = 0
+      while (i < scopes.length) {
+        val s = scopes(i)
+        visitExpr(expr)(s) match {
+          case a: Val.Arr =>
+            val lazyArr = a.asLazyArray
+            var j = 0
+            while (j < lazyArr.length) {
+              newScopes += s.extendSimple(lazyArr(j))
+              j += 1
+            }
+          case r =>
+            Error.fail(
+              "In comprehension, can only iterate over array, not " + r.prettyName,
+              spec
+            )
+        }
+        i += 1
+      }
+      visitComp(rest, newScopes.result())
     case (spec @ IfSpec(offset, expr)) :: rest =>
       visitComp(
         rest,
