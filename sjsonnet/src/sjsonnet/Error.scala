@@ -1,14 +1,15 @@
 package sjsonnet
 
 import java.io.{PrintWriter, StringWriter}
-import scala.util.control.NonFatal
+import scala.util.control.{NoStackTrace, NonFatal}
 
 /**
  * An exception that can keep track of the Sjsonnet call-stack while it is propagating upwards. This
  * helps provide good error messages with line numbers pointing towards user code.
  */
 class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
-    extends Exception(msg, underlying.orNull) {
+    extends Exception(msg, underlying.orNull)
+    with NoStackTrace {
 
   setStackTrace(stack.reverseIterator.map(_.ste).toArray)
 
