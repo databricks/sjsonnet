@@ -17,7 +17,7 @@ lazy val main = (project in file("sjsonnet"))
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "3.1.1",
       "com.lihaoyi" %% "pprint" % "0.9.3",
-      "com.lihaoyi" %% "ujson" % "4.3.2",
+      "com.lihaoyi" %% "ujson" % "4.4.0",
       "com.lihaoyi" %% "scalatags" % "0.13.1",
       "com.lihaoyi" %% "os-lib" % "0.11.4",
       "com.lihaoyi" %% "mainargs" % "0.7.6",
