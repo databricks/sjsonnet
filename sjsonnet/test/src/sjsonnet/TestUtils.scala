@@ -8,6 +8,7 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: Std = new Std()): Either[String, Value] = {
     new Interpreter(
       Map(),
@@ -19,7 +20,8 @@ object TestUtils {
         preserveOrder = preserveOrder,
         strict = strict,
         throwErrorForInvalidSets = true,
-        useNewEvaluator = useNewEvaluator
+        useNewEvaluator = useNewEvaluator,
+        brokenAssertionLogic = brokenAssertionLogic
       ),
       std = std.Std
     ).interpret(s, DummyPath("(memory)"))
@@ -30,12 +32,14 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: Std = new Std()): Value = {
     eval0(
       s,
       preserveOrder,
       strict,
       useNewEvaluator,
+      brokenAssertionLogic,
       std
     ) match {
       case Right(x) => x
@@ -48,12 +52,14 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: Std = new Std()): String = {
     eval0(
       s,
       preserveOrder,
       strict,
       useNewEvaluator,
+      brokenAssertionLogic,
       std
     ) match {
       case Left(err) =>

@@ -2,6 +2,7 @@ package sjsonnet
 
 import utest._
 import TestUtils.{eval, evalErr}
+
 object EvaluatorTests extends TestSuite {
   def allTests(useNewEvaluator: Boolean): Tests = Tests {
     test("arithmetic") {
@@ -763,6 +764,90 @@ object EvaluatorTests extends TestSuite {
         )
       }
     }
+    test("assertInheritanceWithBrokenAssertions") {
+      test - assert(
+        evalErr(
+          """{ } + {assert false}""",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - assert(
+        evalErr(
+          """{assert false} + {}""",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - assert(
+        evalErr(
+          """{assert false} + {} + {}""",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - assert(
+        evalErr(
+          """{} + {assert false} + {}""",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - assert(
+        evalErr(
+          """{} + {} + {assert false}""",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - assert(
+        evalErr(
+          "({assert false} + {f(x): x}).f(1)",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ).contains(
+          "sjsonnet.Error: Assertion failed"
+        )
+      )
+      test - {
+        val problematicStrictInheritedAssertionsSnippet =
+          """local template = { assert self.flag };
+            |{ a: template { flag: true, }, b: template { flag: false, } }
+            |""".stripMargin
+        assert(
+          evalErr(
+            problematicStrictInheritedAssertionsSnippet,
+            useNewEvaluator = useNewEvaluator,
+            brokenAssertionLogic = true
+          ).contains("sjsonnet.Error: Assertion failed")
+        )
+      }
+
+      // Behavior is different from now on.
+      test {
+        eval(
+          "{assert false} + {assert true}",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ) ==> ujson.Obj()
+        eval(
+          "({assert false} + {x: 2}).x",
+          useNewEvaluator = useNewEvaluator,
+          brokenAssertionLogic = true
+        ) ==> ujson.Num(2)
+      }
+    }
+
   }
   def tests = allTests(false).prefix("Evaluator") ++ allTests(true).prefix("NewEvaluator")
 }

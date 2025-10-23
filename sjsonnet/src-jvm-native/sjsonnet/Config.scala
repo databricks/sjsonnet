@@ -140,6 +140,12 @@ final case class Config(
     )
     reverseJpathsPriority: Flag = Flag(),
     @arg(
+      name = "broken-assertion-logic",
+      doc =
+        "Re-enable pre-0.5.5 broken assertion logic. See https://github.com/databricks/sjsonnet/issues/526."
+    )
+    brokenAssertionLogic: Flag = Flag(),
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )

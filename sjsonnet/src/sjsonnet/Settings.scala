@@ -8,7 +8,8 @@ class Settings(
     val preserveOrder: Boolean = false,
     val strict: Boolean = false,
     val throwErrorForInvalidSets: Boolean = false,
-    val useNewEvaluator: Boolean = false
+    val useNewEvaluator: Boolean = false,
+    val brokenAssertionLogic: Boolean = false
 )
 
 object Settings {

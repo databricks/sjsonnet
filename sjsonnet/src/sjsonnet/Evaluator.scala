@@ -880,8 +880,8 @@ class Evaluator(
           val k2 = y.visibleKeyNames
           val k1len = k1.length
           if (k1len != k2.length) return false
-          x.triggerAllAsserts()
-          y.triggerAllAsserts()
+          x.triggerAllAsserts(settings.brokenAssertionLogic)
+          y.triggerAllAsserts(settings.brokenAssertionLogic)
           var i = 0
           while (i < k1len) {
             val k = k1(i)
