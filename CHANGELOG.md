@@ -1,4 +1,7 @@
-## 0.5.6 (Latest)
+## 0.5.7
+* Add flag (--broken-assertion-logic) to disable the new (correct) assertion logic introduced in 0.5.5.
+
+## 0.5.6
 * Re-enable handling of unicode strings in std.base64
 
 ## 0.5.5
