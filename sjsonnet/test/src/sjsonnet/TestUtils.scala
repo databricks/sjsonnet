@@ -8,6 +8,7 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default)
       : Either[String, Value] = {
     new Interpreter(
@@ -20,7 +21,8 @@ object TestUtils {
         preserveOrder = preserveOrder,
         strict = strict,
         throwErrorForInvalidSets = true,
-        useNewEvaluator = useNewEvaluator
+        useNewEvaluator = useNewEvaluator,
+        brokenAssertionLogic = brokenAssertionLogic
       ),
       std = std.module
     ).interpret(s, DummyPath("(memory)"))
@@ -31,12 +33,14 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): Value = {
     eval0(
       s,
       preserveOrder,
       strict,
       useNewEvaluator,
+      brokenAssertionLogic,
       std
     ) match {
       case Right(x) => x
@@ -49,12 +53,14 @@ object TestUtils {
       preserveOrder: Boolean = false,
       strict: Boolean = false,
       useNewEvaluator: Boolean = false,
+      brokenAssertionLogic: Boolean = false,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): String = {
     eval0(
       s,
       preserveOrder,
       strict,
       useNewEvaluator,
+      brokenAssertionLogic,
       std
     ) match {
       case Left(err) =>

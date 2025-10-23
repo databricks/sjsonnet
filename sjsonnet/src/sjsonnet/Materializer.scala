@@ -22,7 +22,7 @@ abstract class Materializer {
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
       case obj: Val.Obj    =>
         storePos(obj.pos)
-        obj.triggerAllAsserts()
+        obj.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
         val objVisitor = visitor.visitObject(obj.visibleKeyNames.length, jsonableKeys = true, -1)
         val sort = !evaluator.settings.preserveOrder
         var prevKey: String = null

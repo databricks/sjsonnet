@@ -292,20 +292,24 @@ object Val {
       value0
     }
 
-    def triggerAllAsserts(): Unit = {
+    def triggerAllAsserts(brokenAssertionLogic: Boolean): Unit = {
       // We need to avoid asserting the same object more than once to prevent
       // infinite recursion
       if (!asserting) {
         asserting = true
-        triggerAllAsserts(this, `super`)
+        triggerAllAsserts(this, `super`, brokenAssertionLogic)
       }
     }
 
     // As we walk up the superclass hierarchy, the `self` binding is unchanged
     // but `super` climbs up the hierarchy as well.
-    @tailrec private def triggerAllAsserts(obj: Val.Obj, sup: Val.Obj): Unit = {
+    @tailrec private def triggerAllAsserts(
+        obj: Val.Obj,
+        sup: Val.Obj,
+        brokenAssertionLogic: Boolean): Unit = {
       if (triggerAsserts != null) triggerAsserts(obj, sup)
-      if (sup != null) sup.triggerAllAsserts(obj, sup.getSuper)
+      if ((!brokenAssertionLogic || triggerAsserts == null) && sup != null)
+        sup.triggerAllAsserts(obj, sup.getSuper, brokenAssertionLogic)
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
@@ -447,7 +451,9 @@ object Val {
           case null =>
             if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
           case m =>
-            self.triggerAllAsserts()
+            if (!evaluator.settings.brokenAssertionLogic || !m.isInstanceOf[Val.Obj.ConstMember]) {
+              self.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
+            }
             val vv = m.invoke(self, s, pos.fileScope, evaluator)
             val v = if (s != null && m.add) {
               s.valueRaw(k, self, pos, null, null) match {
