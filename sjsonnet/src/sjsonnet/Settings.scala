@@ -9,7 +9,8 @@ final case class Settings(
     val strict: Boolean = false,
     val throwErrorForInvalidSets: Boolean = false,
     val useNewEvaluator: Boolean = false,
-    val maxParserRecursionDepth: Int = 1000
+    val maxParserRecursionDepth: Int = 1000,
+    val brokenAssertionLogic: Boolean = false
 )
 
 object Settings {
