@@ -203,12 +203,13 @@ object Val {
     abstract class Member(
         val add: Boolean,
         val visibility: Visibility,
-        val cached: Boolean = true) {
+        val cached: Boolean = true,
+        val deprecatedSkipAsserts: Boolean = false) {
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val
     }
 
     class ConstMember(add2: Boolean, visibility2: Visibility, v: Val, cached2: Boolean = true)
-        extends Member(add2, visibility2, cached2) {
+        extends Member(add2, visibility2, cached2, deprecatedSkipAsserts = true) {
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val = v
     }
 
@@ -451,7 +452,7 @@ object Val {
           case null =>
             if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
           case m =>
-            if (!evaluator.settings.brokenAssertionLogic || !m.isInstanceOf[Val.Obj.ConstMember]) {
+            if (!evaluator.settings.brokenAssertionLogic || !m.deprecatedSkipAsserts) {
               self.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
             }
             val vv = m.invoke(self, s, pos.fileScope, evaluator)

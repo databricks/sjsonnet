@@ -93,7 +93,7 @@ abstract class Materializer {
     case ujson.Obj(xs) =>
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       for (x <- xs) {
-        val v = new Val.Obj.Member(false, Visibility.Normal) {
+        val v = new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             reverse(pos, x._2)
         }
