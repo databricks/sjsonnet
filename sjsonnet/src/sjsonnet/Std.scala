@@ -454,7 +454,7 @@ class Std(
       var i = 0
       while (i < allKeys.length) {
         val k = allKeys(i)
-        val v = new Val.Obj.Member(false, Visibility.Normal) {
+        val v = new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             func.apply2(Val.Str(pos, k), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(
               ev,
@@ -1136,9 +1136,10 @@ class Std(
     builtin(Range),
     builtin("mergePatch", "target", "patch") { (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
-      def createLazyMember(v: => Val) = new Val.Obj.Member(false, Visibility.Normal) {
-        def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
-      }
+      def createLazyMember(v: => Val) =
+        new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+        }
       def recPair(l: Val, r: Val): Val = (l, r) match {
         case (l: Val.Obj, r: Val.Obj) =>
           val keys: Array[String] = distinctKeys(l.visibleKeyNames, r.visibleKeyNames)
@@ -2001,14 +2002,14 @@ class Std(
       } ++ Seq(
       (
         "thisFile",
-        new Val.Obj.Member(false, Visibility.Hidden, cached = false) {
+        new Val.Obj.Member(false, Visibility.Hidden, cached = false, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
         }
       ),
       (
         "pi",
-        new Val.Obj.Member(false, Visibility.Hidden, cached = false) {
+        new Val.Obj.Member(false, Visibility.Hidden, cached = false, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             Val.Num(self.pos, math.Pi)
         }

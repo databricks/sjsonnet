@@ -1,3 +1,6 @@
+## 0.5.8
+* Add more cases to handle properly when --broken-assertion-logic is set
+
 ## 0.5.7
 * Add flag (--broken-assertion-logic) to disable the new (correct) assertion logic introduced in 0.5.5.
 
