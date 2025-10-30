@@ -105,7 +105,7 @@ object ObjectModule extends AbstractFunctionModule {
       var i = 0
       while (i < allKeys.length) {
         val k = allKeys(i)
-        val v = new Val.Obj.Member(false, Visibility.Normal) {
+        val v = new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             func.apply2(Val.Str(pos, k), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(
               ev,
@@ -210,9 +210,10 @@ object ObjectModule extends AbstractFunctionModule {
     },
     builtin("mergePatch", "target", "patch") { (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
-      def createLazyMember(v: => Val) = new Val.Obj.Member(false, Visibility.Normal) {
-        def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
-      }
+      def createLazyMember(v: => Val) =
+        new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
+          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = v
+        }
       def recPair(l: Val, r: Val): Val = (l, r) match {
         case (l: Val.Obj, r: Val.Obj) =>
           val keys: Array[String] = distinctKeys(l.visibleKeyNames, r.visibleKeyNames)
