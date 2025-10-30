@@ -97,7 +97,7 @@ jobs:
         run: |
           echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
           mkdir -p release
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         name: Download Artifacts
         with:
           path: release
