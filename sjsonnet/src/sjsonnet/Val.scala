@@ -267,8 +267,8 @@ object Val {
   final class Obj(
       val pos: Position,
       private var value0: util.LinkedHashMap[String, Obj.Member],
-      static: Boolean,
-      triggerAsserts: (Val.Obj, Val.Obj) => Unit,
+      private val static: Boolean,
+      private val triggerAsserts: (Val.Obj, Val.Obj) => Unit,
       `super`: Obj,
       valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
@@ -314,24 +314,41 @@ object Val {
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
-      `super` match {
-        case null => new Val.Obj(pos, getValue0, false, triggerAsserts, lhs)
-        case x    => new Val.Obj(pos, getValue0, false, triggerAsserts, x.addSuper(pos, lhs))
+      val objs = mutable.ArrayBuffer(this)
+      var current = this
+      while (current.getSuper != null) {
+        objs += current.getSuper
+        current = current.getSuper
       }
+
+      current = lhs
+      for (s <- objs.reverse) {
+        current = new Val.Obj(s.pos, s.getValue0, false, s.triggerAsserts, current)
+      }
+      current
     }
 
     def prettyName = "object"
     override def asObj: Val.Obj = this
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
-      if (static) mapping.putAll(allKeys)
-      else {
-        if (`super` != null) `super`.gatherKeys(mapping)
-        getValue0.forEach { (k, m) =>
-          val vis = m.visibility
-          if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
-          else if (vis == Visibility.Hidden) mapping.put(k, true)
-          else if (vis == Visibility.Unhide) mapping.put(k, false)
+      val objs = mutable.ArrayBuffer(this)
+      var current = this
+      while (current.getSuper != null) {
+        objs += current.getSuper
+        current = current.getSuper
+      }
+
+      for (s <- objs.reverse) {
+        if (s.static) {
+          mapping.putAll(s.allKeys)
+        } else {
+          s.getValue0.forEach { (k, m) =>
+            val vis = m.visibility
+            if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+            else if (vis == Visibility.Hidden) mapping.put(k, true)
+            else if (vis == Visibility.Unhide) mapping.put(k, false)
+          }
         }
       }
     }

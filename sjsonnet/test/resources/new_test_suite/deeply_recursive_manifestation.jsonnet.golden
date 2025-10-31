@@ -1,0 +1,32 @@
+{
+   "ctx": { },
+   "item": {
+      "/inc/users/whoami": {
+         "get": {
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": {
+                           "properties": {
+                              "user": {
+                                 "properties": {
+                                    "#id": "the id this entity",
+                                    "id": {
+                                       "format": "uuid",
+                                       "type": "string",
+                                       "x-name": "users.User"
+                                    }
+                                 },
+                                 "type": "object"
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}

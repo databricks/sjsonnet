@@ -45,7 +45,7 @@ object FileTests extends BaseFileTests {
     test("new_test_suite") - {
       val t = os
         .list(testSuiteRoot / "new_test_suite")
-        .filter(f => f.ext == "jsonnet" && f.last.contains("jvm-native"))
+        .filter(f => f.ext == "jsonnet" && !f.last.contains("-js"))
       assert(t.nonEmpty)
       t.foreach { file =>
         check(file, "new_test_suite")
