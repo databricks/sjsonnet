@@ -1,0 +1,66 @@
+{
+   "bar": {
+      "additional": {
+         "$schema": "http://json-schema.org/draft-07/schema#",
+         "09": [
+            "no",
+            "yes"
+         ]
+      },
+      "prometheusOperator": {
+         "clusterRole": {
+            "rules": [
+               {
+                  "apiGroups": [
+                     "authentication.k8s.io"
+                  ],
+                  "resources": [
+                     "tokenreviews"
+                  ],
+                  "verbs": [
+                     "create"
+                  ]
+               },
+               {
+                  "apiGroups": [
+                     "authorization.k8s.io"
+                  ],
+                  "resources": [
+                     "subjectaccessreviews"
+                  ],
+                  "verbs": [
+                     "create"
+                  ]
+               }
+            ]
+         },
+         "service": {
+            "spec": {
+               "ports": [
+                  {
+                     "name": "https",
+                     "port": 8443,
+                     "targetPort": "https"
+                  }
+               ]
+            }
+         },
+         "serviceMonitor": {
+            "spec": {
+               "endpoints": [
+                  {
+                     "bearerTokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                     "honorLabels": true,
+                     "port": "https",
+                     "scheme": "https",
+                     "tlsConfig": {
+                        "insecureSkipVerify": true
+                     }
+                  }
+               ]
+            }
+         }
+      }
+   },
+   "nothing": "\"additional\":\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\"\n  \"09\":\n    - \"no\"\n    - \"yes\"\n\"prometheusOperator\":\n  \"clusterRole\":\n    \"rules\":\n      - \"apiGroups\":\n          - \"authentication.k8s.io\"\n        \"resources\":\n          - \"tokenreviews\"\n        \"verbs\":\n          - \"create\"\n      - \"apiGroups\":\n          - \"authorization.k8s.io\"\n        \"resources\":\n          - \"subjectaccessreviews\"\n        \"verbs\":\n          - \"create\"\n  \"service\":\n    \"spec\":\n      \"ports\":\n        - \"name\": \"https\"\n          \"port\": 8443\n          \"targetPort\": \"https\"\n  \"serviceMonitor\":\n    \"spec\":\n      \"endpoints\":\n        - \"bearerTokenFile\": \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\n          \"honorLabels\": true\n          \"port\": \"https\"\n          \"scheme\": \"https\"\n          \"tlsConfig\":\n            \"insecureSkipVerify\": true"
+}
