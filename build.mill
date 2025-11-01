@@ -18,6 +18,7 @@ import javalib.NativeImageModule
 import contrib.versionfile.VersionFileModule
 import contrib.jmh.JmhModule
 import mill.util.Jvm
+import mill.api.BuildCtx
 
 import java.util.Base64
 
@@ -101,18 +102,27 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
     this.moduleDir / "resources" / "go_suite"
   )
 
-  def generateBenchmarkList = Task.Anon {
-    resources().map(_.path).flatMap(os.walk(_).filter(os.isFile).filter(_.ext == "jsonnet")).map(_.toString).mkString(",")
+  def listRegressions = Task {
+    resources()
+      .map(_.path)
+      .flatMap(
+        os.walk(_)
+          .filter(os.isFile)
+          .filter(_.ext == "jsonnet")
+      )
+      .sortBy(_.toString)
+      .map(_.relativeTo(BuildCtx.workspaceRoot).toString)
   }
 
-  def regressionBenchs() =     Task.Command {
+  def runRegressions(args: String*) = Task.Command {
     val (_, resources) = generateBenchmarkSources()
+    val regressionCases = if args.isEmpty then listRegressions() else args.toSeq
     val forkedArgs = forkArgs().toSeq
     Jvm.callProcess(
       mainClass = "org.openjdk.jmh.Main",
       classPath = (runClasspath() ++ generatorDeps()).map(_.path) ++
         Seq(jmhGeneratedSources().path, resources.path),
-      mainArgs = Array("sjsonnet.bench.RegressionBenchmark.main" ,s"-p=path=${generateBenchmarkList()}"),
+      mainArgs = Array("sjsonnet.bench.RegressionBenchmark.main" ,s"-p=path=${regressionCases.mkString(",")}"),
       cwd = Task.ctx().dest,
       javaHome = javaHome().map(_.path),
       jvmArgs = forkedArgs,
