@@ -1,4 +1,4 @@
-//| mill-version: 1.0.6-jvm
+//| mill-version: 1.1.1-jvm
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
@@ -358,6 +358,12 @@ object sjsonnet extends VersionFileModule {
     def jvmIndexVersion = "0.0.4-128-8f0ad3"
     def localBinName = "sjsonnet-native"
     def nativeImageClasspath = Seq(jvm(scalaVersions(0)).assembly())
+
+    // Override to skip metadata repository configuration which fails on JDK 25
+    override def nativeMetadataConfigurations = Task {
+      Set.empty[mill.javalib.graalvm.MetadataResult]
+    }
+
     def nativeImageOptions = super.nativeImageOptions() ++ Seq(
       "--no-fallback",
       "-O3",
