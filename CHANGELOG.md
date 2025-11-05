@@ -75,7 +75,7 @@
 
 ## 0.5.1
 * Fix multiple object comprehension bugs by @JoshRosen in https://github.com/databricks/sjsonnet/pull/358
-* Update Scala 3 to 3.3.6 by @He-Pin in https://github.com/databricks/sjsonnet/pull/365
+* Update Scala 3 to 3.3.7 by @He-Pin in https://github.com/databricks/sjsonnet/pull/365
 * feat: Allow negative start/end on std.slice by @He-Pin in https://github.com/databricks/sjsonnet/pull/367
 * Add std.object*Ex methods by @stephenamar-db in https://github.com/databricks/sjsonnet/pull/368
 * fix: Fix foldr for str by @He-Pin in https://github.com/databricks/sjsonnet/pull/373
