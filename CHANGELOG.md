@@ -1,3 +1,6 @@
+## 0.5.9
+* Add more cases to handle properly when --broken-assertion-logic is set
+
 ## 0.5.8
 * Add more cases to handle properly when --broken-assertion-logic is set
 
