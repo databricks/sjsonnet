@@ -122,7 +122,10 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
       mainClass = "org.openjdk.jmh.Main",
       classPath = (runClasspath() ++ generatorDeps()).map(_.path) ++
         Seq(jmhGeneratedSources().path, resources.path),
-      mainArgs = Array("sjsonnet.bench.RegressionBenchmark.main" ,s"-p=path=${regressionCases.mkString(",")}"),
+      mainArgs = Array(
+        "sjsonnet.bench.RegressionBenchmark.main",
+        s"-p=path=${regressionCases.mkString(",")}"
+      ),
       cwd = Task.ctx().dest,
       javaHome = javaHome().map(_.path),
       jvmArgs = forkedArgs,

@@ -17,7 +17,7 @@
 set -e
 
 JAVA_OPTS="-Xss100m"
-JSONNET_BIN="../../../../out/sjsonnet/jvm/3.3.6/assembly.dest/out.jar"
+JSONNET_BIN="../../../../out/sjsonnet/jvm/3.3.7/assembly.dest/out.jar"
 PARAMS="--no-duplicate-keys-in-comprehension --strict-import-syntax --strict-inherited-assertions --strict-set-operations"
 
 if [ $# -eq 0 ] ; then
