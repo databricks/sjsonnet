@@ -48,7 +48,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   def mvnDeps = Seq(
     mvn"com.lihaoyi::fastparse::3.1.1",
     mvn"com.lihaoyi::pprint::0.9.3",
-    mvn"com.lihaoyi::ujson::4.4.0",
+    mvn"com.lihaoyi::ujson::4.4.1",
     mvn"com.lihaoyi::scalatags::0.13.1",
     mvn"org.scala-lang.modules::scala-collection-compat::2.13.0"
   )
