@@ -4,7 +4,7 @@ cancelable in Global := true
 val options = Seq("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
 
 lazy val commonSettings = Seq(
-  scalaVersion := "3.3.6",
+  scalaVersion := "3.3.7",
   scalacOptions ++= options
 )
 
