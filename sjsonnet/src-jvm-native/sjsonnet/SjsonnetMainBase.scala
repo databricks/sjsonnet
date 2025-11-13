@@ -285,7 +285,8 @@ object SjsonnetMainBase {
       settings = new Settings(
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
-        throwErrorForInvalidSets = config.throwErrorForInvalidSets.value
+        throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
+        brokenAssertionLogic = config.brokenAssertionLogic.value
       ),
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       logger = warnLogger,

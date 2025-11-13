@@ -1,3 +1,6 @@
+## 0.5.10
+* Make sure --broken-assertion-logic is set in SjsonnetMain.
+
 ## 0.5.9
 * Add more cases to handle properly when --broken-assertion-logic is set
 
