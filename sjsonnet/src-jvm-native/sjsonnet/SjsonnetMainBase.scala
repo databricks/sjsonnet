@@ -286,7 +286,8 @@ object SjsonnetMainBase {
         preserveOrder = config.preserveOrder.value,
         strict = config.strict.value,
         throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
-        maxParserRecursionDepth = config.maxParserRecursionDepth
+        maxParserRecursionDepth = config.maxParserRecursionDepth,
+        brokenAssertionLogic = config.brokenAssertionLogic.value
       ),
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       logger = warnLogger,
