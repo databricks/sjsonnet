@@ -57,7 +57,7 @@ final case class FileParserInput(file: File) extends ParserInput {
   override def checkTraceable(): Unit = {}
 
   private lazy val lineNumberLookup: Array[Int] = {
-    val lines = mutable.ArrayBuffer[Int]()
+    val lines = mutable.ArrayBuffer[Int](0)
     val bufferedStream = new BufferedInputStream(new FileInputStream(file))
     var byteRead: Int = 0
     var currentPosition = 0
@@ -75,9 +75,17 @@ final case class FileParserInput(file: File) extends ParserInput {
   }
 
   def prettyIndex(index: Int): String = {
-    val line = lineNumberLookup.indexWhere(_ > index) match {
-      case -1 => lineNumberLookup.length - 1
-      case n  => math.max(0, n - 1)
+    // The binary search returns >= 0 if founds exact match. The 0-indexed line
+    // number will be exactly this number in such case.
+    //
+    // If value is not found, then searchResult = (-insertionPoint - 1) is
+    // returned, where insertionPoint is the index where the element would have
+    // been inserted. Line for the given index starts then on (insertionPoint -
+    // 1).
+    val searchResult = java.util.Arrays.binarySearch(lineNumberLookup, index)
+    val line = if (searchResult >= 0) searchResult else {
+      val insertionPoint = -searchResult - 1
+      insertionPoint - 1
     }
     val col = index - lineNumberLookup(line)
     s"${line + 1}:${col + 1}"
