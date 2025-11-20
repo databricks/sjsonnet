@@ -74,22 +74,8 @@ final case class FileParserInput(file: File) extends ParserInput {
     lines.toArray
   }
 
-  def prettyIndex(index: Int): String = {
-    // The binary search returns >= 0 if founds exact match. The 0-indexed line
-    // number will be exactly this number in such case.
-    //
-    // If value is not found, then searchResult = (-insertionPoint - 1) is
-    // returned, where insertionPoint is the index where the element would have
-    // been inserted. Line for the given index starts then on (insertionPoint -
-    // 1).
-    val searchResult = java.util.Arrays.binarySearch(lineNumberLookup, index)
-    val line = if (searchResult >= 0) searchResult else {
-      val insertionPoint = -searchResult - 1
-      insertionPoint - 1
-    }
-    val col = index - lineNumberLookup(line)
-    s"${line + 1}:${col + 1}"
-  }
+  def prettyIndex(index: Int): String =
+    Util.prettyIndex(lineNumberLookup, index)
 }
 
 class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
