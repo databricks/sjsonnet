@@ -57,7 +57,7 @@ final case class FileParserInput(file: File) extends ParserInput {
   override def checkTraceable(): Unit = {}
 
   private lazy val lineNumberLookup: Array[Int] = {
-    val lines = mutable.ArrayBuffer[Int]()
+    val lines = mutable.ArrayBuffer[Int](0)
     val bufferedStream = new BufferedInputStream(new FileInputStream(file))
     var byteRead: Int = 0
     var currentPosition = 0
@@ -74,14 +74,8 @@ final case class FileParserInput(file: File) extends ParserInput {
     lines.toArray
   }
 
-  def prettyIndex(index: Int): String = {
-    val line = lineNumberLookup.indexWhere(_ > index) match {
-      case -1 => lineNumberLookup.length - 1
-      case n  => math.max(0, n - 1)
-    }
-    val col = index - lineNumberLookup(line)
-    s"${line + 1}:${col + 1}"
-  }
+  def prettyIndex(index: Int): String =
+    Util.prettyIndex(lineNumberLookup, index)
 }
 
 class BufferedRandomAccessFile(fileName: String, bufferSize: Int) {
