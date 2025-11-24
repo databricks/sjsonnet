@@ -9,8 +9,7 @@ import scala.collection.mutable
 object StringModule extends AbstractFunctionModule {
   def name = "string"
 
-  private val leadingWhiteSpacePattern = Platform.getPatternFromCache("^[ \t\n\f\r\u0085\u00A0']+")
-  private val trailingWhiteSpacePattern = Platform.getPatternFromCache("[ \t\n\f\r\u0085\u00A0']+$")
+  private val whiteSpaces = StripUtils.codePointsSet(" \t\n\f\r\u0085\u00A0")
 
   private object ToString extends Val.Builtin1("toString", "a") {
     def evalRhs(v1: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(
@@ -105,110 +104,80 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StripUtils {
-    private def getLeadingPattern(chars: String): String = "^[" + Platform.regexQuote(chars) + "]+"
-
-    private def getTrailingPattern(chars: String): String = "[" + Platform.regexQuote(chars) + "]+$"
-
-    def unspecializedStrip(str: String, chars: String, left: Boolean, right: Boolean): String = {
-      var s = str
-      if (right)
-        s = Platform.getPatternFromCache(getTrailingPattern(chars)).matcher(s).replaceAll("")
-      if (left) s = Platform.getPatternFromCache(getLeadingPattern(chars)).matcher(s).replaceAll("")
-      s
+    def codePointsSet(str: String): Set[Int] = {
+      val chars = Set.newBuilder[Int]
+      chars.sizeHint(str.length)
+      var i = 0
+      while (i < str.length) {
+        val codePoint = str.codePointAt(i)
+        chars += codePoint
+        i += 1
+      }
+      chars.result()
     }
 
-    private class SpecStrip(
-        chars: String,
+    def unspecializedStrip(
+        str: String,
+        charsSet: Set[Int],
         left: Boolean,
-        right: Boolean,
-        fn: String
-    ) extends Val.Builtin1(fn, "str") {
-      private val leftPattern = Platform.getPatternFromCache(getLeadingPattern(chars))
-      private val rightPattern = Platform.getPatternFromCache(getTrailingPattern(chars))
+        right: Boolean): String = {
+      if (str.isEmpty) return str
+      var start = 0
+      var end = str.length - 1
 
-      def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
-        var s = str.force.asString
-        if (right) s = rightPattern.matcher(s).replaceAll("")
-        if (left) s = leftPattern.matcher(s).replaceAll("")
-        Val.Str(pos, s)
+      while (left && start <= end && charsSet.contains(str.codePointAt(start))) {
+        start += 1
       }
-    }
-
-    def trySpecialize(
-        str: Expr,
-        chars: Val.Str,
-        left: Boolean,
-        right: Boolean,
-        name: String): (Val.Builtin, Array[Expr]) = {
-      try {
-        (new SpecStrip(chars.value, left, right, name), Array(str))
-      } catch {
-        case _: Exception => null
+      while (right && end >= start && charsSet.contains(str.codePointAt(end))) {
+        end -= 1
       }
+      str.substring(start, end + 1)
     }
   }
 
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.force.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
           str.force.asString,
-          chars.force.asString,
+          charsSet,
           left = true,
           right = true
         )
       )
     }
-
-    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
-      args match {
-        case Array(str, chars: Val.Str) =>
-          StripUtils.trySpecialize(str, chars, left = true, right = true, functionName)
-        case _ => null
-      }
   }
 
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.force.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
           str.force.asString,
-          chars.force.asString,
+          charsSet,
           left = true,
           right = false
         )
       )
     }
-
-    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
-      args match {
-        case Array(str, chars: Val.Str) =>
-          StripUtils.trySpecialize(str, chars, left = true, right = false, functionName)
-        case _ => null
-      }
   }
 
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.force.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
           str.force.asString,
-          chars.force.asString,
+          charsSet,
           left = false,
           right = true
         )
       )
     }
-
-    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
-      args match {
-        case Array(str, chars: Val.Str) =>
-          StripUtils.trySpecialize(str, chars, left = false, right = true, functionName)
-        case _ => null
-      }
   }
 
   private object Join extends Val.Builtin2("join", "sep", "arr") {
@@ -436,9 +405,7 @@ object StringModule extends AbstractFunctionModule {
       str.isEmpty
     },
     builtin("trim", "str") { (_, _, str: String) =>
-      trailingWhiteSpacePattern
-        .matcher(leadingWhiteSpacePattern.matcher(str).replaceAll(""))
-        .replaceAll("")
+      StripUtils.unspecializedStrip(str, whiteSpaces, true, true)
     },
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
       str1.equalsIgnoreCase(str2)
