@@ -242,5 +242,12 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.findSubstr('o', 'Hello 🌍 World')") ==> ujson.Arr(4, 9)
       eval("std.findSubstr('🌍🚀', '🌍🚀 and more 🌍🚀')") ==> ujson.Arr(0, 12)
     }
+
+    test("stripChars") {
+      eval("std.stripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("World")
+      eval("std.lstripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("World🌍H")
+      eval("std.rstripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("Hello 🌍 World")
+
+    }
   }
 }
