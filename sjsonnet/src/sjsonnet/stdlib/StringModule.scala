@@ -104,21 +104,21 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StripUtils {
-    def codePointsSet(str: String): Set[Int] = {
+    def codePointsSet(str: String): collection.Set[Int] = {
       val chars = Set.newBuilder[Int]
-      chars.sizeHint(str.length)
+      chars.sizeHint(str.codePointCount(0, str.length))
       var i = 0
       while (i < str.length) {
         val codePoint = str.codePointAt(i)
         chars += codePoint
-        i += 1
+        i += Character.charCount(codePoint)
       }
       chars.result()
     }
 
     def unspecializedStrip(
         str: String,
-        charsSet: Set[Int],
+        charsSet: collection.Set[Int],
         left: Boolean,
         right: Boolean): String = {
       if (str.isEmpty) return str
@@ -126,10 +126,11 @@ object StringModule extends AbstractFunctionModule {
       var end = str.length - 1
 
       while (left && start <= end && charsSet.contains(str.codePointAt(start))) {
-        start += 1
+        start = str.offsetByCodePoints(start, 1)
       }
+
       while (right && end >= start && charsSet.contains(str.codePointAt(end))) {
-        end -= 1
+        end = str.offsetByCodePoints(end, -1)
       }
       str.substring(start, end + 1)
     }
