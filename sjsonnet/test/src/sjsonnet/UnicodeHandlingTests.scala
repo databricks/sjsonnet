@@ -247,7 +247,14 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.stripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("World")
       eval("std.lstripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("World🌍H")
       eval("std.rstripChars('Hello 🌍 World🌍H', 'Hello 🌍')") ==> ujson.Str("Hello 🌍 World")
-
+      // Regression test for rstripChars with emoji (surrogate pairs) at end of string
+      eval("""std.rstripChars("hello🎉🎉🎉", "🎉")""") ==> ujson.Str("hello")
+      eval("""std.lstripChars("🎉🎉🎉hello", "🎉")""") ==> ujson.Str("hello")
+      eval("""std.stripChars("🎉🎉hello🎉🎉", "🎉")""") ==> ujson.Str("hello")
+      // Regression test for right-stripping ASCII chars after emoji (must not corrupt emoji)
+      eval("""std.rstripChars("🌍 ", " ")""") ==> ujson.Str("🌍")
+      eval("""std.trim("🌍   ")""") ==> ujson.Str("🌍")
+      eval("""std.trim("   🌍   ")""") ==> ujson.Str("🌍")
     }
   }
 }

@@ -123,16 +123,19 @@ object StringModule extends AbstractFunctionModule {
         right: Boolean): String = {
       if (str.isEmpty) return str
       var start = 0
-      var end = str.length - 1
+      // Use exclusive end position with codePointBefore() for right-to-left iteration.
+      // Unlike codePointAt(), codePointBefore() correctly reads surrogate pairs when
+      // scanning backwards (codePointAt on a low surrogate returns the wrong value).
+      var end = str.length
 
-      while (left && start <= end && charsSet.contains(str.codePointAt(start))) {
+      while (left && start < end && charsSet.contains(str.codePointAt(start))) {
         start = str.offsetByCodePoints(start, 1)
       }
 
-      while (right && end >= start && charsSet.contains(str.codePointAt(end))) {
+      while (right && end > start && charsSet.contains(str.codePointBefore(end))) {
         end = str.offsetByCodePoints(end, -1)
       }
-      str.substring(start, end + 1)
+      str.substring(start, end)
     }
   }
 
