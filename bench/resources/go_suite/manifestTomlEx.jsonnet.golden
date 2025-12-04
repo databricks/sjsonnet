@@ -1,0 +1,59 @@
+{
+   "bar": {
+      "prometheusOperator": {
+         "clusterRole": {
+            "rules": [
+               {
+                  "apiGroups": [
+                     "authentication.k8s.io"
+                  ],
+                  "resources": [
+                     "tokenreviews"
+                  ],
+                  "verbs": [
+                     "create"
+                  ]
+               },
+               {
+                  "apiGroups": [
+                     "authorization.k8s.io"
+                  ],
+                  "resources": [
+                     "subjectaccessreviews"
+                  ],
+                  "verbs": [
+                     "create"
+                  ]
+               }
+            ]
+         },
+         "service": {
+            "spec": {
+               "ports": [
+                  {
+                     "name": "https",
+                     "port": 8443,
+                     "targetPort": "https"
+                  }
+               ]
+            }
+         },
+         "serviceMonitor": {
+            "spec": {
+               "endpoints": [
+                  {
+                     "bearerTokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                     "honorLabels": true,
+                     "port": "https",
+                     "scheme": "https",
+                     "tlsConfig": {
+                        "insecureSkipVerify": true
+                     }
+                  }
+               ]
+            }
+         }
+      }
+   },
+   "nothing": "[prometheusOperator]\n\n  [prometheusOperator.clusterRole]\n\n    [[prometheusOperator.clusterRole.rules]]\n      apiGroups = [\n        \"authentication.k8s.io\"\n      ]\n      resources = [\n        \"tokenreviews\"\n      ]\n      verbs = [\n        \"create\"\n      ]\n\n    [[prometheusOperator.clusterRole.rules]]\n      apiGroups = [\n        \"authorization.k8s.io\"\n      ]\n      resources = [\n        \"subjectaccessreviews\"\n      ]\n      verbs = [\n        \"create\"\n      ]\n\n  [prometheusOperator.service]\n\n    [prometheusOperator.service.spec]\n\n      [[prometheusOperator.service.spec.ports]]\n        name = \"https\"\n        port = 8443\n        targetPort = \"https\"\n\n  [prometheusOperator.serviceMonitor]\n\n    [prometheusOperator.serviceMonitor.spec]\n\n      [[prometheusOperator.serviceMonitor.spec.endpoints]]\n        bearerTokenFile = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\n        honorLabels = true\n        port = \"https\"\n        scheme = \"https\"\n\n        [prometheusOperator.serviceMonitor.spec.endpoints.tlsConfig]\n          insecureSkipVerify = true"
+}

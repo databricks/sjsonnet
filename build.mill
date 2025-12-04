@@ -17,6 +17,8 @@ import javalib.api.JvmWorkerUtil
 import javalib.NativeImageModule
 import contrib.versionfile.VersionFileModule
 import contrib.jmh.JmhModule
+import mill.util.Jvm
+import mill.api.BuildCtx
 
 import java.util.Base64
 
@@ -88,10 +90,47 @@ trait SjsonnetJvmNative extends ScalaModule {
 }
 
 object bench extends ScalaModule with JmhModule with ScalafmtModule {
+  def forkArgs = Seq("-Xss" + stackSize)
   def scalaVersion = scalaVersions.head
   def moduleDeps = Seq(sjsonnet.jvm.crossModules.head)
   def jmhCoreVersion = "1.37"
   def scalacOptions = sjsonnet.jvm.crossModules.head.scalacOptions
+
+  def resources = Task.Sources(
+    this.moduleDir / "resources" / "bug_suite",
+    this.moduleDir / "resources" / "cpp_suite",
+    this.moduleDir / "resources" / "go_suite"
+  )
+
+  def listRegressions = Task {
+    resources()
+      .map(_.path)
+      .flatMap(
+        os.walk(_)
+          .filter(os.isFile)
+          .filter(_.ext == "jsonnet")
+      )
+      .sortBy(_.toString)
+      .map(_.relativeTo(BuildCtx.workspaceRoot).toString)
+  }
+
+  def runRegressions(args: String*) = Task.Command {
+    val (_, resources) = generateBenchmarkSources()
+    val regressionCases = if args.isEmpty then listRegressions() else args.toSeq
+    val forkedArgs = forkArgs().toSeq
+    Jvm.callProcess(
+      mainClass = "org.openjdk.jmh.Main",
+      classPath = (runClasspath() ++ generatorDeps()).map(_.path) ++
+        Seq(jmhGeneratedSources().path, resources.path),
+      mainArgs = Array("sjsonnet.bench.RegressionBenchmark.main" ,s"-p=path=${regressionCases.mkString(",")}"),
+      cwd = Task.ctx().dest,
+      javaHome = javaHome().map(_.path),
+      jvmArgs = forkedArgs,
+      stdin = os.Inherit,
+      stdout = os.Inherit
+    )
+    ()
+  }
 }
 
 object sjsonnet extends VersionFileModule {

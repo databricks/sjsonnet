@@ -55,7 +55,9 @@ object FileTests extends BaseFileTests {
 
     test("new_test_suite") - {
       val t = TestResources_new_test_suite.files.keys.toSeq
-        .filter(f => f.matches("[^/]+-js\\.jsonnet"))
+        .filter(f =>
+          f.matches("[^/]+-js\\.jsonnet") || (f.matches("[^/]+\\.jsonnet") && !f.contains("-jvm"))
+        )
         .sorted
       assert(t.nonEmpty)
       t.foreach { file =>
