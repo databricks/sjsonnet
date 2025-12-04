@@ -102,12 +102,12 @@ object ArrayModule extends AbstractFunctionModule {
       val func = _func.force.asFunc
       if (func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while (i < a.length) {
-          if (!func.apply1(a(i), p)(ev, TailstrictModeDisabled).isInstanceOf[Val.True]) {
+          if (!func.apply1(a(i), p)(ev, TailstrictModeDisabled).asBoolean) {
             var b = new Array[Lazy](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
-              if (func.apply1(a(j), p)(ev, TailstrictModeDisabled).isInstanceOf[Val.True]) {
+              if (func.apply1(a(j), p)(ev, TailstrictModeDisabled).asBoolean) {
                 b(i) = a(j)
                 i += 1
               }
@@ -129,13 +129,13 @@ object ArrayModule extends AbstractFunctionModule {
         val scopeIdx = newScope.length - 1
         while (i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
-          if (!func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+          if (!func.evalRhs(newScope, ev, funDefFileScope, p).asBoolean) {
             var b = new Array[Lazy](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
               newScope.bindings(scopeIdx) = a(j)
-              if (func.evalRhs(newScope, ev, funDefFileScope, p).isInstanceOf[Val.True]) {
+              if (func.evalRhs(newScope, ev, funDefFileScope, p).asBoolean) {
                 b(i) = a(j)
                 i += 1
               }
@@ -408,12 +408,11 @@ object ArrayModule extends AbstractFunctionModule {
           pos,
           arr.asLazyArray.flatMap { i =>
             i.force
-            if (
-              !filter_func
-                .apply1(i, pos.noOffset)(ev, TailstrictModeDisabled)
-                .isInstanceOf[Val.True]
-            ) None
-            else Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
+            if (!filter_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled).asBoolean) {
+              None
+            } else {
+              Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
+            }
           }
         )
     },
