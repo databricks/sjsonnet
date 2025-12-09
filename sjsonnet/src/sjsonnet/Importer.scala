@@ -57,21 +57,23 @@ final case class FileParserInput(file: File) extends ParserInput {
   override def checkTraceable(): Unit = {}
 
   private lazy val lineNumberLookup: Array[Int] = {
-    val lines = mutable.ArrayBuffer[Int](0)
+    val lines = new mutable.ArrayBuilder.ofInt
+    lines.sizeHint(100) // reasonable initial size hint
+    lines.+=(0)
     val bufferedStream = new BufferedInputStream(new FileInputStream(file))
     var byteRead: Int = 0
     var currentPosition = 0
 
     while ({ byteRead = bufferedStream.read(); byteRead != -1 }) {
       if (byteRead == '\n') {
-        lines += currentPosition + 1
+        lines.+=(currentPosition + 1)
       }
       currentPosition += 1
     }
 
     bufferedStream.close()
 
-    lines.toArray
+    lines.result()
   }
 
   def prettyIndex(index: Int): String =
