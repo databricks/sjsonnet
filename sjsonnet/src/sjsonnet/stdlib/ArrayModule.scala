@@ -197,6 +197,7 @@ object ArrayModule extends AbstractFunctionModule {
     def evalRhs(value: Lazy, _arr: Lazy, ev: EvalScope, pos: Position): Val = {
       val arr = _arr.force.asArr
       val b = new mutable.ArrayBuilder.ofRef[Lazy]
+      b.sizeHint(arr.length) // Size hint based on array length (worst case)
       var i = 0
       while (i < arr.length) {
         if (ev.equal(arr.force(i), value.force)) {
@@ -428,13 +429,14 @@ object ArrayModule extends AbstractFunctionModule {
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
           val lazyArray = a.asLazyArray
-          val out = new mutable.ArrayBuffer[Lazy](lazyArray.length * count)
+          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          out.sizeHint(lazyArray.length * count)
           var i = 0
           while (i < count) {
-            out.appendAll(lazyArray)
+            out ++= lazyArray
             i += 1
           }
-          Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.result())
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res

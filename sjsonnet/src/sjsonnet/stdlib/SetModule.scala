@@ -62,25 +62,28 @@ object SetModule extends AbstractFunctionModule {
       return arr
     }
 
-    val out = new mutable.ArrayBuffer[Lazy]
+    val out = new mutable.ArrayBuilder.ofRef[Lazy]
+    // Set a reasonable size hint - in the worst case (no duplicates), we'll need arrValue.length elements
+    out.sizeHint(arrValue.length)
     for (v <- arrValue) {
-      if (out.isEmpty) {
-        out.append(v)
+      val outResult = out.result()
+      if (outResult.length == 0) {
+        out.+=(v)
       } else if (keyF.isInstanceOf[Val.False]) {
-        if (!ev.equal(out.last.force, v.force)) {
-          out.append(v)
+        if (!ev.equal(outResult.last.force, v.force)) {
+          out.+=(v)
         }
       } else if (!keyF.isInstanceOf[Val.False]) {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
         val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
-        val o2Key = keyFFunc.apply1(out.last, pos.noOffset)(ev, TailstrictModeDisabled)
+        val o2Key = keyFFunc.apply1(outResult.last, pos.noOffset)(ev, TailstrictModeDisabled)
         if (!ev.equal(o1Key, o2Key)) {
-          out.append(v)
+          out.+=(v)
         }
       }
     }
 
-    Val.Arr(pos, out.toArray)
+    Val.Arr(pos, out.result())
   }
 
   private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
@@ -188,16 +191,18 @@ object SetModule extends AbstractFunctionModule {
         val a = toArrOrString(args(0), pos, ev)
         val b = toArrOrString(args(1), pos, ev)
 
-        val out = new mutable.ArrayBuffer[Lazy]
+        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        // Set a reasonable size hint - intersection will be at most the size of the smaller set
+        out.sizeHint(math.min(a.length, b.length))
 
         // The intersection will always be, at most, the size of the smallest set.
         val sets = if (b.length < a.length) (b, a) else (a, b)
         for (v <- sets._1) {
           if (existsInSet(ev, pos, keyF, sets._2, v.force)) {
-            out.append(v)
+            out.+=(v)
           }
         }
-        Val.Arr(pos, out.toArray)
+        Val.Arr(pos, out.result())
     },
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
@@ -207,14 +212,16 @@ object SetModule extends AbstractFunctionModule {
 
         val a = toArrOrString(args(0), pos, ev)
         val b = toArrOrString(args(1), pos, ev)
-        val out = new mutable.ArrayBuffer[Lazy]
+        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        // Set a reasonable size hint - difference will be at most the size of the first set
+        out.sizeHint(a.length)
 
         for (v <- a) {
           if (!existsInSet(ev, pos, keyF, b, v.force)) {
-            out.append(v)
+            out.+=(v)
           }
         }
-        Val.Arr(pos, out.toArray)
+        Val.Arr(pos, out.result())
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>

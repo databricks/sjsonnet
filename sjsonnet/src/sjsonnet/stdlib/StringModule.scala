@@ -205,19 +205,21 @@ object StringModule extends AbstractFunctionModule {
           }
           Val.Str(pos, b.toString)
         case sep: Val.Arr =>
-          val out = new mutable.ArrayBuffer[Lazy]
+          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          // Set a reasonable size hint based on estimated result size
+          out.sizeHint(arr.length * 2)
           var added = false
           for (x <- arr) {
             x match {
               case Val.Null(_) => // do nothing
               case v: Val.Arr  =>
-                if (added) out.appendAll(sep.asLazyArray)
+                if (added) out ++= sep.asLazyArray
                 added = true
-                out.appendAll(v.asLazyArray)
+                out ++= v.asLazyArray
               case x => Error.fail("Cannot join " + x.prettyName)
             }
           }
-          Val.Arr(pos, out.toArray)
+          Val.Arr(pos, out.result())
         case x => Error.fail("Cannot join " + x.prettyName)
       }
     }
