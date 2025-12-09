@@ -276,7 +276,7 @@ object sjsonnet extends VersionFileModule {
 
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.10",
-      mvn"org.lz4:lz4-java::1.8.0",
+      mvn"at.yawk.lz4:lz4-java::1.10.1",
       mvn"org.yaml:snakeyaml::2.4",
       mvn"com.google.re2j:re2j:1.8"
     )
