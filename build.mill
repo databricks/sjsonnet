@@ -348,17 +348,17 @@ object sjsonnet extends VersionFileModule {
   object graal extends NativeImageModule {
     def finalMainClass = jvm(scalaVersions(0)).mainClass().get
     def runClasspath = Seq()
-    def jvmId = "graalvm-community:21.0.2"
+    def jvmId = "graalvm-community:25.0.1"
+    def jvmIndexVersion = "0.0.4-128-8f0ad3"
     def localBinName = "sjsonnet-native"
     def nativeImageClasspath = Seq(jvm(scalaVersions(0)).assembly())
     def nativeImageOptions = super.nativeImageOptions() ++ Seq(
       "--no-fallback",
       "-O3",
+      "--static-nolibc",
       "-R:MaxHeapSize=2G",
-      "--strict-image-heap",
       "--initialize-at-build-time",
       "--initialize-at-run-time=os.package$",
-      "--install-exit-handlers",
       "-H:+ReportExceptionStackTraces"
     )
   }
