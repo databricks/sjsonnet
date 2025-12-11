@@ -53,6 +53,10 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
     mvn"org.scala-lang.modules::scala-collection-compat::2.14.0"
   )
 
+  def manifest = super.manifest().add(
+    "Enable-Native-Access" -> "net.jpountz.util.Native"
+  )
+
   def generatedSources = Task {
     os.write(
       Task.ctx().dest / "Version.scala",
@@ -90,7 +94,7 @@ trait SjsonnetJvmNative extends ScalaModule {
 }
 
 object bench extends ScalaModule with JmhModule with ScalafmtModule {
-  def forkArgs = Seq("-Xss" + stackSize)
+  def forkArgs = Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
   def scalaVersion = scalaVersions.head
   def moduleDeps = Seq(sjsonnet.jvm.crossModules.head)
   def jmhCoreVersion = "1.37"
@@ -282,7 +286,7 @@ object sjsonnet extends VersionFileModule {
     )
 
     object test extends ScalaTests with CrossTests {
-      def forkArgs = Seq("-Xss" + stackSize)
+      def forkArgs = Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
       def sources = Task.Sources(sourceDirs.map(d => this.moduleDir / d)*)
     }
 
