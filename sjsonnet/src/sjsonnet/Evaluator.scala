@@ -811,16 +811,7 @@ class Evaluator(
   final def visitComp(f: List[CompSpec], scopes: Array[ValScope]): Array[ValScope] = f match {
     case (spec @ ForSpec(_, name, expr)) :: rest =>
       val newScopes = collection.mutable.ArrayBuilder.make[ValScope]
-      // Set a reasonable size hint based on heuristic estimation to avoid full traversal
-      if (scopes.length > 0) {
-        val firstArrSize = visitExpr(expr)(scopes(0)) match {
-          case a: Val.Arr => a.length
-          case _          => 1
-        }
-        // Use heuristic estimation: first array size * scopes count * 2 for safety margin
-        newScopes.sizeHint(math.max(16, firstArrSize * scopes.length * 2))
-      }
-
+      newScopes.sizeHint(math.max(16, scopes.length * 4))
       var i = 0
       while (i < scopes.length) {
         val s = scopes(i)
