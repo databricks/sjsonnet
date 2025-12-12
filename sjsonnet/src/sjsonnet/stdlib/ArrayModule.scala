@@ -213,7 +213,9 @@ object ArrayModule extends AbstractFunctionModule {
   private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
     def evalRhs(arrs: Lazy, ev: EvalScope, pos: Position): Val = {
       val out = new mutable.ArrayBuilder.ofRef[Lazy]
-      for (x <- arrs.force.asArr) {
+      val arr = arrs.force.asArr
+      out.sizeHint(arr.length * 4) // Rough size hint
+      for (x <- arr) {
         x.force match {
           case Val.Null(_) => // do nothing
           case v: Val.Arr  => out ++= v.asLazyArray
@@ -226,9 +228,11 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object FlattenDeepArrays extends Val.Builtin1("flattenDeepArray", "value") {
     def evalRhs(value: Lazy, ev: EvalScope, pos: Position): Val = {
+      val lazyArray = value.force.asArr.asLazyArray
       val out = new mutable.ArrayBuilder.ofRef[Lazy]
-      val q = new java.util.ArrayDeque[Lazy]()
-      value.force.asArr.asLazyArray.foreach(q.add)
+      out.sizeHint(lazyArray.length)
+      val q = new java.util.ArrayDeque[Lazy](lazyArray.length)
+      lazyArray.foreach(q.add)
       while (!q.isEmpty) {
         q.removeFirst().force match {
           case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
