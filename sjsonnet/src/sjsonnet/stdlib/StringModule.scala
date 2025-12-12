@@ -234,6 +234,7 @@ object StringModule extends AbstractFunctionModule {
     }
 
     val b = new mutable.ArrayBuilder.ofRef[Lazy]
+    b.sizeHint(maxSplits)
     var sz = 0
     var i = 0
     var start = 0
@@ -313,8 +314,16 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "str") {
-    def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Arr(pos, s.force.asString.getBytes(UTF_8).map(i => Val.Num(pos, i & 0xff)))
+    def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val = {
+      val bytes = s.force.asString.getBytes(UTF_8)
+      val arr = new Array[Lazy](bytes.length)
+      var i = 0
+      while (i < bytes.length) {
+        arr(i) = Val.Num(pos, bytes(i) & 0xff)
+        i += 1
+      }
+      Val.Arr(pos, arr)
+    }
   }
 
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
