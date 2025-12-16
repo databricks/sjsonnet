@@ -3,6 +3,7 @@ package sjsonnet
 import java.util
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
+import upickle.core.Visitor
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -91,6 +92,13 @@ object Val {
   }
   abstract class Bool extends Literal {
     override def asBoolean: Boolean = this.isInstanceOf[True]
+  }
+
+  /**
+   * Base trait for user-defined [[Val]]s with custom materialization logic.
+   */
+  trait Custom extends Literal {
+    def materialize[T](visitor: Visitor[T, T])(implicit evaluator: EvalScope): T
   }
 
   def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
