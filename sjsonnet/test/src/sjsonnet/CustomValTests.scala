@@ -6,7 +6,7 @@ import utest._
 object CustomValTests extends TestSuite {
   private final case class ImportantString(pos: Position, str: String, importance: Int)
       extends Val.Literal
-      with Val.Custom {
+      with Materializer.Materializable {
     override def prettyName: String = "Important string"
     def materialize[T](visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = {
       visitor.visitString(str + "!".repeat(importance), -1)
