@@ -151,6 +151,7 @@ object Materializer extends Materializer {
 
   /**
    * Trait for providing custom materialization logic to the Materializer.
+   * @since 1.0.0
    */
   trait Materializable {
     def materialize[T](visitor: Visitor[T, T])(implicit evaluator: EvalScope): T
