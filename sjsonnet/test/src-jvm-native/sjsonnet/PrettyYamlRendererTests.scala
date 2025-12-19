@@ -11,7 +11,7 @@ object PrettyYamlRendererTests extends TestSuite {
       Map(),
       Map(),
       OsPath(testSuiteRoot),
-      importer = sjsonnet.SjsonnetMainBase.resolveImport(Array(OsPath(testSuiteRoot)).toIndexedSeq),
+      importer = new SjsonnetMainBase.SimpleImporter(Array(OsPath(testSuiteRoot)).toIndexedSeq),
       parseCache = new DefaultParseCache,
       storePos = if (comments) currentPos = _ else null
     )

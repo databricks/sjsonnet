@@ -51,7 +51,7 @@ abstract class BaseFileTests extends TestSuite {
       ),
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
       OsPath(testSuiteRoot / testSuite),
-      importer = sjsonnet.SjsonnetMainBase.resolveImport(Array.empty[Path].toIndexedSeq),
+      importer = new sjsonnet.SjsonnetMainBase.SimpleImporter(Array.empty[Path].toIndexedSeq),
       parseCache = new DefaultParseCache,
       logger = (isTrace: Boolean, msg: String) => {
         if (isTrace) {
