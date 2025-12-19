@@ -62,7 +62,8 @@ abstract class Materializer {
           "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
           v.pos
         )
-      case vv: Val =>
+      case mat: Materializer.Materializable => storePos(v.pos); mat.materialize(visitor)
+      case vv: Val                          =>
         Error.fail("Unknown value type " + vv.prettyName, vv.pos)
       case null =>
         Error.fail("Unknown value type " + v)
@@ -147,4 +148,12 @@ object Materializer extends Materializer {
 
   final val emptyStringArray = new Array[String](0)
   final val emptyLazyArray = new Array[Lazy](0)
+
+  /**
+   * Trait for providing custom materialization logic to the Materializer.
+   * @since 1.0.0
+   */
+  trait Materializable {
+    def materialize[T](visitor: Visitor[T, T])(implicit evaluator: EvalScope): T
+  }
 }
