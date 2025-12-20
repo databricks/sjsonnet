@@ -17,6 +17,14 @@ object SetModule extends AbstractFunctionModule {
     }
   }
 
+  private def applyKeyFunc(elem: Val, keyF: Val, pos: Position, ev: EvalScope): Val = {
+    keyF match {
+      case keyFFunc: Val.Func =>
+        keyFFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).force
+      case _ => elem
+    }
+  }
+
   private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
     arg match {
       case arr: Val.Arr => arr.asLazyArray
@@ -40,18 +48,11 @@ object SetModule extends AbstractFunctionModule {
       keyF: Val,
       arr: mutable.IndexedSeq[? <: Lazy],
       toFind: Val): Boolean = {
-    val appliedX = keyF match {
-      case keyFFunc: Val.Func => keyFFunc.apply1(toFind, pos.noOffset)(ev, TailstrictModeDisabled)
-      case _                  => toFind
-    }
+    val appliedX = applyKeyFunc(toFind, keyF, pos, ev)
     arr
-      .search(appliedX.force)((toFind: Lazy, value: Lazy) => {
-        val appliedValue = keyF match {
-          case keyFFunc: Val.Func =>
-            keyFFunc.apply1(value, pos.noOffset)(ev, TailstrictModeDisabled)
-          case _ => value
-        }
-        ev.compare(toFind.force, appliedValue.force)
+      .search(appliedX)((toFind: Lazy, value: Lazy) => {
+        val appliedValue = applyKeyFunc(value.force, keyF, pos, ev)
+        ev.compare(toFind.force, appliedValue)
       })
       .isInstanceOf[Found]
   }
@@ -171,15 +172,59 @@ object SetModule extends AbstractFunctionModule {
     },
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
       (args, pos, ev) =>
+        val keyF = args(2)
+        validateSet(ev, pos, keyF, args(0))
+        validateSet(ev, pos, keyF, args(1))
+
         val a = toArrOrString(args(0), pos, ev)
         val b = toArrOrString(args(1), pos, ev)
+
         if (a.isEmpty) {
-          uniqArr(pos, ev, sortArr(pos, ev, args(1), args(2)), args(2))
+          args(1)
         } else if (b.isEmpty) {
-          uniqArr(pos, ev, sortArr(pos, ev, args(0), args(2)), args(2))
+          args(0)
         } else {
-          val concat = Val.Arr(pos, a ++ b)
-          uniqArr(pos, ev, sortArr(pos, ev, concat, args(2)), args(2))
+          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          out.sizeHint(a.length + b.length)
+
+          var idxA = 0
+          var idxB = 0
+
+          while (idxA < a.length && idxB < b.length) {
+            val elemA = a(idxA).force
+            val elemB = b(idxB).force
+
+            val keyA = applyKeyFunc(elemA, keyF, pos, ev)
+            val keyB = applyKeyFunc(elemB, keyF, pos, ev)
+
+            val cmp = ev.compare(keyA, keyB)
+            if (cmp < 0) {
+              // keyA < keyB, take from a
+              out.+=(a(idxA))
+              idxA += 1
+            } else if (cmp > 0) {
+              // keyA > keyB, take from b
+              out.+=(b(idxB))
+              idxB += 1
+            } else {
+              // keyA == keyB, take one and skip duplicate
+              out.+=(a(idxA))
+              idxA += 1
+              idxB += 1
+            }
+          }
+
+          // Add remaining elements from a or b
+          while (idxA < a.length) {
+            out.+=(a(idxA))
+            idxA += 1
+          }
+          while (idxB < b.length) {
+            out.+=(b(idxB))
+            idxB += 1
+          }
+
+          Val.Arr(pos, out.result())
         }
     },
     builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
@@ -195,13 +240,31 @@ object SetModule extends AbstractFunctionModule {
         // Set a reasonable size hint - intersection will be at most the size of the smaller set
         out.sizeHint(math.min(a.length, b.length))
 
-        // The intersection will always be, at most, the size of the smallest set.
-        val sets = if (b.length < a.length) (b, a) else (a, b)
-        for (v <- sets._1) {
-          if (existsInSet(ev, pos, keyF, sets._2, v.force)) {
-            out.+=(v)
+        var idxA = 0
+        var idxB = 0
+
+        while (idxA < a.length && idxB < b.length) {
+          val elemA = a(idxA).force
+          val elemB = b(idxB).force
+
+          val keyA = applyKeyFunc(elemA, keyF, pos, ev)
+          val keyB = applyKeyFunc(elemB, keyF, pos, ev)
+
+          val cmp = ev.compare(keyA, keyB)
+          if (cmp < 0) {
+            // keyA < keyB, elemA not in intersection
+            idxA += 1
+          } else if (cmp > 0) {
+            // keyA > keyB, elemB not in intersection
+            idxB += 1
+          } else {
+            // keyA == keyB, found intersection element
+            out.+=(a(idxA))
+            idxA += 1
+            idxB += 1
           }
         }
+
         Val.Arr(pos, out.result())
     },
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
@@ -216,11 +279,40 @@ object SetModule extends AbstractFunctionModule {
         // Set a reasonable size hint - difference will be at most the size of the first set
         out.sizeHint(a.length)
 
-        for (v <- a) {
-          if (!existsInSet(ev, pos, keyF, b, v.force)) {
-            out.+=(v)
+        var idxA = 0
+        var idxB = 0
+
+        while (idxA < a.length) {
+          val elemA = a(idxA).force
+          val keyA = applyKeyFunc(elemA, keyF, pos, ev)
+
+          // Advance idxB to find first element >= keyA
+          var foundEqual = false
+          var continue = true
+          while (idxB < b.length && continue) {
+            val elemB = b(idxB).force
+            val keyB = applyKeyFunc(elemB, keyF, pos, ev)
+
+            val cmp = ev.compare(keyA, keyB)
+            if (cmp <= 0) {
+              // keyA <= keyB, found position
+              foundEqual = (cmp == 0)
+              if (foundEqual) idxB += 1 // Move past the match
+              continue = false
+            } else {
+              // keyA > keyB, keep advancing in b
+              idxB += 1
+            }
           }
+
+          // Add elemA if we didn't find it in b
+          if (!foundEqual) {
+            out.+=(a(idxA))
+          }
+
+          idxA += 1
         }
+
         Val.Arr(pos, out.result())
     },
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) {
