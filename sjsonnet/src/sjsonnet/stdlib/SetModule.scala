@@ -65,20 +65,23 @@ object SetModule extends AbstractFunctionModule {
     val out = new mutable.ArrayBuilder.ofRef[Lazy]
     // Set a reasonable size hint - in the worst case (no duplicates), we'll need arrValue.length elements
     out.sizeHint(arrValue.length)
+    var last: Lazy = null
     for (v <- arrValue) {
-      val outResult = out.result()
-      if (outResult.length == 0) {
+      if (out.knownSize == 0) {
         out.+=(v)
+        last = v
       } else if (keyF.isInstanceOf[Val.False]) {
-        if (!ev.equal(outResult.last.force, v.force)) {
+        if (!ev.equal(last.force, v.force)) {
           out.+=(v)
+          last = v
         }
-      } else if (!keyF.isInstanceOf[Val.False]) {
+      } else {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
         val o1Key = keyFFunc.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
-        val o2Key = keyFFunc.apply1(outResult.last, pos.noOffset)(ev, TailstrictModeDisabled)
+        val o2Key = keyFFunc.apply1(last, pos.noOffset)(ev, TailstrictModeDisabled)
         if (!ev.equal(o1Key, o2Key)) {
           out.+=(v)
+          last = v
         }
       }
     }
