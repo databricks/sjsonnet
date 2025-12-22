@@ -12,3 +12,6 @@ Licensed under Apache 2.0, see https://github.com/google/jsonnet/blob/7d1cbf8e69
 ## go_suite
 These are benchmarks copied from the Go Jsonnet implementation's test suite.
 Licensed under Apache 2.0, see https://github.com/google/go-jsonnet/blob/10aef6a96ca825c97c87df137a837e39f5df174c/LICENSE
+
+## sjsonnet_suite
+Benchmarks created by this project.
