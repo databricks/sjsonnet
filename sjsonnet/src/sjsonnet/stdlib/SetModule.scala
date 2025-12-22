@@ -66,14 +66,17 @@ object SetModule extends AbstractFunctionModule {
     // Set a reasonable size hint - in the worst case (no duplicates), we'll need arrValue.length elements
     out.sizeHint(arrValue.length)
     var last: Lazy = null
+    var knownSize = 0
     for (v <- arrValue) {
-      if (out.knownSize == 0) {
+      if (knownSize == 0) {
         out.+=(v)
         last = v
+        knownSize += 1
       } else if (keyF.isInstanceOf[Val.False]) {
         if (!ev.equal(last.force, v.force)) {
           out.+=(v)
           last = v
+          knownSize += 1
         }
       } else {
         val keyFFunc = keyF.asInstanceOf[Val.Func]
@@ -82,6 +85,7 @@ object SetModule extends AbstractFunctionModule {
         if (!ev.equal(o1Key, o2Key)) {
           out.+=(v)
           last = v
+          knownSize += 1
         }
       }
     }
