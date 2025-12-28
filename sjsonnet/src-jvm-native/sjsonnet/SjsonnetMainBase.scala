@@ -277,8 +277,9 @@ object SjsonnetMainBase {
     )
 
     var currentPos: Position = null
-    val pyManager = Platform.makePythonContextManager()
+    val starlarkManager = Platform.makeStarlarkContextManager()
     try {
+      starlarkManager.foreach(m => sjsonnet.starlark.StarlarkEngine.currentManager.set(m.asInstanceOf[sjsonnet.starlark.StarlarkContextManager]))
       val interp = new Interpreter(
         queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
         queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
@@ -290,8 +291,8 @@ object SjsonnetMainBase {
         logger = warnLogger,
         std = std,
         variableResolver = {
-          case "importpy" if pyManager.isDefined =>
-            Some(Platform.makePythonImportFunc(pyManager.get, importer))
+          case "importstarlark" if starlarkManager.isDefined =>
+            Some(Platform.makeStarlarkImportFunc(starlarkManager.get, importer))
           case _ => None
         }
       ) {
@@ -373,7 +374,8 @@ object SjsonnetMainBase {
 
       }
     } finally {
-      pyManager.foreach(Platform.closePythonContextManager)
+      sjsonnet.starlark.StarlarkEngine.currentManager.remove()
+      starlarkManager.foreach(Platform.closeStarlarkContextManager)
     }
   }
 
