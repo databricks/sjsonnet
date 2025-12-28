@@ -11,73 +11,82 @@ object PythonInteropTest extends TestSuite {
     .build()
 
   def tests = Tests {
-    test("python_function_call") {
-      // 1. Define Python function
-      val pythonSrc = 
-        """
-        |def my_len(d):
-        |  return len(d)
-        """.stripMargin
-      context.eval("python", pythonSrc)
-      val pyBindings = context.getBindings("python")
-      val pyLen = pyBindings.getMember("my_len")
-
-      // 2. Define Scala binding
-      // We implement a custom Val.Builtin that calls the Python function
-      class PyLenFunc extends Val.Builtin1("my_len", "d") {
-        def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
-           val v = arg1.force
-           val pyArg = valToPy(v, ev)
-           val result = pyLen.execute(pyArg)
-           if (result.isNumber) Val.Num(pos, result.asDouble())
-           else throw new Exception("Expected number from python")
-        }
-      }
-
-      // 3. Helper to convert Val to Java objects for Graal
-      def valToPy(v: Val, ev: EvalScope): Object = v match {
-        case o: Val.Obj =>
-          val map = new java.util.HashMap[String, Object]()
-          o.foreachElement(false, o.pos) { (k, v) =>
-             map.put(k, valToPy(v, ev))
-          }(ev)
-          map
-        case s: Val.Str => s.value
-        case n: Val.Num => Double.box(n.asDouble)
-        case b: Val.Bool => Boolean.box(b.asBoolean)
-        case Val.Null(_) => null
-        case _ => throw new Exception(s"Unsupported type for conversion: ${v.getClass}")
-      }
-
-      // 4. Run Interpreter with this external variable
-      // Interpreter's constructor taking extVars Map[String, String] converts them to Code.
-      // We need the constructor that takes `String => Option[ExternalVariable[?]]` to pass an Expr.
-      
-      val customInterp = new Interpreter(
-        queryExtVar = {
-          case "my_len" => Some(ExternalVariable.expr(new PyLenFunc))
-          case _ => None
-        },
+    test("importpy_functionality") {
+      val wd = OsPath(os.pwd)
+      val interp = new Interpreter(
+        queryExtVar = _ => None,
         queryTlaVar = _ => None,
-        wd = OsPath(os.pwd),
+        wd = wd,
         importer = Importer.empty,
         parseCache = new DefaultParseCache,
         settings = Settings.default,
         storePos = _ => (),
         logger = null,
         std = sjsonnet.stdlib.StdLibModule.Default.module,
-        variableResolver = _ => None
-      )
+        variableResolver = {
+          case "importpy" => Some(new Val.Builtin1("importpy", "path") {
+            // We need to manage the PythonEvaluator lifecycle. 
+            // Ideally, the Interpreter or EvalScope should own it.
+            // For this test, we create one here.
+            val pyEval = new PythonEvaluator(new Importer {
+                def resolve(docBase: Path, importName: String): Option[Path] = {
+                   // Simple resolution relative to wd
+                   Some(wd / importName)
+                }
+                def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
+                   if (os.exists(path.asInstanceOf[OsPath].p)) 
+                     Some(StaticResolvedFile(os.read(path.asInstanceOf[OsPath].p)))
+                   else None
+                }
+            }, new FileScope(wd))
 
+            def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
+               val pathStr = arg1.force match {
+                 case Val.Str(_, s) => s
+                 case _ => Error.fail("path must be a string", pos)(ev)
+               }
+               // Resolve path relative to current file if possible, or wd
+               val currentFile = pos.fileScope.currentFile
+               val resolvedPath = currentFile match {
+                 case p: OsPath => p.parent() / pathStr
+                 case _ => wd / pathStr
+               }
+               pyEval.eval(resolvedPath, pos)
+            }
+          })
+          case _ => None
+        }
+      )
+      
+      // Create a python file
+      os.write(os.pwd / "utils.py", 
+        """
+        |def add(a, b):
+        |  return a + b
+        |
+        |MY_CONST = 100
+        """.stripMargin)
+        
       val jsonnetSrc = 
         """
-        |local my_len = std.extVar("my_len");
-        |my_len({a: 1, b: 2, c: 3})
+        |local utils = importpy("utils.py");
+        |{
+        |  sum: utils.add(10, 20),
+        |  const: utils.MY_CONST
+        |}
         """.stripMargin
-
-      val result = customInterp.interpret(jsonnetSrc, OsPath(os.pwd / "test.jsonnet"))
+        
+      val result = interp.interpret(jsonnetSrc, OsPath(os.pwd / "main.jsonnet"))
       
-      assert(result == Right(ujson.Num(3)))
+      // cleanup
+      os.remove(os.pwd / "utils.py")
+      
+      if (result.isLeft) {
+         println("Interpretation failed: " + result.left.get)
+      }
+      val json = result.right.get
+      assert(json("sum").num == 30)
+      assert(json("const").num == 100)
     }
   }
 }
