@@ -1,6 +1,7 @@
 package sjsonnet.starlark
 
 import org.graalvm.polyglot._
+import org.graalvm.polyglot.proxy.ProxyExecutable
 import java.util.concurrent.ConcurrentHashMap
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.{Path, Position, Val, Lazy, LazyWithComputeFunc, EvalScope, TailstrictMode, FileScope, Expr, Error, Importer, EvalErrorScope}
@@ -233,6 +234,13 @@ object StarlarkMapper {
     case n: Val.Num => Double.box(n.asDouble)
     case b: Val.Bool => Boolean.box(b.asBoolean)
     case Val.Null(_) => null
+    case f: Val.Func => new ProxyExecutable {
+      override def execute(args: Value*): Object = {
+        val jsonnetArgs = args.map(v => pyToVal(v, null))
+        val res = f.apply(jsonnetArgs.map(v => v: Lazy).toArray, null, null)(ev, sjsonnet.TailstrictModeDisabled)
+        valToPy(res, ev)
+      }
+    }
     case a: Val.Arr => 
        a.asStrictArray.map(valToPy(_, ev)).toArray
     case o: Val.Obj =>
