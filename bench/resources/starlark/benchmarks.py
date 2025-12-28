@@ -51,3 +51,21 @@ def map_bench(n):
     n_int = int(n)
 
     return [x * x for x in range(1, n_int + 1)]
+
+
+
+
+
+def filter_bench(n):
+
+    n_int = int(n)
+
+    return [x for x in range(1, n_int + 1) if x % 2 == 0]
+
+
+
+def map_bench(n):
+
+    n_int = int(n)
+
+    return [x * x for x in range(1, n_int + 1)]

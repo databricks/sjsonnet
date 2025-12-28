@@ -79,9 +79,160 @@ class StarlarkBenchmark {
     bh.consume(runJsonnet(code))
   }
 
-  @Benchmark
-  def pow_starlark(bh: Blackhole): Unit = {
-    val code = """local bench = importstarlark("benchmarks.py"); bench.pow_bench(1000)"""
-    bh.consume(runJsonnet(code))
+    @Benchmark
+
+    def pow_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.pow_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def makeArray_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "std.makeArray(1000, function(i) i + 1)"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def makeArray_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.makeArray(1000, function(i) i + 1)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def floor_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "local n = 1000; [std.floor(10.99999) for i in std.range(1, n)][n-1]"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def floor_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.floor_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def ceil_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "local n = 1000; [std.ceil(10.99999) for i in std.range(1, n)][n-1]"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def ceil_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.ceil_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def sqrt_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "local n = 1000; [std.sqrt(16) for i in std.range(1, n)][n-1]"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def sqrt_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.sqrt_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def filter_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "std.filter(function(x) x % 2 == 0, std.range(1, 1000))"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def filter_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.filter_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def map_jsonnet(bh: Blackhole): Unit = {
+
+      val code = "std.map(function(x) x * x, std.range(1, 1000))"
+
+      bh.consume(runJsonnet(code))
+
+    }
+
+  
+
+    @Benchmark
+
+    def map_starlark(bh: Blackhole): Unit = {
+
+      val code = """local bench = importstarlark("benchmarks.py"); bench.map_bench(1000)"""
+
+      bh.consume(runJsonnet(code))
+
+    }
+
   }
-}
+
+  
