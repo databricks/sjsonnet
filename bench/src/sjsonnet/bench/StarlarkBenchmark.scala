@@ -36,56 +36,67 @@ class StarlarkBenchmark {
     }
   }
 
-  private var starlarkManager: StarlarkContextManager = _
-  private var interp: Interpreter = _
+    private var starlarkManager: StarlarkContextManager = _
 
-  @Setup
-  def setup(): Unit = {
-    val manager = Platform.makeStarlarkContextManager().get.asInstanceOf[StarlarkContextManager]
-    starlarkManager = manager
-    StarlarkEngine.currentManager.set(manager)
-    
-    interp = new Interpreter(
-      extVars = Map.empty,
-      tlaVars = Map.empty,
-      wd = wd,
-      importer = importer,
-      parseCache = new DefaultParseCache,
-      settings = Settings.default,
-      variableResolver = {
-        case "importstarlark" =>
-          Some(Platform.makeStarlarkImportFunc(manager, importer))
-        case _ => None
-      }
-    )
-  }
+    private var interp: Interpreter = _
 
-  @TearDown
-  def tearDown(): Unit = {
-    StarlarkEngine.currentManager.remove()
-    Platform.closeStarlarkContextManager(starlarkManager)
-  }
+  
 
-  private def runJsonnet(code: String): ujson.Value = {
-    interp.interpret(code, wd / "bench.jsonnet") match {
-      case Right(v) => v
-      case Left(err) => throw new RuntimeException(err)
+    @Setup
+
+    def setup(): Unit = {
+
+      starlarkManager = Platform.makeStarlarkContextManager().get.asInstanceOf[StarlarkContextManager]
+
+      interp = new Interpreter(
+
+        extVars = Map.empty, tlaVars = Map.empty, wd = wd, importer = importer,
+
+        parseCache = new DefaultParseCache, settings = Settings.default,
+
+        variableResolver = {
+
+          case "importstarlark" => Some(Platform.makeStarlarkImportFunc(starlarkManager, importer))
+
+          case _ => None
+
+        }
+
+      )
+
     }
-  }
 
-  @Benchmark
-  def pow_jsonnet(bh: Blackhole): Unit = {
-    val code = "local n = 1000; [std.pow(3, 2) for i in std.range(1, n)][n-1]"
-    bh.consume(runJsonnet(code))
-  }
+  
 
-    @Benchmark
+    @TearDown
 
-    def pow_starlark(bh: Blackhole): Unit = {
+    def tearDown(): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.pow_bench(1000)"""
+      Platform.closeStarlarkContextManager(starlarkManager)
 
-      bh.consume(runJsonnet(code))
+    }
+
+  
+
+    private def runJsonnet(code: String): ujson.Value = {
+
+      StarlarkEngine.currentManager.set(starlarkManager)
+
+      try {
+
+        interp.interpret(code, wd / "bench.jsonnet") match {
+
+          case Right(v) => v
+
+          case Left(err) => throw new RuntimeException(err)
+
+        }
+
+      } finally {
+
+        StarlarkEngine.currentManager.remove()
+
+      }
 
     }
 
@@ -95,9 +106,7 @@ class StarlarkBenchmark {
 
     def makeArray_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "std.makeArray(1000, function(i) i + 1)"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("std.makeArray(1000, function(i) i + 1)"))
 
     }
 
@@ -107,9 +116,27 @@ class StarlarkBenchmark {
 
     def makeArray_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.makeArray(1000, function(i) i + 1)"""
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.makeArray(1000, function(i) i + 1)"""))
 
-      bh.consume(runJsonnet(code))
+    }
+
+  
+
+    @Benchmark
+
+    def pow_jsonnet(bh: Blackhole): Unit = {
+
+      bh.consume(runJsonnet("local n = 1000; [std.pow(3, 2) for i in std.range(1, n)][n-1]"))
+
+    }
+
+  
+
+    @Benchmark
+
+    def pow_starlark(bh: Blackhole): Unit = {
+
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.pow_bench(1000)"""))
 
     }
 
@@ -119,9 +146,7 @@ class StarlarkBenchmark {
 
     def floor_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "local n = 1000; [std.floor(10.99999) for i in std.range(1, n)][n-1]"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("local n = 1000; [std.floor(10.99999) for i in std.range(1, n)][n-1]"))
 
     }
 
@@ -131,9 +156,7 @@ class StarlarkBenchmark {
 
     def floor_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.floor_bench(1000)"""
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.floor_bench(1000)"""))
 
     }
 
@@ -143,9 +166,7 @@ class StarlarkBenchmark {
 
     def ceil_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "local n = 1000; [std.ceil(10.99999) for i in std.range(1, n)][n-1]"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("local n = 1000; [std.ceil(10.99999) for i in std.range(1, n)][n-1]"))
 
     }
 
@@ -155,9 +176,7 @@ class StarlarkBenchmark {
 
     def ceil_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.ceil_bench(1000)"""
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.ceil_bench(1000)"""))
 
     }
 
@@ -167,9 +186,7 @@ class StarlarkBenchmark {
 
     def sqrt_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "local n = 1000; [std.sqrt(16) for i in std.range(1, n)][n-1]"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("local n = 1000; [std.sqrt(16) for i in std.range(1, n)][n-1]"))
 
     }
 
@@ -179,9 +196,7 @@ class StarlarkBenchmark {
 
     def sqrt_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.sqrt_bench(1000)"""
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.sqrt_bench(1000)"""))
 
     }
 
@@ -191,9 +206,7 @@ class StarlarkBenchmark {
 
     def filter_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "std.filter(function(x) x % 2 == 0, std.range(1, 1000))"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("std.filter(function(x) x % 2 == 0, std.range(1, 1000))"))
 
     }
 
@@ -203,9 +216,7 @@ class StarlarkBenchmark {
 
     def filter_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.filter_bench(1000)"""
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.filter_bench(1000)"""))
 
     }
 
@@ -215,9 +226,7 @@ class StarlarkBenchmark {
 
     def map_jsonnet(bh: Blackhole): Unit = {
 
-      val code = "std.map(function(x) x * x, std.range(1, 1000))"
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("std.map(function(x) x * x, std.range(1, 1000))"))
 
     }
 
@@ -227,9 +236,7 @@ class StarlarkBenchmark {
 
     def map_starlark(bh: Blackhole): Unit = {
 
-      val code = """local bench = importstarlark("benchmarks.py"); bench.map_bench(1000)"""
-
-      bh.consume(runJsonnet(code))
+      bh.consume(runJsonnet("""local b = importstarlark("benchmarks.py"); b.map_bench(1000)"""))
 
     }
 

@@ -236,8 +236,13 @@ object StarlarkMapper {
     case Val.Null(_) => null
     case f: Val.Func => new ProxyExecutable {
       override def execute(args: Value*): Object = {
-        val jsonnetArgs = args.map(v => pyToVal(v, null))
-        val res = f.apply(jsonnetArgs.map(v => v: Lazy).toArray, null, null)(ev, sjsonnet.TailstrictModeDisabled)
+        val jsonnetArgs = new Array[Val](args.length)
+        var i = 0
+        while (i < args.length) {
+          jsonnetArgs(i) = pyToVal(args(i), null)
+          i += 1
+        }
+        val res = f.apply(jsonnetArgs.map(v => v: Lazy), null, null)(ev, sjsonnet.TailstrictModeDisabled)
         valToPy(res, ev)
       }
     }
