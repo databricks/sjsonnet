@@ -33,8 +33,10 @@ object MainBenchmark {
       Map("var1" -> "\"test\"", "var2" -> """{"x": 1, "y": 2}"""),
       Map.empty[String, String],
       OsPath(wd),
-      importer = SjsonnetMainBase
-        .resolveImport(config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)), None),
+      importer = new SjsonnetMainBase.SimpleImporter(
+        config.getOrderedJpaths.map(os.Path(_, wd)).map(OsPath(_)),
+        None
+      ),
       parseCache = parseCache
     )
     val renderer = new Renderer(new StringWriter, indent = 3)

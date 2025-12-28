@@ -4,7 +4,7 @@ import org.graalvm.polyglot._
 import java.util.concurrent.ConcurrentHashMap
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.{Path, Position, Val, Lazy, LazyWithComputeFunc, EvalScope, TailstrictMode, FileScope, Expr, Error, Importer, EvalErrorScope}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object StarlarkEngine {
   // Shared engine to enable JIT code sharing across contexts
