@@ -11,82 +11,68 @@ object PythonInteropTest extends TestSuite {
     .build()
 
   def tests = Tests {
-    test("importpy_functionality") {
+    test("importpy_shared_context") {
       val wd = OsPath(os.pwd)
-      val interp = new Interpreter(
-        queryExtVar = _ => None,
-        queryTlaVar = _ => None,
-        wd = wd,
-        importer = Importer.empty,
-        parseCache = new DefaultParseCache,
-        settings = Settings.default,
-        storePos = _ => (),
-        logger = null,
-        std = sjsonnet.stdlib.StdLibModule.Default.module,
-        variableResolver = {
-          case "importpy" => Some(new Val.Builtin1("importpy", "path") {
-            // We need to manage the PythonEvaluator lifecycle. 
-            // Ideally, the Interpreter or EvalScope should own it.
-            // For this test, we create one here.
-            val pyEval = new PythonEvaluator(new Importer {
-                def resolve(docBase: Path, importName: String): Option[Path] = {
-                   // Simple resolution relative to wd
-                   Some(wd / importName)
-                }
-                def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
-                   if (os.exists(path.asInstanceOf[OsPath].p)) 
-                     Some(StaticResolvedFile(os.read(path.asInstanceOf[OsPath].p)))
-                   else None
-                }
-            }, new FileScope(wd))
-
-            def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
-               val pathStr = arg1.force match {
-                 case Val.Str(_, s) => s
-                 case _ => Error.fail("path must be a string", pos)(ev)
-               }
-               // Resolve path relative to current file if possible, or wd
-               val currentFile = pos.fileScope.currentFile
-               val resolvedPath = currentFile match {
-                 case p: OsPath => p.parent() / pathStr
-                 case _ => wd / pathStr
-               }
-               pyEval.eval(resolvedPath, pos)
-            }
-          })
-          case _ => None
+      val importer = new Importer {
+        def resolve(docBase: Path, importName: String): Option[Path] = Some(docBase / importName)
+        def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
+          val p = path.asInstanceOf[OsPath].p
+          if (os.exists(p)) Some(StaticResolvedFile(os.read(p))) else None
         }
-      )
-      
-      // Create a python file
-      os.write(os.pwd / "utils.py", 
-        """
-        |def add(a, b):
-        |  return a + b
-        |
-        |MY_CONST = 100
-        """.stripMargin)
-        
-      val jsonnetSrc = 
-        """
-        |local utils = importpy("utils.py");
-        |{
-        |  sum: utils.add(10, 20),
-        |  const: utils.MY_CONST
-        |}
-        """.stripMargin
-        
-      val result = interp.interpret(jsonnetSrc, OsPath(os.pwd / "main.jsonnet"))
-      
-      // cleanup
-      os.remove(os.pwd / "utils.py")
-      
-      if (result.isLeft) {
-         println("Interpretation failed: " + result.left.get)
       }
-      val json = result.right.get
-      assert(json("sum").num == 30)
-      assert(json("const").num == 100)
+      val pyManager = Platform.makePythonContextManager()
+      try {
+        val interp = new Interpreter(
+          queryExtVar = _ => None,
+          queryTlaVar = _ => None,
+          wd = wd,
+          importer = importer,
+          parseCache = new DefaultParseCache,
+          settings = Settings.default,
+          storePos = _ => (),
+          logger = null,
+          std = sjsonnet.stdlib.StdLibModule.Default.module,
+          variableResolver = {
+            case "importpy" if pyManager.isDefined =>
+              Some(Platform.makePythonImportFunc(pyManager.get, importer))
+            case _ => None
+          }
+        )
+        
+        os.write(os.pwd / "state.py", 
+          """
+          |counter = 0
+          |def inc():
+          |  global counter
+          |  counter += 1
+          |  return counter
+          """.stripMargin)
+          
+        val jsonnetSrc = 
+          """
+          |local s1 = importpy("state.py");
+          |local s2 = importpy("state.py");
+          |{
+          |  v1: s1.inc(),
+          |  v2: s2.inc(),
+          |  v3: s1.inc()
+          |}
+          """.stripMargin
+          
+        val result = interp.interpret(jsonnetSrc, OsPath(os.pwd / "main.jsonnet"))
+        
+        os.remove(os.pwd / "state.py")
+        
+        if (result.isLeft) {
+           println("Interpretation failed: " + result.left.get)
+        }
+        val json = result.right.get
+        assert(json("v1").num == 1)
+        assert(json("v2").num == 2)
+        assert(json("v3").num == 3)
+      } finally {
+        pyManager.foreach(Platform.closePythonContextManager)
+      }
     }
   }
 }

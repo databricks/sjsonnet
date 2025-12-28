@@ -165,4 +165,10 @@ object Platform {
       quote
     }
   }
+
+  def makePythonContextManager(): Option[Any] = Some(new PythonContextManager())
+  def makePythonImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    new PythonImportFunc(manager.asInstanceOf[PythonContextManager], importer)
+  def closePythonContextManager(manager: Any): Unit =
+    manager.asInstanceOf[PythonContextManager].close()
 }

@@ -110,4 +110,9 @@ object Platform {
   }
 
   def regexQuote(s: String): String = Pattern.quote(s)
+
+  def makePythonContextManager(): Option[Any] = None
+  def makePythonImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    throw new Exception("Python not supported on Scala.js")
+  def closePythonContextManager(manager: Any): Unit = ()
 }

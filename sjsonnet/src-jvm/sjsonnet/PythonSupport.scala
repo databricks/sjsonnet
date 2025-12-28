@@ -9,73 +9,80 @@ object PythonEngine {
   lazy val engine: Engine = Engine.newBuilder()
     .option("engine.WarnInterpreterOnly", "false")
     .build()
+
+  private val sourceCache = new ConcurrentHashMap[(Path, String), Source]()
+
+  def getSource(path: Path, code: String): Source = {
+    val key = (path, code)
+    var src = sourceCache.get(key)
+    if (src == null) {
+      src = Source.newBuilder("python", code, path.toString).build()
+      val existing = sourceCache.putIfAbsent(key, src)
+      if (existing != null) src = existing
+    }
+    src
+  }
 }
 
-class PythonEvaluator(importer: Importer, fileScope: FileScope) {
-  // One context per evaluator/request
-  private val context: Context = Context.newBuilder("python")
-    .engine(PythonEngine.engine)
-    .allowAllAccess(true) // For now, refine later
-    .build()
+class PythonContextManager {
+  private var context: Context = _
+  private var loader: Value = _
+  private val moduleCache = new java.util.HashMap[Path, Val]()
 
-  def close(): Unit = context.close()
-
-  def eval(path: Path, pos: Position): Val = {
-    // 1. Resolve and read the file
-    // We reuse the existing Importer infrastructure to read the file content
-    val resolvedFile = importer.read(path, binaryData = false) match {
-      case Some(r) => r
-      case None => Error.fail(s"Could not read python file: ${path}", pos)(new EvalErrorScope {
-          def settings: Settings = Settings.default
-          def trace(msg: String): Unit = ()
-          def warn(e: Error): Unit = ()
-          def extVars: String => Option[Expr] = _ => None
-          def importer: CachedImporter = null
-          def wd: Path = OsPath(os.pwd)
-      })
-    }
-    
-    val sourceCode = resolvedFile.readString()
-    
-    // 2. Create Graal Source object
-    // Using the path as the name helps Graal cache the compilation
-    val source = Source.newBuilder("python", sourceCode, path.toString).build()
-
-    // 3. Evaluate
-    try {
-      context.eval(source)
-      
-      // 4. Extract exports (globals)
+  def getContext: Context = {
+    if (context == null) {
+      context = Context.newBuilder("python")
+        .engine(PythonEngine.engine)
+        .allowAllAccess(true)
+        .build()
       
       val loaderShim = 
         """
         |import types
-        |def load_module(name, code):
+        |def load_module(name, code, path):
         |    mod = types.ModuleType(name)
+        |    mod.__file__ = path
         |    exec(code, mod.__dict__)
         |    return mod
         """.stripMargin
         
       context.eval("python", loaderShim)
-      val loader = context.getBindings("python").getMember("load_module")
-      
-      val moduleName = path.last // simplistic module name
-      val moduleObj = loader.execute(moduleName, sourceCode)
-      
-      // 5. Convert exported members to Val.Obj
-      PythonMapper.pyToVal(moduleObj, pos)
-      
+      loader = context.getBindings("python").getMember("load_module")
+    }
+    context
+  }
+
+  def loadModel(path: Path, pos: Position, importer: Importer)(implicit ev: EvalErrorScope): Val = {
+    val cached = moduleCache.get(path)
+    if (cached != null) return cached
+
+    val ctx = getContext
+    val resolvedFile = importer.read(path, binaryData = false).getOrElse(
+      Error.fail(s"Could not read python file: ${path}", pos)
+    )
+    val code = resolvedFile.readString()
+    
+    // Ensure the source is registered in the engine for JIT
+    PythonEngine.getSource(path, code)
+
+    try {
+      val moduleName = path.last
+      val moduleObj = loader.execute(moduleName, code, path.toString)
+      val result = PythonMapper.pyToVal(moduleObj, pos)
+      moduleCache.put(path, result)
+      result
     } catch {
       case e: PolyglotException => 
-        Error.fail(s"Python evaluation failed: ${e.getMessage}", pos)(new EvalErrorScope {
-          def settings: Settings = Settings.default
-          def trace(msg: String): Unit = ()
-          def warn(e: Error): Unit = ()
-          def extVars: String => Option[Expr] = _ => None
-          def importer: CachedImporter = null
-          def wd: Path = OsPath(os.pwd)
-        })
+        Error.fail(s"Python evaluation failed: ${e.getMessage}", pos)
     }
+  }
+
+  def close(): Unit = {
+    if (context != null) {
+      context.close()
+      context = null
+    }
+    moduleCache.clear()
   }
 }
 
@@ -113,7 +120,6 @@ object PythonMapper {
          if (!k.startsWith("__")) {
            val member = v.getMember(k)
            val isModule = try {
-              // This is a heuristic. A better way might be checking type(v) == type(sys)
               member.getMetaObject.getMetaSimpleName == "module"
            } catch { case _: Exception => false }
            
@@ -129,10 +135,6 @@ object PythonMapper {
        return new Val.Obj(pos, builder, false, null, null)
     }
     
-    if (v.canExecute) {
-       return new PythonFunc(v, pos)
-    }
-    
     Val.Str(pos, s"<python object: $v>")
   }
   
@@ -141,7 +143,6 @@ object PythonMapper {
             ev: EvalScope,
             tailstrictMode: TailstrictMode): Val = {
             
-            // force args
             val args = argsL.map(_.force)
             val pyArgs = args.map(valToPy(_, ev))
             
@@ -156,8 +157,20 @@ object PythonMapper {
               case e: PolyglotException => Error.fail(s"Python execution failed: ${e.getMessage}", outerPos)
             }
       }
+
+      override def apply0(outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val =
+        apply(Array.empty, null, outerPos)
+
+      override def apply1(argVal: Lazy, outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val =
+        apply(Array(argVal), null, outerPos)
+
+      override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val =
+        apply(Array(argVal1, argVal2), null, outerPos)
+
+      override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val =
+        apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       
-      def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = Val.Null(pos) // Should not be called
+      def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = Val.Null(pos)
   }
 
   def valToPy(v: Val, ev: EvalScope): Object = v match {
@@ -166,7 +179,6 @@ object PythonMapper {
     case b: Val.Bool => Boolean.box(b.asBoolean)
     case Val.Null(_) => null
     case a: Val.Arr => 
-       // Convert to Java List or Array
        a.asStrictArray.map(valToPy(_, ev)).toArray
     case o: Val.Obj =>
        val map = new java.util.HashMap[String, Object]()
@@ -174,6 +186,15 @@ object PythonMapper {
          map.put(k, valToPy(v, ev))
        }(ev)
        map
-    case _ => v.toString // Fallback
+    case _ => v.toString
+  }
+}
+
+class PythonImportFunc(manager: PythonContextManager, importer: Importer) extends Val.Builtin1("importpy", "path") {
+  def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
+    val pathStr = arg1.force.asString
+    val currentFile = pos.fileScope.currentFile
+    val resolvedPath = currentFile.parent() / pathStr
+    manager.loadModel(resolvedPath, pos, importer)(ev)
   }
 }

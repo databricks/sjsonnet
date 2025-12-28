@@ -154,4 +154,9 @@ object Platform {
       quote
     }
   }
+
+  def makePythonContextManager(): Option[Any] = None
+  def makePythonImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    throw new Exception("Python not supported on Scala Native")
+  def closePythonContextManager(manager: Any): Unit = ()
 }

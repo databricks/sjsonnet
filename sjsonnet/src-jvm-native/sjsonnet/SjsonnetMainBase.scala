@@ -277,94 +277,103 @@ object SjsonnetMainBase {
     )
 
     var currentPos: Position = null
-    val interp = new Interpreter(
-      queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
-      queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
-      OsPath(wd),
-      importer = importer,
-      parseCache,
-      settings = settings,
-      storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
-      logger = warnLogger,
-      std = std,
-      variableResolver = _ => None
-    ) {
-      override def createEvaluator(
-          resolver: CachedResolver,
-          extVars: String => Option[Expr],
-          wd: Path,
-          settings: Settings): Evaluator =
-        evaluatorOverride.getOrElse(
-          super.createEvaluator(resolver, extVars, wd, settings)
-        )
-    }
+    val pyManager = Platform.makePythonContextManager()
+    try {
+      val interp = new Interpreter(
+        queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
+        queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
+        OsPath(wd),
+        importer = importer,
+        parseCache,
+        settings = settings,
+        storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
+        logger = warnLogger,
+        std = std,
+        variableResolver = {
+          case "importpy" if pyManager.isDefined =>
+            Some(Platform.makePythonImportFunc(pyManager.get, importer))
+          case _ => None
+        }
+      ) {
+        override def createEvaluator(
+            resolver: CachedResolver,
+            extVars: String => Option[Expr],
+            wd: Path,
+            settings: Settings): Evaluator =
+          evaluatorOverride.getOrElse(
+            super.createEvaluator(resolver, extVars, wd, settings)
+          )
+      }
 
-    (config.multi, config.yamlStream.value) match {
-      case (Some(multiPath), _) =>
-        interp.interpret(jsonnetCode, OsPath(path)).flatMap {
-          case obj: ujson.Obj =>
-            val renderedFiles: Seq[Either[String, os.FilePath]] =
-              obj.value.toSeq.map { case (f, v) =>
-                for {
-                  rendered <- {
-                    val writer = new StringWriter()
+      (config.multi, config.yamlStream.value) match {
+        case (Some(multiPath), _) =>
+          interp.interpret(jsonnetCode, OsPath(path)).flatMap {
+            case obj: ujson.Obj =>
+              val renderedFiles: Seq[Either[String, os.FilePath]] =
+                obj.value.toSeq.map { case (f, v) =>
+                  for {
+                    rendered <- {
+                      val writer = new StringWriter()
+                      val renderer = rendererForConfig(writer, config, () => currentPos)
+                      ujson.transform(v, renderer)
+                      Right(writer.toString)
+                    }
+                    relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
+                    _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
+                  } yield relPath
+                }
+
+              renderedFiles.collect { case Left(err) => err } match {
+                case Nil =>
+                  Right[String, String](
+                    renderedFiles.collect { case Right(path) => path }.mkString("\n")
+                  )
+                case errs =>
+                  Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
+              }
+
+            case _ =>
+              Left(
+                "error: multi mode: top-level should be an object " +
+                  "whose keys are filenames and values hold the JSON for that file."
+              )
+          }
+        case (None, true) =>
+          // YAML stream
+
+          interp.interpret(jsonnetCode, OsPath(path)).flatMap {
+            case arr: ujson.Arr =>
+              writeToFile(config, wd) { writer =>
+                arr.value.toSeq match {
+                  case Nil => // donothing
+                  case Seq(single) =>
                     val renderer = rendererForConfig(writer, config, () => currentPos)
-                    ujson.transform(v, renderer)
-                    Right(writer.toString)
-                  }
-                  relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
-                  _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
-                } yield relPath
+                    single.transform(renderer)
+                    writer.write(if (isScalar(single)) "\n..." else "")
+                  case multiple =>
+                    for ((v, i) <- multiple.zipWithIndex) {
+                      if (i > 0) writer.write('\n')
+                      if (isScalar(v)) writer.write("--- ")
+                      else if (i != 0) writer.write("---\n")
+                      val renderer = rendererForConfig(
+                        writer,
+                        config.copy(yamlOut = mainargs.Flag(true)),
+                        () => currentPos
+                      )
+                      v.transform(renderer)
+                    }
+                }
+                writer.write('\n')
+                Right("")
               }
 
-            renderedFiles.collect { case Left(err) => err } match {
-              case Nil =>
-                Right[String, String](
-                  renderedFiles.collect { case Right(path) => path }.mkString("\n")
-                )
-              case errs =>
-                Left[String, String]("rendering errors:\n" + errs.mkString("\n"))
-            }
+            case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+          }
+        case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
 
-          case _ =>
-            Left(
-              "error: multi mode: top-level should be an object " +
-              "whose keys are filenames and values hold the JSON for that file."
-            )
-        }
-      case (None, true) =>
-        // YAML stream
-
-        interp.interpret(jsonnetCode, OsPath(path)).flatMap {
-          case arr: ujson.Arr =>
-            writeToFile(config, wd) { writer =>
-              arr.value.toSeq match {
-                case Nil         => // donothing
-                case Seq(single) =>
-                  val renderer = rendererForConfig(writer, config, () => currentPos)
-                  single.transform(renderer)
-                  writer.write(if (isScalar(single)) "\n..." else "")
-                case multiple =>
-                  for ((v, i) <- multiple.zipWithIndex) {
-                    if (i > 0) writer.write('\n')
-                    if (isScalar(v)) writer.write("--- ")
-                    else if (i != 0) writer.write("---\n")
-                    val renderer = rendererForConfig(
-                      writer,
-                      config.copy(yamlOut = mainargs.Flag(true)),
-                      () => currentPos
-                    )
-                    v.transform(renderer)
-                  }
-              }
-              writer.write('\n')
-              Right("")
-            }
-
-          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
-        }
-      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
-
+      }
+    } finally {
+      pyManager.foreach(Platform.closePythonContextManager)
     }
   }
 
