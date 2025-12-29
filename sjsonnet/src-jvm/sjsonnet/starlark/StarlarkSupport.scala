@@ -46,10 +46,25 @@ class StarlarkContextManager {
       val loaderShim = 
         """
         |import types
+        |
+        |def freeze(obj, seen=None):
+        |    if seen is None: seen = set()
+        |    if id(obj) in seen: return obj
+        |    seen.add(id(obj))
+        |    if isinstance(obj, list):
+        |        return tuple(freeze(i, seen) for i in obj)
+        |    if isinstance(obj, dict):
+        |        return types.MappingProxyType({k: freeze(v, seen) for k, v in obj.items()})
+        |    return obj
+        |
         |def load_module(name, code, path):
         |    mod = types.ModuleType(name)
         |    mod.__file__ = path
         |    exec(code, mod.__dict__)
+        |    # Freeze user-defined globals
+        |    for k in list(mod.__dict__.keys()):
+        |        if not k.startswith("__"):
+        |            mod.__dict__[k] = freeze(mod.__dict__[k])
         |    return mod
         """.stripMargin
         
@@ -207,7 +222,7 @@ object StarlarkMapper {
       def evalRhs(scope: sjsonnet.ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val = Val.Null(pos)
   }
 
-  class GlobalStarlarkFunc(path: Path, members: Seq[String], defSitePos: Position, code: String) extends Val.Func(defSitePos, sjsonnet.ValScope.empty, Expr.Params(Array.empty, Array.empty)) {
+  class GlobalStarlarkFunc(val path: Path, val members: Seq[String], defSitePos: Position, val code: String) extends Val.Func(defSitePos, sjsonnet.ValScope.empty, Expr.Params(Array.empty, Array.empty)) {
       override def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit
             ev: EvalScope,
             tailstrictMode: TailstrictMode): Val = {
@@ -234,6 +249,9 @@ object StarlarkMapper {
     case n: Val.Num => Double.box(n.asDouble)
     case b: Val.Bool => Boolean.box(b.asBoolean)
     case Val.Null(_) => null
+    case f: GlobalStarlarkFunc => 
+      val manager = StarlarkEngine.currentManager.get()
+      manager.getNestedValue(f.path, f.members, f.code)
     case f: Val.Func => new ProxyExecutable {
       override def execute(args: Value*): Object = {
         val jsonnetArgs = new Array[Val](args.length)
