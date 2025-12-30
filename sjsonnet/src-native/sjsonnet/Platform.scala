@@ -154,4 +154,9 @@ object Platform {
       quote
     }
   }
+
+  def makeStarlarkContextManager(): Option[Any] = None
+  def makeStarlarkImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    throw new Exception("Starlark not supported on Scala Native")
+  def closeStarlarkContextManager(manager: Any): Unit = ()
 }
