@@ -1,30 +1,50 @@
 package sjsonnet.starlark
 
+import java.util.concurrent.ConcurrentHashMap
+
+// import scala.jdk.CollectionConverters._
+
 import org.graalvm.polyglot._
 import org.graalvm.polyglot.proxy.ProxyExecutable
-import java.util.concurrent.ConcurrentHashMap
+
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.{Path, Position, Val, Lazy, LazyWithComputeFunc, EvalScope, TailstrictMode, FileScope, Expr, Error, Importer, EvalErrorScope}
-import scala.jdk.CollectionConverters._
+import sjsonnet.{
+  Error,
+  EvalErrorScope,
+  EvalScope,
+  Expr,
+  FileScope,
+  Importer,
+  Lazy,
+  LazyWithComputeFunc,
+  Path,
+  Position,
+  TailstrictMode,
+  Val
+}
 
 object StarlarkEngine {
+
   // Shared engine to enable JIT code sharing across contexts
   lazy val engine: Engine = Engine.newBuilder()
-    .option("engine.WarnInterpreterOnly", "false")
+    // Emit a warning if we're running on a JVM that does not support Truffle optimizations
+    .option("engine.WarnInterpreterOnly", "true")
     .build()
 
   private val sourceCache = new ConcurrentHashMap[(Path, String), Source]()
+
   private val globalValCache = new ConcurrentHashMap[(Path, Seq[String]), Val]()
-  
+
   val currentManager = new ThreadLocal[StarlarkContextManager]()
 
   def getSource(path: Path, code: String): Source = {
-    sourceCache.computeIfAbsent((path, code), _ => 
+    sourceCache.computeIfAbsent((path, code), _ =>
       Source.newBuilder("python", code, path.toString).build()
     )
   }
 
   def getCachedVal(path: Path, members: Seq[String]): Val = globalValCache.get((path, members))
+
   def cacheVal(path: Path, members: Seq[String], v: Val): Val = {
     val existing = globalValCache.putIfAbsent((path, members), v)
     if (existing != null) existing else v
@@ -145,24 +165,25 @@ object StarlarkMapper {
       val isModule = v.getMetaObject.getMetaSimpleName == "module"
       val moduleName = if (isModule) v.getMember("__name__").asString() else null
       
-      val keys = v.getMemberKeys.asScala.filter(!_.startsWith("__")).toSeq
       val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
       
-      for (k <- keys) {
-        val member = v.getMember(k)
-        val shouldExport = if (isModule) {
-          try {
-            val memberMod = member.getMember("__module__")
-            memberMod != null && memberMod.asString() == moduleName
-          } catch { case _: Exception => true }
-        } else true
+      v.getMemberKeys.forEach { k =>
+        if (!k.startsWith("__")) {
+          val member = v.getMember(k)
+          val shouldExport = if (isModule) {
+            try {
+              val memberMod = member.getMember("__module__")
+              memberMod != null && memberMod.asString() == moduleName
+            } catch { case _: Exception => true }
+          } else true
 
-        if (shouldExport) {
-          builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
-            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              getGlobalVal(path, members :+ k, pos, code)
-            }
-          })
+          if (shouldExport) {
+            builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
+              def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                getGlobalVal(path, members :+ k, pos, code)
+              }
+            })
+          }
         }
       }
       new Val.Obj(pos, builder, false, null, null)
@@ -188,13 +209,14 @@ object StarlarkMapper {
     }
     if (v.canExecute) return new LocalStarlarkFunc(v, pos)
     if (v.hasMembers) {
-       val keys = v.getMemberKeys.asScala.filter(!_.startsWith("__")).toSeq
        val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-       for (k <- keys) {
-         val member = v.getMember(k)
-         builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
-           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = pyToVal(member, pos)
-         })
+       v.getMemberKeys.forEach { k =>
+         if (!k.startsWith("__")) {
+           val member = v.getMember(k)
+           builder.put(k, new Val.Obj.Member(false, Visibility.Normal) {
+             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = pyToVal(member, pos)
+           })
+         }
        }
        return new Val.Obj(pos, builder, false, null, null)
     }

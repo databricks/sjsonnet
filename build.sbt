@@ -29,7 +29,8 @@ lazy val main = (project in file("sjsonnet"))
       "org.graalvm.polyglot" % "polyglot" % "25.0.1",
       "org.graalvm.python" % "python-language" % "25.0.1",
       "org.graalvm.python" % "python-resources" % "25.0.1",
-      "org.graalvm.python" % "python-embedding" % "25.0.1"
+      "org.graalvm.python" % "python-embedding" % "25.0.1",
+      "org.graalvm.truffle" % "truffle-api" % "25.0.1"
     ),
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "utest" % "0.9.1"
