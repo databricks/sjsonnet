@@ -56,7 +56,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   def manifest = super
     .manifest()
     .add(
-      "Enable-Native-Access" -> "net.jpountz.util.Native"
+      "Enable-Native-Access" -> "ALL-UNNAMED"
     )
 
   def generatedSources = Task {
