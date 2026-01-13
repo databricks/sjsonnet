@@ -52,7 +52,7 @@ jobs:
           - name: linux-arm64
             os: ubuntu-22.04-arm
           - name: darwin-x86_64
-            os: macos-13
+            os: macos-15-intel
           - name: darwin-arm64
             os: macos-15
     runs-on: ${{ matrix.platform.os }}
