@@ -35,5 +35,5 @@ jobs:
         if: ${{ matrix.lang == 'jvm' }}
         run: sbt test
       - name: Run Native Image Test Suites
-        if: ${{ (matrix.lang == 'jvm') && (matrix.java == '21') }}
+        if: ${{ (matrix.lang == 'jvm') && (matrix.java == '25') }}
         run: sjsonnet/test/graalvm/run_test_suites.py
