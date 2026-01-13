@@ -261,7 +261,7 @@
    "stripChars": "bbbb",
    "substr": "s",
    "tan": true,
-   "thisFile": "sjsonnet/test/resources/go_test_suite/stdlib_smoke_test.jsonnet",
+   "thisFile": "stdlib_smoke_test.jsonnet",
    "toString": "42",
    "type": "object",
    "uniq": [
