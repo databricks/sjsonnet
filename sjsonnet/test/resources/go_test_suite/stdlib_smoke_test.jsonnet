@@ -158,7 +158,7 @@ local assertClose(a, b) =
     ],
     setInter: [
         std.setInter([1,2,3], [3,4,5]),
-//        std.setInter(a=[1,2,3], b=[3,4,5], keyF=function(x) std.floor(x / 2)),
+        std.setInter(a=[1,2,3], b=[3,4,5], keyF=function(x) std.floor(x / 2)),
     ],
     setUnion: [
         std.setUnion([1,2,3], [3,4,5]),
@@ -166,7 +166,7 @@ local assertClose(a, b) =
     ],
     setDiff: [
         std.setDiff([1,2,3], [3,4,5]),
-//        std.setDiff(a=[1,2,3], b=[3,4,5], keyF=function(x) std.floor(x / 2)),
+        std.setDiff(a=[1,2,3], b=[3,4,5], keyF=function(x) std.floor(x / 2)),
     ],
     setMember: [
         std.setMember(3, [2]),
