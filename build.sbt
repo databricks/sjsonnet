@@ -12,7 +12,10 @@ lazy val main = (project in file("sjsonnet"))
   .settings(commonSettings: _*)
   .settings(
     Test / fork := true,
-    Test / javaOptions += "-Xss100m",
+    Test / javaOptions ++= Seq(
+      "-Xss100m",
+      "--enable-native-access=ALL-UNNAMED"
+    ),
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "3.1.1",
@@ -64,5 +67,8 @@ lazy val bench = (project in file("bench"))
   .settings(commonSettings: _*)
   .settings(
     run / fork := true,
-    run / javaOptions += "-Xss100m"
+    run / javaOptions ++= Seq(
+      "-Xss100m",
+      "--enable-native-access=ALL-UNNAMED"
+    )
   )
