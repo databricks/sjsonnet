@@ -110,4 +110,9 @@ object Platform {
   }
 
   def regexQuote(s: String): String = Pattern.quote(s)
+
+  def makeStarlarkContextManager(): Option[Any] = None
+  def makeStarlarkImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    throw new Exception("Starlark not supported on Scala.js")
+  def closeStarlarkContextManager(manager: Any): Unit = ()
 }
