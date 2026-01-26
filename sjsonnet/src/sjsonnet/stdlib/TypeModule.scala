@@ -36,6 +36,11 @@ object TypeModule extends AbstractFunctionModule {
       Val.bool(pos, v.force.isInstanceOf[Val.Func])
   }
 
+  private object IsNull extends Val.Builtin1("isNull", "v") {
+    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.force.isInstanceOf[Val.Null])
+  }
+
   private object Type extends Val.Builtin1("type", "x") {
     def evalRhs(x: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.force.prettyName)
   }
@@ -57,6 +62,7 @@ object TypeModule extends AbstractFunctionModule {
     builtin(IsObject),
     builtin(IsArray),
     builtin(IsFunction),
+    builtin(IsNull),
     builtin(Type),
     builtin("equals", "a", "b") { (_, ev, a: Val, b: Val) =>
       ev.equal(a, b)
