@@ -146,7 +146,7 @@ object sjsonnet extends VersionFileModule {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.20.1"
+    def scalaJSVersion = "1.20.2"
     def moduleKind = Task { ModuleKind.CommonJSModule }
     val sourceDirs = Seq(
       "src",
@@ -236,7 +236,7 @@ object sjsonnet extends VersionFileModule {
       with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def moduleDir = super.moduleDir / os.up
-    def scalaNativeVersion = "0.5.9"
+    def scalaNativeVersion = "0.5.10"
     val sourceDirs = Seq(
       "src",
       "src-native",
