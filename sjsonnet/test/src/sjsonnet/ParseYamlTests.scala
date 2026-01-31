@@ -10,7 +10,7 @@ object ParseYamlTests extends TestSuite {
       eval("std.parseYaml('- foo: bar')") ==> ujson.Value("""[{"foo":"bar"}]""")
     }
     test {
-      eval("std.parseYaml('')") ==> ujson.Value("""{}""")
+      eval("std.parseYaml('')") ==> ujson.Value("""null""")
       eval("std.parseYaml(\"0777\")") ==> ujson.Value("""511""")
     }
     test {
