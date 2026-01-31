@@ -1,4 +1,4 @@
-sjsonnet.Error: foo
+RUNTIME ERROR: foo
     at [Error].(error.01.jsonnet:17:29)
     at [Apply1].(error.01.jsonnet:18:36)
     at [Apply1].(error.01.jsonnet:19:35)

@@ -1,4 +1,4 @@
-sjsonnet.Error: x
+RUNTIME ERROR: x
     at [Error].(std.primitiveEquals9.jsonnet:1:25)
     at [std.primitiveEquals].(std.primitiveEquals9.jsonnet:1:20)
 

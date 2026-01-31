@@ -1,3 +1,3 @@
-sjsonnet.Error: shift by negative exponent
+RUNTIME ERROR: shift by negative exponent
     at [BinaryOp >>].(error.negative_shfit.jsonnet:1:8)
 

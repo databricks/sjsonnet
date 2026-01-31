@@ -1,4 +1,4 @@
-sjsonnet.ParseError: Expected fail:1:2, found ""
+STATIC ERROR: Expected fail:1:2, found ""
     at .(<ext-var staticErrorVar> offset:1)
     at [std.extVar].(extvar_static_error.jsonnet:1:11)
 

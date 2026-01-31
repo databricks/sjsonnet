@@ -1,4 +1,4 @@
-sjsonnet.Error: Couldn't manifest function with params []
+RUNTIME ERROR: Couldn't manifest function with params []
     at .(function_plus_string.jsonnet:1:2)
     at [BinaryOp +].(function_plus_string.jsonnet:1:17)
 

@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected "\n":18:7, found ""
+STATIC ERROR: Expected "\n":18:7, found ""
     at .(error.parse.text_block_eof.jsonnet:18:7)
 

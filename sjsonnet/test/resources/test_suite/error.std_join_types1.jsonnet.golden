@@ -1,3 +1,3 @@
-sjsonnet.Error: Cannot join array
+RUNTIME ERROR: Cannot join array
     at [std.join].(error.std_join_types1.jsonnet:17:9)
 

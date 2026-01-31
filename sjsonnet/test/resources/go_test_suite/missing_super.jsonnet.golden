@@ -1,3 +1,3 @@
-sjsonnet.Error: Attempt to use `super` when there is no super class
+RUNTIME ERROR: Attempt to use `super` when there is no super class
     at [SelectSuper x].(missing_super.jsonnet:1:11)
 

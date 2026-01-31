@@ -1,4 +1,4 @@
-sjsonnet.Error: xxx
+RUNTIME ERROR: xxx
     at [Error].(type_error.jsonnet:1:10)
     at [std.type].(type_error.jsonnet:1:9)
 

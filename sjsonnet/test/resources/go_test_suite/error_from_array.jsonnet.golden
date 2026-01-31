@@ -1,3 +1,3 @@
-sjsonnet.Error: xxx
+RUNTIME ERROR: xxx
     at [Error].(error_from_array.jsonnet:1:2)
     at [Lookup].(error_from_array.jsonnet:1:14)

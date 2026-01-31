@@ -1,3 +1,3 @@
-sjsonnet.Error: In comprehension, can only iterate over array, not object
+RUNTIME ERROR: In comprehension, can only iterate over array, not object
     at [ForSpec].(object_comp_try_iterate_over_obj.jsonnet:1:10)
 

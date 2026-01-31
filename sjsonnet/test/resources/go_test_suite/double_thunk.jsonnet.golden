@@ -1,4 +1,4 @@
-sjsonnet.Error: xxx
+RUNTIME ERROR: xxx
     at [Error].(double_thunk.jsonnet:1:21)
     at [ValidId y].(double_thunk.jsonnet:1:34)
     at [ValidId x].(double_thunk.jsonnet:1:37)

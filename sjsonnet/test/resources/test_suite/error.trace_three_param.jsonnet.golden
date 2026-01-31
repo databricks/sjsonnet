@@ -1,4 +1,4 @@
-sjsonnet.Error: Too many args, function has 2 parameter(s)
+RUNTIME ERROR: Too many args, function has 2 parameter(s)
     at [Apply3].(error.trace_three_param.jsonnet:17:20)
     at [ValidId v].(error.trace_three_param.jsonnet:19:6)
 

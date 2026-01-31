@@ -1,3 +1,3 @@
-sjsonnet.StaticError: Can't use super outside of an object
+STATIC ERROR: Can't use super outside of an object
     at [Super].(insuper4.jsonnet:1:8)
 

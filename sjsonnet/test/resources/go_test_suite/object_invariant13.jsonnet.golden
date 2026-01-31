@@ -1,3 +1,3 @@
-sjsonnet.Error: x
+RUNTIME ERROR: x
     at [Error].(object_invariant13.jsonnet:1:10)
 

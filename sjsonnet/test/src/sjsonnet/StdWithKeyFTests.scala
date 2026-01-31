@@ -62,24 +62,24 @@ object StdWithKeyFTests extends TestSuite {
       ).toString() ==> """[{"a":[]},{"a":[1]},{"a":[1,"a"]},{"a":[1,"b"]},{"a":[2]}]"""
       assert(
         evalErr("""std.sort([1,2,3], keyF=function(x) error "foo")""").startsWith(
-          "sjsonnet.Error: foo"
+          "RUNTIME ERROR: foo"
         )
       )
-      assert(evalErr("""std.sort([1,2, error "foo"])""").startsWith("sjsonnet.Error: foo"))
+      assert(evalErr("""std.sort([1,2, error "foo"])""").startsWith("RUNTIME ERROR: foo"))
       assert(
         evalErr("""std.sort([1, [error "foo"]])""").startsWith(
-          "sjsonnet.Error: Cannot sort with values that are not all the same type"
+          "RUNTIME ERROR: Cannot sort with values that are not all the same type"
         )
       )
       // google/go-jsonnet and google/jsonnet also error on sorting of booleans:
       assert(
         evalErr("""std.sort([false, true])""").startsWith(
-          "sjsonnet.Error: Cannot sort with values that are booleans"
+          "RUNTIME ERROR: Cannot sort with values that are booleans"
         )
       )
       assert(
         evalErr("""std.sort([1, 2], keyF=function(x) x == 1)""").startsWith(
-          "sjsonnet.Error: Cannot sort with key values that are booleans"
+          "RUNTIME ERROR: Cannot sort with key values that are booleans"
         )
       )
 

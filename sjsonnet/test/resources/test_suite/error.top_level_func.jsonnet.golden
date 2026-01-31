@@ -1,2 +1,2 @@
-sjsonnet.Error: Function parameter name not bound in call
+RUNTIME ERROR: Function parameter name not bound in call
     at .(error.top_level_func.jsonnet:17:1)

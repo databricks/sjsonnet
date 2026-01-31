@@ -1,4 +1,4 @@
-sjsonnet.StaticError: Unknown variable: x
+STATIC ERROR: Unknown variable: x
     at [Id x].(lib/static_check_failure.jsonnet:2:1)
     at [Import].(error.import_static-check-failure.jsonnet:1:1)
 

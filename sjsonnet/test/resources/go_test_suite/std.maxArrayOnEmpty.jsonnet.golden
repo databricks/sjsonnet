@@ -1,3 +1,3 @@
-sjsonnet.Error: Expected at least one element in array. Got none
+RUNTIME ERROR: Expected at least one element in array. Got none
     at [std.maxArray].(std.maxArrayOnEmpty.jsonnet:1:13)
 

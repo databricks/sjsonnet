@@ -1,4 +1,4 @@
-sjsonnet.Error: sarcasm
+RUNTIME ERROR: sarcasm
     at [Error].(error.07.jsonnet:18:31)
     at [Lookup].(error.07.jsonnet:17:32)
     at [Apply1].(error.07.jsonnet:18:20)

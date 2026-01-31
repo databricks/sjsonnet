@@ -1,2 +1,2 @@
-sjsonnet.Error: Function parameter x not bound in call
+RUNTIME ERROR: Function parameter x not bound in call
     at .(function_too_many_params.jsonnet:1:1)

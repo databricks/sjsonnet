@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected any-char:2:1, found ""
+STATIC ERROR: Expected any-char:2:1, found ""
     at .(syntax_error.jsonnet:2:1)
 

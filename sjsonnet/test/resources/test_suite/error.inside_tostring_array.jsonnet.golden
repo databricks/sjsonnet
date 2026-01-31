@@ -1,4 +1,4 @@
-sjsonnet.Error: foobar
+RUNTIME ERROR: foobar
     at [Error].(error.inside_tostring_array.jsonnet:17:8)
     at [BinaryOp +].(error.inside_tostring_array.jsonnet:17:24)
 

@@ -1,3 +1,3 @@
-sjsonnet.Error: Cannot sort with values that are not all the same type
+RUNTIME ERROR: Cannot sort with values that are not all the same type
     at [std.sort].(std.sort4.jsonnet:1:9)
 
