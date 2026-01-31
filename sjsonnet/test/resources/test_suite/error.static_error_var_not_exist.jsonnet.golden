@@ -1,3 +1,3 @@
-sjsonnet.StaticError: Unknown variable: tmp2
+STATIC ERROR: Unknown variable: tmp2
     at [Id tmp2].(error.static_error_var_not_exist.jsonnet:17:16)
 

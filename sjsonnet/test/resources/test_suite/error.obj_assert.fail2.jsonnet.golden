@@ -1,4 +1,4 @@
-sjsonnet.Error: Assertion failed: foo was not equal to bar
+RUNTIME ERROR: Assertion failed: foo was not equal to bar
     at [Assert].(error.obj_assert.fail2.jsonnet:20:25)
     at [BinaryOp ==].(error.obj_assert.fail2.jsonnet:20:74)
     at [And].(error.obj_assert.fail2.jsonnet:20:86)

@@ -1,4 +1,4 @@
-sjsonnet.Error: Couldn't manifest function with params []
+RUNTIME ERROR: Couldn't manifest function with params []
     at .(native5.jsonnet:1:28)
     at [std.jsonToString].(native5.jsonnet:1:27)
 

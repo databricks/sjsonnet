@@ -1,3 +1,3 @@
-sjsonnet.Error: attempted to index a array with string foo
+RUNTIME ERROR: attempted to index a array with string foo
     at [Select foo].(error.array_index_string.jsonnet:17:10)
 

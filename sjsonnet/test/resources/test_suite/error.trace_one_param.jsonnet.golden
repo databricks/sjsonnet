@@ -1,4 +1,4 @@
-sjsonnet.Error: Function parameter rest not bound in call
+RUNTIME ERROR: Function parameter rest not bound in call
     at [Apply1].(error.trace_one_param.jsonnet:17:20)
     at [ValidId v].(error.trace_one_param.jsonnet:19:6)
 

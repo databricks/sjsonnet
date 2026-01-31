@@ -154,7 +154,7 @@ object StdMergePatchTests extends TestSuite {
       // Patch fields are always eagerly evaluated, even if they don't merge with anything:
       assert(
         evalErr("""(std.mergePatch({a: 1}, {b: error "should error"})).a""").startsWith(
-          "sjsonnet.Error: should error"
+          "RUNTIME ERROR: should error"
         )
       )
     }

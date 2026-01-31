@@ -1,3 +1,3 @@
-sjsonnet.Error: native function error
+RUNTIME ERROR: native function error
     at [std.nativeError].(native_error.jsonnet:1:26)
 

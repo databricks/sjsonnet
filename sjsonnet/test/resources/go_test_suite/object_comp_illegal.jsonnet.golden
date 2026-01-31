@@ -1,2 +1,2 @@
-sjsonnet.ParseError: Expected object comprehension must have a field:1:34, found "}\n"
+STATIC ERROR: Expected object comprehension must have a field:1:34, found "}\n"
     at .(object_comp_illegal.jsonnet:1:34)

@@ -1,4 +1,4 @@
-sjsonnet.Error: should happen
+RUNTIME ERROR: should happen
     at [Error].(lazy_operator2.jsonnet:1:9)
     at [And].(lazy_operator2.jsonnet:1:6)
 

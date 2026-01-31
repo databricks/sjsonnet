@@ -1,3 +1,3 @@
-sjsonnet.Error: assertEqual failed: "\n " != "\n"
+RUNTIME ERROR: assertEqual failed: "\n " != "\n"
     at [std.assertEqual].(assert_equal5.jsonnet:1:16)
 

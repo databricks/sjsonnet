@@ -1,2 +1,2 @@
-sjsonnet.ParseError: Expected object comprehension must have a single field with a dynamic field name:1:24, found "}\n"
+STATIC ERROR: Expected object comprehension must have a single field with a dynamic field name:1:24, found "}\n"
     at .(object_comp_bad_field2.jsonnet:1:24)

@@ -1,2 +1,2 @@
-sjsonnet.ParseError: Expected numbers cannot start with a 0 digit:1:4, found "\n"
+STATIC ERROR: Expected numbers cannot start with a 0 digit:1:4, found "\n"
     at .(number_leading_zero.jsonnet:1:4)

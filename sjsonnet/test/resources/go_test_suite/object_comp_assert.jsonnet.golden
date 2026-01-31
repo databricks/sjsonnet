@@ -1,2 +1,2 @@
-sjsonnet.ParseError: Expected object comprehension cannot have asserts:1:46, found "}\n"
+STATIC ERROR: Expected object comprehension cannot have asserts:1:46, found "}\n"
     at .(object_comp_assert.jsonnet:1:46)

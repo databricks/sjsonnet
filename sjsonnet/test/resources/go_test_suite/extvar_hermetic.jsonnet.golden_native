@@ -1,4 +1,4 @@
-sjsonnet.StaticError: Unknown variable: x
+STATIC ERROR: Unknown variable: x
     at [Id x].(<ext-var UndeclaredX> offset)
     at [std.extVar].(extvar_hermetic.jsonnet:1:25)
 

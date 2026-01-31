@@ -1,4 +1,4 @@
-sjsonnet.Error: Couldn't manifest function with params [x]
+RUNTIME ERROR: Couldn't manifest function with params [x]
     at .(error_function_fail.jsonnet:1:8)
     at [Error].(error_function_fail.jsonnet:1:1)
 

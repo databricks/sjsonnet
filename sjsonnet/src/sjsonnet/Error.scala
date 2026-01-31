@@ -14,6 +14,9 @@ class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Thro
 
   override def fillInStackTrace: Throwable = this
 
+  // we format it to keep it the same with google/jsonnet
+  override def toString: String = s"RUNTIME ERROR: $msg"
+
   def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
     if (stack.isEmpty || alwaysAddPos(expr)) {
       val exprErrorString = if (expr == null) null else expr.exprErrorString
@@ -89,6 +92,9 @@ object Error {
 class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
     extends Error(msg, stack, underlying) {
 
+  // we format it to keep it the same with google/jsonnet
+  override def toString: String = s"STATIC ERROR: $msg"
+
   override protected def copy(
       msg: String = msg,
       stack: List[Error.Frame] = stack,
@@ -98,6 +104,9 @@ class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option
 
 class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
     extends Error(msg, stack, underlying) {
+
+  // we format it to keep it the same with google/jsonnet
+  override def toString: String = s"STATIC ERROR: $msg"
 
   override protected def copy(
       msg: String = msg,

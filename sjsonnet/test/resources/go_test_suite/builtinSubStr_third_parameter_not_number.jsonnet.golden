@@ -1,2 +1,2 @@
-sjsonnet.Error: Expected a number for len in substr, got string
+RUNTIME ERROR: Expected a number for len in substr, got string
     at [std.substr].(builtinSubStr_third_parameter_not_number.jsonnet:1:11)

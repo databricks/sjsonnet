@@ -1,4 +1,4 @@
-sjsonnet.Error: xxx
+RUNTIME ERROR: xxx
     at [Error].(recursive_thunk.jsonnet:1:35)
     at [Apply2].(recursive_thunk.jsonnet:2:19)
     at [Apply1].(recursive_thunk.jsonnet:2:23)

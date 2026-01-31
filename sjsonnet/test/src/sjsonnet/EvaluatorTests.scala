@@ -18,7 +18,7 @@ object EvaluatorTests extends TestSuite {
       eval("[1, [2, 3], 4][1][0]", useNewEvaluator = useNewEvaluator) ==> ujson.Num(2)
       eval("([1, 2, 3] + [4, 5, 6])[3]", useNewEvaluator = useNewEvaluator) ==> ujson.Num(4)
       evalErr("[][0]", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: array bounds error: array is empty
+      """RUNTIME ERROR: array bounds error: array is empty
         |at [Lookup].(:1:3)""".stripMargin
       eval("std.slice(std.range(1,4), 0, null, 2)", useNewEvaluator = useNewEvaluator) ==> ujson
         .Arr(1, 3)
@@ -60,7 +60,7 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.True
       assert(
         evalErr("{foo: function() true}", useNewEvaluator = useNewEvaluator).startsWith(
-          "sjsonnet.Error: Couldn't manifest function with params"
+          "RUNTIME ERROR: Couldn't manifest function with params"
         )
       )
       eval("{foo: (function() true)()}", useNewEvaluator = useNewEvaluator) ==> ujson.Obj {
@@ -215,7 +215,7 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.Obj("x" -> ujson.Num(3))
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Field name must be string or null, not number
+      """RUNTIME ERROR: Field name must be string or null, not number
           |at .(:1:1)""".stripMargin
       // Basic function support:
       eval(
@@ -332,7 +332,7 @@ object EvaluatorTests extends TestSuite {
           """local x = { a: 1, b: { c: 2 }}; x { a: super.a * 10, b:: { c: super.b.c * 10 } }.b""",
           useNewEvaluator = useNewEvaluator
         ) ==>
-        """sjsonnet.Error: Attempt to use `super` when there is no super class
+        """RUNTIME ERROR: Attempt to use `super` when there is no super class
           |at [SelectSuper b].(:1:68)
           |at [Select c].(:1:70)
           |at [BinaryOp *].(:1:73)""".stripMargin
@@ -480,16 +480,16 @@ object EvaluatorTests extends TestSuite {
 
     test("unknownVariable") {
       evalErr("x", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.StaticError: Unknown variable: x
+      """STATIC ERROR: Unknown variable: x
         |at [Id x].(:1:1)""".stripMargin
       evalErr("self.x", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.StaticError: Can't use self outside of an object
+      """STATIC ERROR: Can't use self outside of an object
         |at [Self].(:1:1)""".stripMargin
       evalErr("$.x", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.StaticError: Can't use $ outside of an object
+      """STATIC ERROR: Can't use $ outside of an object
         |at [$].(:1:1)""".stripMargin
       evalErr("super.x", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.StaticError: Can't use super outside of an object
+      """STATIC ERROR: Can't use super outside of an object
         |at [Super].(:1:1)""".stripMargin
     }
 
@@ -576,7 +576,7 @@ object EvaluatorTests extends TestSuite {
       eval("({ a: 1 } { b: 2 }).a", strict = false, useNewEvaluator = useNewEvaluator) ==> ujson
         .Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", strict = true, useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+      """STATIC ERROR: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
         |at [ObjExtend].(:1:11)""".stripMargin
       eval(
         "local x = { c: 3 }; (x { a: 1 } { b: 2 }).a",
@@ -593,7 +593,7 @@ object EvaluatorTests extends TestSuite {
         strict = true,
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
+      """STATIC ERROR: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
         |at [ObjExtend].(:1:31)""".stripMargin
     }
     test("objectDeclaration") {
@@ -626,7 +626,7 @@ object EvaluatorTests extends TestSuite {
         """{ [x]: x for x in ["A", "A"]}""",
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+      """RUNTIME ERROR: Duplicate key A in evaluated object comprehension.
         |at .(:1:1)""".stripMargin
     }
     test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
@@ -636,7 +636,7 @@ object EvaluatorTests extends TestSuite {
           |{ [x.a]: x for x in [y, z]}""".stripMargin,
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+      """RUNTIME ERROR: Duplicate key A in evaluated object comprehension.
         |at .(:3:1)""".stripMargin
     }
     test("functionEqualsNull") {
@@ -651,15 +651,15 @@ object EvaluatorTests extends TestSuite {
 
       // Cases where StaticOptimizer replaces the dynamic field names with fixed ones:
       test - (evalErr("""{ ["k"]: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Duplicate key k in evaluated object.
+      """RUNTIME ERROR: Duplicate key k in evaluated object.
           |at .(:1:13)""".stripMargin)
 
       test - (evalErr("""{ k: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Duplicate key k in evaluated object.
+      """RUNTIME ERROR: Duplicate key k in evaluated object.
           |at .(:1:9)""".stripMargin)
 
       test - (evalErr("""{ ["k"]: 1, k: 2 }""", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Duplicate key k in evaluated object.
+      """RUNTIME ERROR: Duplicate key k in evaluated object.
           |at .(:1:13)""".stripMargin)
 
       // Test that lazy evaluation is preserved - duplicate fields should only error when accessed
@@ -673,13 +673,13 @@ object EvaluatorTests extends TestSuite {
         """{x: { ["k"]: 1, ["k"]: 2 }, y:1 }.x""",
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.Error: Duplicate key k in evaluated object.
+      """RUNTIME ERROR: Duplicate key k in evaluated object.
           |at .(:1:17)
           |at [Select x].(:1:34)""".stripMargin)
 
       // Non-StaticOptimizable case:
       test - (evalErr("""{ k: 1, ["k" + ""]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Duplicate key k in evaluated object.
+      """RUNTIME ERROR: Duplicate key k in evaluated object.
           |at .(:1:9)""".stripMargin)
     }
 
@@ -709,33 +709,33 @@ object EvaluatorTests extends TestSuite {
     test("assertInheritance") {
       test - assert(
         evalErr("""{ } + {assert false}""", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
         evalErr("""{assert false} + {}""", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
         evalErr("""{assert false} + {} + {}""", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
         evalErr("""{} + {assert false} + {}""", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
         evalErr("""{} + {} + {assert false}""", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       // Both own and inherited assertions are evaluated:
       test - assert(
         evalErr("{assert false} + {assert true}", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       // Accessing an object member should trigger computation of that object's own
@@ -743,12 +743,12 @@ object EvaluatorTests extends TestSuite {
       // to be a constant.
       test - assert(
         evalErr("({assert false} + {x: 2}).x", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
         evalErr("({assert false} + {f(x): x}).f(1)", useNewEvaluator = useNewEvaluator).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - {
@@ -760,7 +760,7 @@ object EvaluatorTests extends TestSuite {
           evalErr(
             problematicStrictInheritedAssertionsSnippet,
             useNewEvaluator = useNewEvaluator
-          ).contains("sjsonnet.Error: Assertion failed")
+          ).contains("RUNTIME ERROR: Assertion failed")
         )
       }
     }
@@ -771,7 +771,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
@@ -780,7 +780,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
@@ -789,7 +789,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
@@ -798,7 +798,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
@@ -807,7 +807,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - assert(
@@ -816,7 +816,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ).contains(
-          "sjsonnet.Error: Assertion failed"
+          "RUNTIME ERROR: Assertion failed"
         )
       )
       test - {
@@ -829,7 +829,7 @@ object EvaluatorTests extends TestSuite {
             problematicStrictInheritedAssertionsSnippet,
             useNewEvaluator = useNewEvaluator,
             brokenAssertionLogic = true
-          ).contains("sjsonnet.Error: Assertion failed")
+          ).contains("RUNTIME ERROR: Assertion failed")
         )
       }
 

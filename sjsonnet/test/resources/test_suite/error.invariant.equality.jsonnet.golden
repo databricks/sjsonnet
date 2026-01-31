@@ -1,4 +1,4 @@
-sjsonnet.Error: Assertion failed
+RUNTIME ERROR: Assertion failed
     at [Assert].(error.invariant.equality.jsonnet:17:10)
     at [BinaryOp ==].(error.invariant.equality.jsonnet:17:24)
 

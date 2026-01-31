@@ -1,2 +1,2 @@
-sjsonnet.ParseError: Expected finite number required:17:6, found "\n"
+STATIC ERROR: Expected finite number required:17:6, found "\n"
     at .(error.overflow.jsonnet:17:6)

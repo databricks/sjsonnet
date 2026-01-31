@@ -1,4 +1,4 @@
-sjsonnet.Error: Wrong parameter type: expected String, got number
+RUNTIME ERROR: Wrong parameter type: expected String, got number
     at [std.trace].(error.trace_two_param.jsonnet:17:20)
     at [ValidId v].(error.trace_two_param.jsonnet:19:6)
 

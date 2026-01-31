@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected end-of-input:1:2, found "x42\n"
+STATIC ERROR: Expected end-of-input:1:2, found "x42\n"
     at .(error_hexnumber.jsonnet:1:2)
 

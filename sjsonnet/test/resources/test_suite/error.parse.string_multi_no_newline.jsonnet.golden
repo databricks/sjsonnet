@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected |||-blocks require multiple lines:17:5, found "|||\n"
+STATIC ERROR: Expected |||-blocks require multiple lines:17:5, found "|||\n"
     at .(error.parse.string_multi_no_newline.jsonnet:17:5)
 

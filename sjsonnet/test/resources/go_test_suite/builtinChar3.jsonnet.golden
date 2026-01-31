@@ -1,3 +1,3 @@
-sjsonnet.Error: Invalid unicode code point, got -1
+RUNTIME ERROR: Invalid unicode code point, got -1
     at [std.char].(builtinChar3.jsonnet:1:9)
 

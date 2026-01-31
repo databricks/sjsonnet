@@ -1,3 +1,3 @@
-sjsonnet.Error: Unknown unary operation: - string
+RUNTIME ERROR: Unknown unary operation: - string
     at [UnaryOp -].(unary_minus4.jsonnet:1:1)
 

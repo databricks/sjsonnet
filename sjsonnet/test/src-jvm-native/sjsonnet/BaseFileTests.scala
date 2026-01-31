@@ -77,7 +77,8 @@ abstract class BaseFileTests extends TestSuite {
       goldenContent.startsWith("sjsonnet.ParseError") ||
       goldenContent.startsWith("sjsonnet.StaticError") ||
       goldenContent.contains("java.lang.StackOverflowError") ||
-      goldenContent.startsWith("RUNTIME ERROR")
+      goldenContent.startsWith("RUNTIME ERROR") ||
+      goldenContent.startsWith("STATIC ERROR")
     ) {
       checkError(fileName, goldenContent, testSuite)
     } else {

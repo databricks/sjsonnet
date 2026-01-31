@@ -340,7 +340,7 @@ object PreserveOrderTests extends TestSuite {
            error x""",
           preserveOrder = true
         )
-          .startsWith("""sjsonnet.Error: {"b": 1, "a": 2, "c": 3}""")
+          .startsWith("""RUNTIME ERROR: {"b": 1, "a": 2, "c": 3}""")
       )
     }
 

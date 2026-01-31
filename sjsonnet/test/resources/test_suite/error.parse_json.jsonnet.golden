@@ -1,3 +1,3 @@
-sjsonnet.Error: Invalid JSON: expected json value got "b" at index 0
+RUNTIME ERROR: Invalid JSON: expected json value got "b" at index 0
     at [std.parseJson].(error.parse_json.jsonnet:1:14)
 

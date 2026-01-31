@@ -1,4 +1,4 @@
-sjsonnet.ParseError: Expected "\"":2:1, found ""
+STATIC ERROR: Expected "\"":2:1, found ""
     at .(lib/syntax_error.jsonnet:2:1)
     at [Import].(error.import_syntax-error.jsonnet:1:1)
 

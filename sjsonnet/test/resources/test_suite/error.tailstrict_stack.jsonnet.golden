@@ -1,4 +1,4 @@
-sjsonnet.Error: n is 0
+RUNTIME ERROR: n is 0
     at [Error].(error.tailstrict_stack.jsonnet:10:9)
     at [Apply2].(error.tailstrict_stack.jsonnet:12:26)
     at [Apply2].(error.tailstrict_stack.jsonnet:14:37)

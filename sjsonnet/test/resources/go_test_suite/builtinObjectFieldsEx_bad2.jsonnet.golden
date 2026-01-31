@@ -1,3 +1,3 @@
-sjsonnet.Error: Wrong parameter type: expected Boolean, got string
+RUNTIME ERROR: Wrong parameter type: expected Boolean, got string
     at [std.objectFieldsEx].(builtinObjectFieldsEx_bad2.jsonnet:1:19)
 

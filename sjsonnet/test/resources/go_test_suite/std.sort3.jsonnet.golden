@@ -1,4 +1,4 @@
-sjsonnet.Error: foo
+RUNTIME ERROR: foo
     at [Error].(std.sort3.jsonnet:1:16)
     at [std.sort].(std.sort3.jsonnet:1:9)
 

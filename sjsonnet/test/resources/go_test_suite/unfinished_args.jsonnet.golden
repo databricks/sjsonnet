@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected ")":2:1, found ""
+STATIC ERROR: Expected ")":2:1, found ""
     at .(unfinished_args.jsonnet:2:1)
 

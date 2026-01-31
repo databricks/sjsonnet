@@ -1,3 +1,3 @@
-sjsonnet.ParseError: Expected "\"":17:2, found "\\o\"\n"
+STATIC ERROR: Expected "\"":17:2, found "\\o\"\n"
     at .(error.parse.string.invalid_escape.jsonnet:17:2)
 

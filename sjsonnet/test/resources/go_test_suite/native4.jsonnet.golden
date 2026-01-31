@@ -1,4 +1,4 @@
-sjsonnet.Error: xxx
+RUNTIME ERROR: xxx
     at [Error].(native4.jsonnet:1:28)
     at [std.jsonToString].(native4.jsonnet:1:27)
 
