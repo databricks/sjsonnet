@@ -99,17 +99,62 @@ class Parser(
   ).!.filter(s => !keywords.contains(s))
 
   def break[$: P]: P[Unit] = P(!CharIn("_a-zA-Z0-9"))
+  // Digits with optional underscores between them (not at start, not consecutive, not before special chars)
+  def digitsWithSeparator[$: P]: P[Unit] = P(
+    CharIn("0-9") ~~ (CharIn("0-9") | ("_" ~ CharIn("0-9"))).repX
+  )
+
+  // Validate underscore placement in number string
+  // Rules:
+  // - No consecutive underscores (__)
+  // - No underscore before/after decimal point (_. or ._)
+  // - No underscore before/after e/E (_e, e_, _E, E_)
+  // - No underscore after +/- in exponent
+  // - No trailing underscore
+  private def isValidNumberWithSeparators(s: String): Boolean = {
+    var i = 0
+    val length = s.length
+    while (i < length) {
+      (s.charAt(i): @switch) match {
+        case '_' =>
+          // Check what's after underscore
+          if (i + 1 >= length) return false // trailing underscore
+          (s.charAt(i + 1): @switch) match {
+            case '_' | '.' | 'e' | 'E' => return false
+            case _                     => // valid
+          }
+        case '.' | 'e' | 'E' | '+' | '-' =>
+          // Check if next char is underscore
+          if (i + 1 < length && s.charAt(i + 1) == '_') return false
+        case _ => // valid character
+      }
+      i += 1
+    }
+    true
+  }
+
   def number[$: P]: P[Val.Num] = P(
     Pos ~~ (
-      CharsWhileIn("0-9") ~~
-      ("." ~ CharsWhileIn("0-9")).? ~~
-      (CharIn("eE") ~ CharIn("+\\-").? ~~ CharsWhileIn("0-9")).?
+      digitsWithSeparator ~~
+      ("." ~ digitsWithSeparator).? ~~
+      (CharIn("eE") ~ CharIn("+\\-").? ~~ digitsWithSeparator).?
     ).!
   ).flatMapX(s => {
-    if (s._2.length > 1 && Character.isDigit(s._2.charAt(1)) && s._2.charAt(0) == '0') {
+    val numStr = s._2
+    // Check for leading zero followed by underscore or digit (octal not allowed)
+    if (
+      numStr.length > 1 && numStr.charAt(0) == '0' && {
+        val char = numStr.charAt(1)
+        (char == '_' || Character.isDigit(char))
+      }
+    ) {
       Fail.opaque("numbers cannot start with a 0 digit")
+    } else if (!isValidNumberWithSeparators(numStr)) {
+      Fail.opaque("invalid underscore placement in number")
     } else {
-      val v = s._2.toDouble
+      // Remove underscores for parsing
+      val cleanStr = numStr.replace("_", "")
+      val v = cleanStr.toDouble
       if (v.isInfinite) {
         Fail.opaque("finite number required")
       } else {
