@@ -19,19 +19,19 @@ lazy val main = (project in file("sjsonnet"))
     Test / baseDirectory := (ThisBuild / baseDirectory).value,
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "3.1.1",
-      "com.lihaoyi" %% "pprint" % "0.9.4",
-      "com.lihaoyi" %% "ujson" % "4.4.1",
+      "com.lihaoyi" %% "pprint" % "0.9.6",
+      "com.lihaoyi" %% "ujson" % "4.4.2",
       "com.lihaoyi" %% "scalatags" % "0.13.1",
-      "com.lihaoyi" %% "os-lib" % "0.11.6",
-      "com.lihaoyi" %% "mainargs" % "0.7.7",
-      "at.yawk.lz4" % "lz4-java" % "1.10.1",
+      "com.lihaoyi" %% "os-lib" % "0.11.8",
+      "com.lihaoyi" %% "mainargs" % "0.7.8",
+      "at.yawk.lz4" % "lz4-java" % "1.10.3",
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.14.0",
-      "org.tukaani" % "xz" % "1.10",
+      "org.tukaani" % "xz" % "1.11",
       "org.yaml" % "snakeyaml" % "2.5",
       "com.google.re2j" % "re2j" % "1.8"
     ),
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "utest" % "0.9.1"
+      "com.lihaoyi" %% "utest" % "0.9.5"
     ).map(_ % "test"),
     testFrameworks += new TestFramework("utest.runner.Framework"),
     (Compile / unmanagedSourceDirectories) := Seq(
@@ -53,7 +53,7 @@ lazy val main = (project in file("sjsonnet"))
         file,
         s"""package sjsonnet
            |object Version{
-           |  val version = "${sjsonnetVersion}"
+           |  val version = "$sjsonnetVersion"
            |}
            |""".stripMargin
       )

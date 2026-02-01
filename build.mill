@@ -47,8 +47,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   def crossValue: String
   def mvnDeps = Seq(
     mvn"com.lihaoyi::fastparse::3.1.1",
-    mvn"com.lihaoyi::pprint::0.9.4",
-    mvn"com.lihaoyi::ujson::4.4.1",
+    mvn"com.lihaoyi::pprint::0.9.6",
+    mvn"com.lihaoyi::ujson::4.4.2",
     mvn"com.lihaoyi::scalatags::0.13.1",
     mvn"org.scala-lang.modules::scala-collection-compat::2.14.0"
   )
@@ -83,15 +83,15 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
-    def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.1")
+    def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.5")
     def testSandboxWorkingDir = false
   }
 }
 
 trait SjsonnetJvmNative extends ScalaModule {
   def mvnDeps = super.mvnDeps() ++ Seq(
-    mvn"com.lihaoyi::os-lib::0.11.6",
-    mvn"com.lihaoyi::mainargs::0.7.7"
+    mvn"com.lihaoyi::os-lib::0.11.8",
+    mvn"com.lihaoyi::mainargs::0.7.8"
   )
 }
 
@@ -146,7 +146,7 @@ object sjsonnet extends VersionFileModule {
   object js extends Cross[SjsonnetJsModule](scalaVersions)
   trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.20.1"
+    def scalaJSVersion = "1.20.2"
     def moduleKind = Task { ModuleKind.CommonJSModule }
     val sourceDirs = Seq(
       "src",
@@ -236,7 +236,7 @@ object sjsonnet extends VersionFileModule {
       with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def moduleDir = super.moduleDir / os.up
-    def scalaNativeVersion = "0.5.9"
+    def scalaNativeVersion = "0.5.10"
     val sourceDirs = Seq(
       "src",
       "src-native",
@@ -246,7 +246,7 @@ object sjsonnet extends VersionFileModule {
 
     def mvnDeps = super.mvnDeps() ++
       Seq(
-        mvn"com.github.lolgab::scala-native-crypto::0.2.1",
+        mvn"com.github.lolgab::scala-native-crypto::0.3.0",
         mvn"org.virtuslab::scala-yaml::0.3.0"
       )
 
@@ -281,8 +281,8 @@ object sjsonnet extends VersionFileModule {
     def sources = Task.Sources(sourceDirs.map(d => this.moduleDir / d)*)
 
     def mvnDeps = super.mvnDeps() ++ Seq(
-      mvn"org.tukaani:xz::1.10",
-      mvn"at.yawk.lz4:lz4-java::1.10.1",
+      mvn"org.tukaani:xz::1.11",
+      mvn"at.yawk.lz4:lz4-java::1.10.3",
       mvn"org.yaml:snakeyaml::2.4",
       mvn"com.google.re2j:re2j:1.8"
     )
