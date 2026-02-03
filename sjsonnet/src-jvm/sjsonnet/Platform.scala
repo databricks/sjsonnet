@@ -165,4 +165,10 @@ object Platform {
       quote
     }
   }
+
+  def makeStarlarkContextManager(): Option[Any] = Some(new sjsonnet.starlark.StarlarkContextManager())
+  def makeStarlarkImportFunc(manager: Any, importer: Importer): sjsonnet.Val.Func =
+    new sjsonnet.starlark.StarlarkImportFunc(manager.asInstanceOf[sjsonnet.starlark.StarlarkContextManager], importer)
+  def closeStarlarkContextManager(manager: Any): Unit =
+    manager.asInstanceOf[sjsonnet.starlark.StarlarkContextManager].close()
 }

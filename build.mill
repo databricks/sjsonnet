@@ -105,7 +105,9 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
   def resources = Task.Sources(
     this.moduleDir / "resources" / "bug_suite",
     this.moduleDir / "resources" / "cpp_suite",
-    this.moduleDir / "resources" / "go_suite"
+    this.moduleDir / "resources" / "go_suite",
+    this.moduleDir / "resources" / "starlark",
+    sjsonnet.jvm.crossModules.head.moduleDir / "resources"
   )
 
   def listRegressions = Task {
@@ -279,12 +281,18 @@ object sjsonnet extends VersionFileModule {
       "src-jvm-native"
     )
     def sources = Task.Sources(sourceDirs.map(d => this.moduleDir / d)*)
+    def resources = Task.Sources(this.moduleDir / "resources")
 
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.11",
       mvn"at.yawk.lz4:lz4-java::1.10.3",
       mvn"org.yaml:snakeyaml::2.4",
-      mvn"com.google.re2j:re2j:1.8"
+      mvn"com.google.re2j:re2j:1.8",
+      mvn"org.graalvm.polyglot:polyglot:25.0.1",
+      mvn"org.graalvm.python:python-language:25.0.1",
+      mvn"org.graalvm.python:python-resources:25.0.1",
+      mvn"org.graalvm.python:python-embedding:25.0.1",
+      mvn"org.graalvm.truffle:truffle-api:25.0.1"
     )
 
     object test extends ScalaTests with CrossTests {
