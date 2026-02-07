@@ -3,7 +3,7 @@ package sjsonnet
 import utest.*
 
 object PrettyYamlRendererTests extends TestSuite {
-  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
+  val workspaceRoot: os.Path = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources" / "test_suite"
   def eval(path: os.Path, comments: Boolean): String = {
     var currentPos: Position = null

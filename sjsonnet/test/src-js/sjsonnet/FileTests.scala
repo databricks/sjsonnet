@@ -3,7 +3,7 @@ package sjsonnet
 import utest._
 
 object FileTests extends BaseFileTests {
-  val skippedTests = Set(
+  val skippedTests: Set[String] = Set(
     // Stack size issues with the JS runner
     "recursive_function.jsonnet",
     "error.array_recursive_manifest.jsonnet",

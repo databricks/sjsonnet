@@ -1,13 +1,9 @@
-package mill.main.client;
-
-import sjsonnet.client.Lock;
-import sjsonnet.client.Locked;
-import sjsonnet.client.Locks;
+package sjsonnet.client;
 
 import java.util.concurrent.locks.ReentrantLock;
 
 class MemoryLocked implements Locked{
-    java.util.concurrent.locks.Lock l;
+    final java.util.concurrent.locks.Lock l;
     public MemoryLocked(java.util.concurrent.locks.Lock l){
         this.l = l;
     }
@@ -25,7 +21,7 @@ class MemoryLock extends Lock{
         }};
     }
 
-    ReentrantLock innerLock = new ReentrantLock(true);
+    final ReentrantLock innerLock = new ReentrantLock(true);
 
     public boolean probe(){
           return !innerLock.isLocked();
