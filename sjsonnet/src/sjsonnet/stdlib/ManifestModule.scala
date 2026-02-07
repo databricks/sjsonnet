@@ -184,7 +184,8 @@ object ManifestModule extends AbstractFunctionModule {
           .filter(_ != ujson.Null)
           .map {
             case ujson.Str(s) => s + "\n"
-            case _            => ??? /* we ensure it's all strings above */
+            case _            =>
+              throw new RuntimeException("Unexpected") /* we ensure it's all strings above */
           }
           .mkString
       )

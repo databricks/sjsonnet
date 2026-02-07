@@ -169,7 +169,7 @@ class PrettyYamlRenderer(
     def subVisitor: sjsonnet.PrettyYamlRenderer
   } = new ArrVisitor[Writer, Writer] {
     var empty = true
-    val dedentInObject = afterKey && !indentArrayInObject
+    val dedentInObject: Boolean = afterKey && !indentArrayInObject
     def subVisitor: sjsonnet.PrettyYamlRenderer = {
       if (empty) {
         afterColon = false
@@ -198,7 +198,7 @@ class PrettyYamlRenderer(
 
       dashBuffered = true
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): Writer = {
       firstElementInArray = false
       if (!dedentInObject) depth -= 1
       if (empty) {
@@ -214,7 +214,7 @@ class PrettyYamlRenderer(
   override def visitObject(
       length: Int,
       index: Int): upickle.core.ObjVisitor[java.io.Writer, java.io.Writer] {
-    def subVisitor: sjsonnet.PrettyYamlRenderer;
+    def subVisitor: sjsonnet.PrettyYamlRenderer
     def visitKey(index: Int): sjsonnet.PrettyYamlRenderer
   } = new ObjVisitor[Writer, Writer] {
     firstElementInArray = false
@@ -251,7 +251,7 @@ class PrettyYamlRenderer(
       newlineBuffered = true
       afterKey = false
     }
-    def visitEnd(index: Int) = {
+    def visitEnd(index: Int): Writer = {
       if (empty) {
         addSpaceAfterColon()
         out.append("{}")
@@ -316,7 +316,7 @@ object PrettyYamlRenderer {
     var column = leftHandPrefixOffset + leftIndent + 1 // +1 to include the open quote
     var start = 0
     var end = 0
-    def writeData(data: String) = {
+    def writeData(data: String): Unit = {
       out.write(data)
       column += data.length
     }
@@ -345,7 +345,7 @@ object PrettyYamlRenderer {
           "\\u" + hex((ch >> 4) & 15) + hex(ch & 15)
         } else if (ch <= '\uFFFF') {
           "\\u" + hex((ch >> 12) & 15) + hex((ch >> 8) & 15) + hex((ch >> 4) & 15) + hex(ch & 15)
-        } else ???
+        } else throw new RuntimeException("Unexpected")
     }
 
     while (end <= text.length) {

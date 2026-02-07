@@ -1,16 +1,17 @@
 package sjsonnet.client;
 
-import org.scalasbt.ipcsocket.*;
+import org.scalasbt.ipcsocket.UnixDomainSocket;
+import org.scalasbt.ipcsocket.Win32NamedPipeSocket;
 
 import java.io.*;
 import java.net.Socket;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.channels.FileChannel;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class SjsonnetClientMain {
-    static void initServer(String lockBase, boolean setJnaNoSys) throws IOException,URISyntaxException{
+    static void initServer(String lockBase, boolean setJnaNoSys) throws IOException {
         List<String> l = new ArrayList<>();
         List<String> vmOptions = new ArrayList<>();
         l.add("java");
@@ -25,8 +26,9 @@ public class SjsonnetClientMain {
         } else {
             final File vmOptionsFile = new File(lockBase, "vmoptions");
             try (PrintWriter out = new PrintWriter(vmOptionsFile)) {
-                for(String opt: vmOptions)
-                out.println(opt);
+                for(String opt: vmOptions) {
+                    out.println(opt);
+                }
             }
             l.add("-XX:VMOptionsFile=" + vmOptionsFile.getCanonicalPath());
         }
@@ -60,18 +62,15 @@ public class SjsonnetClientMain {
                 java.nio.channels.FileLock tryLock = channel.tryLock();
                 Locks locks = Locks.files(lockBase)){
                 if (tryLock != null) {
-                    int exitCode = SjsonnetClientMain.run(
+                    return SjsonnetClientMain.run(
                             lockBase,
-                            new Runnable() {
-                                @Override
-                                public void run() {
-                                    try{
-                                        initServer(lockBase, setJnaNoSys);
-                                    }catch(Exception e){
-                                        throw new RuntimeException(e);
-                                    }
-                                }
-                            },
+                        () -> {
+                            try {
+                                initServer(lockBase, setJnaNoSys);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        },
                             locks,
                             System.in,
                             System.out,
@@ -79,10 +78,7 @@ public class SjsonnetClientMain {
                             args,
                             env
                     );
-                    return exitCode;
                 }
-            } finally{
-
             }
         }
         throw new Exception("Reached max sjsonnet process limit: " + 5);

@@ -196,9 +196,9 @@ Here's the latest set of benchmarks I've run (as  of 18 May 2023) comparing Sjso
 google/go-jsonnet and google/jsonnet, measuring the time taken to
 evaluate an arbitrary config file in the Databricks codebase:
 
-|              | Sjsonnet 0.4.3 | google/go-jsonnet 0.20.0 | google/jsonnet 0.20.0 |
-| :----------- | -------------: | -------------: | -------------: |
-| staging/runbot-app.jsonnet (~6.6mb output JSON) | ~0.10s |  ~6.5s | ~67s |
+|                                                 | Sjsonnet 0.4.3 | google/go-jsonnet 0.20.0 | google/jsonnet 0.20.0 |
+|:------------------------------------------------|---------------:|-------------------------:|----------------------:|
+| staging/runbot-app.jsonnet (~6.6mb output JSON) |         ~0.10s |                    ~6.5s |                  ~67s |
 
 Sjsonnet was run as a long-lived daemon to keep the JVM warm,
 while go-jsonnet and google/jsonnet were run as subprocesses, following typical

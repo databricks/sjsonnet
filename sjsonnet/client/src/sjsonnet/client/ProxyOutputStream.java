@@ -3,8 +3,8 @@ package sjsonnet.client;
 import java.io.IOException;
 
 public class ProxyOutputStream extends java.io.OutputStream {
-    private java.io.OutputStream out;
-    private int key;
+    private final java.io.OutputStream out;
+    private final int key;
     public ProxyOutputStream(java.io.OutputStream out, int key){
         this.out = out;
         this.key = key;

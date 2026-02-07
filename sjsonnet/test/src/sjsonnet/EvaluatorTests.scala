@@ -849,5 +849,5 @@ object EvaluatorTests extends TestSuite {
     }
 
   }
-  def tests = allTests(false).prefix("Evaluator") ++ allTests(true).prefix("NewEvaluator")
+  def tests: Tests = allTests(false).prefix("Evaluator") ++ allTests(true).prefix("NewEvaluator")
 }

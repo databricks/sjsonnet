@@ -5,7 +5,7 @@ import ujson.Value
 import utest.{TestSuite, assert}
 
 abstract class BaseFileTests extends TestSuite {
-  val workspaceRoot = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
+  val workspaceRoot: os.Path = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   private val stderr = new StringBuffer()
   private val std = new sjsonnet.stdlib.StdLibModule(

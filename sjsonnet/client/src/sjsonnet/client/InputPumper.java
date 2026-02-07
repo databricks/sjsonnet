@@ -4,9 +4,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class InputPumper implements Runnable{
-    private InputStream src;
-    private OutputStream dest;
-    private Boolean checkAvailable;
+    private final InputStream src;
+    private final OutputStream dest;
+    private final Boolean checkAvailable;
     public InputPumper(InputStream src,
                        OutputStream dest,
                        Boolean checkAvailable){

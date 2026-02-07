@@ -5,12 +5,12 @@ package sjsonnet
  * interpreters and shared between all platforms.
  */
 final case class Settings(
-    val preserveOrder: Boolean = false,
-    val strict: Boolean = false,
-    val throwErrorForInvalidSets: Boolean = false,
-    val useNewEvaluator: Boolean = false,
-    val maxParserRecursionDepth: Int = 1000,
-    val brokenAssertionLogic: Boolean = false
+    preserveOrder: Boolean = false,
+    strict: Boolean = false,
+    throwErrorForInvalidSets: Boolean = false,
+    useNewEvaluator: Boolean = false,
+    maxParserRecursionDepth: Int = 1000,
+    brokenAssertionLogic: Boolean = false
 )
 
 object Settings {

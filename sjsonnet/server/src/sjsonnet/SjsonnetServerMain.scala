@@ -42,7 +42,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
     Signal.handle(
       new Signal("INT"),
       new SignalHandler() {
-        def handle(sig: Signal) = {} // do nothing
+        def handle(sig: Signal): Unit = {} // do nothing
       }
     )
     new Server(
@@ -62,7 +62,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
       stderr: PrintStream,
       env: Map[String, String],
       setIdle: Boolean => Unit,
-      wd: os.Path) = {
+      wd: os.Path): (Boolean, Option[DefaultParseCache]) = {
 
     val stateCache2 = stateCache.getOrElse {
       val p = new DefaultParseCache
@@ -101,8 +101,8 @@ class Server[T](
     acceptTimeout: Int,
     locks: Locks) {
 
-  val originalStdout = System.out
-  def run() = {
+  val originalStdout: PrintStream = System.out
+  def run(): Unit = {
     Server
       .tryLockBlock(locks.processLock) {
         var running = true
@@ -147,7 +147,7 @@ class Server[T](
       .getOrElse(throw new Exception("PID already present"))
   }
 
-  def handleRun(clientSocket: Socket) = {
+  def handleRun(clientSocket: Socket): Unit = {
 
     val currentOutErr = clientSocket.getOutputStream
     val stdout = new PrintStream(new ProxyOutputStream(currentOutErr, 1), true)

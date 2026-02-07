@@ -40,7 +40,7 @@ object YamlRendererTests extends TestSuite {
     test("emptyLineIndent") {
       ujson
         .transform(ujson.Obj("k" -> "a\n\nb\n"), new YamlRenderer(quoteKeys = false))
-        .toString() ==>
+        .toString ==>
       "k: |\n  a\n  \n  b"
     }
   }

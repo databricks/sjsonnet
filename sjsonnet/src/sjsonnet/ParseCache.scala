@@ -15,7 +15,7 @@ object ParseCache {
    * An empty parse cache that always returns the default value. This is useful for cases where no
    * caching is desired, such as in tests or when the cache is not needed.
    */
-  val EmptyCache = new ParseCache {
+  val EmptyCache: ParseCache = new ParseCache {
     final override def getOrElseUpdate(
         key: (Path, String),
         defaultValue: => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)] = {

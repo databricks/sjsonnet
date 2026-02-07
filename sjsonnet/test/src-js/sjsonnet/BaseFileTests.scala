@@ -122,7 +122,7 @@ abstract class BaseFileTests extends TestSuite {
       JsVirtualPath(fileName),
       ujson.WebJson.Builder
     ) match {
-      case Left(msg) => throw new js.JavaScriptException(msg)
+      case Left(msg) => throw js.JavaScriptException(msg)
       case Right(v)  => v
     }
   }

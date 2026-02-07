@@ -4,18 +4,19 @@ package sjsonnet.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Util {
-    public static boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
+    public static final boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
     public static boolean isJava9OrAbove = !System.getProperty("java.specification.version").startsWith("1.");
 
     // Windows named pipe prefix (see https://github.com/sbt/ipcsocket/blob/v1.0.0/README.md)
     // Win32NamedPipeServerSocket automatically adds this as a prefix (if it is not already is prefixed),
     // but Win32NamedPipeSocket does not
     // https://github.com/sbt/ipcsocket/blob/v1.0.0/src/main/java/org/scalasbt/ipcsocket/Win32NamedPipeServerSocket.java#L36
-    public static String WIN32_PIPE_PREFIX = "\\\\.\\pipe\\";
+    public static final String WIN32_PIPE_PREFIX = "\\\\.\\pipe\\";
 
     public static String[] parseArgs(InputStream argStream) throws IOException {
 
@@ -70,11 +71,11 @@ public class Util {
                 total += res;
             }
         }
-        return new String(arr, "UTF-8");
+        return new String(arr, StandardCharsets.UTF_8);
     }
 
     public static void writeString(OutputStream outputStream, String string) throws IOException {
-        byte[] bytes = string.getBytes("UTF-8");
+        byte[] bytes = string.getBytes(StandardCharsets.UTF_8);
         writeInt(outputStream, bytes.length);
         outputStream.write(bytes);
     }

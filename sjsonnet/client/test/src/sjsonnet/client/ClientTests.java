@@ -1,17 +1,15 @@
-package sjsonnet;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+package sjsonnet.client;
 
 import org.junit.Test;
-import sjsonnet.client.ProxyOutputStream;
-import sjsonnet.client.ProxyStreamPumper;
-import sjsonnet.client.Util;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Random;
+
+import static org.junit.Assert.*;
 
 public class ClientTests {
     @Test
@@ -27,7 +25,7 @@ public class ClientTests {
                 ByteArrayInputStream i = new ByteArrayInputStream(o.toByteArray());
                 int s = Util.readInt(i);
                 assertEquals(example, s);
-                assertEquals(i.available(), 0);
+                assertEquals(0, i.available());
             }
         }
     }
@@ -48,8 +46,8 @@ public class ClientTests {
     @Test
     public void readWriteBigString() throws Exception{
         int[] lengths = {0, 1, 126, 127, 128, 254, 255, 256, 1024, 99999, 1234567};
-        for(int i = 0; i < lengths.length; i++){
-            final char[] bigChars = new char[lengths[i]];
+        for (final int length : lengths) {
+            final char[] bigChars = new char[length];
             Arrays.fill(bigChars, 'X');
             checkStringRoundTrip(new String(bigChars));
         }
@@ -61,14 +59,14 @@ public class ClientTests {
         ByteArrayInputStream i = new ByteArrayInputStream(o.toByteArray());
         String s = Util.readString(i);
         assertEquals(example, s);
-        assertEquals(i.available(), 0);
+        assertEquals(0, i.available());
     }
 
     public byte[] readSamples(String ...samples) throws Exception{
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for(String sample: samples) {
             byte[] bytes = java.nio.file.Files.readAllBytes(
-                java.nio.file.Paths.get(getClass().getResource(sample).getFile())
+                java.nio.file.Paths.get(Objects.requireNonNull(getClass().getResource(sample)).getFile())
             );
             out.write(bytes);
         }
@@ -147,8 +145,8 @@ public class ClientTests {
                 dest1, dest2
         );
         pumper.run();
-        assertTrue(Arrays.equals(samples1, dest1.toByteArray()));
-        assertTrue(Arrays.equals(samples2, dest2.toByteArray()));
+        assertArrayEquals(samples1, dest1.toByteArray());
+        assertArrayEquals(samples2, dest2.toByteArray());
     }
 
 }

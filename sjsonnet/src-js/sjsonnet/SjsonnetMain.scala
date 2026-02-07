@@ -20,11 +20,11 @@ object SjsonnetMain {
     val interp = new Interpreter(
       ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map {
         case (k, ujson.Str(v)) => (k, v)
-        case _ => throw new js.JavaScriptException("External variables must be strings")
+        case _                 => throw js.JavaScriptException("External variables must be strings")
       },
       ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap.map {
         case (k, ujson.Str(v)) => (k, v)
-        case _                 => throw new js.JavaScriptException("TLA variables must be strings")
+        case _                 => throw js.JavaScriptException("TLA variables must be strings")
       },
       JsVirtualPath(wd0),
       new Importer {
@@ -37,7 +37,7 @@ object SjsonnetMain {
           importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
             case s: String        => Some(StaticResolvedFile(s))
             case arr: Array[Byte] => Some(StaticBinaryResolvedFile(arr))
-            case _ => throw new js.JavaScriptException("Loader result must be string or byte array")
+            case _ => throw js.JavaScriptException("Loader result must be string or byte array")
           }
       },
       parseCache = new DefaultParseCache,
@@ -46,7 +46,7 @@ object SjsonnetMain {
         new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map.from(NativeRegex.functions)).module
     )
     interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match {
-      case Left(msg) => throw new js.JavaScriptException(msg)
+      case Left(msg) => throw js.JavaScriptException(msg)
       case Right(v)  => v
     }
   }

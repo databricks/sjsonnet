@@ -81,7 +81,7 @@ object Platform {
 
   def yamlToJson(s: String): ujson.Value = {
     val docs = docSplitPattern.split(s, -1)
-    docs.size match {
+    docs.length match {
       case 0 => ujson.Obj()
       case 1 =>
         docs.head.asNode match {
@@ -93,7 +93,7 @@ object Platform {
             Error.fail("Error converting YAML to JSON: " + e.getMessage)
         }
       case _ =>
-        val buf = new mutable.ArrayBuffer[ujson.Value](docs.size)
+        val buf = new mutable.ArrayBuffer[ujson.Value](docs.length)
         for (doc <- docs) {
           doc.asNode match {
             case Right(n)               => buf += nodeToJson(n)
