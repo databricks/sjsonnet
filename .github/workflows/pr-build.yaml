@@ -22,6 +22,8 @@ jobs:
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@bebeeb0e6f48ebad66d3783946588ecf43114433 # 6.4.8
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Compile with mill
