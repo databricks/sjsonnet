@@ -271,7 +271,8 @@ object Val {
       private val triggerAsserts: (Val.Obj, Val.Obj) => Unit,
       `super`: Obj,
       valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
-      private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
+      private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null,
+      private val excludedKeys: java.util.Set[String] = null)
       extends Literal
       with Expr.ObjBody {
     private var asserting: Boolean = false
@@ -323,9 +324,61 @@ object Val {
 
       current = lhs
       for (s <- objs.reverse) {
-        current = new Val.Obj(s.pos, s.getValue0, false, s.triggerAsserts, current)
+        // Preserve excludedKeys if they exist in the chain's keys OR in the collected excludedKeys
+        val filteredExcludedKeys = if (s.excludedKeys != null) {
+          // Collect all keys defined in this object chain (before merge with lhs)
+          // We need to check all keys in the chain, including those from super
+          val keysInThisChain = Util.preSizedJavaHashSet[String](objs.length * 4)
+          for (s <- objs) {
+            keysInThisChain.addAll(s.getValue0.keySet())
+          }
+          Util.interset(s.excludedKeys, keysInThisChain)
+        } else null
+        current = new Val.Obj(
+          s.pos,
+          s.getValue0,
+          false,
+          s.triggerAsserts,
+          current,
+          new util.HashMap[Any, Val](),
+          null,
+          filteredExcludedKeys
+        )
       }
       current
+    }
+
+    /**
+     * Create a new object that removes the specified keys from this object.
+     *
+     * The implementation preserves both internal and external inheritance:
+     *   1. Internal: For `objectRemoveKey({ a: 1 } + { b: super.a }, 'a')`, the original object's
+     *      internal super chain is preserved, so `b: super.a` can still access `a`.
+     *   2. External: For `{ a: 1 } + objectRemoveKey({ b: super.a }, 'a')`, the result can
+     *      participate in a new inheritance chain, where `super.a` accesses the new super.
+     *
+     * The approach is to create a thin wrapper object with the original object as super, and mark
+     * the key as excluded via the excludedKeys set. The excluded key won't appear in
+     * allKeyNames/visibleKeyNames, but super.key can still access the value.
+     */
+    def removeKeys(pos: Position, keys: String*): Val.Obj = {
+      val excluded =
+        if (keys.length == 1) java.util.Collections.singleton(keys.head)
+        else {
+          val set = Util.preSizedJavaHashSet[String](keys.length)
+          keys.foreach(set.add)
+          set
+        }
+      new Val.Obj(
+        pos,
+        Util.emptyJavaLinkedHashMap[String, Obj.Member],
+        false,
+        null, // No asserts in wrapper; original object's asserts are triggered via super chain
+        this,
+        new util.HashMap[Any, Val](), // NOTE: Must be a dedicated new value cache.
+        null,
+        excluded
+      )
     }
 
     def prettyName = "object"
@@ -334,20 +387,39 @@ object Val {
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
       val objs = mutable.ArrayBuffer(this)
       var current = this
-      while (current.getSuper != null) {
-        objs += current.getSuper
-        current = current.getSuper
+      var superObj = current.getSuper
+      while (superObj != null) {
+        objs += superObj
+        current = superObj
+        superObj = current.getSuper
+      }
+
+      // Collect all excluded keys from the entire chain
+      val allExcludedKeys = Util.preSizedJavaHashSet[String](objs.length)
+      for (s <- objs) {
+        val keys = s.excludedKeys
+        if (Util.isNotEmpty(keys)) {
+          allExcludedKeys.addAll(keys)
+        }
       }
 
       for (s <- objs.reverse) {
         if (s.static) {
-          mapping.putAll(s.allKeys)
+          s.allKeys
+            .keySet()
+            .forEach(key => {
+              if (!allExcludedKeys.contains(key)) {
+                mapping.put(key, false)
+              }
+            })
         } else {
           s.getValue0.forEach { (k, m) =>
-            val vis = m.visibility
-            if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
-            else if (vis == Visibility.Hidden) mapping.put(k, true)
-            else if (vis == Visibility.Unhide) mapping.put(k, false)
+            if (!allExcludedKeys.contains(k)) {
+              val vis = m.visibility
+              if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
+              else if (vis == Visibility.Hidden) mapping.put(k, true)
+              else if (vis == Visibility.Unhide) mapping.put(k, false)
+            }
           }
         }
       }
@@ -411,6 +483,11 @@ object Val {
           case x    => x
         }
       } else {
+        // Check if the key is excluded (used by objectRemoveKey)
+        // When self != this, we need to check if the key exists in self's visible keys
+        if ((self eq this) && excludedKeys != null && excludedKeys.contains(k)) {
+          Error.fail("Field does not exist: " + k, pos)
+        }
         val cacheKey = if (self eq this) k else (k, self)
         val cachedValue = valueCache.get(cacheKey)
         if (cachedValue != null) {
