@@ -209,16 +209,23 @@ class CachedResolver(
       ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate(
       (path, content.contentHash()), {
-        val parsed = fastparse.parse(
-          content.getParserInput(),
-          parser(path).document(_)
-        ) match {
-          case f @ Parsed.Failure(_, _, _) =>
-            val traced = f.trace()
-            val pos = new Position(new FileScope(path), traced.index)
-            Left(new ParseError(traced.msg).addFrame(pos))
-          case Parsed.Success(r, _) => Right(r)
-        }
+        val parsed =
+          try {
+            fastparse.parse(
+              content.getParserInput(),
+              parser(path).document(_)
+            ) match {
+              case f @ Parsed.Failure(_, _, _) =>
+                val traced = f.trace()
+                val pos = new Position(new FileScope(path), traced.index)
+                Left(new ParseError(traced.msg).addFrame(pos))
+              case Parsed.Success(r, _) => Right(r)
+            }
+          } catch {
+            case e: ParseError if e.offset >= 0 =>
+              val pos = new Position(new FileScope(path), e.offset)
+              Left(new ParseError(e.getMessage).addFrame(pos))
+          }
         parsed.flatMap { case (e, fs) => process(e, fs) }
       }
     )
