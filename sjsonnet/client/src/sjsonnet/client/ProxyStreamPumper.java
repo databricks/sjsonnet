@@ -6,9 +6,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class ProxyStreamPumper implements Runnable{
-    private InputStream src;
-    private OutputStream dest1;
-    private OutputStream dest2;
+    private final InputStream src;
+    private final OutputStream dest1;
+    private final OutputStream dest2;
     public ProxyStreamPumper(InputStream src, OutputStream dest1, OutputStream dest2){
         this.src = src;
         this.dest1 = dest1;
@@ -39,6 +39,7 @@ public class ProxyStreamPumper implements Runnable{
                     if (quantity0 > 0) dest1.write(buffer, 0, offset);
                     else dest2.write(buffer, 0, offset);
                 }
+                first = false;
             } catch (IOException e) {
                 // Win32NamedPipeSocket input stream somehow doesn't return -1,
                 // instead it throws an IOException whose message contains "ReadFile()".

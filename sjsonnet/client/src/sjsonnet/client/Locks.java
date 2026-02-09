@@ -2,7 +2,6 @@ package sjsonnet.client;
 
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class Locks implements AutoCloseable{
     public Lock processLock;
@@ -26,7 +25,7 @@ public class Locks implements AutoCloseable{
     }
 }
 class FileLocked implements Locked{
-    private java.nio.channels.FileLock lock;
+    private final java.nio.channels.FileLock lock;
     public FileLocked(java.nio.channels.FileLock lock){
         this.lock = lock;
     }
@@ -36,7 +35,7 @@ class FileLocked implements Locked{
 }
 
 class FileLock extends Lock{
-    String path;
+    final String path;
     RandomAccessFile raf;
     FileChannel chan;
     public FileLock(String path) throws Exception{
