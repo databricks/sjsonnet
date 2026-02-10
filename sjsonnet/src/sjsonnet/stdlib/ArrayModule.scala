@@ -383,7 +383,10 @@ object ArrayModule extends AbstractFunctionModule {
               val fres = func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
               fres match {
                 case va: Val.Arr => va.asLazyArray
-                case unknown     => Error.fail("flatMap func must return an array, not " + unknown)
+                case unknown     =>
+                  Error.fail(
+                    "std.flatMap on arrays, provided function must return an array, got " + unknown.prettyName
+                  )
               }
             }
           }
@@ -403,7 +406,7 @@ object ArrayModule extends AbstractFunctionModule {
                 case _: Val.Null   => ""
                 case x             =>
                   Error.fail(
-                    "flatMap func must return string, got " + fres
+                    "std.flatMap on strings, provided function must return a string, got " + fres
                       .asInstanceOf[Val]
                       .force
                       .prettyName
@@ -413,7 +416,8 @@ object ArrayModule extends AbstractFunctionModule {
             i += Character.charCount(codePoint)
           }
           Val.Str(pos, builder.toString)
-        case _ => Error.fail("Argument must be either array or string")
+        case unknown =>
+          Error.fail("std.flatMap second param must be array / string, got " + unknown.prettyName)
       }
       res
     },
