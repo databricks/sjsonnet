@@ -27,15 +27,19 @@ jobs:
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Compile with mill
+        timeout-minutes: 15
         run: ./mill _.${{ matrix.lang }}[_].__.compile
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill _.${{ matrix.lang }}[_].__.test
       - name: Compile with sbt
+        timeout-minutes: 15
         if: ${{ matrix.lang == 'jvm' }}
         run: sbt compile bench/compile bench/jmh:compile
       - name: Run sbt tests
+        timeout-minutes: 15
         if: ${{ matrix.lang == 'jvm' }}
         run: sbt test
       - name: Run Native Image Test Suites
+        timeout-minutes: 30
         if: ${{ (matrix.lang == 'jvm') && (matrix.java == '25') }}
         run: sjsonnet/test/graalvm/run_test_suites.py
