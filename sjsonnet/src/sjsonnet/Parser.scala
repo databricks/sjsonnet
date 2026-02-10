@@ -68,6 +68,7 @@ object Parser {
 
   private val emptyLazyArray = new Array[Lazy](0)
   private val isSpaceOrTab: Char => Boolean = c => c == ' ' || c == '\t'
+
 }
 
 class Parser(
@@ -89,6 +90,10 @@ class Parser(
         s"Parsing exceeded maximum recursion depth of ${settings.maxParserRecursionDepth}"
       )
     }
+  }
+
+  private def failParse(msg: String, offset: Int): Nothing = {
+    throw new ParseError(msg, offset = offset)
   }
 
   def Pos[$: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
@@ -284,7 +289,8 @@ class Parser(
 
   def maybeChompedTripleBarString[$: P]: P[Seq[String]] = tripleBarString.map {
     case (true, lines) =>
-      lines.dropRight(1) ++ Seq(lines.last.stripLineEnd)
+      val last = lines.length - 1
+      lines.updated(last, lines(last).stripLineEnd)
     case (false, lines) =>
       lines
   }
@@ -314,14 +320,67 @@ class Parser(
     }
   )
 
+  private def describeWhitespace(whitespace: String): String = {
+    var spaces = 0
+    var tabs = 0
+    for (c <- whitespace) {
+      if (c == ' ') spaces += 1
+      else if (c == '\t') tabs += 1
+    }
+    if (spaces > 0 && tabs > 0) {
+      s"${spaces} ${if (spaces == 1) "space" else "spaces"} and ${tabs} ${
+          if (tabs == 1) "tab" else "tabs"
+        }"
+    } else if (spaces > 0) {
+      s"${spaces} ${if (spaces == 1) "space" else "spaces"}"
+    } else if (tabs > 0) {
+      s"${tabs} ${if (tabs == 1) "tab" else "tabs"}"
+    } else {
+      "no indentation"
+    }
+  }
+
   def tripleBarStringBody[$: P](indent: String, sep: String): P[Seq[String]] = P(
-    // Because we already parsed the indentation, we special case the first line and only look for the content.
+    // First line: indentation already consumed, just capture content up to the line separator.
     (CharsWhile(!sep.contains(_), 0) ~~ sep).!.flatMapX { firstLine =>
-      // That's the core of the parsing. Either we have an empty line or we have indentation + content + new line separator.
-      (sep.! | (indent.! ~~ (CharsWhile(!sep.contains(_), 0) ~~ sep).!).map(_._2))
+      // Subsequent lines: empty line (just separator) | indented line with whitespace check.
+      (sep.! | tripleBarStringIndentedLine(indent, sep))
         .opaque("|||-block line must either be an empty line or start with at least one whitespace")
         .repX
-        .map(Seq(firstLine) ++ _)
+        .map(firstLine +: _)
+    }
+  )
+
+  private def tripleBarStringIndentedLine[$: P](indent: String, sep: String): P[String] = P(
+    // Parse whitespace once, then check if it matches the expected indentation.
+    (CharsWhile(isSpaceOrTab, 0).! ~~ Index).flatMapX { case (whitespace, wsEndOffset) =>
+      if (whitespace.isEmpty) {
+        // No whitespace at all — not an indented line (e.g. ||| terminator without leading spaces).
+        Fail.opaque("expected indentation for text block line")
+      } else if (whitespace.startsWith(indent)) {
+        // Indentation matches — parse the rest of the line content after the indent.
+        (CharsWhile(!sep.contains(_), 0) ~~ sep).!.map { content =>
+          whitespace.substring(indent.length) + content
+        }
+      } else {
+        val isTerminator = P.current.input.isReachable(wsEndOffset + 2) &&
+          P.current.input(wsEndOffset) == '|' &&
+          P.current.input(wsEndOffset + 1) == '|' &&
+          P.current.input(wsEndOffset + 2) == '|'
+        if (isTerminator) {
+          // This is the ||| terminator line — fail to let the outer parser match |||.
+          Fail.opaque("text block terminator |||")
+        } else {
+          // Indentation mismatch — emit a detailed error.
+          val expectedDescription = describeWhitespace(indent)
+          val actualDescription = describeWhitespace(whitespace)
+          failParse(
+            "text block indentation mismatch: expected at least " +
+            expectedDescription + ", found " + actualDescription,
+            wsEndOffset
+          )
+        }
+      }
     }
   )
 

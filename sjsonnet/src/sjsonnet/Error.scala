@@ -86,14 +86,18 @@ object Error {
   }
 }
 
-class ParseError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
+class ParseError(
+    msg: String,
+    stack: List[Error.Frame] = Nil,
+    underlying: Option[Throwable] = None,
+    val offset: Int = -1)
     extends Error(msg, stack, underlying) {
 
   override protected def copy(
       msg: String = msg,
       stack: List[Error.Frame] = stack,
       underlying: Option[Throwable] = underlying): sjsonnet.ParseError =
-    new ParseError(msg, stack, underlying)
+    new ParseError(msg, stack, underlying, offset)
 }
 
 class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
