@@ -7,8 +7,6 @@ import sjsonnet.functions.AbstractFunctionModule
 object ObjectModule extends AbstractFunctionModule {
   def name = "object"
 
-  private val dummyPos: Position = new Position(null, 0)
-
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
     def evalRhs(o: Lazy, f: Lazy, ev: EvalScope, pos: Position): Val =
       Val.bool(pos, o.force.asObj.containsVisibleKey(f.force.asString))
