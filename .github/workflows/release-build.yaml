@@ -18,6 +18,10 @@ jobs:
         with:
           java-version: 17
           distribution: 'zulu'
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
       - name: Set up environment variables
         run: |
           echo "VERSION=$(cat sjsonnet/version)" >> $GITHUB_ENV
@@ -26,6 +30,8 @@ jobs:
         run: ./mill "sjsonnet.jvm[$SCALA_VERSION].__.assembly"
       - name: JS Build
         run: ./mill "sjsonnet.js[$SCALA_VERSION].fullLinkJS"
+      - name: WASM Build
+        run: ./mill "sjsonnet.wasm[$SCALA_VERSION].fullLinkJS"
       - name: Playground Build
         run: ./mill playground.bundle
       - name: Rename Artifacts
@@ -33,6 +39,7 @@ jobs:
           mkdir release
           cp ./out/sjsonnet/js/$SCALA_VERSION/fullLinkJS.dest/main.js ./release/sjsonnet-$VERSION.js
           cp ./out/sjsonnet/js/$SCALA_VERSION/fullLinkJS.dest/main.js.map ./release/sjsonnet-$VERSION.js.map
+          cp -r ./out/sjsonnet/wasm/$SCALA_VERSION/fullLinkJS.dest/ ./release/sjsonnet-wasm-$VERSION/
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar ./release/sjsonnet-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/client/assembly.dest/out.jar ./release/sjsonnet-client-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/server/assembly.dest/out.jar ./release/sjsonnet-server-$VERSION.jar
@@ -40,7 +47,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         name: Upload Artifacts
         with:
-          name: sjsonnet-${{ env.VERSION }}-jvmjs
+          name: sjsonnet-${{ env.VERSION }}-jvmjswasm
           path: release/*
           retention-days: 1
           if-no-files-found: error
