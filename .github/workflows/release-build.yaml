@@ -26,6 +26,8 @@ jobs:
         run: ./mill "sjsonnet.jvm[$SCALA_VERSION].__.assembly"
       - name: JS Build
         run: ./mill "sjsonnet.js[$SCALA_VERSION].fullLinkJS"
+      - name: Playground Build
+        run: ./mill playground.bundle
       - name: Rename Artifacts
         run: |
           mkdir release
@@ -34,6 +36,7 @@ jobs:
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar ./release/sjsonnet-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/client/assembly.dest/out.jar ./release/sjsonnet-client-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/server/assembly.dest/out.jar ./release/sjsonnet-server-$VERSION.jar
+          cp ./out/playground/bundle.dest/index.html ./release/sjsonnet-playground-$VERSION.html
       - uses: actions/upload-artifact@v6
         name: Upload Artifacts
         with:

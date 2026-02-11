@@ -1,0 +1,2559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sjsonnet Playground</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+  <style>
+    /* ===== Dark theme (default) ===== */
+    :root, [data-theme="dark"] {
+      --bg-primary: #1e1e2e;
+      --bg-secondary: #181825;
+      --bg-surface: #313244;
+      --text-primary: #cdd6f4;
+      --text-secondary: #a6adc8;
+      --accent: #89b4fa;
+      --accent-hover: #74c7ec;
+      --success: #a6e3a1;
+      --error: #f38ba8;
+      --border: #45475a;
+      --warning: #f9e2af;
+      --cm-theme: dracula;
+    }
+
+    /* ===== Light theme ===== */
+    [data-theme="light"] {
+      --bg-primary: #eff1f5;
+      --bg-secondary: #e6e9ef;
+      --bg-surface: #ccd0da;
+      --text-primary: #4c4f69;
+      --text-secondary: #6c6f85;
+      --accent: #1e66f5;
+      --accent-hover: #2a6ef5;
+      --success: #40a02b;
+      --error: #d20f39;
+      --border: #bcc0cc;
+      --warning: #df8e1d;
+      --cm-theme: default;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+    }
+
+    header h1 span {
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 13px;
+      margin-left: 10px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-controls label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .header-controls input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+
+    .theme-toggle {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .status-indicator {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 14px;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .status-indicator.success { background: rgba(166, 227, 161, 0.15); color: var(--success); }
+    .status-indicator.error { background: rgba(243, 139, 168, 0.15); color: var(--error); }
+    .status-indicator.running { background: rgba(249, 226, 175, 0.15); color: var(--warning); }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-left {
+      flex: 55;
+      display: flex;
+      flex-direction: row;
+      border-right: 1px solid var(--border);
+    }
+
+    .panel-right {
+      flex: 45;
+    }
+
+    .panel-header {
+      background: var(--bg-secondary);
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-header .timing {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .panel-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-header .download-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 400;
+    }
+
+    .panel-header .download-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ===== File sidebar ===== */
+    .file-sidebar {
+      width: 220px;
+      min-width: 80px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .file-sidebar-resize {
+      width: 4px;
+      cursor: col-resize;
+      background: var(--border);
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .file-sidebar-resize:hover,
+    .file-sidebar-resize.active {
+      background: var(--accent);
+    }
+
+    .file-sidebar-header {
+      padding: 10px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .file-sidebar-header .add-file-btn {
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+      line-height: 1;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+    }
+
+    .file-sidebar-header .add-file-btn:hover {
+      background: var(--bg-surface);
+    }
+
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .file-item {
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: var(--bg-surface);
+      transition: all 0.15s;
+    }
+
+    .file-item:hover {
+      border-color: var(--border);
+      background: var(--bg-primary);
+    }
+
+    .file-item.active {
+      background: var(--bg-primary);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .file-item.entry-file {
+      font-weight: 600;
+    }
+
+    .file-item .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-item .file-actions {
+      display: flex;
+      gap: 3px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+
+    .file-item:hover .file-actions,
+    .file-item:focus-within .file-actions {
+      opacity: 1;
+    }
+
+    .file-item .file-action-btn {
+      font-size: 13px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+    }
+
+    .file-item .file-action-btn:hover {
+      background: rgba(243, 139, 168, 0.3);
+      color: var(--error);
+    }
+
+    .file-item .file-action-btn.entry-btn:hover {
+      background: rgba(166, 227, 161, 0.3);
+      color: var(--success);
+    }
+
+    .file-item .file-action-btn.rename-btn:hover {
+      background: rgba(137, 180, 250, 0.3);
+      color: var(--accent);
+    }
+
+    /* ===== Editor area ===== */
+    .editor-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .toolbar-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--bg-primary);
+    }
+
+    .toolbar-btn:active {
+      transform: scale(0.97);
+    }
+
+    .editor-container {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .editor-container .CodeMirror {
+      height: 100%;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ===== Copy button ===== */
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .editor-container:hover .copy-btn,
+    .output-wrapper:hover .copy-btn,
+    .output-tab-content:hover .copy-btn,
+    .var-section:hover .copy-btn,
+    .copy-btn:focus {
+      opacity: 0.7;
+    }
+
+    .copy-btn:hover {
+      opacity: 1 !important;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .copy-btn.copied {
+      color: var(--success);
+      border-color: var(--success);
+      opacity: 1 !important;
+    }
+
+    /* ===== Autocomplete hints ===== */
+    .CodeMirror-hints {
+      background: var(--bg-surface) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+      font-size: 12px !important;
+      max-height: 240px !important;
+      padding: 4px 0 !important;
+      z-index: 100 !important;
+    }
+
+    .CodeMirror-hint {
+      color: var(--text-primary) !important;
+      padding: 4px 12px !important;
+      border-radius: 0 !important;
+      white-space: nowrap !important;
+      cursor: pointer !important;
+    }
+
+    .CodeMirror-hint-active {
+      background: var(--accent) !important;
+      color: #1e1e2e !important;
+    }
+
+    .cm-hint-signature {
+      color: var(--text-secondary);
+      font-size: 11px;
+      margin-left: 8px;
+    }
+
+    .CodeMirror-hint-active .cm-hint-signature {
+      color: rgba(30, 30, 46, 0.7);
+    }
+
+    /* ===== Output ===== */
+    .output-wrapper {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+
+    .output-editor-wrapper {
+      height: 100%;
+      width: 100%;
+    }
+
+    .output-editor-wrapper .CodeMirror {
+      height: 100%;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .output-wrapper.error-state .CodeMirror {
+      color: var(--error);
+    }
+
+    /* Error line highlighting in editor */
+    .cm-error-line {
+      background: rgba(255, 0, 0, 0.08) !important;
+    }
+    [data-theme="dark"] .cm-error-line {
+      background: rgba(255, 60, 60, 0.15) !important;
+    }
+    .cm-error-mark {
+      text-decoration: wavy underline red;
+      text-decoration-skip-ink: none;
+    }
+    .cm-error-gutter {
+      color: var(--error);
+      font-size: 14px;
+      padding: 0 3px;
+      cursor: pointer;
+    }
+
+    .output-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      padding: 6px 8px 0;
+      gap: 4px;
+    }
+
+    .output-tab {
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .output-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+      border-color: var(--border);
+    }
+
+    .output-tab.active {
+      color: var(--accent);
+      background: var(--bg-primary);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .output-tab-content {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+
+    .output-tab-content .output-editor-wrapper .CodeMirror {
+      height: 100%;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ===== Variables panel ===== */
+    .vars-resize-handle {
+      height: 4px;
+      cursor: row-resize;
+      background: var(--border);
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .vars-resize-handle:hover,
+    .vars-resize-handle.active {
+      background: var(--accent);
+    }
+
+    .vars-panel {
+      background: var(--bg-secondary);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .vars-panel .panel-header {
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border: none;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+      color: inherit;
+    }
+
+    .vars-panel .panel-header:hover {
+      background: var(--bg-surface);
+    }
+
+    .vars-panel .panel-header .toggle-icon {
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+
+    .vars-panel .panel-header .toggle-icon.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .vars-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .vars-container.collapsed {
+      display: none;
+    }
+
+    .var-section {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .var-section + .var-section {
+      border-top: 1px solid var(--border);
+    }
+
+    .var-section-header {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--accent);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .var-editor-wrapper {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .var-editor-wrapper .CodeMirror {
+      height: 100%;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .var-error {
+      font-size: 11px;
+      color: var(--error);
+      padding: 2px 12px;
+      background: rgba(243, 139, 168, 0.08);
+      display: none;
+      flex-shrink: 0;
+    }
+
+    .var-error.visible {
+      display: block;
+    }
+
+    /* ===== Resize handles ===== */
+    .resize-handle {
+      width: 4px;
+      cursor: col-resize;
+      background: var(--border);
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: var(--accent);
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <header>
+    <h1>Sjsonnet Playground <span>— Interactive Jsonnet Evaluator</span></h1>
+    <div class="header-controls">
+      <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme" aria-label="Toggle light/dark theme">🌙 Dark</button>
+      <label>
+        <input type="checkbox" id="preserveOrder"> Preserve key order
+      </label>
+      <label>
+        <input type="checkbox" id="autoEval" checked> Auto-evaluate
+      </label>
+      <span class="status-indicator" id="status" role="status" aria-live="polite">Ready</span>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="panel panel-left" id="panelLeft">
+      <div class="file-sidebar" id="fileSidebar">
+        <div class="file-sidebar-header">
+          <span>Files</span>
+          <button class="add-file-btn" id="addFileBtn" title="Add file" aria-label="Add new file">+</button>
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+      <div class="file-sidebar-resize" id="fileSidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize file sidebar" tabindex="0"></div>
+      <div class="editor-area">
+        <div class="panel-header">
+          <span>Script</span>
+          <div class="panel-header-actions">
+            <button class="toolbar-btn" id="openFileBtn" title="Open file from disk" aria-label="Open file from disk">📂 Open</button>
+            <button class="toolbar-btn" id="saveFileBtn" title="Save current file to disk" aria-label="Save current file to disk">💾 Save</button>
+            <button class="toolbar-btn" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">↩ Undo</button>
+            <button class="toolbar-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↪ Redo</button>
+          </div>
+        </div>
+        <input type="file" id="fileOpenInput" style="display:none" accept=".jsonnet,.libsonnet,.json,.txt,*/*">
+        <div class="editor-container" id="editorContainer">
+          <button class="copy-btn" id="copyCodeBtn" title="Copy code">Copy</button>
+          <textarea id="jsonnetInput"></textarea>
+        </div>
+
+        <div class="vars-resize-handle" id="varsResizeHandle" role="separator" aria-orientation="horizontal" aria-label="Resize variables panel" tabindex="0"></div>
+        <div class="vars-panel" id="varsPanel" style="height: 200px;">
+          <button class="panel-header" id="varsToggle" aria-expanded="true" aria-controls="varsContainer">
+            <span><span class="toggle-icon" id="toggleIcon">▼</span> Variables</span>
+          </button>
+          <div class="vars-container" id="varsContainer">
+            <div class="var-section">
+              <div class="var-section-header">External Variables (ext vars) — JSON object</div>
+              <div class="var-error" id="extVarsError"></div>
+              <div class="var-editor-wrapper">
+                <textarea id="extVarsInput"></textarea>
+              </div>
+              <button class="copy-btn" id="copyExtVarsBtn" title="Copy ext vars">Copy</button>
+            </div>
+            <div class="var-section">
+              <div class="var-section-header">Top-Level Arguments (TLA vars) — JSON object</div>
+              <div class="var-error" id="tlaVarsError"></div>
+              <div class="var-editor-wrapper">
+                <textarea id="tlaVarsInput"></textarea>
+              </div>
+              <button class="copy-btn" id="copyTlaVarsBtn" title="Copy TLA vars">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resize-handle" id="resizeHandle" role="separator" aria-orientation="vertical" aria-label="Resize editor and output panels" tabindex="0"></div>
+
+    <div class="panel panel-right" id="panelRight">
+      <div class="panel-header">
+        <span>Output</span>
+        <div class="panel-header-actions">
+          <span class="timing" id="timing"></span>
+          <button class="download-btn" id="downloadOutputBtn" title="Download output">⬇ Save</button>
+          <button class="download-btn" id="downloadAllOutputBtn" title="Download all output files" style="display:none">⬇ Save All</button>
+        </div>
+      </div>
+      <div class="output-tabs" id="outputTabs" role="tablist" aria-label="Output file tabs" style="display: none;"></div>
+      <div class="output-tab-content" id="outputTabContent" role="tabpanel" style="display: none;">
+        <button class="copy-btn" id="copyTabOutputBtn" title="Copy output">Copy</button>
+        <div id="tabOutputEditorWrapper" class="output-editor-wrapper"></div>
+      </div>
+      <div class="output-wrapper" id="outputWrapper" role="region" aria-label="Evaluation output">
+        <button class="copy-btn" id="copyOutputBtn" title="Copy output">Copy</button>
+        <div id="outputEditorWrapper" class="output-editor-wrapper"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/properties/properties.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/toml/toml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+  <script>/* SJSONNET_BUNDLE_PLACEHOLDER */</script>
+  <script>
+    (function () {
+      var STORAGE_KEY = "sjsonnet-playground-state";
+      var THEME_KEY = "sjsonnet-playground-theme";
+
+      var DEFAULT_MAIN_CODE = '// Welcome to Sjsonnet Playground!\n// Try editing this Jsonnet code:\n\nlocal greeting = "Hello";\nlocal target = std.extVar("name");\n\n{\n  message: greeting + ", " + target + "!",\n  numbers: [x * x for x in std.range(1, 5)],\n  nested: {\n    enabled: true,\n    tags: ["jsonnet", "sjsonnet", "playground"],\n  },\n}\n';
+      var DEFAULT_EXT_VARS = '{"name": "World"}';
+      var DEFAULT_TLA_VARS = '{}';
+
+      // ===== Theme =====
+      var currentTheme = (function () {
+        try { return localStorage.getItem(THEME_KEY); } catch (ignored) {}
+        return null;
+      })() || "dark";
+
+      function applyTheme(theme) {
+        currentTheme = theme;
+        document.body.setAttribute("data-theme", theme);
+        try { localStorage.setItem(THEME_KEY, theme); } catch (error) { console.warn("Failed to save theme preference:", error.name); }
+        var cmTheme = theme === "dark" ? "dracula" : "default";
+        var themeBtn = document.getElementById("themeToggle");
+        themeBtn.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
+        if (typeof allEditors !== "undefined") {
+          allEditors.forEach(function (ed) {
+            if (ed) ed.setOption("theme", cmTheme);
+          });
+        }
+      }
+
+      document.getElementById("themeToggle").addEventListener("click", function () {
+        applyTheme(currentTheme === "dark" ? "light" : "dark");
+      });
+
+      // ===== Copy helper =====
+      function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+        // Fallback for older browsers or non-HTTPS contexts
+        return new Promise(function (resolve, reject) {
+          var textarea = document.createElement("textarea");
+          try {
+            textarea.value = text;
+            textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
+            textarea.setAttribute("readonly", "");
+            document.body.appendChild(textarea);
+            textarea.select();
+            var success = document.execCommand("copy");
+            success ? resolve() : reject(new Error("execCommand copy failed"));
+          } catch (err) {
+            reject(err);
+          } finally {
+            if (textarea.parentNode) {
+              document.body.removeChild(textarea);
+            }
+          }
+        });
+      }
+
+      function setupCopyButton(btnId, getTextFn) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var text = getTextFn();
+          copyToClipboard(text).then(function () {
+            btn.textContent = "Copied!";
+            btn.classList.add("copied");
+            setTimeout(function () {
+              btn.textContent = "Copy";
+              btn.classList.remove("copied");
+            }, 1500);
+          }).catch(function () {
+            btn.textContent = "Failed";
+            setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+          });
+        });
+      }
+
+      // ===== State =====
+      var STATE_VERSION = 2;
+      var state = null;
+      function createDefaultState() {
+        return {
+          version: STATE_VERSION,
+          files: [{ name: "main.jsonnet", code: DEFAULT_MAIN_CODE, isEntry: true }],
+          activeFileName: "main.jsonnet",
+          extVars: DEFAULT_EXT_VARS,
+          tlaVars: DEFAULT_TLA_VARS,
+        };
+      }
+
+      function migrateState(data) {
+        var version = data.version || 1;
+
+        // v1 → v2: add version field
+        if (version < 2) {
+          data.version = 2;
+        }
+
+        // Future migrations go here:
+        // if (version < 3) { ... }
+
+        return data;
+      }
+
+      function isValidVarsJson(text) {
+        if (!text || typeof text !== "string") return false;
+        var trimmed = text.trim();
+        if (!trimmed || trimmed === "{}") return true;
+        try {
+          var parsed = JSON.parse(trimmed);
+          return typeof parsed === "object" && !Array.isArray(parsed) && parsed !== null;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function validateState(data) {
+        if (!data || typeof data !== "object") return false;
+        if (!Array.isArray(data.files) || data.files.length === 0) return false;
+
+        // Validate each file has required fields
+        for (var i = 0; i < data.files.length; i++) {
+          var file = data.files[i];
+          if (!file || typeof file.name !== "string" || !file.name) return false;
+          if (typeof file.code !== "string") return false;
+        }
+
+        // Ensure activeFileName points to an existing file
+        var activeExists = data.files.some(function (f) { return f.name === data.activeFileName; });
+        if (!activeExists) data.activeFileName = data.files[0].name;
+
+        // Ensure exactly one entry file
+        var entryFiles = data.files.filter(function (f) { return f.isEntry; });
+        if (entryFiles.length === 0) {
+          data.files[0].isEntry = true;
+        } else if (entryFiles.length > 1) {
+          data.files.forEach(function (f) { f.isEntry = false; });
+          data.files[0].isEntry = true;
+        }
+
+        // Reset invalid variable JSON to defaults
+        if (!isValidVarsJson(data.extVars)) {
+          data.extVars = DEFAULT_EXT_VARS;
+        }
+        if (!isValidVarsJson(data.tlaVars)) {
+          data.tlaVars = DEFAULT_TLA_VARS;
+        }
+
+        return true;
+      }
+
+      function loadState() {
+        try {
+          var stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            var data = JSON.parse(stored);
+            data = migrateState(data);
+            if (validateState(data)) {
+              state = data;
+              return;
+            }
+            console.warn("Stored state failed validation, using defaults");
+          }
+        } catch (error) {
+          console.warn("Failed to restore saved state:", error);
+          setTimeout(function () {
+            var statusEl = document.getElementById("status");
+            if (statusEl) {
+              statusEl.textContent = "⚠ Could not restore previous session";
+              statusEl.className = "status-indicator error";
+            }
+          }, 200);
+        }
+        state = createDefaultState();
+      }
+
+      var saveStateTimer = null;
+
+      function saveState() {
+        if (saveStateTimer) clearTimeout(saveStateTimer);
+        saveStateTimer = setTimeout(function () {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          } catch (error) {
+            console.warn("Failed to save state to localStorage:", error.name);
+          }
+        }, 300);
+      }
+
+      function saveStateImmediate() {
+        if (saveStateTimer) { clearTimeout(saveStateTimer); saveStateTimer = null; }
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+          console.warn("Failed to save state to localStorage:", error.name);
+        }
+      }
+
+      function getActiveFile() {
+        for (var i = 0; i < state.files.length; i++) {
+          if (state.files[i].name === state.activeFileName) return state.files[i];
+        }
+        return state.files[0];
+      }
+
+      function getEntryFile() {
+        for (var i = 0; i < state.files.length; i++) {
+          if (state.files[i].isEntry) return state.files[i];
+        }
+        return state.files[0];
+      }
+
+      function findFileByName(name) {
+        for (var i = 0; i < state.files.length; i++) {
+          if (state.files[i].name === name) return state.files[i];
+        }
+        return null;
+      }
+
+      // ===== Editors =====
+      var cmTheme = currentTheme === "dark" ? "dracula" : "default";
+
+      // ===== Jsonnet autocomplete data =====
+      var jsonnetKeywords = [
+        "assert", "else", "error", "false", "for", "function", "if", "import",
+        "importbin", "importstr", "in", "local", "null", "self", "super", "then",
+        "true", "tailstrict"
+      ];
+
+      var jsonnetSnippets = [
+        { text: "local", displayText: "local ... = ...;", snippet: true },
+        { text: "if", displayText: "if ... then ... else ...", snippet: true },
+        { text: "function", displayText: "function(params) body", snippet: true },
+        { text: "import", displayText: "import 'file.libsonnet'", snippet: true },
+        { text: "importstr", displayText: "importstr 'file'", snippet: true },
+        { text: "importbin", displayText: "importbin 'file'", snippet: true },
+        { text: "assert", displayText: "assert condition : 'message';", snippet: true },
+        { text: "error", displayText: "error 'message'", snippet: true }
+      ];
+
+      // std library functions with signatures: [name, signature]
+      var stdFunctions = [
+        // Array functions
+        ["makeArray", "(sz, func)"], ["length", "(x)"], ["member", "(arr, x)"],
+        ["count", "(arr, x)"], ["find", "(arr, x)"], ["map", "(func, arr)"],
+        ["mapWithIndex", "(func, arr)"], ["filter", "(func, arr)"],
+        ["filterMap", "(filter_func, map_func, arr)"], ["flatMap", "(func, arr)"],
+        ["foldl", "(func, arr, init)"], ["foldr", "(func, arr, init)"],
+        ["range", "(from, to)"], ["repeat", "(what, count)"],
+        ["reverse", "(arr)"], ["flattenArrays", "(arr)"], ["flattenDeepArray", "(arr)"],
+        ["sort", "(arr, keyF=id)"], ["uniq", "(arr, keyF=id)"],
+        ["all", "(arr)"], ["any", "(arr)"], ["sum", "(arr)"], ["avg", "(arr)"],
+        ["contains", "(arr, elem)"], ["remove", "(arr, elem)"], ["removeAt", "(arr, idx)"],
+        ["minArray", "(arr, keyF=id, onEmpty=error)"], ["maxArray", "(arr, keyF=id, onEmpty=error)"],
+        // String functions
+        ["toString", "(a)"], ["codepoint", "(str)"], ["char", "(n)"],
+        ["substr", "(str, from, len)"], ["startsWith", "(a, b)"], ["endsWith", "(a, b)"],
+        ["strReplace", "(str, from, to)"], ["isEmpty", "(str)"], ["trim", "(str)"],
+        ["stripChars", "(str, chars)"], ["lstripChars", "(str, chars)"], ["rstripChars", "(str, chars)"],
+        ["split", "(str, c)"], ["splitLimit", "(str, c, maxsplits)"], ["splitLimitR", "(str, c, maxsplits)"],
+        ["join", "(sep, arr)"], ["lines", "(arr)"], ["deepJoin", "(arr)"],
+        ["asciiUpper", "(str)"], ["asciiLower", "(str)"],
+        ["stringChars", "(str)"], ["findSubstr", "(pat, str)"],
+        ["parseInt", "(str)"], ["parseOctal", "(str)"], ["parseHex", "(str)"],
+        ["encodeUTF8", "(str)"], ["decodeUTF8", "(arr)"],
+        ["escapeStringJson", "(str)"], ["escapeStringPython", "(str)"],
+        ["escapeStringBash", "(str)"], ["escapeStringDollars", "(str)"],
+        ["escapeStringXML", "(str)"], ["equalsIgnoreCase", "(str1, str2)"],
+        ["format", "(str, vals)"],
+        // Object functions
+        ["objectHas", "(o, f)"], ["objectHasAll", "(o, f)"], ["objectHasEx", "(o, f, inc_hidden)"],
+        ["objectFields", "(o)"], ["objectFieldsAll", "(o)"], ["objectFieldsEx", "(o, inc_hidden)"],
+        ["objectValues", "(o)"], ["objectValuesAll", "(o)"],
+        ["objectKeysValues", "(o)"], ["objectKeysValuesAll", "(o)"],
+        ["objectRemoveKey", "(o, key)"],
+        ["get", "(o, f, default=null, inc_hidden=true)"],
+        ["mapWithKey", "(func, obj)"], ["mergePatch", "(target, patch)"], ["prune", "(a)"],
+        // Math functions
+        ["abs", "(n)"], ["sign", "(n)"], ["max", "(a, b)"], ["min", "(a, b)"],
+        ["pow", "(x, n)"], ["sqrt", "(x)"], ["floor", "(x)"], ["ceil", "(x)"], ["round", "(x)"],
+        ["mod", "(a, b)"], ["modulo", "(x, y)"], ["clamp", "(x, minVal, maxVal)"],
+        ["sin", "(x)"], ["cos", "(x)"], ["tan", "(x)"],
+        ["asin", "(x)"], ["acos", "(x)"], ["atan", "(x)"], ["atan2", "(y, x)"],
+        ["log", "(x)"], ["log2", "(x)"], ["log10", "(x)"], ["exp", "(x)"],
+        ["mantissa", "(x)"], ["exponent", "(x)"],
+        ["hypot", "(x, y)"], ["deg2rad", "(x)"], ["rad2deg", "(x)"],
+        ["isEven", "(x)"], ["isOdd", "(x)"], ["isInteger", "(x)"], ["isDecimal", "(x)"],
+        ["xor", "(x, y)"], ["xnor", "(x, y)"],
+        // Type functions
+        ["type", "(x)"], ["isString", "(x)"], ["isNumber", "(x)"], ["isBoolean", "(x)"],
+        ["isObject", "(x)"], ["isArray", "(x)"], ["isFunction", "(x)"], ["isNull", "(x)"],
+        ["assertEqual", "(a, b)"], ["equals", "(a, b)"], ["primitiveEquals", "(a, b)"],
+        // Encoding functions
+        ["base64", "(input)"], ["base64Decode", "(str)"], ["base64DecodeBytes", "(str)"],
+        ["md5", "(s)"], ["sha1", "(s)"], ["sha256", "(s)"], ["sha512", "(s)"], ["sha3", "(s)"],
+        // Manifest functions
+        ["manifestJson", "(value)"], ["manifestJsonMinified", "(value)"],
+        ["manifestJsonEx", "(value, indent, newline, key_val_sep)"],
+        ["parseJson", "(str)"], ["parseYaml", "(str)"],
+        ["manifestYamlDoc", "(value, indent_array_in_object, quote_keys)"],
+        ["manifestYamlStream", "(value, indent_array_in_object, c_document_end, quote_keys)"],
+        ["manifestIni", "(ini)"], ["manifestPython", "(v)"], ["manifestPythonVars", "(conf)"],
+        ["manifestXmlJsonml", "(value)"],
+        ["manifestToml", "(value)"], ["manifestTomlEx", "(value, indent)"],
+        // Set functions
+        ["set", "(arr, keyF=id)"], ["setUnion", "(a, b, keyF=id)"],
+        ["setInter", "(a, b, keyF=id)"], ["setDiff", "(a, b, keyF=id)"],
+        ["setMember", "(x, arr, keyF=id)"], ["slice", "(indexable, index, end, step)"],
+        // Regex functions
+        ["regexFullMatch", "(pattern, str)"], ["regexPartialMatch", "(pattern, str)"],
+        ["regexGlobalReplace", "(str, pattern, to)"], ["regexReplace", "(str, pattern, to)"],
+        ["regexQuoteMeta", "(str)"],
+        // Core functions
+        ["extVar", "(x)"], ["native", "(name)"], ["trace", "(str, rest)"]
+      ];
+
+      // std constants
+      var stdConstants = ["pi", "thisFile"];
+
+      function extractIdentifiers(text) {
+        var identifiers = { locals: [], params: [], fields: [] };
+        var seen = {};
+
+        // Extract local variable names: local foo = ...
+        var localPattern = /\blocal\s+([a-zA-Z_]\w*)\s*(?:\([^)]*\))?\s*=/g;
+        var match;
+        while ((match = localPattern.exec(text)) !== null) {
+          if (!seen[match[1]]) { identifiers.locals.push(match[1]); seen[match[1]] = true; }
+        }
+
+        // Extract function parameter names: function(a, b, c)
+        var funcParamPattern = /\bfunction\s*\(([^)]*)\)/g;
+        while ((match = funcParamPattern.exec(text)) !== null) {
+          var params = match[1].split(",");
+          for (var pi = 0; pi < params.length; pi++) {
+            var paramName = params[pi].trim().replace(/=.*$/, "").trim();
+            if (paramName && /^[a-zA-Z_]\w*$/.test(paramName) && !seen[paramName]) {
+              identifiers.params.push(paramName);
+              seen[paramName] = true;
+            }
+          }
+        }
+
+        // Extract object field names: { fieldName: ..., "fieldName":: ... }
+        var fieldPattern = /(?:^|[{,;])\s*([a-zA-Z_]\w*)\s*(?:::?:?|[+(])/gm;
+        while ((match = fieldPattern.exec(text)) !== null) {
+          var fieldName = match[1];
+          if (!seen[fieldName] && jsonnetKeywords.indexOf(fieldName) === -1) {
+            identifiers.fields.push(fieldName);
+            seen[fieldName] = true;
+          }
+        }
+
+        return identifiers;
+      }
+
+      function extractCrossFileIdentifiers() {
+        var allIdentifiers = { locals: [], fields: [] };
+        var seen = {};
+        for (var i = 0; i < state.files.length; i++) {
+          var file = state.files[i];
+          if (file.name === state.activeFileName) continue;
+          var ids = extractIdentifiers(file.code);
+          var combined = ids.locals.concat(ids.fields);
+          for (var j = 0; j < combined.length; j++) {
+            if (!seen[combined[j]]) {
+              allIdentifiers.locals.push(combined[j]);
+              seen[combined[j]] = true;
+            }
+          }
+        }
+        return allIdentifiers;
+      }
+
+      function extractImportedFileNames() {
+        var names = [];
+        for (var i = 0; i < state.files.length; i++) {
+          names.push(state.files[i].name);
+        }
+        return names;
+      }
+
+      function extractVarKeys(cmEditor) {
+        var keys = [];
+        try {
+          var text = cmEditor.getValue().trim();
+          if (!text || text === "{}") return keys;
+          var parsed = JSON.parse(text);
+          if (typeof parsed === "object" && !Array.isArray(parsed) && parsed !== null) {
+            for (var key in parsed) {
+              if (parsed.hasOwnProperty(key)) keys.push(key);
+            }
+          }
+        } catch (ignored) {}
+        return keys;
+      }
+
+      function jsonnetHint(editor) {
+        var cursor = editor.getCursor();
+        var line = editor.getLine(cursor.line);
+        var textBefore = line.slice(0, cursor.ch);
+        var textAfter = line.slice(cursor.ch).trim();
+        var completions = [];
+        var fromPos = cursor.ch;
+
+        // Suggest function definition template after "local funcName"
+        var localFuncMatch = textBefore.match(/^\s*local\s+([a-zA-Z_]\w*)\s*$/);
+        if (localFuncMatch && !textAfter) {
+          completions.push({ text: "(", displayText: "( ) = ...;  (function definition)" });
+          completions.push({ text: " = ", displayText: " = ...;  (variable definition)" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+
+
+        // String escape sequence completion: inside a string after backslash
+        var escapeMatch = textBefore.match(/(?:^|[^\\])["'](?:[^"'\\]|\\.)*\\([a-z]?)$/);
+        if (escapeMatch) {
+          var escPrefix = escapeMatch[1] || "";
+          fromPos = cursor.ch - escPrefix.length;
+          var escapes = [
+            ["n", "\\n (newline)"], ["t", "\\t (tab)"], ["r", "\\r (carriage return)"],
+            ["\\", "\\\\ (backslash)"], ["\"", "\\\" (double quote)"],
+            ["'", "\\' (single quote)"], ["/", "\\/ (slash)"],
+            ["u", "\\uXXXX (unicode)"], ["0", "\\0 (null)"]
+          ];
+          for (var ei = 0; ei < escapes.length; ei++) {
+            if (escapes[ei][0].indexOf(escPrefix) === 0) {
+              completions.push({ text: escapes[ei][0], displayText: escapes[ei][1] });
+            }
+          }
+          if (completions.length > 0) {
+            return { list: completions, from: CodeMirror.Pos(cursor.line, fromPos), to: cursor };
+          }
+        }
+
+        // String format placeholder completion: inside a string after %
+        var fmtMatch = textBefore.match(/["'](?:[^"'\\]|\\.)*%([a-z]?)$/);
+        if (fmtMatch) {
+          var fmtPrefix = fmtMatch[1] || "";
+          fromPos = cursor.ch - fmtPrefix.length;
+          var formatSpecs = [
+            ["s", "%s (string)"], ["d", "%d (integer)"], ["f", "%f (float)"],
+            ["g", "%g (compact float)"], ["e", "%e (scientific)"],
+            ["i", "%i (integer)"], ["o", "%o (octal)"], ["x", "%x (hex lowercase)"],
+            ["X", "%X (hex uppercase)"], ["%", "%% (literal %)"]
+          ];
+          for (var fsi = 0; fsi < formatSpecs.length; fsi++) {
+            if (formatSpecs[fsi][0].toLowerCase().indexOf(fmtPrefix.toLowerCase()) === 0) {
+              completions.push({ text: formatSpecs[fsi][0], displayText: formatSpecs[fsi][1] });
+            }
+          }
+          if (completions.length > 0) {
+            return { list: completions, from: CodeMirror.Pos(cursor.line, fromPos), to: cursor };
+          }
+        }
+
+        // if/then/else contextual completion
+        if (!textAfter || textAfter === "") {
+          // After an expression following "if ... ", suggest "then"
+          var ifThenMatch = textBefore.match(/\bif\s+.+\S\s*$/);
+          if (ifThenMatch && !textBefore.match(/\bthen\b/)) {
+            completions.push({ text: " then ", displayText: "then" });
+          }
+          // After an expression following "then ... ", suggest "else"
+          var thenElseMatch = textBefore.match(/\bthen\s+.+\S\s*$/);
+          if (thenElseMatch && !textBefore.match(/\belse\b/)) {
+            completions.push({ text: " else ", displayText: "else" });
+          }
+          if (completions.length > 0) {
+            return { list: completions, from: cursor, to: cursor };
+          }
+        }
+
+        // Suggest "for" keyword inside array/object comprehension context
+        // Only trigger after expressions that look like comprehension bodies (no colon/comma suggesting normal object/array)
+        var forInMatch = textBefore.match(/[\[{]\s*[a-zA-Z_$][\w.[\]()]*\s+$/);
+        if (forInMatch && !textBefore.match(/\bfor\b/) && !textBefore.match(/[:,]/) && !textAfter) {
+          completions.push({ text: "for ", displayText: "for x in arr" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+        // Suggest "in" keyword after "for identifier"
+        var inMatch = textBefore.match(/\bfor\s+[a-zA-Z_]\w*\s+$/);
+        if (inMatch) {
+          completions.push({ text: "in ", displayText: "in arr" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+        // Suggest "if" filter after "for x in arr" inside comprehension
+        var compIfMatch = textBefore.match(/\bfor\s+\w+\s+in\s+.+\s+$/);
+        if (compIfMatch && !textBefore.match(/\bif\b/) && !textAfter) {
+          completions.push({ text: "if ", displayText: "if condition (filter)" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+        // Array/object comprehension templates after "["
+        if (textBefore.match(/\[\s*$/) && !textAfter) {
+          completions.push({ text: " for x in ", displayText: "[expr for x in arr] (array comprehension)" });
+          completions.push({ text: " for x in  if ", displayText: "[expr for x in arr if cond] (filtered comprehension)" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+        // Object comprehension template after "{"
+        if (textBefore.match(/\{\s*$/) && !textAfter) {
+          completions.push({ text: "[key]: value for key in ", displayText: "{[key]: value for key in arr} (object comprehension)" });
+          return { list: completions, from: cursor, to: cursor };
+        }
+
+        // Check for std. prefix
+        var stdMatch = textBefore.match(/\bstd\.([a-zA-Z_]\w*)?$/);
+        if (stdMatch) {
+          var prefix = (stdMatch[1] || "").toLowerCase();
+          fromPos = cursor.ch - (stdMatch[1] || "").length;
+
+          for (var i = 0; i < stdFunctions.length; i++) {
+            var funcName = stdFunctions[i][0];
+            var funcSig = stdFunctions[i][1];
+            if (funcName.toLowerCase().indexOf(prefix) === 0 || (prefix.length > 0 && funcName.toLowerCase().indexOf(prefix) !== -1)) {
+              completions.push({
+                text: funcName,
+                displayText: funcName + funcSig,
+                render: function (element, self, data) {
+                  var nameSpan = document.createElement("span");
+                  nameSpan.textContent = data.funcName;
+                  var sigSpan = document.createElement("span");
+                  sigSpan.className = "cm-hint-signature";
+                  sigSpan.textContent = data.funcSig;
+                  element.appendChild(nameSpan);
+                  element.appendChild(sigSpan);
+                },
+                funcName: funcName,
+                funcSig: funcSig
+              });
+            }
+          }
+
+          // Also suggest std constants
+          for (var ci = 0; ci < stdConstants.length; ci++) {
+            var constName = stdConstants[ci];
+            if (constName.toLowerCase().indexOf(prefix) === 0) {
+              completions.push({
+                text: constName,
+                displayText: constName + " (constant)",
+                render: function (element, self, data) {
+                  var nameSpan = document.createElement("span");
+                  nameSpan.textContent = data.text;
+                  var sigSpan = document.createElement("span");
+                  sigSpan.className = "cm-hint-signature";
+                  sigSpan.textContent = " (constant)";
+                  element.appendChild(nameSpan);
+                  element.appendChild(sigSpan);
+                }
+              });
+            }
+          }
+
+          // Sort: exact prefix matches first, then contains matches
+          completions.sort(function (a, b) {
+            var aStarts = a.text.toLowerCase().indexOf(prefix) === 0;
+            var bStarts = b.text.toLowerCase().indexOf(prefix) === 0;
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+            return a.text.localeCompare(b.text);
+          });
+
+          return {
+            list: completions,
+            from: CodeMirror.Pos(cursor.line, fromPos),
+            to: cursor
+          };
+        }
+
+        // Suggest parameter names inside std.funcName( calls
+        var stdCallMatch = textBefore.match(/\bstd\.(\w+)\s*\([^)]*$/);
+        if (stdCallMatch && !textBefore.match(/\bstd\.\w+\s*\(\s*['"]/) ) {
+          var calledFunc = stdCallMatch[1];
+          // Find the function signature
+          for (var sfi = 0; sfi < stdFunctions.length; sfi++) {
+            if (stdFunctions[sfi][0] === calledFunc) {
+              var sig = stdFunctions[sfi][1];
+              // Parse parameter names from signature like "(arr, keyF=id)"
+              var paramStr = sig.replace(/^\(/, "").replace(/\)$/, "");
+              var params = paramStr.split(",");
+              // Count how many commas are already in the call to determine current param index
+              var callArgs = textBefore.slice(textBefore.lastIndexOf("(") + 1);
+              var commaCount = (callArgs.match(/,/g) || []).length;
+              if (commaCount < params.length) {
+                var currentParam = params[commaCount].trim();
+                var paramName = currentParam.replace(/=.*$/, "").trim();
+                // Only show if cursor is right after ( or , with optional whitespace
+                if (textBefore.match(/[,(]\s*$/)) {
+                  completions.push({
+                    text: "",
+                    displayText: "▸ " + paramName + (currentParam.indexOf("=") !== -1 ? " " + currentParam.slice(currentParam.indexOf("=")) : "") + "  (" + (commaCount + 1) + "/" + params.length + ")",
+                    hint: function () {} // no-op: just show info, don't insert
+                  });
+                  // Also show all remaining params as reference
+                  for (var rpi = commaCount + 1; rpi < params.length; rpi++) {
+                    completions.push({
+                      text: "",
+                      displayText: "  " + params[rpi].trim() + "  (" + (rpi + 1) + "/" + params.length + ")",
+                      hint: function () {}
+                    });
+                  }
+                  return { list: completions, from: cursor, to: cursor };
+                }
+              }
+              break;
+            }
+          }
+        }
+
+        // Check for std.extVar(" or std.extVar(' — suggest extVar key names
+        var extVarMatch = textBefore.match(/\bstd\.extVar\s*\(\s*(['"])([^'"]*)?$/);
+        if (extVarMatch) {
+          var quoteChar = extVarMatch[1];
+          var extVarPrefix = (extVarMatch[2] || "").toLowerCase();
+          fromPos = cursor.ch - (extVarMatch[2] || "").length;
+          // Check if closing quote and paren already exist after cursor
+          var textAfterCursor = line.slice(cursor.ch);
+          var hasClosing = textAfterCursor.match(new RegExp("^" + (quoteChar === "'" ? "'" : '"') + "\\)"));
+          var suffix = hasClosing ? "" : quoteChar + ")";
+          var extKeys = extractVarKeys(extVarsEditor);
+          for (var evi = 0; evi < extKeys.length; evi++) {
+            if (extKeys[evi].toLowerCase().indexOf(extVarPrefix) === 0) {
+              completions.push({ text: extKeys[evi] + suffix });
+            }
+          }
+          return { list: completions, from: CodeMirror.Pos(cursor.line, fromPos), to: cursor };
+        }
+
+        // Check for self., super., or $. prefix — suggest object field names from current code
+        var selfMatch = textBefore.match(/\b(?:self|super|\$)\.([a-zA-Z_]\w*)?$/);
+        if (selfMatch) {
+          var selfPrefix = (selfMatch[1] || "").toLowerCase();
+          fromPos = cursor.ch - (selfMatch[1] || "").length;
+          var editorText = editor.getValue();
+          var ids = extractIdentifiers(editorText);
+          var seenFields = {};
+          for (var si = 0; si < ids.fields.length; si++) {
+            var field = ids.fields[si];
+            if (!seenFields[field] && field.toLowerCase().indexOf(selfPrefix) === 0) {
+              completions.push({ text: field });
+              seenFields[field] = true;
+            }
+          }
+          // Also check cross-file fields
+          var crossIds = extractCrossFileIdentifiers();
+          for (var cfi = 0; cfi < crossIds.locals.length; cfi++) {
+            var crossField = crossIds.locals[cfi];
+            if (!seenFields[crossField] && crossField.toLowerCase().indexOf(selfPrefix) === 0) {
+              completions.push({ text: crossField });
+              seenFields[crossField] = true;
+            }
+          }
+          completions.sort(function (a, b) { return a.text.localeCompare(b.text); });
+          return { list: completions, from: CodeMirror.Pos(cursor.line, fromPos), to: cursor };
+        }
+
+        // Check for import/importstr/importbin path completion
+        var importMatch = textBefore.match(/\b(?:import|importstr|importbin)\s+['"]([^'"]*)?$/);
+        if (importMatch) {
+          var pathPrefix = (importMatch[1] || "").toLowerCase();
+          fromPos = cursor.ch - (importMatch[1] || "").length;
+          var fileNames = extractImportedFileNames();
+          for (var fi = 0; fi < fileNames.length; fi++) {
+            if (fileNames[fi].toLowerCase().indexOf(pathPrefix) === 0) {
+              completions.push({ text: fileNames[fi] });
+            }
+          }
+          return {
+            list: completions,
+            from: CodeMirror.Pos(cursor.line, fromPos),
+            to: cursor
+          };
+        }
+
+        // General identifier completion: keywords + local/param/field variables + cross-file
+        var identMatch = textBefore.match(/\b([a-zA-Z_]\w*)$/);
+        if (identMatch) {
+          var identPrefix = identMatch[1].toLowerCase();
+          fromPos = cursor.ch - identMatch[1].length;
+
+          // Don't trigger for very short prefixes unless explicitly requested
+          if (identPrefix.length < 2) {
+            return { list: [], from: cursor, to: cursor };
+          }
+
+          var addedIdents = {};
+
+          // Add "std" as a completion
+          if ("std".indexOf(identPrefix) === 0) {
+            completions.push({ text: "std", displayText: "std (standard library)" });
+            addedIdents["std"] = true;
+          }
+
+          // Keywords with snippet hints
+          for (var ki = 0; ki < jsonnetKeywords.length; ki++) {
+            var kw = jsonnetKeywords[ki];
+            if (kw.indexOf(identPrefix) === 0 && kw !== identPrefix) {
+              // Check if there is a matching snippet for richer display
+              var snippetInfo = null;
+              for (var sni = 0; sni < jsonnetSnippets.length; sni++) {
+                if (jsonnetSnippets[sni].text === kw) { snippetInfo = jsonnetSnippets[sni]; break; }
+              }
+              if (snippetInfo) {
+                completions.push({
+                  text: kw,
+                  displayText: snippetInfo.displayText,
+                  render: function (element, self, data) {
+                    var nameSpan = document.createElement("span");
+                    nameSpan.textContent = data.text;
+                    var sigSpan = document.createElement("span");
+                    sigSpan.className = "cm-hint-signature";
+                    sigSpan.textContent = "  " + data.displayText.slice(data.text.length);
+                    element.appendChild(nameSpan);
+                    element.appendChild(sigSpan);
+                  }
+                });
+              } else {
+                completions.push({ text: kw });
+              }
+              addedIdents[kw] = true;
+            }
+          }
+
+          // Identifiers from current editor: locals, params, fields
+          var editorText = editor.getValue();
+          var currentIds = extractIdentifiers(editorText);
+          var allCurrentIdents = currentIds.locals.concat(currentIds.params, currentIds.fields);
+          for (var li = 0; li < allCurrentIdents.length; li++) {
+            var ident = allCurrentIdents[li];
+            if (!addedIdents[ident] && ident.toLowerCase().indexOf(identPrefix) === 0 && ident !== identMatch[1]) {
+              completions.push({ text: ident });
+              addedIdents[ident] = true;
+            }
+          }
+
+          // Cross-file identifiers
+          var crossFileIds = extractCrossFileIdentifiers();
+          for (var xi = 0; xi < crossFileIds.locals.length; xi++) {
+            var crossIdent = crossFileIds.locals[xi];
+            if (!addedIdents[crossIdent] && crossIdent.toLowerCase().indexOf(identPrefix) === 0 && crossIdent !== identMatch[1]) {
+              completions.push({ text: crossIdent });
+              addedIdents[crossIdent] = true;
+            }
+          }
+
+          // TLA variable keys as top-level argument names
+          if (typeof tlaVarsEditor !== "undefined") {
+            var tlaKeys = extractVarKeys(tlaVarsEditor);
+            for (var ti = 0; ti < tlaKeys.length; ti++) {
+              var tlaKey = tlaKeys[ti];
+              if (!addedIdents[tlaKey] && tlaKey.toLowerCase().indexOf(identPrefix) === 0 && tlaKey !== identMatch[1]) {
+                completions.push({ text: tlaKey });
+                addedIdents[tlaKey] = true;
+              }
+            }
+          }
+
+          // Sort alphabetically
+          completions.sort(function (a, b) { return a.text.localeCompare(b.text); });
+
+          return {
+            list: completions,
+            from: CodeMirror.Pos(cursor.line, fromPos),
+            to: cursor
+          };
+        }
+
+        // Lowest priority: suggest ";" after local/assert statements that are missing it
+        if (!textAfter && textBefore.match(/^\s*(?:local\s+.+=.+\S|assert\s+.+\S)\s*$/)) {
+          var lastChar = textBefore.trim().slice(-1);
+          if (lastChar !== ";" && lastChar !== "," && lastChar !== "{" && lastChar !== "." && lastChar !== "(") {
+            return { list: [{ text: ";", displayText: "; (end statement)" }], from: cursor, to: cursor };
+          }
+        }
+
+        return { list: [], from: cursor, to: cursor };
+      }
+
+      var jsonnetEditor = CodeMirror.fromTextArea(document.getElementById("jsonnetInput"), {
+        mode: "javascript",
+        theme: cmTheme,
+        lineNumbers: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        tabSize: 2,
+        indentWithTabs: false,
+        extraKeys: {
+          "Ctrl-Space": function (cm) { cm.showHint({ hint: jsonnetHint, completeSingle: false }); }
+        }
+      });
+
+      // Auto-trigger hints when typing "std." or after identifier characters
+      jsonnetEditor.on("inputRead", function (cm, changeObj) {
+        if (changeObj.origin !== "+input") return;
+        var cursor = cm.getCursor();
+        var line = cm.getLine(cursor.line);
+        var textBefore = line.slice(0, cursor.ch);
+
+        // Auto-trigger after "std.", "self.", "super.", or "$."
+        if (textBefore.match(/\b(?:std|self|super|\$)\.$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+          return;
+        }
+
+        // Auto-trigger after std.extVar(" or std.extVar('
+        if (textBefore.match(/\bstd\.extVar\s*\(\s*['"]$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+          return;
+        }
+
+        // Auto-trigger parameter hints after std.funcName( or comma inside std call
+        if (textBefore.match(/\bstd\.\w+\s*\(\s*$/) || textBefore.match(/\bstd\.\w+\s*\([^)]*,\s*$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+          return;
+        }
+
+        // Auto-trigger escape sequence hints after backslash inside string
+        if (textBefore.match(/["'](?:[^"'\\]|\\.)*\\$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+          return;
+        }
+
+        // Auto-trigger after typing inside import quotes
+        if (textBefore.match(/\b(?:import|importstr|importbin)\s+['"][^'"]*$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+          return;
+        }
+
+        // Auto-trigger ";" completion after closing paren on local/assert lines
+        if (textBefore.match(/[)\]}\w'"]\s*$/) && !textBefore.match(/;\s*$/)) {
+          var fullLine = cm.getLine(cursor.line);
+          if (fullLine.match(/^\s*(?:local\s+|assert\s+)/) && !fullLine.match(/;\s*$/)) {
+            cm.showHint({ hint: jsonnetHint, completeSingle: false });
+            return;
+          }
+        }
+
+        // Auto-trigger after 3+ identifier characters
+        if (textBefore.match(/\b[a-zA-Z_]\w{2,}$/)) {
+          cm.showHint({ hint: jsonnetHint, completeSingle: false });
+        }
+      });
+
+      var extVarsEditor = CodeMirror.fromTextArea(document.getElementById("extVarsInput"), {
+        mode: { name: "javascript", json: true },
+        theme: cmTheme,
+        lineNumbers: false,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        tabSize: 2,
+      });
+
+      var tlaVarsEditor = CodeMirror.fromTextArea(document.getElementById("tlaVarsInput"), {
+        mode: { name: "javascript", json: true },
+        theme: cmTheme,
+        lineNumbers: false,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        tabSize: 2,
+      });
+
+      var outputEditor = CodeMirror(document.getElementById("outputEditorWrapper"), {
+        mode: { name: "javascript", json: true },
+        theme: cmTheme,
+        lineNumbers: true,
+        readOnly: true,
+        lineWrapping: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+      });
+
+      var tabOutputEditor = CodeMirror(document.getElementById("tabOutputEditorWrapper"), {
+        mode: "text/plain",
+        theme: cmTheme,
+        lineNumbers: true,
+        readOnly: true,
+        lineWrapping: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+      });
+
+      var allEditors = [jsonnetEditor, extVarsEditor, tlaVarsEditor, outputEditor, tabOutputEditor];
+
+      // ===== Copy buttons =====
+      setupCopyButton("copyCodeBtn", function () { return jsonnetEditor.getValue(); });
+      setupCopyButton("copyExtVarsBtn", function () { return extVarsEditor.getValue(); });
+      setupCopyButton("copyTlaVarsBtn", function () { return tlaVarsEditor.getValue(); });
+      setupCopyButton("copyOutputBtn", function () { return outputEditor.getValue(); });
+      setupCopyButton("copyTabOutputBtn", function () { return tabOutputEditor.getValue(); });
+
+      // ===== Download helper =====
+      function getMimeType(filename) {
+        var lower = (filename || "").toLowerCase();
+        if (lower.endsWith(".json")) return "application/json;charset=utf-8";
+        if (lower.endsWith(".yaml") || lower.endsWith(".yml")) return "text/yaml;charset=utf-8";
+        if (lower.endsWith(".xml") || lower.endsWith(".svg")) return "application/xml;charset=utf-8";
+        if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html;charset=utf-8";
+        if (lower.endsWith(".css")) return "text/css;charset=utf-8";
+        if (lower.endsWith(".js")) return "application/javascript;charset=utf-8";
+        if (lower.endsWith(".sh") || lower.endsWith(".bash")) return "application/x-sh;charset=utf-8";
+        if (lower.endsWith(".ini") || lower.endsWith(".cfg") || lower.endsWith(".conf") || lower.endsWith(".toml") || lower.endsWith(".properties")) return "text/plain;charset=utf-8";
+        return "text/plain;charset=utf-8";
+      }
+
+      function downloadFile(filename, content) {
+        var blob = new Blob([content], { type: getMimeType(filename) });
+        var url = URL.createObjectURL(blob);
+        try {
+          var anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = filename;
+          anchor.style.display = "none";
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+        } finally {
+          // Delay revocation to ensure the browser has started the download
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+      }
+
+      // ===== Editor toolbar: Undo / Redo =====
+      document.getElementById("undoBtn").addEventListener("click", function () {
+        jsonnetEditor.undo();
+        jsonnetEditor.focus();
+      });
+
+      document.getElementById("redoBtn").addEventListener("click", function () {
+        jsonnetEditor.redo();
+        jsonnetEditor.focus();
+      });
+
+      // ===== Editor toolbar: Save current file =====
+      document.getElementById("saveFileBtn").addEventListener("click", function () {
+        saveEditorToState();
+        var file = getActiveFile();
+        downloadFile(file.name, file.code);
+      });
+
+      // ===== Editor toolbar: Open file from disk =====
+      var fileOpenInput = document.getElementById("fileOpenInput");
+
+      document.getElementById("openFileBtn").addEventListener("click", function () {
+        fileOpenInput.click();
+      });
+
+      fileOpenInput.addEventListener("change", function () {
+        var selectedFile = fileOpenInput.files[0];
+        if (!selectedFile) return;
+        var reader = new FileReader();
+        reader.onload = function (event) {
+          var content = event.target.result;
+          var fileName = selectedFile.name;
+          saveEditorToState();
+          var existing = findFileByName(fileName);
+          if (existing) {
+            existing.code = content;
+            state.activeFileName = fileName;
+            loadFileIntoEditor(fileName);
+          } else {
+            state.files.push({ name: fileName, code: content, isEntry: false });
+            state.activeFileName = fileName;
+            loadFileIntoEditor(fileName);
+          }
+          renderFileList();
+          saveState();
+          scheduleEvaluation();
+        };
+        reader.onerror = function () {
+          setStatus("File Read Error", "error");
+          console.warn("Failed to read file:", selectedFile.name);
+        };
+        reader.readAsText(selectedFile);
+        fileOpenInput.value = "";
+      });
+
+      // ===== Output download buttons =====
+      var downloadOutputBtn = document.getElementById("downloadOutputBtn");
+      var downloadAllOutputBtn = document.getElementById("downloadAllOutputBtn");
+
+      downloadOutputBtn.addEventListener("click", function () {
+        if (currentOutputTabData && activeOutputTabKey) {
+          // Multi-file mode: download current tab
+          downloadFile(activeOutputTabKey, currentOutputTabData[activeOutputTabKey]);
+        } else {
+          // Single output mode
+          var content = outputEditor.getValue();
+          if (content) {
+            var entryName = getEntryFile().name;
+            var outputName = entryName.replace(/\.(jsonnet|libsonnet)$/, ".json");
+            if (outputName === entryName) outputName = entryName + ".json";
+            downloadFile(outputName, content);
+          }
+        }
+      });
+
+      downloadAllOutputBtn.addEventListener("click", function () {
+        if (!currentOutputTabData) return;
+        var keys = Object.keys(currentOutputTabData);
+        if (keys.length > 5 && !confirm("Download " + keys.length + " files?")) return;
+        // Stagger downloads to avoid browser popup blockers
+        keys.forEach(function (key, index) {
+          setTimeout(function () {
+            downloadFile(key, currentOutputTabData[key]);
+          }, index * 200);
+        });
+      });
+
+      // ===== Detect CodeMirror mode =====
+      function detectCodeMirrorMode(filename, content) {
+        if (!filename) return { name: "javascript", json: true };
+        var lower = filename.toLowerCase();
+        if (lower.endsWith(".json")) return { name: "javascript", json: true };
+        if (lower.endsWith(".yaml") || lower.endsWith(".yml")) return "yaml";
+        if (lower.endsWith(".conf")) return "yaml";
+        if (lower.endsWith(".ini") || lower.endsWith(".cfg") || lower.endsWith(".properties")) return "properties";
+        if (lower.endsWith(".sh") || lower.endsWith(".bash") || lower.endsWith(".zsh")) return "shell";
+        if (lower.endsWith(".toml")) return "toml";
+        if (lower.endsWith(".xml") || lower.endsWith(".html") || lower.endsWith(".svg")) return "xml";
+        if (lower.endsWith(".js") || lower.endsWith(".ts") || lower.endsWith(".jsonnet") || lower.endsWith(".libsonnet")) return "javascript";
+
+        if (!content) return "text/plain";
+        var trimmed = content.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return { name: "javascript", json: true };
+        if (trimmed.startsWith("#!/")) return "shell";
+        if (/^\[[^\]]+\]\s*$/m.test(trimmed)) return "properties";
+        if (trimmed.startsWith("<?xml") || trimmed.startsWith("<")) return "xml";
+        if (trimmed.indexOf(":\n") !== -1 || trimmed.indexOf(": ") !== -1) return "yaml";
+        return "text/plain";
+      }
+
+      // ===== DOM refs =====
+      var outputWrapper = document.getElementById("outputWrapper");
+      var outputTabs = document.getElementById("outputTabs");
+      var outputTabContent = document.getElementById("outputTabContent");
+      var statusElement = document.getElementById("status");
+      var timingElement = document.getElementById("timing");
+      var preserveOrderCheckbox = document.getElementById("preserveOrder");
+      var autoEvalCheckbox = document.getElementById("autoEval");
+      var extVarsErrorElement = document.getElementById("extVarsError");
+      var tlaVarsErrorElement = document.getElementById("tlaVarsError");
+      var fileList = document.getElementById("fileList");
+      var addFileBtn = document.getElementById("addFileBtn");
+      var editorAreaElement = document.querySelector(".editor-area");
+      var mainContainerElement = document.querySelector(".main-container");
+
+      // ===== Save/load editor content =====
+      var suppressSave = false;
+
+      function saveEditorToState() {
+        if (suppressSave) return;
+        var file = getActiveFile();
+        if (file) file.code = jsonnetEditor.getValue();
+        state.extVars = extVarsEditor.getValue();
+        state.tlaVars = tlaVarsEditor.getValue();
+        saveState();
+      }
+
+      function loadFileIntoEditor(fileName) {
+        var file = findFileByName(fileName);
+        if (!file) return;
+        suppressSave = true;
+        jsonnetEditor.setValue(file.code);
+        suppressSave = false;
+        jsonnetEditor.clearHistory();
+      }
+
+      // ===== File sidebar =====
+      function renderFileList() {
+        while (fileList.firstChild) fileList.removeChild(fileList.firstChild);
+        state.files.forEach(function (file) {
+          var item = document.createElement("div");
+          item.className = "file-item" + (file.name === state.activeFileName ? " active" : "") + (file.isEntry ? " entry-file" : "");
+
+          var nameSpan = document.createElement("span");
+          nameSpan.className = "file-name";
+          nameSpan.textContent = (file.isEntry ? "▶ " : "") + file.name;
+          nameSpan.title = file.isEntry ? file.name + " (entry point)" : file.name;
+          nameSpan.addEventListener("dblclick", function (event) {
+            event.stopPropagation();
+            startRenameFile(file, nameSpan);
+          });
+          item.appendChild(nameSpan);
+
+          var actions = document.createElement("span");
+          actions.className = "file-actions";
+
+          // Rename button
+          var renameBtn = document.createElement("button");
+          renameBtn.className = "file-action-btn rename-btn";
+          renameBtn.textContent = "✏";
+          renameBtn.title = "Rename file";
+          renameBtn.setAttribute("aria-label", "Rename file " + file.name);
+          renameBtn.addEventListener("click", function (event) {
+            event.stopPropagation();
+            var currentNameSpan = item.querySelector(".file-name");
+            startRenameFile(file, currentNameSpan);
+          });
+          actions.appendChild(renameBtn);
+
+          // Set as entry button
+          if (!file.isEntry) {
+            var entryBtn = document.createElement("button");
+            entryBtn.className = "file-action-btn entry-btn";
+            entryBtn.textContent = "▶";
+            entryBtn.title = "Set as entry point";
+            entryBtn.setAttribute("aria-label", "Set " + file.name + " as entry point");
+            entryBtn.addEventListener("click", function (event) {
+              event.stopPropagation();
+              setEntryFile(file.name);
+            });
+            actions.appendChild(entryBtn);
+          }
+
+          // Delete button
+          if (state.files.length > 1) {
+            var delBtn = document.createElement("button");
+            delBtn.className = "file-action-btn";
+            delBtn.textContent = "×";
+            delBtn.title = "Delete file";
+            delBtn.setAttribute("aria-label", "Delete file " + file.name);
+            delBtn.addEventListener("click", function (event) {
+              event.stopPropagation();
+              deleteFile(file.name);
+            });
+            actions.appendChild(delBtn);
+          }
+
+          item.appendChild(actions);
+
+          item.addEventListener("click", function () {
+            switchToFile(file.name);
+          });
+
+          fileList.appendChild(item);
+        });
+      }
+
+      function isValidFileName(name) {
+        if (!name || name !== name.trim()) return false;
+        if (name.length > 255) return false;
+        if (/[<>:"|?*\x00-\x1f\\\/]/.test(name)) return false;
+        if (/^\.+$/.test(name)) return false;
+        return true;
+      }
+
+      function startRenameFile(file, nameSpan) {
+        if (!nameSpan || !nameSpan.parentNode) return;
+        var input = document.createElement("input");
+        input.type = "text";
+        input.value = file.name;
+        input.setAttribute("aria-label", "Rename file " + file.name);
+        input.style.cssText = "background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--accent);font-size:12px;padding:1px 4px;width:100%;outline:none;font-family:inherit;border-radius:2px;";
+
+        var renameCompleted = false;
+        function finishRename() {
+          if (renameCompleted) return;
+          renameCompleted = true;
+          var newName = input.value.trim();
+          if (!newName || !isValidFileName(newName)) newName = file.name;
+          if (newName !== file.name && findFileByName(newName)) {
+            newName = file.name;
+          }
+          var oldName = file.name;
+          file.name = newName;
+          if (state.activeFileName === oldName) state.activeFileName = newName;
+          renderFileList();
+          saveState();
+          scheduleEvaluation();
+        }
+
+        input.addEventListener("blur", finishRename);
+        input.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") { event.preventDefault(); input.blur(); }
+          if (event.key === "Escape") { input.value = file.name; input.blur(); }
+        });
+
+        nameSpan.parentNode.replaceChild(input, nameSpan);
+        input.focus();
+        input.select();
+      }
+
+      function switchToFile(fileName) {
+        if (fileName === state.activeFileName) return;
+        saveEditorToState();
+        state.activeFileName = fileName;
+        loadFileIntoEditor(fileName);
+        renderFileList();
+        saveState();
+        scheduleEvaluation();
+      }
+
+      function addNewFile() {
+        saveEditorToState();
+        var num = 1;
+        var name = "file" + num + ".jsonnet";
+        var maxAttempts = 1000;
+        while (findFileByName(name) && num < maxAttempts) {
+          num++;
+          name = "file" + num + ".jsonnet";
+        }
+        state.files.push({ name: name, code: "", isEntry: false });
+        state.activeFileName = name;
+        loadFileIntoEditor(name);
+        renderFileList();
+        saveState();
+        scheduleEvaluation();
+        jsonnetEditor.focus();
+      }
+
+      function deleteFile(fileName) {
+        if (state.files.length <= 1) return;
+        if (!confirm('Delete "' + fileName + '"? This cannot be undone.')) return;
+        var idx = -1;
+        for (var i = 0; i < state.files.length; i++) {
+          if (state.files[i].name === fileName) { idx = i; break; }
+        }
+        if (idx === -1) return;
+
+        var wasEntry = state.files[idx].isEntry;
+        state.files.splice(idx, 1);
+
+        if (wasEntry && state.files.length > 0) {
+          state.files[0].isEntry = true;
+        }
+
+        if (fileName === state.activeFileName) {
+          var newIdx = Math.min(idx, state.files.length - 1);
+          state.activeFileName = state.files[newIdx].name;
+          loadFileIntoEditor(state.activeFileName);
+        }
+
+        renderFileList();
+        saveState();
+        scheduleEvaluation();
+      }
+
+      function setEntryFile(fileName) {
+        state.files.forEach(function (f) { f.isEntry = false; });
+        var file = findFileByName(fileName);
+        if (file) file.isEntry = true;
+        renderFileList();
+        saveState();
+        scheduleEvaluation();
+      }
+
+      addFileBtn.addEventListener("click", addNewFile);
+
+      // ===== File sidebar resize =====
+      var fileSidebar = document.getElementById("fileSidebar");
+      var fileSidebarResize = document.getElementById("fileSidebarResize");
+      var isSidebarResizing = false;
+
+      fileSidebarResize.addEventListener("mousedown", function (event) {
+        isSidebarResizing = true;
+        fileSidebarResize.classList.add("active");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        event.preventDefault();
+      });
+
+      // ===== Variables panel toggle =====
+      var varsToggle = document.getElementById("varsToggle");
+      var varsContainer = document.getElementById("varsContainer");
+      var varsPanel = document.getElementById("varsPanel");
+      var varsResizeHandle = document.getElementById("varsResizeHandle");
+      var toggleIcon = document.getElementById("toggleIcon");
+      var varsCollapsed = false;
+
+      function toggleVarsPanel() {
+        varsCollapsed = !varsCollapsed;
+        varsToggle.setAttribute("aria-expanded", String(!varsCollapsed));
+        if (varsCollapsed) {
+          varsContainer.classList.add("collapsed");
+          toggleIcon.classList.add("collapsed");
+          varsResizeHandle.style.display = "none";
+          varsPanel.style.height = "auto";
+        } else {
+          varsContainer.classList.remove("collapsed");
+          toggleIcon.classList.remove("collapsed");
+          varsResizeHandle.style.display = "";
+          varsPanel.style.height = "200px";
+          extVarsEditor.refresh();
+          tlaVarsEditor.refresh();
+        }
+        jsonnetEditor.refresh();
+      }
+
+      varsToggle.addEventListener("click", toggleVarsPanel);
+
+      // ===== Variables panel vertical resize =====
+      var isVarsResizing = false;
+
+      varsResizeHandle.addEventListener("mousedown", function (event) {
+        isVarsResizing = true;
+        varsResizeHandle.classList.add("active");
+        document.body.style.cursor = "row-resize";
+        document.body.style.userSelect = "none";
+        event.preventDefault();
+      });
+
+      // ===== Left-right resize handle =====
+      var resizeHandle = document.getElementById("resizeHandle");
+      var panelLeft = document.getElementById("panelLeft");
+      var panelRight = document.getElementById("panelRight");
+      var isResizing = false;
+
+      resizeHandle.addEventListener("mousedown", function (event) {
+        isResizing = true;
+        resizeHandle.classList.add("active");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        event.preventDefault();
+      });
+
+      // Unified mousemove handler for all resize interactions
+      document.addEventListener("mousemove", function (event) {
+        if (isSidebarResizing) {
+          var panelLeftRect = panelLeft.getBoundingClientRect();
+          var newWidth = event.clientX - panelLeftRect.left;
+          var clampedWidth = Math.max(80, Math.min(300, newWidth));
+          fileSidebar.style.width = clampedWidth + "px";
+          jsonnetEditor.refresh();
+        } else if (isVarsResizing) {
+          var areaRect = editorAreaElement.getBoundingClientRect();
+          var varsHeight = areaRect.bottom - event.clientY;
+          var clampedHeight = Math.max(80, Math.min(areaRect.height * 0.7, varsHeight));
+          varsPanel.style.height = clampedHeight + "px";
+          extVarsEditor.refresh();
+          tlaVarsEditor.refresh();
+          jsonnetEditor.refresh();
+        } else if (isResizing) {
+          var containerRect = mainContainerElement.getBoundingClientRect();
+          var ratio = (event.clientX - containerRect.left) / containerRect.width;
+          var clampedRatio = Math.max(0.2, Math.min(0.8, ratio));
+          panelLeft.style.flex = "none";
+          panelRight.style.flex = "none";
+          panelLeft.style.width = (clampedRatio * 100) + "%";
+          panelRight.style.width = ((1 - clampedRatio) * 100) + "%";
+          jsonnetEditor.refresh();
+        }
+      });
+
+      // Unified mouseup handler for all resize interactions
+      document.addEventListener("mouseup", function () {
+        var wasResizing = isSidebarResizing || isVarsResizing || isResizing;
+        if (isSidebarResizing) {
+          isSidebarResizing = false;
+          fileSidebarResize.classList.remove("active");
+        }
+        if (isVarsResizing) {
+          isVarsResizing = false;
+          varsResizeHandle.classList.remove("active");
+        }
+        if (isResizing) {
+          isResizing = false;
+          resizeHandle.classList.remove("active");
+        }
+        if (wasResizing) {
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        }
+      });
+
+      // ===== Multi-file tab output =====
+      var currentOutputTabData = null;
+      var activeOutputTabKey = null;
+
+      function isMultiFileResult(result) {
+        if (result === null || typeof result !== "object" || Array.isArray(result)) return false;
+        var keys = Object.keys(result);
+        if (keys.length < 2) return false;
+        return keys.every(function (key) {
+          if (typeof result[key] !== "string") return false;
+          if (!key || key !== key.trim()) return false;
+          if (/[<>:"|?*\x00-\x1f]/.test(key)) return false;
+          return true;
+        });
+      }
+
+      function renderOutputTabs(result) {
+        currentOutputTabData = result;
+        var keys = Object.keys(result);
+        activeOutputTabKey = activeOutputTabKey && keys.indexOf(activeOutputTabKey) !== -1 ? activeOutputTabKey : keys[0];
+
+        while (outputTabs.firstChild) outputTabs.removeChild(outputTabs.firstChild);
+        keys.forEach(function (key, index) {
+          var tab = document.createElement("div");
+          tab.className = "output-tab" + (key === activeOutputTabKey ? " active" : "");
+          tab.setAttribute("role", "tab");
+          tab.setAttribute("aria-selected", key === activeOutputTabKey ? "true" : "false");
+          tab.setAttribute("tabindex", key === activeOutputTabKey ? "0" : "-1");
+          tab.textContent = key;
+          tab.addEventListener("click", function () {
+            activeOutputTabKey = key;
+            renderOutputTabs(currentOutputTabData);
+          });
+          tab.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              activeOutputTabKey = key;
+              renderOutputTabs(currentOutputTabData);
+            } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+              event.preventDefault();
+              var nextIndex = (index + 1) % keys.length;
+              activeOutputTabKey = keys[nextIndex];
+              renderOutputTabs(currentOutputTabData);
+              var nextTab = outputTabs.children[nextIndex];
+              if (nextTab) nextTab.focus();
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+              event.preventDefault();
+              var prevIndex = (index - 1 + keys.length) % keys.length;
+              activeOutputTabKey = keys[prevIndex];
+              renderOutputTabs(currentOutputTabData);
+              var prevTab = outputTabs.children[prevIndex];
+              if (prevTab) prevTab.focus();
+            }
+          });
+          outputTabs.appendChild(tab);
+        });
+
+        var content = result[activeOutputTabKey];
+        var mode = detectCodeMirrorMode(activeOutputTabKey, content);
+        tabOutputEditor.setOption("mode", mode);
+        tabOutputEditor.setValue(content);
+
+        outputTabs.style.display = "flex";
+        outputTabContent.style.display = "flex";
+        outputWrapper.style.display = "none";
+        downloadAllOutputBtn.style.display = "";
+        setTimeout(function () { tabOutputEditor.refresh(); }, 10);
+      }
+
+      function renderSingleOutput(text, isError) {
+        currentOutputTabData = null;
+        outputTabs.style.display = "none";
+        outputTabContent.style.display = "none";
+        outputWrapper.style.display = "";
+        outputWrapper.classList.toggle("error-state", isError);
+        downloadAllOutputBtn.style.display = "none";
+
+        if (isError) {
+          outputEditor.setOption("mode", "text/plain");
+        } else {
+          outputEditor.setOption("mode", { name: "javascript", json: true });
+        }
+        outputEditor.setValue(text);
+        setTimeout(function () { outputEditor.refresh(); }, 10);
+      }
+
+      // ===== Parse variables =====
+      function parseVars(editor, errorElement) {
+        var text = editor.getValue().trim();
+        errorElement.classList.remove("visible");
+        if (!text || text === "{}") return {};
+        try {
+          var parsed = JSON.parse(text);
+          if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) {
+            throw new Error('Must be a JSON object (e.g. {"key": "value"})');
+          }
+          var result = {};
+          for (var key in parsed) {
+            if (parsed.hasOwnProperty(key)) {
+              // All values are stringified because Sjsonnet parses extVar values as Jsonnet code
+              result[key] = JSON.stringify(parsed[key]);
+            }
+          }
+          return result;
+        } catch (error) {
+          errorElement.textContent = "⚠ " + error.message;
+          errorElement.classList.add("visible");
+          return null;
+        }
+      }
+
+      // ===== Import support =====
+      function normalizePath(path) {
+        var parts = path.split("/");
+        var normalized = [];
+        for (var i = 0; i < parts.length; i++) {
+          var part = parts[i];
+          if (part === "." || part === "") continue;
+          if (part === ".." && normalized.length > 0 && normalized[normalized.length - 1] !== "..") {
+            normalized.pop();
+          } else if (part !== "..") {
+            normalized.push(part);
+          }
+        }
+        return normalized.join("/");
+      }
+
+      function importResolver(wd, importName) {
+        // Direct match by name
+        if (findFileByName(importName)) {
+          return importName;
+        }
+        // Resolve relative path against working directory
+        if (wd && (importName.indexOf("./") === 0 || importName.indexOf("../") === 0)) {
+          var basePath = wd.indexOf("/") !== -1 ? wd.substring(0, wd.lastIndexOf("/")) : "";
+          var resolved = normalizePath(basePath + "/" + importName);
+          if (findFileByName(resolved)) {
+            return resolved;
+          }
+        }
+        return null;
+      }
+
+      function importLoader(path, binaryData) {
+        var file = findFileByName(path);
+        if (file) {
+          if (binaryData) {
+            // Return Uint8Array for importbin (directly matched by Scala.js Uint8Array type)
+            if (typeof TextEncoder !== "undefined") {
+              return new TextEncoder().encode(file.code);
+            }
+            // Manual UTF-8 encoding fallback for environments without TextEncoder
+            var str = file.code;
+            var utf8 = [];
+            for (var ci = 0; ci < str.length; ci++) {
+              var code = str.charCodeAt(ci);
+              if (code < 0x80) {
+                utf8.push(code);
+              } else if (code < 0x800) {
+                utf8.push(0xC0 | (code >> 6), 0x80 | (code & 0x3F));
+              } else if (code >= 0xD800 && code <= 0xDBFF && ci + 1 < str.length) {
+                var next = str.charCodeAt(ci + 1);
+                if (next >= 0xDC00 && next <= 0xDFFF) {
+                  var cp = ((code - 0xD800) << 10) + (next - 0xDC00) + 0x10000;
+                  utf8.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+                  ci++;
+                }
+              } else {
+                utf8.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
+              }
+            }
+            return new Uint8Array(utf8);
+          }
+          return file.code;
+        }
+        throw new Error("File not found: " + path);
+      }
+
+      // ===== Error markers =====
+      var errorMarkers = [];
+      var errorLineWidgets = [];
+
+      function clearErrorMarkers() {
+        for (var i = 0; i < errorMarkers.length; i++) {
+          errorMarkers[i].clear();
+        }
+        errorMarkers = [];
+        for (var j = 0; j < errorLineWidgets.length; j++) {
+          jsonnetEditor.removeLineClass(errorLineWidgets[j].line, "background", "cm-error-line");
+          if (errorLineWidgets[j].widget) errorLineWidgets[j].widget.clear();
+        }
+        errorLineWidgets = [];
+      }
+
+      function parseErrorLocations(message) {
+        var locations = [];
+        // Match patterns like (memory):2:1 or (filename.jsonnet):5:3
+        var pattern = /\((?:memory|[^)]+)\):(\d+):(\d+)/g;
+        var match;
+        while ((match = pattern.exec(message)) !== null) {
+          var errorLine = parseInt(match[1], 10) - 1;
+          var errorCol = parseInt(match[2], 10) - 1;
+          if (errorLine >= 0) {
+            locations.push({ line: errorLine, col: Math.max(0, errorCol) });
+          }
+        }
+        return locations;
+      }
+
+      function extractErrorSummary(message) {
+        // Extract the first line of the error message as summary
+        var firstLine = message.split("\n")[0];
+        // Remove the "sjsonnet.ParseError: " or "sjsonnet.Error: " prefix
+        var cleaned = firstLine.replace(/^sjsonnet\.\w+:\s*/, "");
+        return cleaned;
+      }
+
+      function markErrors(message) {
+        clearErrorMarkers();
+        var locations = parseErrorLocations(message);
+        if (locations.length === 0) return;
+
+        var summary = extractErrorSummary(message);
+
+        for (var i = 0; i < locations.length; i++) {
+          var loc = locations[i];
+          var lineCount = jsonnetEditor.lineCount();
+          if (loc.line >= lineCount) continue;
+
+          // Highlight the error line background
+          jsonnetEditor.addLineClass(loc.line, "background", "cm-error-line");
+
+          // Underline the error token with wavy red line
+          var lineText = jsonnetEditor.getLine(loc.line);
+          var endCol = loc.col + 1;
+          // Try to extend the mark to cover the whole token
+          if (lineText) {
+            var tokenMatch = lineText.slice(loc.col).match(/^[a-zA-Z_]\w*|^\S/);
+            if (tokenMatch) {
+              endCol = loc.col + tokenMatch[0].length;
+            }
+          }
+          var marker = jsonnetEditor.markText(
+            CodeMirror.Pos(loc.line, loc.col),
+            CodeMirror.Pos(loc.line, endCol),
+            { className: "cm-error-mark", title: summary }
+          );
+          errorMarkers.push(marker);
+
+          // Add inline error widget below the line
+          var errorWidget = document.createElement("div");
+          errorWidget.className = "cm-error-gutter";
+          errorWidget.style.cssText = "color: var(--error); font-size: 12px; padding: 0 0 0 4ch; opacity: 0.85; white-space: pre-wrap;";
+          errorWidget.textContent = "⚠ " + summary;
+          var widget = jsonnetEditor.addLineWidget(loc.line, errorWidget, { coverGutter: false, noHScroll: true });
+
+          errorLineWidgets.push({ line: loc.line, widget: widget });
+        }
+      }
+
+      // ===== Evaluation =====
+      var evaluationTimer = null;
+
+      function setStatus(text, type) {
+        statusElement.textContent = text;
+        statusElement.className = "status-indicator " + (type || "");
+      }
+
+      function evaluate() {
+        saveEditorToState();
+
+        var entryFile = getEntryFile();
+        var code = entryFile.code;
+        var extVars = parseVars(extVarsEditor, extVarsErrorElement);
+        var tlaVars = parseVars(tlaVarsEditor, tlaVarsErrorElement);
+
+        if (extVars === null || tlaVars === null) {
+          setStatus("Variable Error", "error");
+          return;
+        }
+
+        if (!code.trim()) {
+          renderSingleOutput("", false);
+          setStatus("Ready");
+          timingElement.textContent = "";
+          return;
+        }
+
+        setStatus("Evaluating…", "running");
+
+        var startTime = performance.now();
+        var elapsed;
+        try {
+          var preserveOrder = preserveOrderCheckbox.checked;
+          var result = SjsonnetMain.interpret(
+            code,
+            extVars,
+            tlaVars,
+            "",
+            importResolver,
+            importLoader,
+            preserveOrder
+          );
+          elapsed = performance.now() - startTime;
+
+          if (isMultiFileResult(result)) {
+            renderOutputTabs(result);
+          } else {
+            var outputText;
+            try {
+              outputText = JSON.stringify(result, null, 2);
+            } catch (stringifyError) {
+              outputText = String(result);
+            }
+            renderSingleOutput(outputText, false);
+          }
+          lastEvalDurationMs = elapsed;
+          clearErrorMarkers();
+          setStatus("Success", "success");
+          timingElement.textContent = elapsed.toFixed(1) + " ms";
+        } catch (error) {
+          elapsed = performance.now() - startTime;
+          lastEvalDurationMs = elapsed;
+          var message = error.message || error.toString();
+          renderSingleOutput(message, true);
+          markErrors(message);
+          setStatus("Error", "error");
+          timingElement.textContent = elapsed.toFixed(1) + " ms";
+        }
+      }
+
+      var lastEvalDurationMs = 0;
+
+      function scheduleEvaluation() {
+        if (!autoEvalCheckbox.checked) return;
+        if (evaluationTimer) clearTimeout(evaluationTimer);
+        // Adaptive debounce: fast evals get snappy feedback, slow evals get more breathing room
+        var delay = Math.max(400, Math.min(2000, lastEvalDurationMs * 3));
+        evaluationTimer = setTimeout(evaluate, delay);
+      }
+
+      // ===== Event listeners =====
+      jsonnetEditor.on("change", function () {
+        saveEditorToState();
+        scheduleEvaluation();
+      });
+      extVarsEditor.on("change", function () {
+        saveEditorToState();
+        scheduleEvaluation();
+      });
+      tlaVarsEditor.on("change", function () {
+        saveEditorToState();
+        scheduleEvaluation();
+      });
+      preserveOrderCheckbox.addEventListener("change", evaluate);
+      autoEvalCheckbox.addEventListener("change", function () {
+        if (autoEvalCheckbox.checked) evaluate();
+      });
+
+      // ===== Keyboard shortcuts =====
+      document.addEventListener("keydown", function (event) {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          event.preventDefault();
+          evaluate();
+        }
+        if ((event.metaKey || event.ctrlKey) && event.key === "n") {
+          event.preventDefault();
+          addNewFile();
+        }
+        if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+          event.preventDefault();
+          saveEditorToState();
+          var file = getActiveFile();
+          downloadFile(file.name, file.code);
+        }
+      });
+
+      // ===== Save on page unload =====
+      window.addEventListener("beforeunload", function () {
+        saveEditorToState();
+        saveStateImmediate();
+      });
+
+      // ===== Initialize =====
+      loadState();
+      applyTheme(currentTheme);
+      renderFileList();
+
+      suppressSave = true;
+      jsonnetEditor.setValue(getActiveFile().code);
+      extVarsEditor.setValue(state.extVars || DEFAULT_EXT_VARS);
+      tlaVarsEditor.setValue(state.tlaVars || DEFAULT_TLA_VARS);
+      suppressSave = false;
+
+      setTimeout(evaluate, 100);
+    })();
+  </script>
+</body>
+</html>

@@ -375,3 +375,70 @@ object sjsonnet extends VersionFileModule {
     )
   }
 }
+
+object playground extends Module {
+
+  def playgroundHtml = Task.Source(BuildCtx.workspaceRoot / "playground" / "index.html")
+
+  /**
+   * Compile ScalaJS and inline the resulting JS bundle into a single HTML file. Note: the HTML
+   * template (playground/index.html) may still reference external assets (e.g. CSS/JS from CDNs),
+   * so the output is not guaranteed to be fully self-contained or offline-capable.
+   */
+  def bundle = Task {
+    val jsOutput = sjsonnet.js(scalaVersions.head).fullLinkJS()
+    val mainJs = jsOutput.dest.path / "main.js"
+    val dest = Task.ctx().dest
+
+    // Wrap CommonJS module for browser usage
+    val source = os.read(mainJs)
+    val wrappedJs =
+      s"""// sjsonnet browser bundle - auto-generated
+         |(function(global) {
+         |  var exports = {};
+         |  var module = { exports: exports };
+         |
+         |  $source
+         |
+         |  global.SjsonnetMain = exports.SjsonnetMain || module.exports.SjsonnetMain;
+         |})(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : Function('return this')());""".stripMargin
+
+    // Read HTML template and inline the JS bundle
+    val htmlTemplate = os.read(playgroundHtml().path)
+    val placeholder = "/* SJSONNET_BUNDLE_PLACEHOLDER */"
+    val occurrences =
+      java.util.regex.Pattern.quote(placeholder).r.findAllMatchIn(htmlTemplate).length
+    require(
+      occurrences == 1,
+      s"Expected exactly 1 occurrence of '$placeholder' in playground/index.html, found $occurrences"
+    )
+    val inlinedHtml = htmlTemplate.replace(placeholder, wrappedJs)
+    os.write(dest / "index.html", inlinedHtml)
+
+    PathRef(dest)
+  }
+
+  /**
+   * Build and open the playground in the default browser.
+   *
+   * Since the HTML is self-contained (JS inlined), no HTTP server is needed. The file is opened
+   * directly in the default browser.
+   */
+  def start() = Task.Command {
+    val htmlFile = bundle().path / "index.html"
+    val fileUri = htmlFile.toNIO.toUri.toString
+    println(s"Opening Sjsonnet Playground: $fileUri")
+
+    val osName = System.getProperty("os.name", "").toLowerCase
+    val openCmd =
+      if (osName.contains("mac") || osName.contains("darwin")) Seq("open", fileUri)
+      else if (osName.contains("win")) Seq("cmd", "/c", "start", "", fileUri)
+      else Seq("xdg-open", fileUri) // Linux / BSD
+
+    val opened = scala.util.Try(os.proc(openCmd).call(stdout = os.Inherit, stderr = os.Inherit))
+    if (opened.isFailure) {
+      println(s"Could not open browser automatically. Please open this file manually:")
+      println(s"  $htmlFile")
+    }
+  }
+}
