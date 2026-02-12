@@ -9,8 +9,6 @@ import scala.collection.Searching.*
 object SetModule extends AbstractFunctionModule {
   def name = "set"
 
-  private val dummyPos: Position = new Position(null, 0)
-
   private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
     def evalRhs(arr: Lazy, keyF: Lazy, ev: EvalScope, pos: Position): Val = {
       uniqArr(pos, ev, sortArr(pos, ev, arr.force, keyF.force), keyF.force)

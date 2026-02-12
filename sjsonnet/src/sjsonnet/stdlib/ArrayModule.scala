@@ -8,8 +8,6 @@ import scala.collection.mutable
 object ArrayModule extends AbstractFunctionModule {
   def name = "array"
 
-  private val dummyPos: Position = new Position(null, 0)
-
   private object MinArray
       extends Val.Builtin(
         "minArray",

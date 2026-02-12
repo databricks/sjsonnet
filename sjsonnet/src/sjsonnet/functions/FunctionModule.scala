@@ -8,7 +8,12 @@ import sjsonnet.{Position, Val}
  * Function modules are collections of functions that can be used in Jsonnet.
  */
 trait FunctionModule extends FunctionBuilder {
-  protected val position = new Position(null, 0)
+
+  /**
+   * A dummy position used for functions that do not have a meaningful position in the source code.
+   * This is useful for built-in functions that are not defined in the user's code.
+   */
+  protected val dummyPos: Position = new Position(null, 0)
 
   /**
    * module name
@@ -29,7 +34,7 @@ trait FunctionModule extends FunctionBuilder {
    *   the module object
    */
   def moduleFromFunctions(functions: (String, Val.Func)*): Val.Obj = {
-    Val.Obj.mk(position, functions.map { case (k, v) => (k, memberOf(v)) }: _*)
+    Val.Obj.mk(dummyPos, functions.map { case (k, v) => (k, memberOf(v)) }: _*)
   }
 
   /**
@@ -41,7 +46,7 @@ trait FunctionModule extends FunctionBuilder {
    *   the module object
    */
   def moduleFromModules(subModules: FunctionModule*): Val.Obj = {
-    Val.Obj.mk(position, subModules.map { module => (module.name, memberOf(module.module)) }: _*)
+    Val.Obj.mk(dummyPos, subModules.map { module => (module.name, memberOf(module.module)) }: _*)
   }
 
   /**

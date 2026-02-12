@@ -9,8 +9,6 @@ import scala.collection.mutable
 object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
-  private val dummyPos: Position = new Position(null, 0)
-
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer.apply0(v.force, MaterializeJsonRenderer())(ev).toString)
