@@ -8,6 +8,7 @@ import org.scalasbt.ipcsocket._
 import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util => ClientUtil}
 import sun.misc.{Signal, SignalHandler}
 
+import scala.annotation.nowarn
 import scala.util.control.NonFatal
 
 trait SjsonnetServerMain[T] {
@@ -147,6 +148,7 @@ class Server[T](
       .getOrElse(throw new Exception("PID already present"))
   }
 
+  @nowarn("cat=deprecation")
   def handleRun(clientSocket: Socket): Unit = {
 
     val currentOutErr = clientSocket.getOutputStream
@@ -208,7 +210,9 @@ class Server[T](
     if (!idle) interruptServer()
 
     t.interrupt()
-    t.stop()
+    // Thread.stop() is removed in Java 25+; try it for older JVMs but ignore failures
+    try t.stop()
+    catch { case NonFatal(_) => }
 
     if (ClientUtil.isWindows) {
       // Closing Win32NamedPipeSocket can often take ~5s
