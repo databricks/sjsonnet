@@ -241,6 +241,36 @@ wrong, as well as better performance for the more computationally-intense
 builtin functions, other implementations [google/go-jsonnet](https://github.com/google/go-jsonnet/)
 and [jrsonnet](https://github.com/CertainLach/jrsonnet) implement the Jsonnet standard library in the host language too.
 
+## Playground
+
+Sjsonnet includes a browser-based interactive playground that lets you write, evaluate, and experiment with Jsonnet code directly in your browser — no installation required.
+
+### Online
+
+If GitHub Pages is enabled for this repository, the playground is available at:
+
+`https://databricks.github.io/sjsonnet/`
+
+### Running Locally
+
+To build and start the playground locally:
+
+```bash
+./mill playground.start
+```
+
+This compiles the ScalaJS bundle and opens the playground directly in your default browser. No HTTP server or Python is required — the Sjsonnet JS engine is inlined into the HTML file. Note that the editor UI (CodeMirror) is loaded from a CDN, so an internet connection is needed on first load.
+
+### Building the Bundle Only
+
+To generate the static files without starting a server:
+
+```bash
+./mill playground.bundle
+```
+
+The output is a single `index.html` file (with the Sjsonnet JS engine inlined) written to `out/playground/bundle.dest/`. You can open it directly in a browser — no server needed — or serve it with any static file server. The editor UI (CodeMirror) is loaded from a CDN at runtime, so an internet connection is required.
+
 ## Client-Server
 
 Sjsonnet comes with a built in thin-client and background server, to help
