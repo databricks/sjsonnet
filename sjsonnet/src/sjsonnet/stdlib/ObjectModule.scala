@@ -105,7 +105,11 @@ object ObjectModule extends AbstractFunctionModule {
         val k = allKeys(i)
         val v = new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
-            func.apply2(Val.Str(pos, k), () => obj.value(k, pos.noOffset)(ev), pos.noOffset)(
+            func.apply2(
+              Val.Str(pos, k),
+              new LazyWithComputeFunc(() => obj.value(k, pos.noOffset)(ev)),
+              pos.noOffset
+            )(
               ev,
               TailstrictModeDisabled
             )
@@ -135,7 +139,7 @@ object ObjectModule extends AbstractFunctionModule {
     Val.Arr(
       pos,
       keys.map { k =>
-        (() => v1.value(k, pos.noOffset)(ev)): Lazy
+        new LazyWithComputeFunc(() => v1.value(k, pos.noOffset)(ev))
       }
     )
 

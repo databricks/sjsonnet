@@ -12,22 +12,20 @@ import scala.reflect.ClassTag
 /**
  * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily evaluated dictionary values,
  * array contents, or function parameters are all wrapped in [[Lazy]] and only truly evaluated
- * on-demand
+ * on-demand. [[Val]] also extends [[Lazy]] so that already-evaluated values can be stored directly
+ * in [[Array[Lazy]]] without wrapper overhead.
  */
-abstract class Lazy {
-  protected var cached: Val = _
-  def compute(): Val
-  final def force: Val = {
-    if (cached == null) cached = compute()
-    cached
-  }
+trait Lazy {
+  def force: Val
 }
 
 /**
  * Thread-safe implementation that discards the compute function after initialization.
  */
 final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) extends Lazy {
-  def compute(): Val = {
+  private var cached: Val = _
+  def force: Val = {
+    if (cached != null) return cached
     val f = computeFunc
     if (f != null) { // we won the race to initialize
       val result = f()
@@ -47,8 +45,7 @@ final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) ex
  * array contents are lazy, and the tree can contain functions.
  */
 sealed abstract class Val extends Lazy {
-  cached = this // avoid a megamorphic call to compute() when forcing
-  final def compute(): Val = this
+  final def force: Val = this
 
   def pos: Position
   def prettyName: String

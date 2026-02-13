@@ -166,7 +166,9 @@ object ArrayModule extends AbstractFunctionModule {
         pos: Position): Val.Arr = {
       Val.Arr(
         pos,
-        arg.map(v => (() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)): Lazy)
+        arg.map(v =>
+          new LazyWithComputeFunc(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled))
+        )
       )
     }
 
@@ -184,7 +186,9 @@ object ArrayModule extends AbstractFunctionModule {
       while (i < a.length) {
         val x = arr(i)
         val idx = Val.Num(pos, i)
-        a(i) = () => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled)
+        a(i) = new LazyWithComputeFunc(() =>
+          func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled)
+        )
         i += 1
       }
       Val.Arr(pos, a)
@@ -414,7 +418,11 @@ object ArrayModule extends AbstractFunctionModule {
             if (!filter_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled).asBoolean) {
               None
             } else {
-              Some[Lazy](() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
+              Some[Lazy](
+                new LazyWithComputeFunc(() =>
+                  map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled)
+                )
+              )
             }
           }
         )
@@ -451,8 +459,9 @@ object ArrayModule extends AbstractFunctionModule {
           var i = 0
           while (i < sz) {
             val forcedI = i
-            a(i) =
-              () => func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
+            a(i) = new LazyWithComputeFunc(() =>
+              func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
+            )
             i += 1
           }
           a
