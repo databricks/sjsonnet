@@ -1,6 +1,8 @@
 package sjsonnet
 
 object Util {
+  // A special empty LinkedHashMap instance to avoid creating multiple empty maps
+  private val EMPTY_LINKED_HASHMAP = new java.util.LinkedHashMap[Any, Any]()
   private val hashMapDefaultLoadFactor = 0.75f
   def prettyIndex(lineStarts: Array[Int], index: Int): String = {
     // Returns (-insertionPoint - 1) when the value is not found, where
@@ -190,8 +192,24 @@ object Util {
     new java.util.LinkedHashMap[K, V](hashMapCapacity(expectedElems), hashMapDefaultLoadFactor)
   }
 
+  /**
+   * Returns a shared empty Java HashMap instance, please do not modify it!
+   */
+  def emptyJavaLinkedHashMap[K, V]: java.util.LinkedHashMap[K, V] =
+    EMPTY_LINKED_HASHMAP.asInstanceOf[java.util.LinkedHashMap[K, V]]
+
   def preSizedJavaHashMap[K, V](expectedElems: Int): java.util.HashMap[K, V] = {
     new java.util.HashMap[K, V](hashMapCapacity(expectedElems), hashMapDefaultLoadFactor)
+  }
+
+  def preSizedJavaHashSet[E](expectedElems: Int): java.util.HashSet[E] = {
+    new java.util.HashSet[E](hashMapCapacity(expectedElems), hashMapDefaultLoadFactor)
+  }
+
+  def intersect[E](a: java.util.Set[E], b: java.util.Set[E]): java.util.Set[E] = {
+    val result = new java.util.HashSet[E](a)
+    result.retainAll(b)
+    result
   }
 
   private def hashMapCapacity(expectedElems: Int): Int = {
@@ -203,5 +221,9 @@ object Util {
       // From JavaDoc - true for both Scala & Java HashMaps
       (expectedElems / hashMapDefaultLoadFactor).toInt + 1
     }
+  }
+
+  def isNotEmpty(collection: java.util.Collection[_]): Boolean = {
+    (collection ne null) && !collection.isEmpty
   }
 }

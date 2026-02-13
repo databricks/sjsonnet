@@ -200,11 +200,7 @@ object ObjectModule extends AbstractFunctionModule {
       )
     },
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
-      val bindings: Array[(String, Val.Obj.Member)] = for {
-        k <- o.visibleKeyNames if k != key
-        v = o.value(k, pos.fileScope.noOffsetPos)(ev)
-      } yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-      Val.Obj.mk(pos, bindings)
+      o.removeKeys(pos, key)
     },
     builtin("mergePatch", "target", "patch") { (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos

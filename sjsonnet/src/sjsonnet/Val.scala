@@ -4,7 +4,7 @@ import java.util
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.Params
 
-import scala.annotation.tailrec
+import scala.annotation.{nowarn, tailrec}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -271,7 +271,8 @@ object Val {
       private val triggerAsserts: (Val.Obj, Val.Obj) => Unit,
       `super`: Obj,
       valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
-      private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null)
+      private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null,
+      private val excludedKeys: java.util.Set[String] = null)
       extends Literal
       with Expr.ObjBody {
     private var asserting: Boolean = false
@@ -314,36 +315,144 @@ object Val {
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
-      val objs = mutable.ArrayBuffer(this)
+      // Single traversal: collect chain in this-first order
+      val builder = new mutable.ArrayBuilder.ofRef[Val.Obj]
       var current = this
-      while (current.getSuper != null) {
-        objs += current.getSuper
+      while (current != null) {
+        builder += current
         current = current.getSuper
       }
+      val chain = builder.result()
 
+      // Pre-collect all keys defined in this chain once (only needed if any obj has excludedKeys)
+      lazy val keysInThisChain: java.util.Set[String] = {
+        val set = Util.preSizedJavaHashSet[String](chain.length * 4)
+        for (s <- chain) set.addAll(s.getValue0.keySet())
+        set
+      }
+
+      // Iterate root-first (reverse of collection order) to build the new super chain
       current = lhs
-      for (s <- objs.reverse) {
-        current = new Val.Obj(s.pos, s.getValue0, false, s.triggerAsserts, current)
+      var i = chain.length - 1
+      while (i >= 0) {
+        val s = chain(i)
+        val filteredExcludedKeys = if (s.excludedKeys != null) {
+          Util.intersect(s.excludedKeys, keysInThisChain)
+        } else null
+        current = new Val.Obj(
+          s.pos,
+          s.getValue0,
+          false,
+          s.triggerAsserts,
+          current,
+          new util.HashMap[Any, Val](),
+          null,
+          filteredExcludedKeys
+        )
+        i -= 1
       }
       current
+    }
+
+    /**
+     * Create a new object that removes the specified keys from this object.
+     *
+     * The implementation preserves both internal and external inheritance:
+     *   1. Internal: For `objectRemoveKey({ a: 1 } + { b: super.a }, 'a')`, the original object's
+     *      internal super chain is preserved, so `b: super.a` can still access `a`.
+     *   2. External: For `{ a: 1 } + objectRemoveKey({ b: super.a }, 'a')`, the result can
+     *      participate in a new inheritance chain, where `super.a` accesses the new super.
+     *
+     * The approach is to create a thin wrapper object with the original object as super, and mark
+     * the key as excluded via the excludedKeys set. The excluded key won't appear in
+     * allKeyNames/visibleKeyNames, but super.key can still access the value.
+     */
+    @nowarn("cat=deprecation")
+    def removeKeys(pos: Position, keys: String*): Val.Obj = {
+      val excluded =
+        if (keys.length == 1)
+          java.util.Collections.singleton(keys.head)
+        else {
+          import scala.collection.JavaConverters._
+          new util.HashSet[String](keys.asJavaCollection)
+        }
+
+      new Val.Obj(
+        pos,
+        Util.emptyJavaLinkedHashMap[String, Obj.Member],
+        false,
+        null, // No asserts in wrapper; original object's asserts are triggered via super chain
+        this,
+        new util.HashMap[Any, Val](), // NOTE: Must be a dedicated new value cache.
+        null,
+        excluded
+      )
     }
 
     def prettyName = "object"
     override def asObj: Val.Obj = this
 
     private def gatherKeys(mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
-      val objs = mutable.ArrayBuffer(this)
-      var current = this
-      while (current.getSuper != null) {
-        objs += current.getSuper
-        current = current.getSuper
+      // Fast path: no super chain — just copy this object's keys directly
+      if (this.getSuper == null) {
+        gatherKeysForSingle(this, null, mapping)
+        return
       }
 
-      for (s <- objs.reverse) {
-        if (s.static) {
-          mapping.putAll(s.allKeys)
-        } else {
-          s.getValue0.forEach { (k, m) =>
+      // Single traversal: collect chain in this-first order using ArrayBuilder
+      val builder = new mutable.ArrayBuilder.ofRef[Val.Obj]
+      var current = this
+      while (current != null) {
+        builder += current
+        current = current.getSuper
+      }
+      val chain = builder.result()
+      val chainLength = chain.length
+
+      // Collect all excluded keys, reusing the set directly when only one source has exclusions
+      var exclusionSet: java.util.Set[String] = null
+      var multipleExclusions = false
+      for (s <- chain) {
+        val keys = s.excludedKeys
+        if (Util.isNotEmpty(keys)) {
+          if (exclusionSet == null) {
+            exclusionSet = keys
+          } else {
+            if (!multipleExclusions) {
+              val merged = new util.HashSet[String](exclusionSet.size + keys.size)
+              merged.addAll(exclusionSet)
+              exclusionSet = merged
+              multipleExclusions = true
+            }
+            exclusionSet.asInstanceOf[util.HashSet[String]].addAll(keys)
+          }
+        }
+      }
+
+      // Iterate root-first (reverse of collection order) and populate the mapping
+      var i = chainLength - 1
+      while (i >= 0) {
+        gatherKeysForSingle(chain(i), exclusionSet, mapping)
+        i -= 1
+      }
+    }
+
+    /** Gather keys from a single object into the mapping, filtering by exclusions. */
+    private def gatherKeysForSingle(
+        obj: Val.Obj,
+        exclusionSet: java.util.Set[String],
+        mapping: util.LinkedHashMap[String, java.lang.Boolean]): Unit = {
+      if (obj.static) {
+        obj.allKeys
+          .keySet()
+          .forEach(key => {
+            if (exclusionSet == null || !exclusionSet.contains(key)) {
+              mapping.put(key, false)
+            }
+          })
+      } else {
+        obj.getValue0.forEach { (k, m) =>
+          if (exclusionSet == null || !exclusionSet.contains(k)) {
             val vis = m.visibility
             if (!mapping.containsKey(k)) mapping.put(k, vis == Visibility.Hidden)
             else if (vis == Visibility.Hidden) mapping.put(k, true)
@@ -411,6 +520,11 @@ object Val {
           case x    => x
         }
       } else {
+        // Check if the key is excluded (used by objectRemoveKey)
+        // When self != this, we need to check if the key exists in self's visible keys
+        if ((self eq this) && excludedKeys != null && excludedKeys.contains(k)) {
+          Error.fail("Field does not exist: " + k, pos)
+        }
         val cacheKey = if (self eq this) k else (k, self)
         val cachedValue = valueCache.get(cacheKey)
         if (cachedValue != null) {

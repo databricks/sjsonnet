@@ -111,7 +111,9 @@ abstract class BaseFileTests extends TestSuite {
       eval(fileName, testSuite) match {
         case Left(e) =>
           assert(e.strip() startsWith expected)
-        case Right(_) =>
+        case Right(result) =>
+          println(s"Expected error: $expected")
+          println(s"But got success: $result")
           assert(false)
       }
     } catch {
