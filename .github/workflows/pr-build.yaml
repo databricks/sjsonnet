@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lang: ['jvm', 'js', 'native']
+        lang: ['jvm', 'js', 'wasm', 'native']
         java: ['17', '21', '25']
     name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
     steps:
@@ -22,6 +22,11 @@ jobs:
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      - name: Set up Node.js 24
+        if: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
       - name: Cache Coursier cache
         uses: coursier/cache-action@bebeeb0e6f48ebad66d3783946588ecf43114433 # 6.4.8
       - name: Check Formatting

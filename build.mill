@@ -143,11 +143,12 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
 }
 
 object sjsonnet extends VersionFileModule {
-  object js extends Cross[SjsonnetJsModule](scalaVersions)
-  trait SjsonnetJsModule extends SjsonnetCrossModule with ScalaJSModule with SjsonnetPublishModule {
+  trait SjsonnetScalaJSModule
+      extends SjsonnetCrossModule
+      with ScalaJSModule
+      with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
     def scalaJSVersion = "1.20.2"
-    def moduleKind = Task { ModuleKind.CommonJSModule }
     val sourceDirs = Seq(
       "src",
       "src-js",
@@ -160,8 +161,10 @@ object sjsonnet extends VersionFileModule {
         mvn"org.virtuslab::scala-yaml::0.3.0"
       )
 
-    object test extends ScalaJSTests with CrossTests {
-      def jsEnvConfig = JsEnvConfig.NodeJs(args = List("--stack-size=" + stackSizekBytes))
+    def nodeJsArgs: List[String] = List("--stack-size=" + stackSizekBytes)
+
+    trait SjsonnetScalaJSTests extends ScalaJSTests with CrossTests {
+      def jsEnvConfig = JsEnvConfig.NodeJs(args = nodeJsArgs)
       def resources = Task.Sources(
         this.moduleDir / "resources" / "test_suite",
         this.moduleDir / "resources" / "go_test_suite",
@@ -227,6 +230,21 @@ object sjsonnet extends VersionFileModule {
         }
       }
     }
+  }
+
+  object js extends Cross[SjsonnetJsModule](scalaVersions)
+  trait SjsonnetJsModule extends SjsonnetScalaJSModule {
+    def moduleKind = Task { ModuleKind.CommonJSModule }
+    object test extends SjsonnetScalaJSTests
+  }
+
+  object wasm extends Cross[SjsonnetWasmModule](scalaVersions)
+  trait SjsonnetWasmModule extends SjsonnetScalaJSModule {
+    def moduleKind = Task { ModuleKind.ESModule }
+    def moduleSplitStyle = ModuleSplitStyle.FewestModules
+    def scalaJSExperimentalUseWebAssembly = true
+    override def nodeJsArgs = super.nodeJsArgs ++ List("--experimental-wasm-exnref")
+    object test extends SjsonnetScalaJSTests
   }
 
   object native extends Cross[SjsonnetNativeModule](scalaVersions)
