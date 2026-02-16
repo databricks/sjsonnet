@@ -39,7 +39,7 @@ jobs:
           cp out/playground/bundle.dest/index.html _site/
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
