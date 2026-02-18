@@ -296,12 +296,16 @@ object ArrayModule extends AbstractFunctionModule {
 
         case s: Val.Str =>
           var current = init.force
-          for (char <- s.value) {
+          val str = s.value
+          var i = 0
+          while (i < str.length) {
             val c = current
-            current = func.apply2(c, Val.Str(pos, new String(Array(char))), pos.noOffset)(
+            val codePoint = str.codePointAt(i)
+            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), pos.noOffset)(
               ev,
               TailstrictModeDisabled
             )
+            i += Character.charCount(codePoint)
           }
           current
 
@@ -324,9 +328,13 @@ object ArrayModule extends AbstractFunctionModule {
           current
         case s: Val.Str =>
           var current = init.force
-          for (char <- s.value.reverse) {
+          val str = s.value
+          var i = str.length
+          while (i > 0) {
+            val codePoint = str.codePointBefore(i)
+            i -= Character.charCount(codePoint)
             val c = current
-            current = func.apply2(Val.Str(pos, new String(Array(char))), c, pos.noOffset)(
+            current = func.apply2(Val.Str(pos, Character.toString(codePoint)), c, pos.noOffset)(
               ev,
               TailstrictModeDisabled
             )
