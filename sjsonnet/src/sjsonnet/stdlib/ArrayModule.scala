@@ -14,15 +14,15 @@ object ArrayModule extends AbstractFunctionModule {
         Array("arr", "keyF", "onEmpty"),
         Array(null, Val.False(dummyPos), Val.False(dummyPos))
       ) {
-    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
-      val arr = args(0).force.asArr
-      val keyF = args(1).force
+    override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
+      val arr = args(0).value.asArr
+      val keyF = args(1).value
       val onEmpty = args(2)
       if (arr.length == 0) {
-        if (onEmpty.force.isInstanceOf[Val.False]) {
+        if (onEmpty.value.isInstanceOf[Val.False]) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
-          onEmpty.force
+          onEmpty.value
         }
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.min(ev)
@@ -35,7 +35,7 @@ object ArrayModule extends AbstractFunctionModule {
           )
           .zipWithIndex
           .min((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.force(minTuple._2)
+        arr.value(minTuple._2)
       }
     }
   }
@@ -46,15 +46,15 @@ object ArrayModule extends AbstractFunctionModule {
         Array("arr", "keyF", "onEmpty"),
         Array(null, Val.False(dummyPos), Val.False(dummyPos))
       ) {
-    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
-      val arr = args(0).force.asArr
-      val keyF = args(1).force
+    override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
+      val arr = args(0).value.asArr
+      val keyF = args(1).value
       val onEmpty = args(2)
       if (arr.length == 0) {
-        if (onEmpty.force.isInstanceOf[Val.False]) {
+        if (onEmpty.value.isInstanceOf[Val.False]) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
-          onEmpty.force
+          onEmpty.value
         }
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.max(ev)
@@ -67,41 +67,41 @@ object ArrayModule extends AbstractFunctionModule {
           )
           .zipWithIndex
           .max((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.force(maxTuple._2)
+        arr.value(maxTuple._2)
       }
     }
   }
 
   private object All extends Val.Builtin1("all", "arr") {
-    def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.force.asArr.forall(v => v.asBoolean))
+    def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
+      Val.bool(pos, arr.value.asArr.forall(v => v.asBoolean))
     }
   }
 
   private object Any extends Val.Builtin1("any", "arr") {
-    def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.force.asArr.iterator.exists(v => v.asBoolean))
+    def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
+      Val.bool(pos, arr.value.asArr.iterator.exists(v => v.asBoolean))
     }
   }
 
   private object Count extends Val.Builtin2("count", "arr", "x") {
-    def evalRhs(arr: Lazy, x: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
       var count = 0
-      arr.force.asArr.foreach(v => if (ev.equal(v.force, x.force)) count += 1)
+      arr.value.asArr.foreach(v => if (ev.equal(v.value, x.value)) count += 1)
       Val.Num(pos, count)
     }
   }
 
   private object Filter extends Val.Builtin2("filter", "func", "arr") {
-    def evalRhs(_func: Lazy, arr: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(_func: Eval, arr: Eval, ev: EvalScope, pos: Position): Val = {
       val p = pos.noOffset
-      val a = arr.force.asArr.asLazyArray
+      val a = arr.value.asArr.asLazyArray
       var i = 0
-      val func = _func.force.asFunc
+      val func = _func.value.asFunc
       if (func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while (i < a.length) {
           if (!func.apply1(a(i), p)(ev, TailstrictModeDisabled).asBoolean) {
-            var b = new Array[Lazy](a.length - 1)
+            var b = new Array[Eval](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
@@ -128,7 +128,7 @@ object ArrayModule extends AbstractFunctionModule {
         while (i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
           if (!func.evalRhs(newScope, ev, funDefFileScope, p).asBoolean) {
-            var b = new Array[Lazy](a.length - 1)
+            var b = new Array[Eval](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
@@ -150,9 +150,9 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Map_ extends Val.Builtin2("map", "func", "arr") {
-    def evalRhs(_func: Lazy, arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      val func = _func.force.asFunc
-      val arg = arr.force
+    def evalRhs(_func: Eval, arr: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      val arg = arr.value
       arg match {
         case Val.Str(_, str) => evalStr(func, str, ev, pos.noOffset)
         case _               => evalArr(func, arg.asArr.asLazyArray, ev, pos)
@@ -161,14 +161,12 @@ object ArrayModule extends AbstractFunctionModule {
 
     private def evalArr(
         _func: Val.Func,
-        arg: Array[Lazy],
+        arg: Array[Eval],
         ev: EvalScope,
         pos: Position): Val.Arr = {
       Val.Arr(
         pos,
-        arg.map(v =>
-          new LazyWithComputeFunc(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled))
-        )
+        arg.map(v => new Lazy(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)))
       )
     }
 
@@ -178,17 +176,15 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object MapWithIndex extends Val.Builtin2("mapWithIndex", "func", "arr") {
-    def evalRhs(_func: Lazy, _arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      val func = _func.force.asFunc
-      val arr = _arr.force.asArr.asLazyArray
-      val a = new Array[Lazy](arr.length)
+    def evalRhs(_func: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      val arr = _arr.value.asArr.asLazyArray
+      val a = new Array[Eval](arr.length)
       var i = 0
       while (i < a.length) {
         val x = arr(i)
         val idx = Val.Num(pos, i)
-        a(i) = new LazyWithComputeFunc(() =>
-          func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled)
-        )
+        a(i) = new Lazy(() => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled))
         i += 1
       }
       Val.Arr(pos, a)
@@ -196,13 +192,13 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Find extends Val.Builtin2("find", "value", "arr") {
-    def evalRhs(value: Lazy, _arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      val arr = _arr.force.asArr
-      val b = new mutable.ArrayBuilder.ofRef[Lazy]
+    def evalRhs(value: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
+      val arr = _arr.value.asArr
+      val b = new mutable.ArrayBuilder.ofRef[Eval]
       b.sizeHint(arr.length) // Size hint based on array length (worst case)
       var i = 0
       while (i < arr.length) {
-        if (ev.equal(arr.force(i), value.force)) {
+        if (ev.equal(arr.value(i), value.value)) {
           val finalI = i
           b.+=(Val.Num(pos, finalI))
         }
@@ -213,12 +209,12 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
-    def evalRhs(arrs: Lazy, ev: EvalScope, pos: Position): Val = {
-      val out = new mutable.ArrayBuilder.ofRef[Lazy]
-      val arr = arrs.force.asArr
+    def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
+      val out = new mutable.ArrayBuilder.ofRef[Eval]
+      val arr = arrs.value.asArr
       out.sizeHint(arr.length * 4) // Rough size hint
       for (x <- arr) {
-        x.force match {
+        x.value match {
           case Val.Null(_) => // do nothing
           case v: Val.Arr  => out ++= v.asLazyArray
           case x           => Error.fail("Cannot call flattenArrays on " + x)
@@ -229,14 +225,14 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object FlattenDeepArrays extends Val.Builtin1("flattenDeepArray", "value") {
-    def evalRhs(value: Lazy, ev: EvalScope, pos: Position): Val = {
-      val lazyArray = value.force.asArr.asLazyArray
-      val out = new mutable.ArrayBuilder.ofRef[Lazy]
+    def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
+      val lazyArray = value.value.asArr.asLazyArray
+      val out = new mutable.ArrayBuilder.ofRef[Eval]
       out.sizeHint(lazyArray.length)
-      val q = new java.util.ArrayDeque[Lazy](lazyArray.length)
+      val q = new java.util.ArrayDeque[Eval](lazyArray.length)
       lazyArray.foreach(q.add)
       while (!q.isEmpty) {
-        q.removeFirst().force match {
+        q.removeFirst().value match {
           case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
           case x          => out += x
         }
@@ -246,25 +242,25 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
-    def evalRhs(arrs: Lazy, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, arrs.force.asArr.asLazyArray.reverse)
+    def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
+      Val.Arr(pos, arrs.value.asArr.asLazyArray.reverse)
     }
   }
 
   private object Member extends Val.Builtin2("member", "arr", "x") {
-    def evalRhs(arr: Lazy, x: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
       Val.bool(
         pos,
-        arr.force match {
+        arr.value match {
           case str: Val.Str =>
-            val secondArg = x.force match {
+            val secondArg = x.value match {
               case Val.Str(_, value) => value
               case n                 =>
                 Error.fail("std.member second argument must be a string, got " + n.prettyName)
             }
-            str.value.contains(secondArg)
+            str.str.contains(secondArg)
           case a: Val.Arr =>
-            a.asLazyArray.indexWhere(v => ev.equal(v.force, x.force)) >= 0
+            a.asLazyArray.indexWhere(v => ev.equal(v.value, x.value)) >= 0
           case arr =>
             Error.fail(
               "std.member first argument must be an array or a string, got " + arr.prettyName
@@ -275,19 +271,19 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Range extends Val.Builtin2("range", "from", "to") {
-    def evalRhs(from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val =
+    def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val =
       Val.Arr(
         pos,
-        (from.force.asInt to to.force.asInt).map(i => Val.Num(pos, i)).toArray
+        (from.value.asInt to to.value.asInt).map(i => Val.Num(pos, i)).toArray
       )
   }
 
   private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
-    def evalRhs(_func: Lazy, arr: Lazy, init: Lazy, ev: EvalScope, pos: Position): Val = {
-      val func = _func.force.asFunc
-      arr.force match {
+    def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      arr.value match {
         case arr: Val.Arr =>
-          var current = init.force
+          var current = init.value
           for (item <- arr.asLazyArray) {
             val c = current
             current = func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
@@ -295,8 +291,8 @@ object ArrayModule extends AbstractFunctionModule {
           current
 
         case s: Val.Str =>
-          var current = init.force
-          val str = s.value
+          var current = init.value
+          val str = s.str
           var i = 0
           while (i < str.length) {
             val c = current
@@ -316,19 +312,19 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Foldr extends Val.Builtin3("foldr", "func", "arr", "init") {
-    def evalRhs(_func: Lazy, arr: Lazy, init: Lazy, ev: EvalScope, pos: Position): Val = {
-      val func = _func.force.asFunc
-      arr.force match {
+    def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      arr.value match {
         case arr: Val.Arr =>
-          var current = init.force
+          var current = init.value
           for (item <- arr.asLazyArray.reverse) {
             val c = current
             current = func.apply2(item, c, pos.noOffset)(ev, TailstrictModeDisabled)
           }
           current
         case s: Val.Str =>
-          var current = init.force
-          val str = s.value
+          var current = init.value
+          val str = s.str
           var i = str.length
           while (i > 0) {
             val codePoint = str.codePointBefore(i)
@@ -346,7 +342,7 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private def stringChars(pos: Position, str: String): Val.Arr = {
-    val chars = new Array[Lazy](str.codePointCount(0, str.length))
+    val chars = new Array[Eval](str.codePointCount(0, str.length))
     var charIndex = 0
     var i = 0
     while (i < str.length) {
@@ -392,20 +388,20 @@ object ArrayModule extends AbstractFunctionModule {
         case s: Val.Str =>
           val builder = new java.lang.StringBuilder()
           var i = 0
-          while (i < s.value.length) {
-            val codePoint = s.value.codePointAt(i)
+          while (i < s.str.length) {
+            val codePoint = s.str.codePointAt(i)
             val codepointStr = Character.toString(codePoint)
             val fres =
               func.apply1(Val.Str(pos, codepointStr), pos.noOffset)(ev, TailstrictModeDisabled)
             builder.append(
               fres match {
-                case fstr: Val.Str => fstr.value
+                case fstr: Val.Str => fstr.str
                 case _: Val.Null   => ""
                 case x             =>
                   Error.fail(
                     "flatMap func must return string, got " + fres
                       .asInstanceOf[Val]
-                      .force
+                      .value
                       .prettyName
                   )
               }
@@ -422,14 +418,12 @@ object ArrayModule extends AbstractFunctionModule {
         Val.Arr(
           pos,
           arr.asLazyArray.flatMap { i =>
-            i.force
+            i.value
             if (!filter_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled).asBoolean) {
               None
             } else {
-              Some[Lazy](
-                new LazyWithComputeFunc(() =>
-                  map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled)
-                )
+              Some[Eval](
+                new Lazy(() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
               )
             }
           }
@@ -447,7 +441,7 @@ object ArrayModule extends AbstractFunctionModule {
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
           val lazyArray = a.asLazyArray
-          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          val out = new mutable.ArrayBuilder.ofRef[Eval]
           out.sizeHint(lazyArray.length * count)
           var i = 0
           while (i < count) {
@@ -463,11 +457,11 @@ object ArrayModule extends AbstractFunctionModule {
       Val.Arr(
         pos, {
           val sz = size.cast[Val.Num].asPositiveInt
-          val a = new Array[Lazy](sz)
+          val a = new Array[Eval](sz)
           var i = 0
           while (i < sz) {
             val forcedI = i
-            a(i) = new LazyWithComputeFunc(() =>
+            a(i) = new Lazy(() =>
               func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
             )
             i += 1
@@ -477,10 +471,10 @@ object ArrayModule extends AbstractFunctionModule {
       )
     },
     builtin("contains", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      arr.asLazyArray.indexWhere(s => ev.equal(s.force, elem)) != -1
+      arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem)) != -1
     },
     builtin("remove", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      val idx = arr.asLazyArray.indexWhere(s => ev.equal(s.force, elem))
+      val idx = arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem))
       if (idx == -1) {
         arr
       } else {
@@ -503,7 +497,7 @@ object ArrayModule extends AbstractFunctionModule {
       if (!arr.forall(_.isInstanceOf[Val.Num])) {
         Error.fail("Argument must be an array of numbers")
       }
-      arr.asLazyArray.map(_.force.asDouble).sum
+      arr.asLazyArray.map(_.value.asDouble).sum
     },
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
       if (!arr.forall(_.isInstanceOf[Val.Num])) {
@@ -512,7 +506,7 @@ object ArrayModule extends AbstractFunctionModule {
       if (arr.length == 0) {
         Error.fail("Cannot calculate average of an empty array")
       }
-      arr.asLazyArray.map(_.force.asDouble).sum / arr.length
+      arr.asLazyArray.map(_.value.asDouble).sum / arr.length
     }
   )
 }

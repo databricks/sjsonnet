@@ -50,7 +50,7 @@ abstract class Materializer {
         var i = 0
         while (i < xs.length) {
           val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
-          arrVisitor.visitValue(apply0(xs.force(i), sub), -1)
+          arrVisitor.visitValue(apply0(xs.value(i), sub), -1)
           i += 1
         }
         arrVisitor.visitEnd(-1)
@@ -83,11 +83,11 @@ abstract class Materializer {
     case ujson.Str(s)  => Val.Str(pos, s)
     case ujson.Arr(xs) =>
       val len = xs.length
-      val res = new Array[Lazy](len)
+      val res = new Array[Eval](len)
       var i = 0
       while (i < len) {
         val x = xs(i)
-        res(i) = new LazyWithComputeFunc(() => reverse(pos, x))
+        res(i) = new Lazy(() => reverse(pos, x))
         i += 1
       }
       Val.Arr(pos, res)
@@ -147,7 +147,7 @@ object Materializer extends Materializer {
   def storePos(v: Val): Unit = ()
 
   final val emptyStringArray = new Array[String](0)
-  final val emptyLazyArray = new Array[Lazy](0)
+  final val emptyLazyArray = new Array[Eval](0)
 
   /**
    * Trait for providing custom materialization logic to the Materializer.

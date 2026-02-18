@@ -207,25 +207,45 @@ line which is run by all of these is defined in
 `MainBenchmark.mainArgs`. You need to change it to point to a suitable input
 before running a benchmark or the profiler.
 
-## Laziness
+## Laziness and Evaluation Model
 
 The Jsonnet language is _lazy_: expressions don't get evaluated unless
 their value is needed, and thus even erroneous expressions do not cause
-a failure if un-used. This is represented in the Sjsonnet codebase by
-`sjsonnet.Lazy`: a wrapper type that encapsulates an arbitrary
-computation that returns a `sjsonnet.Val`.
+a failure if un-used.
 
-`sjsonnet.Lazy` is used in several places, representing where
-laziness is present in the language:
+Sjsonnet models this with a flat type hierarchy rooted at `sjsonnet.Eval`:
 
-- Inside `sjsonnet.Scope`, representing local variable name bindings
+```
+    Eval (trait)          — common interface: def value: Val
+   /          \
+Lazy           Val (sealed abstract class)
+(final class)    |
+              Val.Str, Val.Num, Val.Arr, Val.Obj, Val.Func, ...
+```
+
+- **`Eval`** is the unified parent trait defining `def value: Val`. All places
+  that accept either a lazy or an already-computed value use `Eval` as the type.
+
+- **`Lazy`** represents lazy evaluation — a computation that has not yet been
+  performed. It wraps a `() => Val` closure, caches the result on first access,
+  and is thread-safe. After the value is computed, the closure reference is
+  cleared to allow it to be garbage collected.
+
+- **`Val`** represents an already-computed value. It extends `Eval` directly and
+  implements `value` as simply returning `this`.
+
+The hierarchy is intentionally kept flat (only two direct implementors of `Eval`)
+to enable the JVM JIT compiler's bimorphic inlining optimization on the
+hot `Eval.value` call site.
+
+`Eval` is used in several places, representing where laziness may be
+present in the language:
+
+- Inside `sjsonnet.ValScope`, representing local variable name bindings
 
 - Inside `sjsonnet.Val.Arr`, representing the contents of array cells
 
 - Inside `sjsonnet.Val.Obj`, representing the contents of object values
-
-`Val` extends `Lazy` so that an already computed value can be treated as
-lazy without having to wrap it.
 
 Unlike [google/jsonnet](https://github.com/google/jsonnet), Sjsonnet caches the
 results of lazy computations the first time they are evaluated, avoiding

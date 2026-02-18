@@ -14,11 +14,11 @@ import java.util
  * The bindings array is private and only copy-on-write, so for nested scopes which do not change it
  * (e.g. those just updating `dollar0` or `self0`) the bindings array can be shared cheaply.
  */
-final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
+final class ValScope private (val bindings: Array[Eval]) extends AnyVal {
 
   def length: Int = bindings.length
 
-  def extend(newBindings: Array[Lazy], newSelf: Val.Obj, newSuper: Val.Obj): ValScope = {
+  def extend(newBindings: Array[Eval], newSelf: Val.Obj, newSuper: Val.Obj): ValScope = {
     val b = util.Arrays.copyOf(bindings, bindings.length + newBindings.length + 2)
     b(bindings.length) = newSelf
     b(bindings.length + 1) = newSuper
@@ -26,7 +26,7 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
     new ValScope(b)
   }
 
-  def extendSimple(newBindingsV: Array[? <: Lazy]): ValScope = {
+  def extendSimple(newBindingsV: Array[? <: Eval]): ValScope = {
     if (newBindingsV == null || newBindingsV.length == 0) this
     else {
       val b = util.Arrays.copyOf(bindings, bindings.length + newBindingsV.length)
@@ -39,20 +39,20 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
     if (num == 0) this
     else new ValScope(util.Arrays.copyOf(bindings, bindings.length + num))
 
-  def extendSimple(l1: Lazy): ValScope = {
+  def extendSimple(l1: Eval): ValScope = {
     val b = util.Arrays.copyOf(bindings, bindings.length + 1)
     b(bindings.length) = l1
     new ValScope(b)
   }
 
-  def extendSimple(l1: Lazy, l2: Lazy): ValScope = {
+  def extendSimple(l1: Eval, l2: Eval): ValScope = {
     val b = util.Arrays.copyOf(bindings, bindings.length + 2)
     b(bindings.length) = l1
     b(bindings.length + 1) = l2
     new ValScope(b)
   }
 
-  def extendSimple(l1: Lazy, l2: Lazy, l3: Lazy): ValScope = {
+  def extendSimple(l1: Eval, l2: Eval, l3: Eval): ValScope = {
     val b = util.Arrays.copyOf(bindings, bindings.length + 3)
     b(bindings.length) = l1
     b(bindings.length + 1) = l2
@@ -62,6 +62,6 @@ final class ValScope private (val bindings: Array[Lazy]) extends AnyVal {
 }
 
 object ValScope {
-  private val emptyArr = new Array[Lazy](0)
+  private val emptyArr = new Array[Eval](0)
   def empty = new ValScope(emptyArr)
 }

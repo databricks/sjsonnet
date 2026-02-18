@@ -15,8 +15,8 @@ object CustomValTests extends TestSuite {
 
   private final class IncreaseImportance
       extends Val.Builtin1("increaseImportance", "important_string") {
-    def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
-      arg1.force match {
+    def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val = {
+      arg1.value match {
         case importantString: ImportantString =>
           importantString.copy(importance = importantString.importance + 1)
         case other => other

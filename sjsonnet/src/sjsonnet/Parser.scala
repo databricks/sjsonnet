@@ -66,7 +66,7 @@ object Parser {
 
   def idStartChar(c: Char): Boolean = c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
-  private val emptyLazyArray = new Array[Lazy](0)
+  private val emptyLazyArray = new Array[Eval](0)
   private val isSpaceOrTab: Char => Boolean = c => c == ' ' || c == '\t'
 
 }
@@ -409,7 +409,7 @@ class Parser(
       case (first, None)             => Expr.Arr(offset, Array(first))
       case (first, Some(Left(comp))) => Expr.Comp(offset, first, comp._1, comp._2.toArray)
       case (first: Val, Some(Right(rest))) if rest.forall(_.isInstanceOf[Val]) =>
-        val a = new Array[Lazy](rest.length + 1)
+        val a = new Array[Eval](rest.length + 1)
         a(0) = first
         var i = 1
         rest.foreach { v =>
@@ -756,9 +756,9 @@ class Parser(
               (lhs, comps) match {
                 case (Val.Str(_, _), (Expr.ForSpec(_, _, Expr.Arr(_, values)), _))
                     if values.length > 1 =>
-                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].str}" """)
                 case (Val.Str(_, _), (Expr.ForSpec(_, _, arr: Val.Arr), _)) if arr.length > 1 =>
-                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].value}" """)
+                  Fail.opaque(s"""no duplicate field: "${lhs.asInstanceOf[Val.Str].str}" """)
                 case _ =>
                   Pass(
                     Expr.ObjBody.ObjComp(

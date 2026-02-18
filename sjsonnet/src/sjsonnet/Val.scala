@@ -10,21 +10,21 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 /**
- * [[Lazy]] models lazy evaluation within a Jsonnet program. Lazily evaluated dictionary values,
- * array contents, or function parameters are all wrapped in [[Lazy]] and only truly evaluated
- * on-demand. [[Val]] also extends [[Lazy]] so that already-evaluated values can be stored directly
- * in [[Array[Lazy]]] without wrapper overhead.
+ * [[Eval]] is the common parent trait for both lazy and eager evaluation, providing a unified
+ * abstraction for evaluation strategies within a Jsonnet program.
  */
-trait Lazy {
-  def force: Val
+trait Eval {
+  def value: Val
 }
 
 /**
- * Thread-safe implementation that discards the compute function after initialization.
+ * Thread-safe lazy evaluation implementation that discards the compute function after
+ * initialization. Lazily evaluated dictionary values, array contents, or function parameters are
+ * all wrapped in [[Lazy]] and only truly evaluated on-demand.
  */
-final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) extends Lazy {
+final class Lazy(@volatile private var computeFunc: () => Val) extends Eval {
   private var cached: Val = _
-  def force: Val = {
+  def value: Val = {
     if (cached != null) return cached
     val f = computeFunc
     if (f != null) { // we won the race to initialize
@@ -44,8 +44,8 @@ final class LazyWithComputeFunc(@volatile private var computeFunc: () => Val) ex
  * [[Val]] data structure is essentially a JSON tree, except evaluation of object attributes and
  * array contents are lazy, and the tree can contain functions.
  */
-sealed abstract class Val extends Lazy {
-  final def force: Val = this
+sealed abstract class Val extends Eval {
+  final def value: Val = this
 
   def pos: Position
   def prettyName: String
@@ -101,74 +101,74 @@ object Val {
   final case class Null(pos: Position) extends Literal {
     def prettyName = "null"
   }
-  final case class Str(pos: Position, value: String) extends Literal {
+  final case class Str(pos: Position, str: String) extends Literal {
     def prettyName = "string"
-    override def asString: String = value
+    override def asString: String = str
   }
-  final case class Num(pos: Position, private val value: Double) extends Literal {
-    if (value.isInfinite) {
+  final case class Num(pos: Position, private val num: Double) extends Literal {
+    if (num.isInfinite) {
       Error.fail("overflow")
     }
 
     def prettyName = "number"
-    override def asInt: Int = value.toInt
+    override def asInt: Int = num.toInt
 
     def asPositiveInt: Int = {
-      if (!value.isWhole || !value.isValidInt) {
+      if (!num.isWhole || !num.isValidInt) {
         Error.fail("index value is not a valid integer")
       }
 
-      if (value.toInt < 0) {
-        Error.fail("index value is not a positive integer, got: " + value.toInt)
+      if (num.toInt < 0) {
+        Error.fail("index value is not a positive integer, got: " + num.toInt)
       }
-      value.toInt
+      num.toInt
     }
 
-    override def asLong: Long = value.toLong
+    override def asLong: Long = num.toLong
 
     def asSafeLong: Long = {
-      if (value.isInfinite || value.isNaN) {
+      if (num.isInfinite || num.isNaN) {
         Error.fail("numeric value is not finite")
       }
 
-      if (value < DOUBLE_MIN_SAFE_INTEGER || value > DOUBLE_MAX_SAFE_INTEGER) {
+      if (num < DOUBLE_MIN_SAFE_INTEGER || num > DOUBLE_MAX_SAFE_INTEGER) {
         Error.fail("numeric value outside safe integer range for bitwise operation")
       }
-      value.toLong
+      num.toLong
     }
 
     override def asDouble: Double = {
-      if (value.isNaN) {
+      if (num.isNaN) {
         Error.fail("not a number")
       }
-      value
+      num
     }
   }
 
-  final case class Arr(pos: Position, private val value: Array[? <: Lazy]) extends Literal {
+  final case class Arr(pos: Position, private val arr: Array[? <: Eval]) extends Literal {
     def prettyName = "array"
 
     override def asArr: Arr = this
-    def length: Int = value.length
-    def force(i: Int): Val = value(i).force
+    def length: Int = arr.length
+    def value(i: Int): Val = arr(i).value
 
-    def asLazyArray: Array[Lazy] = value.asInstanceOf[Array[Lazy]]
-    def asStrictArray: Array[Val] = value.map(_.force)
+    def asLazyArray: Array[Eval] = arr.asInstanceOf[Array[Eval]]
+    def asStrictArray: Array[Val] = arr.map(_.value)
 
-    def concat(newPos: Position, rhs: Arr): Arr = Arr(newPos, value ++ rhs.value)
+    def concat(newPos: Position, rhs: Arr): Arr = Arr(newPos, arr ++ rhs.arr)
 
-    def iterator: Iterator[Val] = value.iterator.map(_.force)
+    def iterator: Iterator[Val] = arr.iterator.map(_.value)
     def foreach[U](f: Val => U): Unit = {
       var i = 0
-      while (i < value.length) {
-        f(value(i).force)
+      while (i < arr.length) {
+        f(arr(i).value)
         i += 1
       }
     }
     def forall(f: Val => Boolean): Boolean = {
       var i = 0
-      while (i < value.length) {
-        if (!f(value(i).force)) return false
+      while (i < arr.length) {
+        if (!f(arr(i).value)) return false
         i += 1
       }
       true
@@ -545,11 +545,11 @@ object Val {
     private def mergeMember(l: Val, r: Val, pos: Position)(implicit evaluator: EvalScope): Literal =
       (l, r) match {
         case (lStr: Val.Str, rStr: Val.Str) =>
-          Val.Str(pos, lStr.value ++ rStr.value)
+          Val.Str(pos, lStr.str ++ rStr.str)
         case (lStr: Val.Str, _) =>
-          Val.Str(pos, lStr.value ++ renderString(r))
+          Val.Str(pos, lStr.str ++ renderString(r))
         case (_, rStr: Val.Str) =>
-          Val.Str(pos, renderString(l) ++ rStr.value)
+          Val.Str(pos, renderString(l) ++ rStr.str)
         case (lNum: Val.Num, rNum: Val.Num) =>
           Val.Num(pos, lNum.asDouble + rNum.asDouble)
         case (lArr: Val.Arr, rArr: Val.Arr) =>
@@ -672,7 +672,7 @@ object Val {
 
     override def asFunc: Func = this
 
-    def apply(argsL: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(implicit
+    def apply(argsL: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
@@ -683,7 +683,7 @@ object Val {
       // println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
       if (simple) {
         if (tailstrictMode == TailstrictModeEnabled) {
-          argsL.foreach(_.force)
+          argsL.foreach(_.value)
         }
         val newScope = defSiteValScope.extendSimple(argsL)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
@@ -723,7 +723,7 @@ object Val {
             if (argVals(j) == null) {
               val default = params.defaultExprs(i)
               if (default != null) {
-                argVals(j) = new LazyWithComputeFunc(() => evalDefault(default, newScope, ev))
+                argVals(j) = new Lazy(() => evalDefault(default, newScope, ev))
               } else {
                 if (missing == null) missing = new ArrayBuffer
                 missing.+=(params.names(i))
@@ -741,7 +741,7 @@ object Val {
           }
         }
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVals.foreach(_.force)
+          argVals.foreach(_.value)
         }
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
@@ -758,7 +758,7 @@ object Val {
       }
     }
 
-    def apply1(argVal: Lazy, outerPos: Position)(implicit
+    def apply1(argVal: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 1) apply(Array(argVal), null, outerPos)
@@ -768,14 +768,14 @@ object Val {
           case p    => p.fileScope
         }
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal.force
+          argVal.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
 
-    def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
+    def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
@@ -785,15 +785,15 @@ object Val {
           case p    => p.fileScope
         }
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.force
-          argVal2.force
+          argVal1.value
+          argVal2.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
       }
     }
 
-    def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit
+    def apply3(argVal1: Eval, argVal2: Eval, argVal3: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
@@ -803,9 +803,9 @@ object Val {
           case p    => p.fileScope
         }
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.force
-          argVal2.force
-          argVal3.force
+          argVal1.value
+          argVal2.value
+          argVal3.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
         evalRhs(newScope, ev, funDefFileScope, outerPos)
@@ -835,40 +835,40 @@ object Val {
       evalRhs(scope.bindings, ev, pos)
     }
 
-    def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val
+    def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val
 
-    override def apply1(argVal: Lazy, outerPos: Position)(implicit
+    override def apply1(argVal: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 1) apply(Array(argVal), null, outerPos)
       else {
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal.force
+          argVal.value
         }
         evalRhs(Array(argVal), ev, outerPos)
       }
 
-    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
+    override def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
       else {
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.force
-          argVal2.force
+          argVal1.value
+          argVal2.value
         }
         evalRhs(Array(argVal1, argVal2), ev, outerPos)
       }
 
-    override def apply3(argVal1: Lazy, argVal2: Lazy, argVal3: Lazy, outerPos: Position)(implicit
+    override def apply3(argVal1: Eval, argVal2: Eval, argVal3: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
       else {
         if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.force
-          argVal2.force
-          argVal3.force
+          argVal1.value
+          argVal2.value
+          argVal3.value
         }
         evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
       }
@@ -889,12 +889,12 @@ object Val {
 
   abstract class Builtin0(fn: String, def1: Expr = null)
       extends Builtin(fn: String, Array.empty, if (def1 == null) null else Array(def1)) {
-    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
+    final def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
       evalRhs(ev, pos)
 
     def evalRhs(ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
+    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
@@ -905,38 +905,38 @@ object Val {
 
   abstract class Builtin1(fn: String, pn1: String, def1: Expr = null)
       extends Builtin(fn: String, Array(pn1), if (def1 == null) null else Array(def1)) {
-    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0).force, ev, pos)
+    final def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).value, ev, pos)
 
-    def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
+    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).force, ev, outerPos)
+      if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).value, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
   abstract class Builtin2(fn: String, pn1: String, pn2: String, defs: Array[Expr] = null)
       extends Builtin(fn: String, Array(pn1, pn2), defs) {
-    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0).force, args(1).force, ev, pos)
+    final def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).value, args(1).value, ev, pos)
 
-    def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Eval, arg2: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
+    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 2)
-        evalRhs(argVals(0).force, argVals(1).force, ev, outerPos)
+        evalRhs(argVals(0).value, argVals(1).value, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
 
-    override def apply2(argVal1: Lazy, argVal2: Lazy, outerPos: Position)(implicit
+    override def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (params.names.length == 2) evalRhs(argVal1.force, argVal2.force, ev, outerPos)
+      if (params.names.length == 2) evalRhs(argVal1.value, argVal2.value, ev, outerPos)
       else super.apply(Array(argVal1, argVal2), null, outerPos)
   }
 
@@ -947,17 +947,17 @@ object Val {
       pn3: String,
       defs: Array[Expr] = null)
       extends Builtin(fn: String, Array(pn1, pn2, pn3), defs) {
-    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0).force, args(1).force, args(2).force, ev, pos)
+    final def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).value, args(1).value, args(2).value, ev, pos)
 
-    def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Eval, arg2: Eval, arg3: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
+    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 3)
-        evalRhs(argVals(0).force, argVals(1).force, argVals(2).force, ev, outerPos)
+        evalRhs(argVals(0).value, argVals(1).value, argVals(2).value, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
   }
 
@@ -969,21 +969,21 @@ object Val {
       pn4: String,
       defs: Array[Expr] = null)
       extends Builtin(fn: String, Array(pn1, pn2, pn3, pn4), defs) {
-    final def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val =
-      evalRhs(args(0).force, args(1).force, args(2).force, args(3).force, ev, pos)
+    final def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
+      evalRhs(args(0).value, args(1).value, args(2).value, args(3).value, ev, pos)
 
-    def evalRhs(arg1: Lazy, arg2: Lazy, arg3: Lazy, arg4: Lazy, ev: EvalScope, pos: Position): Val
+    def evalRhs(arg1: Eval, arg2: Eval, arg3: Eval, arg4: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Lazy], namedNames: Array[String], outerPos: Position)(
+    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
         implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 4)
         evalRhs(
-          argVals(0).force,
-          argVals(1).force,
-          argVals(2).force,
-          argVals(3).force,
+          argVals(0).value,
+          argVals(1).value,
+          argVals(2).value,
+          argVals(3).value,
           ev,
           outerPos
         )
