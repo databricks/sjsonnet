@@ -572,6 +572,24 @@ object EvaluatorTests extends TestSuite {
         "-123.45600"
       )
     }
+    test("formatIntegerOverflow") {
+      // %d, %o, %x should not overflow to Long.MAX_VALUE for large doubles
+      eval("'%d' % 1e19", useNewEvaluator = useNewEvaluator) ==> ujson.Str("10000000000000000000")
+      eval("'%d' % 1e20", useNewEvaluator = useNewEvaluator) ==> ujson.Str(
+        "100000000000000000000"
+      )
+      eval("'%d' % -1e19", useNewEvaluator = useNewEvaluator) ==> ujson.Str(
+        "-10000000000000000000"
+      )
+      eval("'%o' % 1e19", useNewEvaluator = useNewEvaluator) ==> ujson.Str(
+        "1053071060221172000000"
+      )
+      eval("'%x' % 1e19", useNewEvaluator = useNewEvaluator) ==> ujson.Str("8ac7230489e80000")
+      // Sign should be determined from the truncated integer, not the original double:
+      // -0.3 truncates to 0, so no minus sign should appear.
+      eval("'%5.3d' % -0.3", useNewEvaluator = useNewEvaluator) ==> ujson.Str("  000")
+      eval("'%d' % -0.9", useNewEvaluator = useNewEvaluator) ==> ujson.Str("0")
+    }
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", strict = false, useNewEvaluator = useNewEvaluator) ==> ujson
         .Num(1)
