@@ -256,5 +256,34 @@ object UnicodeHandlingTests extends TestSuite {
       eval("""std.trim("🌍   ")""") ==> ujson.Str("🌍")
       eval("""std.trim("   🌍   ")""") ==> ujson.Str("🌍")
     }
+
+    test("foldl") {
+      // foldl must iterate by codepoint, not UTF-16 code unit
+      eval("""std.foldl(function(acc, c) acc + [c], "a😀b", [])""") ==>
+      ujson.Arr("a", "😀", "b")
+      eval("""std.foldl(function(acc, c) acc + 1, "a😀b", 0)""") ==> ujson.Num(3)
+      eval("""std.foldl(function(acc, c) acc + [c], "🎉🔥", [])""") ==>
+      ujson.Arr("🎉", "🔥")
+      // Round-trip concatenation
+      eval("""std.foldl(function(acc, c) acc + c, "a😀b", "")""") ==> ujson.Str("a😀b")
+    }
+
+    test("foldr") {
+      // foldr must iterate by codepoint, not UTF-16 code unit
+      eval("""std.foldr(function(c, acc) acc + [c], "a😀b", [])""") ==>
+      ujson.Arr("b", "😀", "a")
+      eval("""std.foldr(function(c, acc) acc + [c], "🎉🔥", [])""") ==>
+      ujson.Arr("🔥", "🎉")
+      // Round-trip concatenation (right-to-left: 'b' then '😀' then 'a')
+      eval("""std.foldr(function(c, acc) acc + c, "a😀b", "")""") ==> ujson.Str("b😀a")
+    }
+
+    test("formatPercentC") {
+      // %c must handle non-BMP codepoints
+      eval("""std.format("%c", [128512])""") ==> ujson.Str("😀") // U+1F600
+      eval("""std.format("%c", [128293])""") ==> ujson.Str("🔥") // U+1F525
+      eval("""std.format("%c", [127757])""") ==> ujson.Str("🌍") // U+1F30D
+      eval("""std.format("%c", [65])""") ==> ujson.Str("A") // BMP char
+    }
   }
 }

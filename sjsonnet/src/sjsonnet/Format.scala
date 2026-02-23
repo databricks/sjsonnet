@@ -196,7 +196,7 @@ object Format {
                 case 'f' | 'F'       => formatFloat(formatted, s)
                 case 'g'             => formatGeneric(formatted, s).toLowerCase
                 case 'G'             => formatGeneric(formatted, s)
-                case 'c'             => widenRaw(formatted, s.toChar.toString)
+                case 'c'             => widenRaw(formatted, Character.toString(s.toInt))
                 case 's'             =>
                   if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
                   else widenRaw(formatted, s.toString)
