@@ -236,13 +236,20 @@ object Format {
     output.toString()
   }
 
-  private def formatInteger(formatted: FormatSpec, s: Double): String = {
+  // Truncate a double toward zero, returning the integer part as a BigInt.
+  // Uses Long as a fast path (mirrors RenderUtils.renderDouble); falls back to
+  // BigDecimal for values that exceed Long range (~9.2e18).
+  private def truncateToInteger(s: Double): BigInt = {
     val sl = s.toLong
-    val (lhs, rhs) = if (sl < 0) {
-      ("-", sl.toString.substring(1))
-    } else {
-      ("", sl.toString)
-    }
+    if (sl.toDouble == s) BigInt(sl)
+    else BigDecimal(s).toBigInt
+  }
+
+  private def formatInteger(formatted: FormatSpec, s: Double): String = {
+    val i = truncateToInteger(s)
+    val negative = i.signum < 0
+    val lhs = if (negative) "-" else ""
+    val rhs = i.abs.toString(10)
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,
@@ -250,7 +257,7 @@ object Format {
       "",
       rhs2,
       numeric = true,
-      signedConversion = sl >= 0
+      signedConversion = !negative
     )
   }
 
@@ -275,11 +282,10 @@ object Format {
   }
 
   private def formatOctal(formatted: FormatSpec, s: Double): String = {
-    val (lhs, rhs) = if (s < 0) {
-      ("-", s.toLong.abs.toOctalString)
-    } else {
-      ("", s.toLong.toOctalString)
-    }
+    val i = truncateToInteger(s)
+    val negative = i.signum < 0
+    val lhs = if (negative) "-" else ""
+    val rhs = i.abs.toString(8)
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,
@@ -287,16 +293,15 @@ object Format {
       if (!formatted.alternate || rhs2(0) == '0') "" else "0",
       rhs2,
       numeric = true,
-      signedConversion = s > 0
+      signedConversion = !negative
     )
   }
 
   private def formatHexadecimal(formatted: FormatSpec, s: Double): String = {
-    val (lhs, rhs) = if (s < 0) {
-      ("-", s.toLong.abs.toHexString)
-    } else {
-      ("", s.toLong.toHexString)
-    }
+    val i = truncateToInteger(s)
+    val negative = i.signum < 0
+    val lhs = if (negative) "-" else ""
+    val rhs = i.abs.toString(16)
     val rhs2 = precisionPad(lhs, rhs, formatted.precision)
     widen(
       formatted,
@@ -304,7 +309,7 @@ object Format {
       if (!formatted.alternate) "" else "0x",
       rhs2,
       numeric = true,
-      signedConversion = s > 0
+      signedConversion = !negative
     )
   }
 
