@@ -568,7 +568,7 @@ class Evaluator(
             if (rr < 0) {
               Error.fail("shift by negative exponent", pos)
             }
-            if (rr >= 1 && ll >= (1L << (63 - rr)))
+            if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
               Error.fail("numeric value outside safe integer range for bitwise operation", pos)
             else
               Val.Num(pos, (ll << rr).toDouble)
