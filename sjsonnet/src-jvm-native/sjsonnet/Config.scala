@@ -146,6 +146,11 @@ final case class Config(
     )
     maxParserRecursionDepth: Int = 1000,
     @arg(
+      name = "no-trailing-newline",
+      doc = "Do not add a trailing newline to the output"
+    )
+    noTrailingNewline: Flag = Flag(),
+    @arg(
       name = "broken-assertion-logic",
       doc =
         "Re-enable pre-0.5.5 broken assertion logic. See https://github.com/databricks/sjsonnet/issues/526."

@@ -95,6 +95,11 @@ object SjsonnetMainBase {
         customDoc = doc,
         autoPrintHelpAndExit = None
       )
+      _ <- {
+        if (config.noTrailingNewline.value && config.yamlStream.value)
+          Left("error: cannot use --no-trailing-newline with --yaml-stream")
+        else Right(())
+      }
       file <- Right(config.file)
       outputStr <- mainConfigured(
         file,
@@ -131,7 +136,12 @@ object SjsonnetMainBase {
       case Right((config, str)) =>
         if (str.nonEmpty) {
           config.outputFile match {
-            case None    => stdout.println(str)
+            case None =>
+              // In multi mode, the file list on stdout always ends with a newline,
+              // matching go-jsonnet/C++ jsonnet behavior. --no-trailing-newline only
+              // affects the content written to the output files, not the file list.
+              if (config.multi.isDefined || !config.noTrailingNewline.value) stdout.println(str)
+              else stdout.print(str)
             case Some(f) => os.write.over(os.Path(f, wd), str)
           }
         }
@@ -162,8 +172,18 @@ object SjsonnetMainBase {
       case e                      => e.toString
     }
 
-  private def writeFile(config: Config, f: os.Path, contents: String): Either[String, Unit] =
-    handleWriteFile(os.write.over(f, contents, createFolders = config.createDirs.value))
+  private def writeFile(
+      config: Config,
+      f: os.Path,
+      contents: String,
+      trailingNewline: Boolean): Either[String, Unit] =
+    handleWriteFile(
+      os.write.over(
+        f,
+        if (trailingNewline) contents + "\n" else contents,
+        createFolders = config.createDirs.value
+      )
+    )
 
   private def writeToFile(config: Config, wd: os.Path)(
       materialize: Writer => Either[String, ?]): Either[String, String] = {
@@ -196,7 +216,7 @@ object SjsonnetMainBase {
     writeToFile(config, wd) { writer =>
       val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-      if (config.yamlOut.value) writer.write('\n')
+      if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
       res
     }
   }
@@ -301,6 +321,7 @@ object SjsonnetMainBase {
 
     (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
+        val trailingNewline = !config.noTrailingNewline.value
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.FilePath]] =
@@ -313,7 +334,7 @@ object SjsonnetMainBase {
                     Right(writer.toString)
                   }
                   relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
-                  _ <- writeFile(config, relPath.resolveFrom(wd), rendered)
+                  _ <- writeFile(config, relPath.resolveFrom(wd), rendered, trailingNewline)
                 } yield relPath
               }
 
@@ -333,7 +354,7 @@ object SjsonnetMainBase {
             )
         }
       case (None, true) =>
-        // YAML stream
+        // YAML stream (--no-trailing-newline is already rejected above for yaml-stream)
 
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
           case arr: ujson.Arr =>

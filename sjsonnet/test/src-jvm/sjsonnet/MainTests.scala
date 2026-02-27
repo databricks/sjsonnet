@@ -114,10 +114,10 @@ object MainTests extends TestSuite {
       assert((res, out, err) == ((0, expectedOut, "")))
 
       val helloDestStr = os.read(multiDest / "hello")
-      assert(helloDestStr == "1")
+      assert(helloDestStr == "1\n")
 
       val worldDestStr = os.read(multiDest / "world")
-      assert(worldDestStr == expectedWorldDestStr)
+      assert(worldDestStr == expectedWorldDestStr + "\n")
     }
 
     test("multiOutputFile") {
@@ -132,10 +132,10 @@ object MainTests extends TestSuite {
       assert(destStr == expectedOut)
 
       val helloDestStr = os.read(multiDest / "hello")
-      assert(helloDestStr == "1")
+      assert(helloDestStr == "1\n")
 
       val worldDestStr = os.read(multiDest / "world")
-      assert(worldDestStr == expectedWorldDestStr)
+      assert(worldDestStr == expectedWorldDestStr + "\n")
     }
 
     test("multiYamlOut") {
@@ -146,15 +146,166 @@ object MainTests extends TestSuite {
       assert((res, out, err) == ((0, expectedOut, "")))
 
       val helloDestStr = os.read(multiDest / "hello")
-      assert(helloDestStr == "1")
+      assert(helloDestStr == "1\n")
 
       val worldDestStr = os.read(multiDest / "world")
       assert(
         worldDestStr ==
         """- 2
           |- three
-          |- true""".stripMargin
+          |- true
+          |""".stripMargin
       )
+    }
+
+    // -- Default trailing newline behavior (with newline) --
+
+    test("execString") {
+      val source = """"hello""""
+      val (res, out, err) = runMain(source, "--exec", "--string")
+      assert((res, out, err) == ((0, "hello\n", "")))
+    }
+
+    test("multiStringOutput") {
+      val source = testSuiteRoot / "db" / "multi_string.jsonnet"
+      val multiDest = os.temp.dir()
+      val (res, out, err) = runMain(source, "--multi", multiDest, "--string")
+      assert(res == 0)
+      assert(err.isEmpty)
+
+      val helloDestStr = os.read(multiDest / "hello.txt")
+      assert(helloDestStr == "hello world\n")
+
+      val barDestStr = os.read(multiDest / "bar.txt")
+      assert(barDestStr == "bar\n")
+    }
+
+    // -- No trailing newline behavior --
+
+    test("noTrailingNewline") {
+      // Simple scalar output — default has trailing newline
+      val (resDefault, outDefault, _) = runMain("42", "--exec")
+      assert((resDefault, outDefault) == ((0, "42\n")))
+
+      // Simple scalar output — no trailing newline
+      val (res1, out1, err1) = runMain("42", "--exec", "--no-trailing-newline")
+      assert((res1, out1, err1) == ((0, "42", "")))
+
+      // Object output — default has trailing newline
+      val (resObj, outObj, _) = runMain("""{"a": 1, "b": 2}""", "--exec")
+      val expectedJsonWithNewline =
+        """{
+          |   "a": 1,
+          |   "b": 2
+          |}
+          |""".stripMargin
+      assert((resObj, outObj) == ((0, expectedJsonWithNewline)))
+
+      // Object output — no trailing newline
+      val (res2, out2, err2) =
+        runMain("""{"a": 1, "b": 2}""", "--exec", "--no-trailing-newline")
+      val expectedJson =
+        """{
+          |   "a": 1,
+          |   "b": 2
+          |}""".stripMargin
+      assert((res2, out2, err2) == ((0, expectedJson, "")))
+
+      // String output — default has trailing newline
+      val (resStr, outStr, _) = runMain(""""hello"""", "--exec", "--string")
+      assert((resStr, outStr) == ((0, "hello\n")))
+
+      // String output — no trailing newline
+      val (res3, out3, err3) =
+        runMain(""""hello"""", "--exec", "--string", "--no-trailing-newline")
+      assert((res3, out3, err3) == ((0, "hello", "")))
+    }
+
+    test("noTrailingNewlineMulti") {
+      // Default multi — files have trailing newline
+      val source = testSuiteRoot / "db" / "multi.jsonnet"
+      val multiDestDefault = os.temp.dir()
+      val (resDefault, _, _) = runMain(source, "--multi", multiDestDefault)
+      assert(resDefault == 0)
+      assert(os.read(multiDestDefault / "hello") == "1\n")
+      assert(os.read(multiDestDefault / "world") == expectedWorldDestStr + "\n")
+
+      // No trailing newline multi — files have no trailing newline,
+      // but the file list on stdout still ends with \n (matching go-jsonnet behavior)
+      val multiDest = os.temp.dir()
+      val (res, out, err) =
+        runMain(source, "--multi", multiDest, "--no-trailing-newline")
+      val expectedOut = s"$multiDest/hello\n$multiDest/world\n"
+      assert((res, out, err) == ((0, expectedOut, "")))
+      assert(os.read(multiDest / "hello") == "1")
+      assert(os.read(multiDest / "world") == expectedWorldDestStr)
+    }
+
+    test("noTrailingNewlineMultiString") {
+      val source = testSuiteRoot / "db" / "multi_string.jsonnet"
+
+      // Default multi+string — files have trailing newline
+      val multiDestDefault = os.temp.dir()
+      val (resDefault, _, _) = runMain(source, "--multi", multiDestDefault, "--string")
+      assert(resDefault == 0)
+      assert(os.read(multiDestDefault / "hello.txt") == "hello world\n")
+      assert(os.read(multiDestDefault / "bar.txt") == "bar\n")
+
+      // No trailing newline multi+string — files have no trailing newline,
+      // but the file list on stdout still ends with \n (matching go-jsonnet behavior)
+      val multiDest = os.temp.dir()
+      val (res, out, err) =
+        runMain(source, "--multi", multiDest, "--string", "--no-trailing-newline")
+      val expectedOut = s"$multiDest/bar.txt\n$multiDest/hello.txt\n"
+      assert((res, out, err) == ((0, expectedOut, "")))
+      assert(os.read(multiDest / "hello.txt") == "hello world")
+      assert(os.read(multiDest / "bar.txt") == "bar")
+    }
+
+    test("noTrailingNewlineOutputFile") {
+      // Default output-file — file has content without trailing newline (file mode)
+      val source = "42"
+      val destDefault = os.temp()
+      val (resDefault, _, _) = runMain(source, "--exec", "--output-file", destDefault)
+      assert(resDefault == 0)
+      val defaultContent = os.read(destDefault)
+      assert(defaultContent == "42")
+
+      // No trailing newline output-file — same behavior
+      val dest = os.temp()
+      val (res, out, err) =
+        runMain(source, "--exec", "--no-trailing-newline", "--output-file", dest)
+      assert((res, out, err) == ((0, "", "")))
+      assert(os.read(dest) == "42")
+    }
+
+    test("noTrailingNewlineYamlStreamError") {
+      val source = testSuiteRoot / "db" / "stream.jsonnet"
+      val (res, out, err) =
+        runMain(source, "--yaml-stream", "--no-trailing-newline")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("cannot use --no-trailing-newline with --yaml-stream"))
+    }
+
+    test("noTrailingNewlineYamlOut") {
+      // Default yaml-out — has trailing newline
+      val source = "local x = [1]; local y = [2]; x + y"
+      val (resDefault, outDefault, _) = runMain(source, "--exec", "--yaml-out")
+      val expectedYamlWithNewline =
+        """- 1
+          |- 2
+          |
+          |""".stripMargin
+      assert((resDefault, outDefault) == ((0, expectedYamlWithNewline)))
+
+      // No trailing newline yaml-out — no trailing newline
+      val (res, out, err) =
+        runMain(source, "--exec", "--yaml-out", "--no-trailing-newline")
+      val expectedYaml =
+        """- 1
+          |- 2""".stripMargin
+      assert((res, out, err) == ((0, expectedYaml, "")))
     }
   }
 
