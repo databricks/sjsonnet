@@ -44,6 +44,7 @@ usage: sjsonnet [sjsonnet-options] script-file
   --tla-str-file <str>            <var>=<file> Provide top-level arguments variable as string from
                                   the file
   -y --yaml-stream                Write output as a YAML stream of JSON documents
+  --no-trailing-newline           Do not add a trailing newline to the output
   --yaml-debug                    Generate source line comments in the output YAML doc to make it
                                   easier to figure out where values come from.
   --yaml-out                      Write output as a YAML document
