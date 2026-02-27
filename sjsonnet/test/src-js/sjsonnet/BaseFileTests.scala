@@ -8,6 +8,26 @@ import utest._
 
 abstract class BaseFileTests extends TestSuite {
   private val stderr = new StringBuffer()
+
+  case class TestFailure(fileName: String, message: String)
+  protected val failures = scala.collection.mutable.ArrayBuffer.empty[TestFailure]
+
+  protected def printSummaryAndAssert(): Unit = {
+    if (failures.nonEmpty) {
+      val count = failures.size
+      val failedFiles = failures.map(_.fileName).mkString(", ")
+      println()
+      println(s"==================== FAILURE SUMMARY ($count failed) ====================")
+      failures.foreach { f =>
+        println(s"  FAIL: ${f.fileName}")
+        f.message.linesIterator.take(3).foreach(line => println(s"        $line"))
+      }
+      println("=" * 60)
+      println()
+      failures.clear()
+      throw new utest.AssertionError(s"$count test(s) failed: $failedFiles", Seq.empty, null)
+    }
+  }
   private val std = new sjsonnet.stdlib.StdLibModule(
     nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
@@ -129,38 +149,52 @@ abstract class BaseFileTests extends TestSuite {
 
   def check(files: Map[String, () => Array[Byte]], fileName: String, testSuite: String): Unit = {
     println(s"Checking $testSuite/$fileName")
-    val goldenContent = if (files.contains(fileName + ".golden_js")) {
-      new String(files(fileName + ".golden_js")(), StandardCharsets.UTF_8)
-    } else {
-      new String(files(fileName + ".golden")(), StandardCharsets.UTF_8)
-    }
-    if (
-      goldenContent.startsWith("sjsonnet.Error") ||
-      goldenContent.startsWith("sjsonnet.ParseError") ||
-      goldenContent.startsWith("sjsonnet.StaticError") ||
-      goldenContent.contains("java.lang.StackOverflowError") ||
-      goldenContent.startsWith("RUNTIME ERROR")
-    ) {
-      checkError(files, fileName, goldenContent, testSuite)
-    } else {
-      val res = ujson.WebJson.transform(eval(files, fileName, testSuite), ujson.Value)
-      try {
-        val expected = ujson.read(goldenContent, false)
-        assert(res == expected)
-        assert(stderr.toString.isEmpty)
-      } catch {
-        case e: ujson.ParsingFailedException =>
-          if (
-            stderr.toString.stripLineEnd.nonEmpty && goldenContent.contains(
-              stderr.toString.stripLineEnd
-            )
-          ) {
-            assert(true)
-          } else {
-            println(res)
-            assert(e.getMessage == goldenContent.stripLineEnd)
-          }
+    try {
+      val goldenContent = if (files.contains(fileName + ".golden_js")) {
+        new String(files(fileName + ".golden_js")(), StandardCharsets.UTF_8)
+      } else {
+        new String(files(fileName + ".golden")(), StandardCharsets.UTF_8)
       }
+      if (
+        goldenContent.startsWith("sjsonnet.Error") ||
+        goldenContent.startsWith("sjsonnet.ParseError") ||
+        goldenContent.startsWith("sjsonnet.StaticError") ||
+        goldenContent.contains("java.lang.StackOverflowError") ||
+        goldenContent.startsWith("RUNTIME ERROR")
+      ) {
+        checkError(files, fileName, goldenContent, testSuite)
+      } else {
+        val res = ujson.WebJson.transform(eval(files, fileName, testSuite), ujson.Value)
+        try {
+          val expected = ujson.read(goldenContent, false)
+          if (res != expected) {
+            val actual = res.toString.take(200)
+            failures += TestFailure(
+              fileName,
+              s"Expected: ${goldenContent.take(200)}\nActual:   $actual"
+            )
+          } else if (stderr.toString.nonEmpty) {
+            failures += TestFailure(fileName, s"Unexpected stderr: ${stderr.toString.take(200)}")
+          }
+        } catch {
+          case e: ujson.ParsingFailedException =>
+            if (
+              stderr.toString.stripLineEnd.nonEmpty && goldenContent.contains(
+                stderr.toString.stripLineEnd
+              )
+            ) {
+              // ok - stderr matches golden
+            } else {
+              failures += TestFailure(fileName, s"JSON parse error: ${e.getMessage.take(200)}")
+            }
+        }
+      }
+    } catch {
+      case e: Throwable =>
+        failures += TestFailure(
+          fileName,
+          s"Exception: ${e.getClass.getSimpleName}: ${e.getMessage.take(200)}"
+        )
     }
   }
 
@@ -174,12 +208,20 @@ abstract class BaseFileTests extends TestSuite {
       .strip()
 
     try {
-      ujson.WebJson.transform(eval(files, fileName, testSuite), ujson.Value)
-      assert(false)
+      val result = ujson.WebJson.transform(eval(files, fileName, testSuite), ujson.Value)
+      failures += TestFailure(
+        fileName,
+        s"Expected error but got success: ${result.toString.take(200)}"
+      )
     } catch {
       case e: js.JavaScriptException =>
         val msg = e.getMessage.replaceAll("<no stack trace available>", "").strip()
-        assert(msg startsWith expected)
+        if (!(msg startsWith expected)) {
+          failures += TestFailure(
+            fileName,
+            s"Expected: ${expected.linesIterator.next()}\nActual:   ${msg.linesIterator.next()}"
+          )
+        }
     }
   }
 }

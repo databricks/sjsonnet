@@ -1,0 +1,2 @@
+sjsonnet.Error: std.flatMap on strings, provided function must return a string, got number
+    at [std.flatMap].(error.flatMap_string_typecheck.jsonnet:1:12)

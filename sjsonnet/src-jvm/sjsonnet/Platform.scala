@@ -89,7 +89,7 @@ object Platform {
       val yaml =
         new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
       yaml.size match {
-        case 0 => ujson.Obj()
+        case 0 => ujson.Null
         case 1 => nodeToJson(yaml.head)
         case _ =>
           val buf = new mutable.ArrayBuffer[ujson.Value](yaml.size)

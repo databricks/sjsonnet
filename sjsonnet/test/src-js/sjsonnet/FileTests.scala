@@ -40,6 +40,7 @@ object FileTests extends BaseFileTests {
       t.foreach { file =>
         check(TestResources_test_suite.files, file, "test_suite")
       }
+      printSummaryAndAssert()
     }
 
     test("go_test_suite") - {
@@ -51,6 +52,7 @@ object FileTests extends BaseFileTests {
       t.foreach { file =>
         check(TestResources_go_test_suite.files, file, "go_test_suite")
       }
+      printSummaryAndAssert()
     }
 
     test("new_test_suite") - {
@@ -63,6 +65,7 @@ object FileTests extends BaseFileTests {
       t.foreach { file =>
         check(TestResources_new_test_suite.files, file, "new_test_suite")
       }
+      printSummaryAndAssert()
     }
   }
 }

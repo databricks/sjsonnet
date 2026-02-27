@@ -82,13 +82,13 @@ object Platform {
   def yamlToJson(s: String): ujson.Value = {
     val docs = docSplitPattern.split(s, -1)
     docs.length match {
-      case 0 => ujson.Obj()
+      case 0 => ujson.Null
       case 1 =>
         docs.head.asNode match {
           case Right(n) =>
             nodeToJson(n)
           case Left(e) if docs.head.trim.isEmpty =>
-            ujson.Obj()
+            ujson.Null
           case Left(e) =>
             Error.fail("Error converting YAML to JSON: " + e.getMessage)
         }

@@ -2,12 +2,33 @@ package sjsonnet
 
 import sjsonnet.stdlib.NativeRegex
 import ujson.Value
-import utest.{TestSuite, assert}
+import utest.TestSuite
 
 abstract class BaseFileTests extends TestSuite {
   val workspaceRoot: os.Path = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
   private val stderr = new StringBuffer()
+
+  case class TestFailure(fileName: String, message: String)
+  protected val failures: scala.collection.mutable.ArrayBuffer[TestFailure] =
+    scala.collection.mutable.ArrayBuffer.empty[TestFailure]
+
+  protected def printSummaryAndAssert(): Unit = {
+    if (failures.nonEmpty) {
+      val count = failures.size
+      val failedFiles = failures.map(_.fileName).mkString(", ")
+      println()
+      println(s"==================== FAILURE SUMMARY ($count failed) ====================")
+      failures.foreach { f =>
+        println(s"  FAIL: ${f.fileName}")
+        f.message.linesIterator.take(3).foreach(line => println(s"        $line"))
+      }
+      println("=" * 60)
+      println()
+      failures.clear()
+      throw new utest.AssertionError(s"$count test(s) failed: $failedFiles", Seq.empty, null)
+    }
+  }
   private val std = new sjsonnet.stdlib.StdLibModule(
     nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
@@ -66,42 +87,55 @@ abstract class BaseFileTests extends TestSuite {
 
   def check(fileName: os.Path, testSuite: String): Unit = {
     println(s"Checking ${fileName.relativeTo(workspaceRoot)}")
-    val goldenContent =
-      if (isScalaNative && os.exists(os.Path(fileName.toString + ".golden_native"))) {
-        os.read(os.Path(fileName.toString + ".golden_native")).stripLineEnd
+    try {
+      val goldenContent =
+        if (isScalaNative && os.exists(os.Path(fileName.toString + ".golden_native"))) {
+          os.read(os.Path(fileName.toString + ".golden_native")).stripLineEnd
+        } else {
+          os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
+        }
+      if (
+        goldenContent.startsWith("sjsonnet.Error") ||
+        goldenContent.startsWith("sjsonnet.ParseError") ||
+        goldenContent.startsWith("sjsonnet.StaticError") ||
+        goldenContent.contains("java.lang.StackOverflowError") ||
+        goldenContent.startsWith("RUNTIME ERROR")
+      ) {
+        checkError(fileName, goldenContent, testSuite)
       } else {
-        os.read(os.Path(fileName.toString + ".golden")).stripLineEnd
-      }
-    if (
-      goldenContent.startsWith("sjsonnet.Error") ||
-      goldenContent.startsWith("sjsonnet.ParseError") ||
-      goldenContent.startsWith("sjsonnet.StaticError") ||
-      goldenContent.contains("java.lang.StackOverflowError") ||
-      goldenContent.startsWith("RUNTIME ERROR")
-    ) {
-      checkError(fileName, goldenContent, testSuite)
-    } else {
-      val res = eval(fileName, testSuite)
-      try {
-        val expected = ujson.read(goldenContent, false)
-        assert(res == Right(expected))
-        assert(stderr.toString.isEmpty)
-      } catch {
-        case e: ujson.ParsingFailedException =>
-          if (
-            res.isRight && stderr.toString.stripLineEnd.nonEmpty && goldenContent.contains(
-              stderr.toString.stripLineEnd
+        val res = eval(fileName, testSuite)
+        try {
+          val expected = ujson.read(goldenContent, false)
+          if (res != Right(expected)) {
+            failures += TestFailure(
+              fileName.last,
+              s"Expected: ${goldenContent.take(200)}\nActual:   ${res.fold(e => s"Left($e)", v => v.toString).take(200)}"
             )
-          ) {
-            assert(true)
-          } else {
-            println(res.left.getOrElse(""))
-            assert(e.getMessage == goldenContent.stripLineEnd)
+          } else if (stderr.toString.nonEmpty) {
+            failures += TestFailure(
+              fileName.last,
+              s"Unexpected stderr: ${stderr.toString.take(200)}"
+            )
           }
-        case e: Throwable =>
-          println(stderr.toString)
-          throw e
+        } catch {
+          case e: ujson.ParsingFailedException =>
+            if (
+              res.isRight && stderr.toString.stripLineEnd.nonEmpty && goldenContent.contains(
+                stderr.toString.stripLineEnd
+              )
+            ) {
+              // ok - stderr matches golden
+            } else {
+              failures += TestFailure(fileName.last, s"JSON parse error: ${e.getMessage.take(200)}")
+            }
+        }
       }
+    } catch {
+      case e: Throwable =>
+        failures += TestFailure(
+          fileName.last,
+          s"Exception: ${e.getClass.getSimpleName}: ${e.getMessage.take(200)}"
+        )
     }
   }
 
@@ -110,15 +144,23 @@ abstract class BaseFileTests extends TestSuite {
     try {
       eval(fileName, testSuite) match {
         case Left(e) =>
-          assert(e.strip() startsWith expected)
+          if (!(e.strip() startsWith expected)) {
+            failures += TestFailure(
+              fileName.last,
+              s"Expected: ${expected.linesIterator.next()}\nActual:   ${e.strip().linesIterator.next()}"
+            )
+          }
         case Right(result) =>
-          println(s"Expected error: $expected")
-          println(s"But got success: $result")
-          assert(false)
+          failures += TestFailure(
+            fileName.last,
+            s"Expected error but got success: ${result.toString.take(200)}"
+          )
       }
     } catch {
       case _: java.lang.StackOverflowError =>
-        assert(expected.contains("StackOverflowError"))
+        if (!expected.contains("StackOverflowError")) {
+          failures += TestFailure(fileName.last, "Unexpected StackOverflowError")
+        }
     }
   }
 

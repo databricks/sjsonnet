@@ -72,7 +72,7 @@ object ManifestModule extends AbstractFunctionModule {
   private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val input = str.value.asString
-      if (input.isEmpty) {
+      if (input.isBlank) {
         return Val.Null(pos)
       }
       ujson.transform(Platform.yamlToJson(input), new ValVisitor(pos))
