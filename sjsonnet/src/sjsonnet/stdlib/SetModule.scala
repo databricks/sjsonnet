@@ -10,15 +10,15 @@ object SetModule extends AbstractFunctionModule {
   def name = "set"
 
   private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
-    def evalRhs(arr: Lazy, keyF: Lazy, ev: EvalScope, pos: Position): Val = {
-      uniqArr(pos, ev, sortArr(pos, ev, arr.force, keyF.force), keyF.force)
+    def evalRhs(arr: Eval, keyF: Eval, ev: EvalScope, pos: Position): Val = {
+      uniqArr(pos, ev, sortArr(pos, ev, arr.value, keyF.value), keyF.value)
     }
   }
 
   private def applyKeyFunc(elem: Val, keyF: Val, pos: Position, ev: EvalScope): Val = {
     keyF match {
       case keyFFunc: Val.Func =>
-        keyFFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).force
+        keyFFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).value
       case _ => elem
     }
   }
@@ -26,7 +26,7 @@ object SetModule extends AbstractFunctionModule {
   private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
     arg match {
       case arr: Val.Arr => arr.asLazyArray
-      case str: Val.Str => stringChars(pos, str.value).asLazyArray
+      case str: Val.Str => stringChars(pos, str.str).asLazyArray
       case _            => Error.fail(f"Argument must be either arrays or strings")
     }
   }
@@ -35,7 +35,7 @@ object SetModule extends AbstractFunctionModule {
     if (ev.settings.throwErrorForInvalidSets) {
       val sorted = uniqArr(pos.noOffset, ev, sortArr(pos.noOffset, ev, arr, keyF), keyF)
       if (!ev.equal(arr, sorted)) {
-        Error.fail("Set operation on " + arr.force.prettyName + " was called with a non-set")
+        Error.fail("Set operation on " + arr.value.prettyName + " was called with a non-set")
       }
     }
   }
@@ -44,13 +44,13 @@ object SetModule extends AbstractFunctionModule {
       ev: EvalScope,
       pos: Position,
       keyF: Val,
-      arr: mutable.IndexedSeq[? <: Lazy],
+      arr: mutable.IndexedSeq[? <: Eval],
       toFind: Val): Boolean = {
     val appliedX = applyKeyFunc(toFind, keyF, pos, ev)
     arr
-      .search(appliedX)((toFind: Lazy, value: Lazy) => {
-        val appliedValue = applyKeyFunc(value.force, keyF, pos, ev)
-        ev.compare(toFind.force, appliedValue)
+      .search(appliedX)((toFind: Eval, value: Eval) => {
+        val appliedValue = applyKeyFunc(value.value, keyF, pos, ev)
+        ev.compare(toFind.value, appliedValue)
       })
       .isInstanceOf[Found]
   }
@@ -61,7 +61,7 @@ object SetModule extends AbstractFunctionModule {
       return arr
     }
 
-    val out = new mutable.ArrayBuilder.ofRef[Lazy]
+    val out = new mutable.ArrayBuilder.ofRef[Eval]
     // Set a reasonable size hint - in the worst case (no duplicates), we'll need arrValue.length elements
     out.sizeHint(arrValue.length)
 
@@ -70,7 +70,7 @@ object SetModule extends AbstractFunctionModule {
     while (i < arrValue.length) {
       val v = arrValue(i)
       val vKey =
-        if (keyF.isInstanceOf[Val.False]) v.force
+        if (keyF.isInstanceOf[Val.False]) v.value
         else keyF.asInstanceOf[Val.Func].apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
       if (lastAddedKey == null || !ev.equal(vKey, lastAddedKey)) {
         out.+=(v)
@@ -93,7 +93,7 @@ object SetModule extends AbstractFunctionModule {
         pos,
         if (keyFFunc != null) {
           val keys: Array[Val] = vs.map(v =>
-            keyFFunc(Array(v.force), null, pos.noOffset)(ev, TailstrictModeDisabled).force
+            keyFFunc(Array(v.value), null, pos.noOffset)(ev, TailstrictModeDisabled).value
           )
           val keyType = keys(0).getClass
           if (classOf[Val.Bool].isAssignableFrom(keyType)) {
@@ -117,23 +117,24 @@ object SetModule extends AbstractFunctionModule {
 
           sortedIndices.map(i => vs(i))
         } else {
-          val keyType = vs(0).force.getClass
+          val strict = vs.map(_.value)
+          val keyType = strict(0).getClass
           if (classOf[Val.Bool].isAssignableFrom(keyType)) {
             Error.fail("Cannot sort with values that are booleans")
           }
-          if (!vs.forall(_.force.getClass == keyType))
+          if (!strict.forall(_.getClass == keyType))
             Error.fail("Cannot sort with values that are not all the same type")
 
           if (keyType == classOf[Val.Str]) {
-            vs.map(_.force.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
+            strict.map(_.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
-            vs.map(_.force.cast[Val.Num]).sortBy(_.asDouble)
+            strict.map(_.cast[Val.Num]).sortBy(_.asDouble)
           } else if (keyType == classOf[Val.Arr]) {
-            vs.map(_.force.cast[Val.Arr]).sortBy(identity)(ev.compare(_, _))
+            strict.map(_.cast[Val.Arr]).sortBy(identity)(ev.compare(_, _))
           } else if (keyType == classOf[Val.Obj]) {
             Error.fail("Unable to sort array of objects without key function")
           } else {
-            Error.fail("Cannot sort array of " + vs(0).force.prettyName)
+            Error.fail("Cannot sort array of " + strict(0).prettyName)
           }
         }
       )
@@ -141,7 +142,7 @@ object SetModule extends AbstractFunctionModule {
   }
 
   def stringChars(pos: Position, str: String): Val.Arr = {
-    val chars = new Array[Lazy](str.codePointCount(0, str.length))
+    val chars = new Array[Eval](str.codePointCount(0, str.length))
     var charIndex = 0
     var i = 0
     while (i < str.length) {
@@ -179,15 +180,15 @@ object SetModule extends AbstractFunctionModule {
         } else if (b.isEmpty) {
           args(0)
         } else {
-          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          val out = new mutable.ArrayBuilder.ofRef[Eval]
           out.sizeHint(a.length + b.length)
 
           var idxA = 0
           var idxB = 0
 
           while (idxA < a.length && idxB < b.length) {
-            val elemA = a(idxA).force
-            val elemB = b(idxB).force
+            val elemA = a(idxA).value
+            val elemB = b(idxB).value
 
             val keyA = applyKeyFunc(elemA, keyF, pos, ev)
             val keyB = applyKeyFunc(elemB, keyF, pos, ev)
@@ -231,7 +232,7 @@ object SetModule extends AbstractFunctionModule {
         val a = toArrOrString(args(0), pos, ev)
         val b = toArrOrString(args(1), pos, ev)
 
-        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        val out = new mutable.ArrayBuilder.ofRef[Eval]
         // Set a reasonable size hint - intersection will be at most the size of the smaller set
         out.sizeHint(math.min(a.length, b.length))
 
@@ -239,8 +240,8 @@ object SetModule extends AbstractFunctionModule {
         var idxB = 0
 
         while (idxA < a.length && idxB < b.length) {
-          val elemA = a(idxA).force
-          val elemB = b(idxB).force
+          val elemA = a(idxA).value
+          val elemB = b(idxB).value
 
           val keyA = applyKeyFunc(elemA, keyF, pos, ev)
           val keyB = applyKeyFunc(elemB, keyF, pos, ev)
@@ -270,7 +271,7 @@ object SetModule extends AbstractFunctionModule {
 
         val a = toArrOrString(args(0), pos, ev)
         val b = toArrOrString(args(1), pos, ev)
-        val out = new mutable.ArrayBuilder.ofRef[Lazy]
+        val out = new mutable.ArrayBuilder.ofRef[Eval]
         // Set a reasonable size hint - difference will be at most the size of the first set
         out.sizeHint(a.length)
 
@@ -278,14 +279,14 @@ object SetModule extends AbstractFunctionModule {
         var idxB = 0
 
         while (idxA < a.length) {
-          val elemA = a(idxA).force
+          val elemA = a(idxA).value
           val keyA = applyKeyFunc(elemA, keyF, pos, ev)
 
           // Advance idxB to find first element >= keyA
           var foundEqual = false
           var continue = true
           while (idxB < b.length && continue) {
-            val elemB = b(idxB).force
+            val elemB = b(idxB).value
             val keyB = applyKeyFunc(elemB, keyF, pos, ev)
 
             val cmp = ev.compare(keyA, keyB)

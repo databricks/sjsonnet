@@ -11,12 +11,12 @@ abstract class BaseFileTests extends TestSuite {
   private val std = new sjsonnet.stdlib.StdLibModule(
     nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
-        override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
+        override def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val = {
           Val.Str(
             pos,
             Materializer
               .apply0(
-                arg1.force,
+                arg1.value,
                 MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
               )(ev)
               .toString
@@ -35,8 +35,8 @@ abstract class BaseFileTests extends TestSuite {
     additionalStdFunctions = Map(
       // Scala.js does not support md5, for now, so we stub it out for the various smoke tests.
       "md5" -> new Val.Builtin1("md5", "s") {
-        override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
-          arg1.force match {
+        override def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val = {
+          arg1.value match {
             case Val.Str(_, s) =>
               s match {
                 case ""      => Val.Str(pos, "d41d8cd98f00b204e9800998ecf8427e")

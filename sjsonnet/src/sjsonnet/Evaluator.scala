@@ -88,14 +88,14 @@ class Evaluator(
       Error.fail("Should not have happened.", e.pos)
   }
 
-  def visitAsLazy(e: Expr)(implicit scope: ValScope): Lazy = e match {
+  def visitAsLazy(e: Expr)(implicit scope: ValScope): Eval = e match {
     case v: Val => v
-    case e      => new LazyWithComputeFunc(() => visitExpr(e))
+    case e      => new Lazy(() => visitExpr(e))
   }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
-    ref.force
+    ref.value
   }
 
   def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
@@ -116,7 +116,7 @@ class Evaluator(
           newScope.bindings(base + i) = b.args match {
             case null    => visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
         }
@@ -311,7 +311,7 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
-    val arr = new Array[Lazy](e.argExprs.length)
+    val arr = new Array[Eval](e.argExprs.length)
     var idx = 0
 
     if (e.tailstrict) {
@@ -371,10 +371,10 @@ class Evaluator(
         if (v.length == 0) Error.fail("array bounds error: array is empty", pos)
         if (int >= v.length)
           Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
-        v.force(int)
+        v.value(int)
       case (v: Val.Str, i: Val.Num) =>
         val int = i.asPositiveInt
-        val str = v.value
+        val str = v.str
         if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
         val unicodeLength = str.codePointCount(0, str.length)
         if (int >= unicodeLength)
@@ -383,7 +383,7 @@ class Evaluator(
         val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
         Val.Str(pos, str.substring(startUtf16, endUtf16))
       case (v: Val.Obj, i: Val.Str) =>
-        v.value(i.value, pos)
+        v.value(i.str, pos)
       case (lhs, rhs) =>
         Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
     }
@@ -393,7 +393,7 @@ class Evaluator(
     var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
     if (sup == null) sup = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
-    sup.value(key.value, e.pos)
+    sup.value(key.str, e.pos)
   }
 
   def visitImportStr(e: ImportStr): Val.Str =
@@ -460,7 +460,7 @@ class Evaluator(
     if (sup == null) Val.False(e.pos)
     else {
       val key = visitExpr(e.value).cast[Val.Str]
-      Val.bool(e.pos, sup.containsKey(key.value))
+      Val.bool(e.pos, sup.containsKey(key.str))
     }
   }
 
@@ -642,16 +642,16 @@ class Evaluator(
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = visitExpr(expr)(vs)
     }
 
-  def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Lazy] = {
-    val arrF = new Array[Lazy](bindings.length)
+  def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Eval] = {
+    val arrF = new Array[Eval](bindings.length)
     var i = 0
     while (i < bindings.length) {
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          new LazyWithComputeFunc(() => visitExpr(b.rhs)(scope))
+          new Lazy(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(scope))
+          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(scope))
       }
       i += 1
     }
@@ -689,7 +689,7 @@ class Evaluator(
             case null => Error.fail("Assertion failed", a.value.pos, "Assert")
             case msg  =>
               Error.fail(
-                "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].value,
+                "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].str,
                 a.value.pos,
                 "Assert"
               )
@@ -716,7 +716,7 @@ class Evaluator(
             case null =>
               visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new LazyWithComputeFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
           j += 1
@@ -851,13 +851,13 @@ class Evaluator(
   def compare(x: Val, y: Val): Int = (x, y) match {
     case (_: Val.Null, _: Val.Null) => 0
     case (x: Val.Num, y: Val.Num)   => x.asDouble.compareTo(y.asDouble)
-    case (x: Val.Str, y: Val.Str)   => Util.compareStringsByCodepoint(x.value, y.value)
+    case (x: Val.Str, y: Val.Str)   => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
     case (x: Val.Arr, y: Val.Arr)   =>
       val len = math.min(x.length, y.length)
       var i = 0
       while (i < len) {
-        val cmp = compare(x.force(i), y.force(i))
+        val cmp = compare(x.value(i), y.value(i))
         if (cmp != 0) return cmp
         i += 1
       }
@@ -871,7 +871,7 @@ class Evaluator(
     case _: Val.Null  => y.isInstanceOf[Val.Null]
     case x: Val.Str   =>
       y match {
-        case y: Val.Str => x.value == y.value
+        case y: Val.Str => x.str == y.str
         case _          => false
       }
     case x: Val.Num =>
@@ -886,7 +886,7 @@ class Evaluator(
           if (xlen != y.length) return false
           var i = 0
           while (i < xlen) {
-            if (!equal(x.force(i), y.force(i))) return false
+            if (!equal(x.value(i), y.value(i))) return false
             i += 1
           }
           true
@@ -995,5 +995,5 @@ object Evaluator {
    */
   type Logger = (Boolean, String) => Unit
   val emptyStringArray = new Array[String](0)
-  val emptyLazyArray = new Array[Lazy](0)
+  val emptyLazyArray = new Array[Eval](0)
 }

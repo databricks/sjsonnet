@@ -8,67 +8,67 @@ object ObjectModule extends AbstractFunctionModule {
   def name = "object"
 
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
-    def evalRhs(o: Lazy, f: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, o.force.asObj.containsVisibleKey(f.force.asString))
+    def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, o.value.asObj.containsVisibleKey(f.value.asString))
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
-        case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+        case Array(o, s: Val.Str) => (new SpecF(s.str), Array(o))
         case _                    => null
       }
     private class SpecF(f: String) extends Val.Builtin1("objectHas", "o") {
-      def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val =
-        Val.bool(pos, o.force.asObj.containsVisibleKey(f))
+      def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val =
+        Val.bool(pos, o.value.asObj.containsVisibleKey(f))
     }
   }
 
   private object ObjectHasAll extends Val.Builtin2("objectHasAll", "o", "f") {
-    def evalRhs(o: Lazy, f: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, o.force.asObj.containsKey(f.force.asString))
+    def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, o.value.asObj.containsKey(f.value.asString))
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
-        case Array(o, s: Val.Str) => (new SpecF(s.value), Array(o))
+        case Array(o, s: Val.Str) => (new SpecF(s.str), Array(o))
         case _                    => null
       }
     class SpecF(f: String) extends Val.Builtin1("objectHasAll", "o") {
-      def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val =
-        Val.bool(pos, o.force.asObj.containsKey(f))
+      def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val =
+        Val.bool(pos, o.value.asObj.containsKey(f))
     }
   }
 
   private object ObjectFields extends Val.Builtin1("objectFields", "o") {
-    def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val = {
-      val keys = getVisibleKeys(ev, o.force.asObj)
+    def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
+      val keys = getVisibleKeys(ev, o.value.asObj)
       Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
   private object ObjectFieldsAll extends Val.Builtin1("objectFieldsAll", "o") {
-    def evalRhs(o: Lazy, ev: EvalScope, pos: Position): Val = {
-      val keys = getAllKeys(ev, o.force.asObj)
+    def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
+      val keys = getAllKeys(ev, o.value.asObj)
       Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
   private object ObjectFieldsEx extends Val.Builtin2("objectFieldsEx", "o", "inc_hidden") {
-    def evalRhs(o: Lazy, incHidden: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(o: Eval, incHidden: Eval, ev: EvalScope, pos: Position): Val = {
       val keys =
-        if (incHidden.force.asBoolean) getAllKeys(ev, o.force.asObj)
-        else getVisibleKeys(ev, o.force.asObj)
+        if (incHidden.value.asBoolean) getAllKeys(ev, o.value.asObj)
+        else getVisibleKeys(ev, o.value.asObj)
       Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
     }
   }
 
   private object ObjectValues extends Val.Builtin1("objectValues", "o") {
-    def evalRhs(_o: Lazy, ev: EvalScope, pos: Position): Val = {
-      val o = _o.force.asObj
+    def evalRhs(_o: Eval, ev: EvalScope, pos: Position): Val = {
+      val o = _o.value.asObj
       val keys = getVisibleKeys(ev, o)
       getObjValuesFromKeys(pos, ev, o, keys)
     }
   }
 
   private object ObjectValuesAll extends Val.Builtin1("objectValuesAll", "o") {
-    def evalRhs(_o: Lazy, ev: EvalScope, pos: Position): Val = {
-      val o = _o.force.asObj
+    def evalRhs(_o: Eval, ev: EvalScope, pos: Position): Val = {
+      val o = _o.value.asObj
       val keys = getAllKeys(ev, o)
       getObjValuesFromKeys(pos, ev, o, keys)
     }
@@ -80,24 +80,24 @@ object ObjectModule extends AbstractFunctionModule {
         Array("o", "f", "default", "inc_hidden"),
         Array(null, null, Val.Null(dummyPos), Val.True(dummyPos))
       ) {
-    override def evalRhs(args: Array[? <: Lazy], ev: EvalScope, pos: Position): Val = {
-      val obj = args(0).force.asObj
-      val k = args(1).force.asString
-      val incHidden = args(3).force.asBoolean
+    override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
+      val obj = args(0).value.asObj
+      val k = args(1).value.asString
+      val incHidden = args(3).value.asBoolean
       if (incHidden && obj.containsKey(k)) {
         obj.value(k, pos.noOffset, obj)(ev)
       } else if (!incHidden && obj.containsVisibleKey(k)) {
         obj.value(k, pos.noOffset, obj)(ev)
       } else {
-        args(2).force
+        args(2).value
       }
     }
   }
 
   private object MapWithKey extends Val.Builtin2("mapWithKey", "func", "obj") {
-    def evalRhs(_func: Lazy, _obj: Lazy, ev: EvalScope, pos: Position): Val = {
-      val func = _func.force.asFunc
-      val obj = _obj.force.asObj
+    def evalRhs(_func: Eval, _obj: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      val obj = _obj.value.asObj
       val allKeys = obj.allKeyNames
       val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.length)
       var i = 0
@@ -107,7 +107,7 @@ object ObjectModule extends AbstractFunctionModule {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             func.apply2(
               Val.Str(pos, k),
-              new LazyWithComputeFunc(() => obj.value(k, pos.noOffset)(ev)),
+              new Lazy(() => obj.value(k, pos.noOffset)(ev)),
               pos.noOffset
             )(
               ev,
@@ -139,7 +139,7 @@ object ObjectModule extends AbstractFunctionModule {
     Val.Arr(
       pos,
       keys.map { k =>
-        new LazyWithComputeFunc(() => v1.value(k, pos.noOffset)(ev))
+        new Lazy(() => v1.value(k, pos.noOffset)(ev))
       }
     )
 
@@ -322,7 +322,7 @@ object ObjectModule extends AbstractFunctionModule {
           (lKeys ++ rKeys).distinct
         }
       }
-      recPair(target.force, patch.force)
+      recPair(target.value, patch.value)
     },
     builtin("prune", "a") { (pos, ev, s: Val) =>
       def filter(x: Val) = x match {
@@ -331,7 +331,7 @@ object ObjectModule extends AbstractFunctionModule {
         case Val.Null(_)                                 => false
         case _                                           => true
       }
-      def rec(x: Lazy): Val = x.force match {
+      def rec(x: Eval): Val = x.value match {
         case o: Val.Obj =>
           val bindings: Array[(String, Val.Obj.Member)] = for {
             k <- o.visibleKeyNames

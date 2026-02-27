@@ -17,8 +17,8 @@ final class StdLibModule(
 
   // Override the native function to use the provided native functions
   private def nativeFunction = new Val.Builtin1("native", "name") {
-    def evalRhs(name: Lazy, ev: EvalScope, pos: Position): Val =
-      nativeFunctions.getOrElse(name.force.asString, Val.Null(pos))
+    def evalRhs(name: Eval, ev: EvalScope, pos: Position): Val =
+      nativeFunctions.getOrElse(name.value.asString, Val.Null(pos))
   }
 
   // All functions including native and additional functions
@@ -57,17 +57,17 @@ object StdLibModule {
 
   // Core std library functions that belong directly in StdLibModule
   private val traceFunction = new Val.Builtin2("trace", "str", "rest") {
-    def evalRhs(str: Lazy, rest: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(str: Eval, rest: Eval, ev: EvalScope, pos: Position): Val = {
       ev.trace(
-        s"TRACE: ${pos.fileScope.currentFileLastPathElement} " + str.force.asString
+        s"TRACE: ${pos.fileScope.currentFileLastPathElement} " + str.value.asString
       )
-      rest.force
+      rest.value
     }
   }
 
   private val extVarFunction = new Val.Builtin1("extVar", "x") {
-    def evalRhs(_x: Lazy, ev: EvalScope, pos: Position): Val = {
-      val x = _x.force.asString
+    def evalRhs(_x: Eval, ev: EvalScope, pos: Position): Val = {
+      val x = _x.value.asString
       ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
     }
 

@@ -1,7 +1,7 @@
 package sjsonnet.stdlib
 
 import sjsonnet.functions.AbstractFunctionModule
-import sjsonnet.{Error, EvalScope, Lazy, Platform, Position, Val}
+import sjsonnet.{Error, Eval, EvalScope, Platform, Position, Val}
 
 object NativeXz extends AbstractFunctionModule {
   def name = "xz"
@@ -13,8 +13,8 @@ object NativeXz extends AbstractFunctionModule {
       "compressionLevel",
       Array(Val.Null(dummyPos), Val.Null(dummyPos))
     ) {
-      override def evalRhs(arg1: Lazy, arg2: Lazy, ev: EvalScope, pos: Position): Val = {
-        val compressionLevel: Option[Int] = arg2.force match {
+      override def evalRhs(arg1: Eval, arg2: Eval, ev: EvalScope, pos: Position): Val = {
+        val compressionLevel: Option[Int] = arg2.value match {
           case Val.Null(_) =>
             // Use default compression level if the user didn't set one
             None
@@ -23,7 +23,7 @@ object NativeXz extends AbstractFunctionModule {
           case x =>
             Error.fail("Cannot xz encode with compression level " + x.prettyName)
         }
-        arg1.force match {
+        arg1.value match {
           case Val.Str(_, value) => Val.Str(pos, Platform.xzString(value, compressionLevel))
           case arr: Val.Arr      =>
             Val.Str(

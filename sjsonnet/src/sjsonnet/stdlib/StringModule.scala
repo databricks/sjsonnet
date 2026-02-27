@@ -12,9 +12,9 @@ object StringModule extends AbstractFunctionModule {
   private val whiteSpaces = StripUtils.codePointsSet(" \t\n\f\r\u0085\u00A0")
 
   private object ToString extends Val.Builtin1("toString", "a") {
-    def evalRhs(v1: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(
+    def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = Val.Str(
       pos,
-      v1.force match {
+      v1.value match {
         case Val.Str(_, s) => s
         case v             => Materializer.stringify(v)(ev)
       }
@@ -22,10 +22,10 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object Length extends Val.Builtin1("length", "x") {
-    def evalRhs(x: Lazy, ev: EvalScope, pos: Position): Val =
+    def evalRhs(x: Eval, ev: EvalScope, pos: Position): Val =
       Val.Num(
         pos,
-        x.force match {
+        x.value match {
           case Val.Str(_, s) => s.codePointCount(0, s.length)
           case a: Val.Arr    => a.length
           case o: Val.Obj    => o.visibleKeyNames.length
@@ -36,8 +36,8 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
-      val s = str.force.asString
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val s = str.value.asString
       val codePointCount = s.codePointCount(0, s.length)
       if (codePointCount != 1) {
         Error.fail("expected a single character string, got " + s)
@@ -48,15 +48,15 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
-    def evalRhs(_s: Lazy, from: Lazy, len: Lazy, ev: EvalScope, pos: Position): Val = {
-      val str = _s.force.asString
-      val offset = from.force match {
+    def evalRhs(_s: Eval, from: Eval, len: Eval, ev: EvalScope, pos: Position): Val = {
+      val str = _s.value.asString
+      val offset = from.value match {
         case v: Val.Num => v.asPositiveInt
-        case _ => Error.fail("Expected a number for offset in substr, got " + from.force.prettyName)
+        case _ => Error.fail("Expected a number for offset in substr, got " + from.value.prettyName)
       }
-      val length = len.force match {
+      val length = len.value match {
         case v: Val.Num => v.asPositiveInt
-        case _ => Error.fail("Expected a number for len in substr, got " + len.force.prettyName)
+        case _ => Error.fail("Expected a number for len in substr, got " + len.value.prettyName)
       }
 
       val unicodeLength = str.codePointCount(0, str.length)
@@ -74,18 +74,18 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StartsWith extends Val.Builtin2("startsWith", "a", "b") {
-    def evalRhs(a: Lazy, b: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, a.force.asString.startsWith(b.force.asString))
+    def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, a.value.asString.startsWith(b.value.asString))
   }
 
   private object EndsWith extends Val.Builtin2("endsWith", "a", "b") {
-    def evalRhs(a: Lazy, b: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, a.force.asString.endsWith(b.force.asString))
+    def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, a.value.asString.endsWith(b.value.asString))
   }
 
   private object Char_ extends Val.Builtin1("char", "n") {
-    def evalRhs(n: Lazy, ev: EvalScope, pos: Position): Val = {
-      val c = n.force.asInt
+    def evalRhs(n: Eval, ev: EvalScope, pos: Position): Val = {
+      val c = n.value.asInt
       if (!Character.isValidCodePoint(c)) {
         Error.fail(s"Invalid unicode code point, got " + c)
       }
@@ -94,12 +94,12 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
-    def evalRhs(str: Lazy, from: Lazy, to: Lazy, ev: EvalScope, pos: Position): Val = {
-      val fromForce = from.force.asString
+    def evalRhs(str: Eval, from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
+      val fromForce = from.value.asString
       if (fromForce.isEmpty) {
         Error.fail("Cannot replace empty string in strReplace")
       }
-      Val.Str(pos, str.force.asString.replace(fromForce, to.force.asString))
+      Val.Str(pos, str.value.asString.replace(fromForce, to.value.asString))
     }
   }
 
@@ -140,12 +140,12 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
-    def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.force.asString)
+    def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.value.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
-          str.force.asString,
+          str.value.asString,
           charsSet,
           left = true,
           right = true
@@ -155,12 +155,12 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
-    def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.force.asString)
+    def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.value.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
-          str.force.asString,
+          str.value.asString,
           charsSet,
           left = true,
           right = false
@@ -170,12 +170,12 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
-    def evalRhs(str: Lazy, chars: Lazy, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.force.asString)
+    def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
+      val charsSet = StripUtils.codePointsSet(chars.value.asString)
       Val.Str(
         pos,
         StripUtils.unspecializedStrip(
-          str.force.asString,
+          str.value.asString,
           charsSet,
           left = false,
           right = true
@@ -185,15 +185,15 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object Join extends Val.Builtin2("join", "sep", "arr") {
-    def evalRhs(sep: Lazy, _arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.force)
-      sep.force match {
+    def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
+      val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
+      sep.value match {
         case Val.Str(_, s) =>
           val b = new java.lang.StringBuilder()
           var i = 0
           var added = false
           while (i < arr.length) {
-            arr.force(i) match {
+            arr.value(i) match {
               case _: Val.Null   =>
               case Val.Str(_, x) =>
                 if (added) b.append(s)
@@ -205,7 +205,7 @@ object StringModule extends AbstractFunctionModule {
           }
           Val.Str(pos, b.toString)
         case sep: Val.Arr =>
-          val out = new mutable.ArrayBuilder.ofRef[Lazy]
+          val out = new mutable.ArrayBuilder.ofRef[Eval]
           // Set a reasonable size hint based on estimated result size
           out.sizeHint(arr.length * 2)
           var added = false
@@ -225,7 +225,7 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
-  private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Lazy] = {
+  private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Eval] = {
     if (maxSplits < 0 && maxSplits != -1) {
       Error.fail("maxSplits should be -1 or non-negative, got " + maxSplits)
     }
@@ -233,7 +233,7 @@ object StringModule extends AbstractFunctionModule {
       Error.fail("Cannot split by an empty string")
     }
 
-    val b = new mutable.ArrayBuilder.ofRef[Lazy]
+    val b = new mutable.ArrayBuilder.ofRef[Eval]
     b.sizeHint(maxSplits)
     var sz = 0
     var i = 0
@@ -256,67 +256,67 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object Split extends Val.Builtin2("split", "str", "c") {
-    def evalRhs(str: Lazy, c: Lazy, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, -1))
+    def evalRhs(str: Eval, c: Eval, ev: EvalScope, pos: Position): Val = {
+      Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, -1))
     }
   }
 
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
-    def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, splitLimit(pos, str.force.asString, c.force.asString, maxSplits.force.asInt))
+    def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
+      Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, maxSplits.value.asInt))
     }
   }
 
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
-    def evalRhs(str: Lazy, c: Lazy, maxSplits: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       Val.Arr(
         pos,
-        splitLimit(pos, str.force.asString.reverse, c.force.asString.reverse, maxSplits.force.asInt)
-          .map(s => Val.Str(pos, s.force.force.asString.reverse))
+        splitLimit(pos, str.value.asString.reverse, c.value.asString.reverse, maxSplits.value.asInt)
+          .map(s => Val.Str(pos, s.value.asString.reverse))
           .reverse
       )
     }
   }
 
   private object StringChars extends Val.Builtin1("stringChars", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      stringChars(pos, str.force.asString)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
+      stringChars(pos, str.value.asString)
   }
 
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       try {
-        Val.Num(pos, str.force.asString.toLong.toDouble)
+        Val.Num(pos, str.value.asString.toLong.toDouble)
       } catch {
         case _: NumberFormatException =>
-          Error.fail("Cannot parse '" + str.force.asString + "' as an integer in base 10")
+          Error.fail("Cannot parse '" + str.value.asString + "' as an integer in base 10")
       }
   }
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 8).toDouble)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Num(pos, java.lang.Long.parseLong(str.value.asString, 8).toDouble)
   }
 
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.force.asString, 16).toDouble)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Num(pos, java.lang.Long.parseLong(str.value.asString, 16).toDouble)
   }
 
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.force.asString.toUpperCase)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, str.value.asString.toUpperCase)
   }
 
   private object AsciiLower extends Val.Builtin1("asciiLower", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.force.asString.toLowerCase)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, str.value.asString.toLowerCase)
   }
 
   private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "str") {
-    def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val = {
-      val bytes = s.force.asString.getBytes(UTF_8)
-      val arr = new Array[Lazy](bytes.length)
+    def evalRhs(s: Eval, ev: EvalScope, pos: Position): Val = {
+      val bytes = s.value.asString.getBytes(UTF_8)
+      val arr = new Array[Eval](bytes.length)
       var i = 0
       while (i < bytes.length) {
         arr(i) = Val.Num(pos, bytes(i) & 0xff)
@@ -327,8 +327,8 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
-    def evalRhs(arr: Lazy, ev: EvalScope, pos: Position): Val = {
-      for ((v, idx) <- arr.force.asArr.iterator.zipWithIndex) {
+    def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
+      for ((v, idx) <- arr.value.asArr.iterator.zipWithIndex) {
         if (!v.isInstanceOf[Val.Num] || !v.asDouble.isWhole || v.asInt < 0 || v.asInt > 255) {
           throw Error.fail(
             f"Element $idx of the provided array was not an integer in range [0,255]"
@@ -337,25 +337,25 @@ object StringModule extends AbstractFunctionModule {
       }
       Val.Str(
         pos,
-        new String(arr.force.asArr.iterator.map(_.asInt.toByte).toArray, UTF_8)
+        new String(arr.value.asArr.iterator.map(_.asInt.toByte).toArray, UTF_8)
       )
     }
   }
 
   private object Format_ extends Val.Builtin2("format", "str", "vals") {
-    def evalRhs(str: Lazy, vals: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Format.format(str.force.asString, vals.force, pos)(ev))
+    def evalRhs(str: Eval, vals: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, Format.format(str.value.asString, vals.value, pos)(ev))
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
         case Array(str, fmt: Val.Str) =>
-          try { (new Format.PartialApplyFmt(fmt.value), Array(str)) }
+          try { (new Format.PartialApplyFmt(fmt.str), Array(str)) }
           catch { case _: Exception => null }
         case _ => null
       }
   }
 
   private def stringChars(pos: Position, str: String): Val.Arr = {
-    val chars = new Array[Lazy](str.codePointCount(0, str.length))
+    val chars = new Array[Eval](str.codePointCount(0, str.length))
     var charIndex = 0
     var i = 0
     while (i < str.length) {
@@ -393,10 +393,10 @@ object StringModule extends AbstractFunctionModule {
     builtin(DecodeUTF8),
     builtin(Format_),
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
-      if (pat.isEmpty) Val.Arr(pos, new Array[Lazy](0))
+      if (pat.isEmpty) Val.Arr(pos, new Array[Eval](0))
       else {
         var matchIndex = str.indexOf(pat)
-        if (matchIndex == -1) Val.Arr(pos, new Array[Lazy](0))
+        if (matchIndex == -1) Val.Arr(pos, new Array[Eval](0))
         else {
           val indices = new mutable.ArrayBuilder.ofRef[Val.Num]
 
@@ -426,7 +426,7 @@ object StringModule extends AbstractFunctionModule {
       str1.equalsIgnoreCase(str2)
     },
     builtin("escapeStringJson", "str_") { (pos, ev, str: Val) =>
-      if (str.force.isInstanceOf[Val.Str]) {
+      if (str.value.isInstanceOf[Val.Str]) {
         Materializer.stringify(str)(ev)
       } else {
         val out = new java.io.StringWriter()

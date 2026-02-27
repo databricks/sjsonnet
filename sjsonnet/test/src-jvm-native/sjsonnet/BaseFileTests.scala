@@ -11,12 +11,12 @@ abstract class BaseFileTests extends TestSuite {
   private val std = new sjsonnet.stdlib.StdLibModule(
     nativeFunctions = Map(
       "jsonToString" -> new Val.Builtin1("jsonToString", "x") {
-        override def evalRhs(arg1: Lazy, ev: EvalScope, pos: Position): Val = {
+        override def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val = {
           Val.Str(
             pos,
             Materializer
               .apply0(
-                arg1.force,
+                arg1.value,
                 MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
               )(ev)
               .toString
