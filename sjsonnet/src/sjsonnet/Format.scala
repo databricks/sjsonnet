@@ -100,7 +100,7 @@ object Format {
     val values = values0 match {
       case x: Val.Arr => x
       case x: Val.Obj => x
-      case x          => Val.Arr(pos, Array[Lazy](x))
+      case x          => Val.Arr(pos, Array[Eval](x))
     }
     val output = new StringBuilder
     output.append(leading)
@@ -121,9 +121,9 @@ object Format {
           val raw = formatted.label match {
             case None =>
               (formatted.widthStar, formatted.precisionStar) match {
-                case (false, false) => values.cast[Val.Arr].force(i)
+                case (false, false) => values.cast[Val.Arr].value(i)
                 case (true, false)  =>
-                  val width = values.cast[Val.Arr].force(i)
+                  val width = values.cast[Val.Arr].value(i)
                   if (!width.isInstanceOf[Val.Num]) {
                     Error.fail(
                       "A * was specified at position %d. An integer is expected for a width".format(
@@ -133,9 +133,9 @@ object Format {
                   }
                   i += 1
                   formatted = formatted.updateWithStarValues(Some(width.asInt), None)
-                  values.cast[Val.Arr].force(i)
+                  values.cast[Val.Arr].value(i)
                 case (false, true) =>
-                  val precision = values.cast[Val.Arr].force(i)
+                  val precision = values.cast[Val.Arr].value(i)
                   if (!precision.isInstanceOf[Val.Num]) {
                     Error.fail(
                       "A * was specified at position %d. An integer is expected for a precision"
@@ -144,9 +144,9 @@ object Format {
                   }
                   i += 1
                   formatted = formatted.updateWithStarValues(None, Some(precision.asInt))
-                  values.cast[Val.Arr].force(i)
+                  values.cast[Val.Arr].value(i)
                 case (true, true) =>
-                  val width = values.cast[Val.Arr].force(i)
+                  val width = values.cast[Val.Arr].value(i)
                   if (!width.isInstanceOf[Val.Num]) {
                     Error.fail(
                       "A * was specified at position %d. An integer is expected for a width".format(
@@ -155,7 +155,7 @@ object Format {
                     )
                   }
                   i += 1
-                  val precision = values.cast[Val.Arr].force(i)
+                  val precision = values.cast[Val.Arr].value(i)
                   if (!precision.isInstanceOf[Val.Num]) {
                     Error.fail(
                       "A * was specified at position %d. An integer is expected for a precision"
@@ -165,16 +165,16 @@ object Format {
                   i += 1
                   formatted =
                     formatted.updateWithStarValues(Some(width.asInt), Some(precision.asInt))
-                  values.cast[Val.Arr].force(i)
+                  values.cast[Val.Arr].value(i)
               }
             case Some(key) =>
               values match {
-                case v: Val.Arr => v.force(i)
+                case v: Val.Arr => v.value(i)
                 case v: Val.Obj => v.value(key, pos)
                 case _          => Error.fail("Invalid format values")
               }
           }
-          val value = raw.force match {
+          val value = raw.value match {
             case f: Val.Func => Error.fail("Cannot format function value", f)
             case r: Val.Arr  => Materializer.apply0(r, new Renderer(indent = -1))
             case r: Val.Obj  => Materializer.apply0(r, new Renderer(indent = -1))
@@ -385,7 +385,7 @@ object Format {
 
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
     val (leading, chunks) = fastparse.parse(fmt, format(_)).get.value
-    def evalRhs(values0: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, format(leading, chunks, values0.force, pos)(ev))
+    def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, format(leading, chunks, values0.value, pos)(ev))
   }
 }

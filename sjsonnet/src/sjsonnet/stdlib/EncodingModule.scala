@@ -9,8 +9,8 @@ object EncodingModule extends AbstractFunctionModule {
   def name = "encoding"
 
   private object MD5 extends Val.Builtin1("md5", "s") {
-    def evalRhs(s: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Platform.md5(s.force.asString))
+    def evalRhs(s: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, Platform.md5(s.value.asString))
   }
 
   val functions: Seq[(String, Val.Func)] = Seq(
@@ -23,7 +23,7 @@ object EncodingModule extends AbstractFunctionModule {
           val byteArr = new Array[Byte](arr.length)
           var i = 0
           while (i < arr.length) {
-            val v = arr.force(i)
+            val v = arr.value(i)
             if (!v.isInstanceOf[Val.Num]) {
               Error.fail(f"Expected an array of numbers, got a ${v.prettyName} at position $i")
             }

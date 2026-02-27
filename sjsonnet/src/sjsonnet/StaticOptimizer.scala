@@ -41,7 +41,7 @@ class StaticOptimizer(
     case BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
       InSuper(pos, lhs, selfIdx)
     case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
-      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.value), rhs, tailstrict = false)
+      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str), rhs, tailstrict = false)
       catch { case _: Exception => b2 }
 
     case e @ Id(pos, name) =>
@@ -132,7 +132,7 @@ class StaticOptimizer(
       transform(x) match {
         case x2: Val.Str =>
           // println(s"----- Fixing FieldName: "+x2.value)
-          FieldName.Fixed(x2.value)
+          FieldName.Fixed(x2.str)
         case x2 if x2 eq x => f
         case x2            => FieldName.Dyn(x2)
       }

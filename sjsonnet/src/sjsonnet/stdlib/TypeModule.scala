@@ -7,48 +7,48 @@ object TypeModule extends AbstractFunctionModule {
   def name = "type"
 
   private object IsString extends Val.Builtin1("isString", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Str])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Str])
   }
 
   private object IsBoolean extends Val.Builtin1("isBoolean", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Bool])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Bool])
   }
 
   private object IsNumber extends Val.Builtin1("isNumber", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Num])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Num])
   }
 
   private object IsObject extends Val.Builtin1("isObject", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Obj])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Obj])
   }
 
   private object IsArray extends Val.Builtin1("isArray", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Arr])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Arr])
   }
 
   private object IsFunction extends Val.Builtin1("isFunction", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Func])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Func])
   }
 
   private object IsNull extends Val.Builtin1("isNull", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, v.force.isInstanceOf[Val.Null])
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.bool(pos, v.value.isInstanceOf[Val.Null])
   }
 
   private object Type extends Val.Builtin1("type", "x") {
-    def evalRhs(x: Lazy, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.force.prettyName)
+    def evalRhs(x: Eval, ev: EvalScope, pos: Position): Val = Val.Str(pos, x.value.prettyName)
   }
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
-    def evalRhs(v1: Lazy, v2: Lazy, ev: EvalScope, pos: Position): Val = {
-      val x1 = Materializer(v1.force)(ev)
-      val x2 = Materializer(v2.force)(ev)
+    def evalRhs(v1: Eval, v2: Eval, ev: EvalScope, pos: Position): Val = {
+      val x1 = Materializer(v1.value)(ev)
+      val x2 = Materializer(v2.value)(ev)
       if (x1 == x2) Val.True(pos)
       else Error.fail("assertEqual failed: " + x1 + " != " + x2)
     }
@@ -68,25 +68,23 @@ object TypeModule extends AbstractFunctionModule {
       ev.equal(a, b)
     },
     builtin("primitiveEquals", "x", "y") { (_, ev, x: Val, y: Val) =>
-      val xForce = x.force
-      val yForce = y.force
-      if (xForce.prettyName != yForce.prettyName) {
+      if (x.prettyName != y.prettyName) {
         false
       } else {
-        (xForce, yForce) match {
+        (x, y) match {
           case (_: Val.Num, _: Val.Num) =>
-            ev.compare(xForce, yForce) == 0
+            ev.compare(x, y) == 0
           case (_: Val.Str, _: Val.Str) =>
-            ev.compare(xForce, yForce) == 0
+            ev.compare(x, y) == 0
           case (_: Val.Bool, _: Val.Bool) =>
-            ev.compare(xForce, yForce) == 0
+            ev.compare(x, y) == 0
           case (_: Val.Null, _) =>
             true
           case (_, _: Val.Null) =>
             true
           case _ =>
             Error.fail(
-              "primitiveEquals operates on primitive types, got " + xForce.prettyName + " and " + yForce.prettyName
+              "primitiveEquals operates on primitive types, got " + x.prettyName + " and " + y.prettyName
             )
         }
       }

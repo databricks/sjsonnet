@@ -10,17 +10,17 @@ object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v.force, MaterializeJsonRenderer())(ev).toString)
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
+      Val.Str(pos, Materializer.apply0(v.value, MaterializeJsonRenderer())(ev).toString)
   }
 
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "value") {
-    def evalRhs(v: Lazy, ev: EvalScope, pos: Position): Val =
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(
         pos,
         Materializer
           .apply0(
-            v.force,
+            v.value,
             MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
           )(ev)
           .toString
@@ -37,21 +37,21 @@ object ManifestModule extends AbstractFunctionModule {
         Array(null, null, Val.Str(dummyPos, "\n"), Val.Str(dummyPos, ": "))
       ) {
     def evalRhs(
-        v: Lazy,
-        i: Lazy,
-        newline: Lazy,
-        keyValSep: Lazy,
+        v: Eval,
+        i: Eval,
+        newline: Eval,
+        keyValSep: Eval,
         ev: EvalScope,
         pos: Position): Val =
       Val.Str(
         pos,
         Materializer
           .apply0(
-            v.force,
+            v.value,
             MaterializeJsonRenderer(
-              indent = i.force.asString.length,
-              newline = newline.force.asString,
-              keyValueSeparator = keyValSep.force.asString
+              indent = i.value.asString.length,
+              newline = newline.value.asString,
+              keyValueSeparator = keyValSep.value.asString
             )
           )(ev)
           .toString
@@ -59,9 +59,9 @@ object ManifestModule extends AbstractFunctionModule {
   }
 
   private object ParseJson extends Val.Builtin1("parseJson", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       try {
-        ujson.StringParser.transform(str.force.asString, new ValVisitor(pos))
+        ujson.StringParser.transform(str.value.asString, new ValVisitor(pos))
       } catch {
         case e: ujson.ParseException =>
           throw Error.fail("Invalid JSON: " + e.getMessage, pos)(ev)
@@ -70,8 +70,8 @@ object ManifestModule extends AbstractFunctionModule {
   }
 
   private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
-    def evalRhs(str: Lazy, ev: EvalScope, pos: Position): Val = {
-      val input = str.force.asString
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val input = str.value.asString
       if (input.isBlank) {
         return Val.Null(pos)
       }
@@ -80,12 +80,12 @@ object ManifestModule extends AbstractFunctionModule {
   }
 
   private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
-    private def isTableArray(v: Val) = v.force match {
+    private def isTableArray(v: Val) = v.value match {
       case s: Val.Arr => s.length > 0 && s.asLazyArray.forall(_.isInstanceOf[Val.Obj])
       case _          => false
     }
 
-    private def isSection(v: Val) = v.force.isInstanceOf[Val.Obj] || isTableArray(v.force)
+    private def isSection(v: Val) = v.value.isInstanceOf[Val.Obj] || isTableArray(v.value)
 
     private def renderTableInternal(
         out: StringWriter,
@@ -115,7 +115,7 @@ object ManifestModule extends AbstractFunctionModule {
             out.write('\n')
             renderTableInternal(
               out,
-              v0.asArr.force(i).asObj,
+              v0.asArr.value(i).asObj,
               cumulatedIndent + indent,
               indent,
               path :+ k,
@@ -153,13 +153,13 @@ object ManifestModule extends AbstractFunctionModule {
       out
     }
 
-    def evalRhs(v: Lazy, indent: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = {
       val out = new StringWriter
       renderTableInternal(
         out,
-        v.force.asObj,
+        v.value.asObj,
         "",
-        indent.force.asString,
+        indent.value.asString,
         Seq.empty[String],
         Seq.empty[String]
       )(ev)
@@ -168,15 +168,15 @@ object ManifestModule extends AbstractFunctionModule {
   }
 
   private object Lines extends Val.Builtin1("lines", "arr") {
-    def evalRhs(v1: Lazy, ev: EvalScope, pos: Position): Val = {
-      v1.force.asArr.foreach {
+    def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = {
+      v1.value.asArr.foreach {
         case _: Val.Str | _: Val.Null => // donothing
-        case x                        => Error.fail("Cannot call .lines on " + x.force.prettyName)
+        case x                        => Error.fail("Cannot call .lines on " + x.value.prettyName)
       }
       Val.Str(
         pos,
         Materializer
-          .apply(v1.force)(ev)
+          .apply(v1.value)(ev)
           .asInstanceOf[ujson.Arr]
           .value
           .filter(_ != ujson.Null)
@@ -191,14 +191,14 @@ object ManifestModule extends AbstractFunctionModule {
   }
 
   private object DeepJoin extends Val.Builtin1("deepJoin", "arr") {
-    def evalRhs(value: Lazy, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
       val out = new StringWriter()
-      val q = new java.util.ArrayDeque[Lazy]()
+      val q = new java.util.ArrayDeque[Eval]()
       q.add(value)
       while (!q.isEmpty) {
-        q.removeFirst().force match {
+        q.removeFirst().value match {
           case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
-          case s: Val.Str => out.write(s.value)
+          case s: Val.Str => out.write(s.str)
           case s          => Error.fail("Cannot call deepJoin on " + s.prettyName)
         }
       }
@@ -271,7 +271,7 @@ object ManifestModule extends AbstractFunctionModule {
             .map { item =>
               Materializer
                 .apply0(
-                  item.force,
+                  item.value,
                   new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
                 )(ev)
                 .toString
