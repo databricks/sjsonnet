@@ -225,6 +225,8 @@ class CachedResolver(
             case e: ParseError if e.offset >= 0 =>
               val pos = new Position(new FileScope(path), e.offset)
               Left(new ParseError(e.getMessage).addFrame(pos))
+            case e: ParseError =>
+              Left(e)
           }
         parsed.flatMap { case (e, fs) => process(e, fs) }
       }

@@ -158,7 +158,7 @@ object sjsonnet extends VersionFileModule {
 
     def mvnDeps = super.mvnDeps() ++
       Seq(
-        mvn"org.virtuslab::scala-yaml::0.3.0"
+        mvn"org.virtuslab::scala-yaml::0.3.1"
       )
 
     def nodeJsArgs: List[String] = List("--stack-size=" + stackSizekBytes)
@@ -265,7 +265,7 @@ object sjsonnet extends VersionFileModule {
     def mvnDeps = super.mvnDeps() ++
       Seq(
         mvn"com.github.lolgab::scala-native-crypto::0.3.0",
-        mvn"org.virtuslab::scala-yaml::0.3.0"
+        mvn"org.virtuslab::scala-yaml::0.3.1"
       )
 
     def releaseMode = ReleaseMode.ReleaseFull
@@ -301,7 +301,7 @@ object sjsonnet extends VersionFileModule {
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.11",
       mvn"at.yawk.lz4:lz4-java::1.10.3",
-      mvn"org.yaml:snakeyaml::2.4",
+      mvn"org.yaml:snakeyaml::2.6",
       mvn"com.google.re2j:re2j:1.8"
     )
 

@@ -1,0 +1,3 @@
+# Files to ignore when syncing from google/go-jsonnet (Go test suite).
+# One .jsonnet filename per line. Lines starting with '#' are comments.
+# Corresponding .golden files are also automatically ignored.

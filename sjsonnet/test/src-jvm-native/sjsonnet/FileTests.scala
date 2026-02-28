@@ -3,25 +3,18 @@ package sjsonnet
 import utest.*
 
 object FileTests extends BaseFileTests {
-  val testDataSkippedTests: Set[String] = {
-    val nativeOnly =
-      if (isScalaNative)
-        Set(
-          // These tests are skipped in Scala Native because we can't catch the stack overflow and recover.
-          "error.obj_recursive_manifest.jsonnet",
-          "error.recursive_object_non_term.jsonnet",
-          "error.recursive_import.jsonnet",
-          "error.recursive_function_nonterm.jsonnet",
-          "error.function_infinite_default.jsonnet",
-          "error.obj_recursive.jsonnet"
-        )
-      else Set.empty[String]
-    nativeOnly ++ Set(
-      // ParseError is thrown directly (not caught by Interpreter.interpret) for deeply nested arrays,
-      // causing the test framework to crash rather than producing a Left error result.
-      "error.parse.deep_array_nesting.jsonnet"
-    )
-  }
+  val testDataSkippedTests: Set[String] =
+    if (isScalaNative)
+      Set(
+        // These tests are skipped in Scala Native because we can't catch the stack overflow and recover.
+        "error.obj_recursive_manifest.jsonnet",
+        "error.recursive_object_non_term.jsonnet",
+        "error.recursive_import.jsonnet",
+        "error.recursive_function_nonterm.jsonnet",
+        "error.function_infinite_default.jsonnet",
+        "error.obj_recursive.jsonnet"
+      )
+    else Set.empty[String]
 
   val goTestDataSkippedTests: Set[String] = Set(
     // We support base64 of unicode strings

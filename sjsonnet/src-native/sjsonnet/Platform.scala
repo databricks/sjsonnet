@@ -77,32 +77,66 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
-  private val docSplitPattern = Pattern.compile("(?m)^---\\s*$")
-
   def yamlToJson(s: String): ujson.Value = {
-    val docs = docSplitPattern.split(s, -1)
-    docs.length match {
+    // Split YAML multi-document stream manually, similar to SnakeYAML's loadAll
+    // since parseManyYamls doesn't handle all cases correctly
+    val documents = splitYamlDocuments(s)
+
+    documents.size match {
       case 0 => ujson.Null
-      case 1 =>
-        docs.head.asNode match {
-          case Right(n) =>
-            nodeToJson(n)
-          case Left(e) if docs.head.trim.isEmpty =>
-            ujson.Null
-          case Left(e) =>
-            Error.fail("Error converting YAML to JSON: " + e.getMessage)
-        }
+      case 1 => parseSingleDocument(documents.head)
       case _ =>
-        val buf = new mutable.ArrayBuffer[ujson.Value](docs.length)
-        for (doc <- docs) {
-          doc.asNode match {
-            case Right(n)               => buf += nodeToJson(n)
-            case Left(e) if doc.isEmpty =>
-            case Left(e)                =>
-              Error.fail("Error converting YAML to JSON: " + e.getMessage)
-          }
+        val buf = new mutable.ArrayBuffer[ujson.Value](documents.size)
+        for (doc <- documents) {
+          buf += parseSingleDocument(doc)
         }
         ujson.Arr(buf)
+    }
+  }
+
+  private def splitYamlDocuments(s: String): List[String] = {
+    if (s.trim.isEmpty) return Nil
+
+    // Split on document separator "---" at line start
+    // But only if it's followed by whitespace or end of line
+    val lines = s.split("\n", -1).toList
+    val documents = mutable.ArrayBuffer[String]()
+    val currentDoc = mutable.ArrayBuffer[String]()
+    var isFirstDoc = true
+
+    for (line <- lines) {
+      val trimmed = line.trim
+      // Check if this line starts with "---" and is followed by whitespace or end
+      if (trimmed.startsWith("---") && (trimmed.length == 3 || trimmed.charAt(3).isWhitespace)) {
+        // Save previous document if not empty
+        if (currentDoc.nonEmpty || !isFirstDoc) {
+          documents += currentDoc.mkString("\n")
+        }
+        currentDoc.clear()
+        isFirstDoc = false
+      } else {
+        currentDoc += line
+      }
+    }
+
+    // Add last document
+    if (currentDoc.nonEmpty || documents.nonEmpty) {
+      documents += currentDoc.mkString("\n")
+    }
+
+    documents.toList
+  }
+
+  private def parseSingleDocument(doc: String): ujson.Value = {
+    val trimmed = doc.trim
+    if (trimmed.isEmpty) {
+      ujson.Null
+    } else {
+      // Use parseYaml for single document
+      parseYaml(trimmed) match {
+        case Right(node) => nodeToJson(node)
+        case Left(e)     => Error.fail("Error converting YAML to JSON: " + e.getMessage)
+      }
     }
   }
 

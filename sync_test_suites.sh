@@ -5,7 +5,9 @@
 # This script copies .jsonnet source files and .golden files from upstream repos
 # into sjsonnet's test resource directories. Only *.jsonnet and *.golden files are
 # synced. Lint-related files (*.linter.*) and formatter-related files (*.fmt.*)
-# from google/jsonnet are excluded. A .jsonnet file is only synced if it has a
+# from google/jsonnet are excluded. Files listed in per-suite .sync_ignore files
+# are also excluded (one .jsonnet filename per line, comments start with '#').
+# A .jsonnet file is only synced if it has a
 # corresponding valid .golden file (upstream or already present locally), so that
 # Scala tests always find a matching .jsonnet.golden for each .jsonnet file.
 # For new .jsonnet files that have no golden file after syncing,
@@ -54,7 +56,19 @@ sync_test_files() {
     return
   fi
 
-  echo "  Syncing $suite_name..."
+  # Load .sync_ignore file from target directory (if it exists)
+  local ignore_file="$target_dir/.sync_ignore"
+  local ignore_stems_file
+  ignore_stems_file=$(mktemp)
+  if [ -f "$ignore_file" ]; then
+    # Strip comments and blank lines, extract stems (remove .jsonnet extension)
+    grep -v '^\s*#' "$ignore_file" | grep -v '^\s*$' | sed 's/\.jsonnet$//' > "$ignore_stems_file"
+    local ignore_count
+    ignore_count=$(wc -l < "$ignore_stems_file" | tr -d ' ')
+    echo "  Syncing $suite_name... ($ignore_count file(s) in .sync_ignore)"
+  else
+    echo "  Syncing $suite_name..."
+  fi
 
   local before_jsonnet_count
   before_jsonnet_count=$(find "$target_dir" -maxdepth 1 -name '*.jsonnet' 2>/dev/null | wc -l | tr -d ' ')
@@ -86,7 +100,12 @@ sync_test_files() {
       continue
     fi
     # Extract stem: a.jsonnet.golden -> a
-    echo "${basename%.jsonnet.golden}" >> "$golden_stems_file"
+    local stem="${basename%.jsonnet.golden}"
+    # Skip stems listed in .sync_ignore
+    if grep -Fqx "$stem" "$ignore_stems_file" 2>/dev/null; then
+      continue
+    fi
+    echo "$stem" >> "$golden_stems_file"
   done
 
   # Check *.golden files (that are not *.jsonnet.golden, skip directories)
@@ -102,6 +121,10 @@ sync_test_files() {
     fi
     # Extract stem: a.golden -> a
     local stem="${basename%.golden}"
+    # Skip stems listed in .sync_ignore
+    if grep -qx "$stem" "$ignore_stems_file" 2>/dev/null; then
+      continue
+    fi
     # Only count if corresponding .jsonnet exists upstream
     if [ -f "$source_dir/${stem}.jsonnet" ]; then
       echo "$stem" >> "$golden_stems_file"
@@ -136,8 +159,13 @@ sync_test_files() {
     # Extract stem: a.jsonnet -> a
     local stem="${basename%.jsonnet}"
 
+    # Skip files listed in .sync_ignore
+    if grep -Fqx "$stem" "$ignore_stems_file" 2>/dev/null; then
+      continue
+    fi
+
     # Skip .jsonnet files that have no valid golden file (upstream or local)
-    if ! grep -qx "$stem" "$golden_stems_file" 2>/dev/null; then
+    if ! grep -Fqx "$stem" "$golden_stems_file" 2>/dev/null; then
       skipped_no_golden=$((skipped_no_golden + 1))
       continue
     fi
@@ -172,6 +200,12 @@ sync_test_files() {
       continue
     fi
 
+    # Skip files listed in .sync_ignore
+    local stem="${basename%.jsonnet.golden}"
+    if grep -Fqx "$stem" "$ignore_stems_file" 2>/dev/null; then
+      continue
+    fi
+
     local dest_file="$target_dir/$basename"
 
     # Only copy new golden files, never overwrite existing ones
@@ -202,6 +236,12 @@ sync_test_files() {
 
     # Derive the corresponding .jsonnet filename: a.golden -> a.jsonnet
     local stem="${basename%.golden}"
+
+    # Skip files listed in .sync_ignore
+    if grep -Fqx "$stem" "$ignore_stems_file" 2>/dev/null; then
+      continue
+    fi
+
     local jsonnet_file="$source_dir/${stem}.jsonnet"
 
     # Only sync if the corresponding .jsonnet file exists upstream
@@ -225,6 +265,7 @@ sync_test_files() {
   echo "    .golden:  Before=$before_golden_count, After=$after_golden_count (New=$new_golden, Updated=$updated_golden)"
 
   rm -f "$golden_stems_file"
+  rm -f "$ignore_stems_file"
 }
 
 # Sync C++ test suite (google/jsonnet test_suite -> sjsonnet test_suite)
