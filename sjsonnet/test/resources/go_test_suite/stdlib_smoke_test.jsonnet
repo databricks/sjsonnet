@@ -6,12 +6,30 @@
 // and the other with all of them.
 
 local assertClose(a, b) =
+  // Using 1e-12 as tolerance. Jsonnet uses double-precision floats with machine epsilon of 2**-53 ≈ 1.11e-16.
+  // This tolerance is ~9000x the machine epsilon, which is quite lenient and should work across
+  // different platforms and math libraries.
+  //
+  // We use a combination of absolute and relative error to handle both small and large values:
+  // - For values near zero, we use absolute error to avoid division issues
+  // - For larger values, we use relative error to maintain precision
+  //
+  // This correctly handles cases like:
+  //   assertClose(1e-15, 0) - should pass (both are essentially zero)
+  //   assertClose(-100, 0) - should fail (significant difference)
+  //   assertClose(std.sin(std.pi), 0) - should pass (tiny floating point error)
+  local abs_a = std.abs(a);
+  local abs_b = std.abs(b);
+  local diff = std.abs(a - b);
+  local max_abs = std.max(abs_a, abs_b);
   local err =
-    if b == 0 then
-      a - b
+    if abs_a == 0 && abs_b == 0 then
+      0  // Both are exactly zero, so no error
+    else if max_abs < 1e-12 then
+      diff  // For very small values, use absolute error
     else
-      if a / b - 1 > 0 then a / b - 1 else 1 - a / b;
-  if err > 0.000005 then
+      diff / max_abs;  // For larger values, use relative error
+  if err > 1e-12 then
     error 'Assertion failed (error ' + err + '). ' + a + ' !~ ' + b
   else
     true;
@@ -61,7 +79,7 @@ local assertClose(a, b) =
     mantissa: std.mantissa(x=5),
     floor: std.floor(x=5),
     ceil: std.ceil(x=5),
-    sqrt: std.sqrt(x=5),
+    sqrt: std.assertEqual(std.sqrt(x=5), 2.23606797749979),
     sin: assertClose(std.sin(x=5), -0.9589242746631385),
     cos: assertClose(std.cos(x=5), 0.28366218546322625),
     tan: assertClose(std.tan(x=5), -3.380515006246586),
