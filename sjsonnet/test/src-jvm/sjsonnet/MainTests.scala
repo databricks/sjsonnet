@@ -307,9 +307,102 @@ object MainTests extends TestSuite {
           |- 2""".stripMargin
       assert((res, out, err) == ((0, expectedYaml, "")))
     }
+
+    test("jsonnetPath") {
+      // Create temp directories with library files to test JSONNET_PATH resolution
+      val libDir = os.temp.dir()
+      os.write(libDir / "mylib.libsonnet", """{ x: 42 }""")
+
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(mainFile, """local lib = import 'mylib.libsonnet'; lib.x""")
+
+      // Without JSONNET_PATH or -J, the import should fail
+      val (res1, _, err1) = runMain(mainFile)
+      assert(res1 == 1)
+      assert(err1.contains("Couldn't import"))
+
+      // With -J pointing to the lib directory, the import should succeed
+      val (res2, out2, _) = runMain("-J", libDir, mainFile)
+      assert(res2 == 0)
+      assert(out2.trim == "42")
+
+      // With JSONNET_PATH pointing to the lib directory, the import should succeed
+      val (res3, out3, _) =
+        runMainWithEnv(jsonnetPathEnv = libDir.toString, mainFile)
+      assert(res3 == 0)
+      assert(out3.trim == "42")
+    }
+
+    test("jsonnetPathMultipleDirs") {
+      // Test that JSONNET_PATH=a:b results in left-most winning (a has priority over b)
+      val libDirA = os.temp.dir()
+      val libDirB = os.temp.dir()
+
+      // Both dirs have mylib.libsonnet but with different values
+      os.write(libDirA / "mylib.libsonnet", """{ x: "from_a" }""")
+      os.write(libDirB / "mylib.libsonnet", """{ x: "from_b" }""")
+
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(mainFile, """local lib = import 'mylib.libsonnet'; lib.x""")
+
+      // JSONNET_PATH=a:b → left-most (a) wins
+      val sep = java.io.File.pathSeparator
+      val (res, out, _) =
+        runMainWithEnv(jsonnetPathEnv = s"$libDirA$sep$libDirB", mainFile)
+      assert(res == 0)
+      assert(out.trim == "\"from_a\"")
+    }
+
+    test("jsonnetPathJpathPriority") {
+      // -J flags should take priority over JSONNET_PATH
+      val libDirEnv = os.temp.dir()
+      val libDirJ = os.temp.dir()
+
+      os.write(libDirEnv / "mylib.libsonnet", """{ x: "from_env" }""")
+      os.write(libDirJ / "mylib.libsonnet", """{ x: "from_jflag" }""")
+
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(mainFile, """local lib = import 'mylib.libsonnet'; lib.x""")
+
+      // -J flag should win over JSONNET_PATH
+      val (res, out, _) =
+        runMainWithEnv(jsonnetPathEnv = libDirEnv.toString, "-J", libDirJ, mainFile)
+      assert(res == 0)
+      assert(out.trim == "\"from_jflag\"")
+    }
+
+    test("jsonnetPathReverseJpathsPriority") {
+      // With --reverse-jpaths-priority, rightmost -J wins, but -J still beats JSONNET_PATH
+      val libDirEnv = os.temp.dir()
+      val libDirC = os.temp.dir()
+      val libDirD = os.temp.dir()
+
+      os.write(libDirEnv / "mylib.libsonnet", """{ x: "from_env" }""")
+      os.write(libDirC / "mylib.libsonnet", """{ x: "from_c" }""")
+      os.write(libDirD / "mylib.libsonnet", """{ x: "from_d" }""")
+
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(mainFile, """local lib = import 'mylib.libsonnet'; lib.x""")
+
+      // With --reverse-jpaths-priority, -J d (rightmost) should win over -J c and JSONNET_PATH
+      val (res, out, _) = runMainWithEnv(
+        jsonnetPathEnv = libDirEnv.toString,
+        "--reverse-jpaths-priority",
+        "-J",
+        libDirC,
+        "-J",
+        libDirD,
+        mainFile
+      )
+      assert(res == 0)
+      assert(out.trim == "\"from_d\"")
+    }
   }
 
-  def runMain(args: os.Shellable*): (Int, String, String) = {
+  def runMain(args: os.Shellable*): (Int, String, String) =
+    runMainWithEnv(jsonnetPathEnv = "", args*)
+
+  def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) = {
     val err = new ByteArrayOutputStream()
     val perr = new PrintStream(err, true, "UTF-8")
     val out = new ByteArrayOutputStream()
@@ -321,7 +414,8 @@ object MainTests extends TestSuite {
       pout,
       perr,
       workspaceRoot,
-      None
+      None,
+      jsonnetPathEnv = Some(jsonnetPathEnv)
     )
     (res, new String(out.toByteArray, "UTF-8"), new String(err.toByteArray, "UTF-8"))
   }

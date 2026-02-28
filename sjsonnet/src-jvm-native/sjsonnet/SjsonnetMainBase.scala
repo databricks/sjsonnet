@@ -64,6 +64,33 @@ object SjsonnetMainBase {
     }
   }
 
+  /**
+   * Java-compatible overload that omits `jsonnetPathEnv` (defaults to `None`). Keeps source
+   * compatibility for callers that were compiled against the pre-JSONNET_PATH signature.
+   */
+  def main0(
+      args: Array[String],
+      parseCache: ParseCache,
+      stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      wd: os.Path,
+      allowedInputs: Option[Set[os.Path]],
+      importer: Option[Importer],
+      std: Val.Obj): Int =
+    main0(
+      args,
+      parseCache,
+      stdin,
+      stdout,
+      stderr,
+      wd,
+      allowedInputs,
+      importer,
+      std,
+      jsonnetPathEnv = None
+    )
+
   def main0(
       args: Array[String],
       parseCache: ParseCache,
@@ -73,7 +100,8 @@ object SjsonnetMainBase {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]] = None,
       importer: Option[Importer] = None,
-      std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module): Int = {
+      std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
+      jsonnetPathEnv: Option[String] = None): Int = {
 
     var hasWarnings = false
     def warn(isTrace: Boolean, msg: String): Unit = {
@@ -87,14 +115,27 @@ object SjsonnetMainBase {
     val parser = mainargs.ParserForClass[Config]
     val name = s"Sjsonnet ${sjsonnet.Version.version}"
     val doc = "usage: sjsonnet  [sjsonnet-options] script-file"
+    val envVarsDoc =
+      """
+        |Environment variables:
+        |  JSONNET_PATH is a colon (semicolon on Windows) separated list of directories
+        |  added in reverse order before the paths specified by --jpath (i.e. left-most
+        |  wins). E.g. these are equivalent:
+        |    JSONNET_PATH=a:b sjsonnet -J c -J d
+        |    JSONNET_PATH=d:c:a:b sjsonnet
+        |    sjsonnet -J b -J a -J c -J d""".stripMargin
+
     val result = for {
-      config <- parser.constructEither(
-        args.toIndexedSeq,
-        allowRepeats = true,
-        customName = name,
-        customDoc = doc,
-        autoPrintHelpAndExit = None
-      )
+      config <- parser
+        .constructEither(
+          args.toIndexedSeq,
+          allowRepeats = true,
+          customName = name,
+          customDoc = doc,
+          autoPrintHelpAndExit = None
+        )
+        .left
+        .map(_ + envVarsDoc)
       _ <- {
         if (config.noTrailingNewline.value && config.yamlStream.value)
           Left("error: cannot use --no-trailing-newline with --yaml-stream")
@@ -115,7 +156,7 @@ object SjsonnetMainBase {
         wd,
         importer.getOrElse {
           new SimpleImporter(
-            config.getOrderedJpaths.map(p => OsPath(os.Path(p, wd))),
+            config.getOrderedJpaths(jsonnetPathEnv).map(p => OsPath(os.Path(p, wd))),
             allowedInputs,
             debugImporter = config.debugImporter.value
           )
