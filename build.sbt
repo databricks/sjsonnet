@@ -27,7 +27,7 @@ lazy val main = (project in file("sjsonnet"))
       "at.yawk.lz4" % "lz4-java" % "1.10.3",
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.14.0",
       "org.tukaani" % "xz" % "1.11",
-      "org.yaml" % "snakeyaml" % "2.5",
+      "org.yaml" % "snakeyaml" % "2.6",
       "com.google.re2j" % "re2j" % "1.8"
     ),
     libraryDependencies ++= Seq(
