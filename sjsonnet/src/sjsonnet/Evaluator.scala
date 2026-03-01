@@ -116,7 +116,7 @@ class Evaluator(
           newScope.bindings(base + i) = b.args match {
             case null    => visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(newScope))
           }
           i += 1
         }
@@ -634,9 +634,10 @@ class Evaluator(
     Error.fail(s"Field name must be string or null, not ${fieldName.prettyName}", pos)
   }
 
-  def visitMethod(rhs: Expr, params: Params, outerPos: Position)(implicit
+  def visitMethod(rhs: Expr, params: Params, outerPos: Position, name: String = null)(implicit
       scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
+      override def functionName: String = name
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExpr(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = visitExpr(expr)(vs)
@@ -651,7 +652,7 @@ class Evaluator(
         case null =>
           new Lazy(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(scope))
+          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(scope))
       }
       i += 1
     }

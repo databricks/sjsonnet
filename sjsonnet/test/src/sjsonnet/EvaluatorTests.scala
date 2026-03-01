@@ -457,7 +457,7 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("Function parameter y not bound in call"))
+      assert(ex.getMessage.contains("Function newParams parameter y not bound in call"))
     }
 
     test("invalidParam") {
@@ -475,7 +475,7 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("Function has no parameter hello"))
+      assert(ex.getMessage.contains("Function Person has no parameter hello"))
     }
 
     test("unknownVariable") {
@@ -863,6 +863,86 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator,
           brokenAssertionLogic = true
         ) ==> ujson.Num(2)
+      }
+    }
+
+    test("builtinErrorMessageIncludesFunctionName") {
+      // Issue #416: error messages for builtin functions should include the function name.
+
+      // Too many args
+      test("tooManyArgs") {
+        val ex = assertThrows[Exception] {
+          eval("std.length([1], [2])", useNewEvaluator = useNewEvaluator)
+        }
+        assert(ex.getMessage.contains("Too many args, function length has"))
+      }
+
+      // Parameter not bound in call (missing required arg)
+      test("missingRequiredArg") {
+        val ex = assertThrows[Exception] {
+          eval("std.substr('hello')", useNewEvaluator = useNewEvaluator)
+        }
+        assert(ex.getMessage.contains("Function substr parameter"))
+        assert(ex.getMessage.contains("not bound in call"))
+      }
+
+      // Function has no parameter (invalid named arg)
+      test("invalidNamedArg") {
+        val ex = assertThrows[Exception] {
+          eval("std.length(x=[1], noSuchParam=2)", useNewEvaluator = useNewEvaluator)
+        }
+        assert(ex.getMessage.contains("Function length has no parameter noSuchParam"))
+      }
+
+      // Binding parameter a second time
+      test("duplicateArg") {
+        val ex = assertThrows[Exception] {
+          eval("std.pow(2, x=3)", useNewEvaluator = useNewEvaluator)
+        }
+        assert(ex.getMessage.contains("binding parameter a second time: x in function pow"))
+      }
+
+      // User-defined function should include function name from local binding
+      test("userDefinedFunctionIncludesFunctionName") {
+        val ex = assertThrows[Exception] {
+          eval(
+            """local myFunc(x, y) = x + y;
+              |myFunc("a")
+            """.stripMargin,
+            useNewEvaluator = useNewEvaluator
+          )
+        }
+        assert(ex.getMessage.contains("Function myFunc parameter y not bound in call"))
+      }
+
+      // User-defined function: too many args should include function name
+      test("userDefinedTooManyArgs") {
+        val ex = assertThrows[Exception] {
+          eval(
+            """local add(x, y) = x + y;
+              |add(1, 2, 3)
+            """.stripMargin,
+            useNewEvaluator = useNewEvaluator
+          )
+        }
+        assert(ex.getMessage.contains("Too many args, function add has 2 parameter(s)"))
+      }
+
+      // Anonymous function should NOT include function name in error message
+      test("anonymousFunctionNoFunctionName") {
+        val ex = assertThrows[Exception] {
+          eval("(function(x, y) x + y)('a')", useNewEvaluator = useNewEvaluator)
+        }
+        // Should be exactly "Function parameter..." without a function name inserted
+        assert(ex.getMessage.contains("Function parameter y not bound in call"))
+      }
+
+      // Anonymous function: too many args should NOT include function name
+      test("anonymousFunctionTooManyArgs") {
+        val ex = assertThrows[Exception] {
+          eval("(function(x) x)(1, 2)", useNewEvaluator = useNewEvaluator)
+        }
+        assert(ex.getMessage.contains("Too many args, function has 1 parameter(s)"))
       }
     }
 
