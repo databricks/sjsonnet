@@ -2,11 +2,24 @@ package sjsonnet
 
 import sjsonnet.Expr.{FieldName, Member, ObjBody}
 import sjsonnet.Expr.Member.Visibility
-import upickle.core.Visitor
+import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 
 /**
  * Serializes the given [[Val]] out to the given [[upickle.core.Visitor]], which can transform it
- * into [[ujson.Value]]s or directly serialize it to `String`s
+ * into [[ujson.Value]]s or directly serialize it to `String`s.
+ *
+ * TCO boundary: all [[Val]] values entering materialization — whether from object field evaluation
+ * (`Val.Obj.value`), array element forcing (`Val.Arr.value`), or top-level evaluation — must not
+ * contain unresolved [[TailCall]] sentinels. This invariant is maintained by the evaluator: object
+ * field `invoke` calls `visitExpr` (not `visitExprWithTailCallSupport`), and `Val.Func.apply*`
+ * resolves TailCalls when called with `TailstrictModeDisabled`. A defensive check in the match arms
+ * guards against accidental TailCall leakage with a clear internal-error diagnostic.
+ *
+ * Match ordering: all dispatch points ([[apply0]], [[materializeRecursiveChild]],
+ * [[materializeChild]]) use a unified match that places [[Val.Str]] first, followed by [[Val.Obj]],
+ * [[Val.Num]], [[Val.Arr]], and other leaf types. This ordering mirrors the original single-method
+ * design and ensures the most common leaf type (strings) is matched without first testing for
+ * container types.
  */
 abstract class Materializer {
   def storePos(pos: Position): Unit
@@ -17,43 +30,19 @@ abstract class Materializer {
     apply0(v, new sjsonnet.Renderer()).toString
   }
 
+  /**
+   * Hybrid materialization: uses JVM stack recursion for shallow nesting (zero heap allocation,
+   * JIT-friendly) and automatically switches to an explicit stack-based iterative loop when the
+   * recursion depth exceeds [[Settings.materializeRecursiveDepthLimit]].
+   */
   def apply0[T](v: Val, visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = try {
     v match {
       case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
       case obj: Val.Obj    =>
-        storePos(obj.pos)
-        obj.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
-        val objVisitor = visitor.visitObject(obj.visibleKeyNames.length, jsonableKeys = true, -1)
-        val sort = !evaluator.settings.preserveOrder
-        var prevKey: String = null
-        obj.foreachElement(sort, evaluator.emptyMaterializeFileScopePos) { (k, v) =>
-          storePos(v)
-          objVisitor.visitKeyValue(objVisitor.visitKey(-1).visitString(k, -1))
-          objVisitor.visitValue(
-            apply0(v, objVisitor.subVisitor.asInstanceOf[Visitor[T, T]]),
-            -1
-          )
-          if (sort) {
-            if (prevKey != null && Util.compareStringsByCodepoint(k, prevKey) <= 0)
-              Error.fail(
-                s"""Internal error: Unexpected key "$k" after "$prevKey" in sorted object materialization""",
-                v.pos
-              )
-            prevKey = k
-          }
-        }
-        objVisitor.visitEnd(-1)
+        materializeRecursiveObj(obj, visitor, 0, Materializer.MaterializeContext(evaluator))
       case Val.Num(pos, _) => storePos(pos); visitor.visitFloat64(v.asDouble, -1)
       case xs: Val.Arr     =>
-        storePos(xs.pos)
-        val arrVisitor = visitor.visitArray(xs.length, -1)
-        var i = 0
-        while (i < xs.length) {
-          val sub = arrVisitor.subVisitor.asInstanceOf[Visitor[T, T]]
-          arrVisitor.visitValue(apply0(xs.value(i), sub), -1)
-          i += 1
-        }
-        arrVisitor.visitEnd(-1)
+        materializeRecursiveArr(xs, visitor, 0, Materializer.MaterializeContext(evaluator))
       case Val.True(pos)                    => storePos(pos); visitor.visitTrue(-1)
       case Val.False(pos)                   => storePos(pos); visitor.visitFalse(-1)
       case Val.Null(pos)                    => storePos(pos); visitor.visitNull(-1)
@@ -79,8 +68,261 @@ abstract class Materializer {
     case _: StackOverflowError =>
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
     case _: OutOfMemoryError =>
-      Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
+      Error.fail("Out of memory while materializing, possibly due to recursive value", v.pos)
   }
+
+  @inline private def materializeRecursiveObj[T](
+      obj: Val.Obj,
+      visitor: Visitor[T, T],
+      depth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    storePos(obj.pos)
+    obj.triggerAllAsserts(ctx.brokenAssertionLogic)
+    val keys =
+      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      else obj.visibleKeyNames
+    val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
+    var i = 0
+    var prevKey: String = null
+    while (i < keys.length) {
+      val key = keys(i)
+      val childVal = obj.value(key, ctx.emptyPos)
+      storePos(childVal)
+      if (ctx.sort) {
+        if (prevKey != null && Util.compareStringsByCodepoint(key, prevKey) <= 0)
+          Error.fail(
+            s"""Internal error: Unexpected key "$key" after "$prevKey" in sorted object materialization""",
+            childVal.pos
+          )
+        prevKey = key
+      }
+      ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
+      val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+      ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+      i += 1
+    }
+    ov.visitEnd(-1)
+  }
+
+  @inline private def materializeRecursiveArr[T](
+      xs: Val.Arr,
+      visitor: Visitor[T, T],
+      depth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    storePos(xs.pos)
+    val av = visitor.visitArray(xs.length, -1)
+    var i = 0
+    while (i < xs.length) {
+      val childVal = xs.value(i)
+      av.visitValue(
+        materializeRecursiveChild(childVal, av.subVisitor.asInstanceOf[Visitor[T, T]], depth, ctx),
+        -1
+      )
+      i += 1
+    }
+    av.visitEnd(-1)
+  }
+
+  @inline private def materializeRecursiveChild[T](
+      childVal: Val,
+      childVisitor: Visitor[T, T],
+      depth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = childVal match {
+    case Val.Str(pos, s) => storePos(pos); childVisitor.visitString(s, -1)
+    case obj: Val.Obj    =>
+      val nextDepth = depth + 1
+      if (nextDepth < ctx.recursiveDepthLimit)
+        materializeRecursiveObj(obj, childVisitor, nextDepth, ctx)
+      else
+        materializeStackless(childVal, childVisitor, ctx)
+    case Val.Num(pos, _) => storePos(pos); childVisitor.visitFloat64(childVal.asDouble, -1)
+    case xs: Val.Arr     =>
+      val nextDepth = depth + 1
+      if (nextDepth < ctx.recursiveDepthLimit)
+        materializeRecursiveArr(xs, childVisitor, nextDepth, ctx)
+      else
+        materializeStackless(childVal, childVisitor, ctx)
+    case Val.True(pos)                    => storePos(pos); childVisitor.visitTrue(-1)
+    case Val.False(pos)                   => storePos(pos); childVisitor.visitFalse(-1)
+    case Val.Null(pos)                    => storePos(pos); childVisitor.visitNull(-1)
+    case mat: Materializer.Materializable => storePos(childVal.pos); mat.materialize(childVisitor)
+    case s: Val.Func                      =>
+      Error.fail(
+        "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
+        childVal.pos
+      )
+    case tc: TailCall =>
+      Error.fail(
+        "Internal error: TailCall sentinel leaked into materialization. " +
+        "This indicates a bug in the TCO protocol — a TailCall was not resolved before " +
+        "reaching the Materializer.",
+        tc.pos
+      )
+    case vv: Val =>
+      Error.fail("Unknown value type " + vv.prettyName, vv.pos)
+    case null =>
+      Error.fail("Unknown value type " + childVal)
+  }
+
+  // Iterative materialization for deep nesting. Used as a fallback when recursive depth exceeds
+  // the recursive depth limit. Uses an explicit ArrayDeque stack to avoid StackOverflowError.
+  private def materializeStackless[T](
+      v: Val,
+      visitor: Visitor[T, T],
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    val stack = new java.util.ArrayDeque[Materializer.MaterializeFrame](
+      Math.max(16, Math.min(ctx.recursiveDepthLimit * 4, 8192))
+    )
+
+    // Push the initial container frame
+    v match {
+      case obj: Val.Obj => pushObjFrame(obj, visitor, stack, ctx)
+      case xs: Val.Arr  => pushArrFrame(xs, visitor, stack, ctx)
+      case _            => () // unreachable
+    }
+
+    while (true) {
+      stack.peekFirst() match {
+        case frame: Materializer.MaterializeObjFrame[T @unchecked] =>
+          val keys = frame.keys
+          val ov = frame.objVisitor
+          if (frame.index < keys.length) {
+            val key = keys(frame.index)
+            val childVal = frame.obj.value(key, ctx.emptyPos)
+            storePos(childVal)
+
+            if (frame.sort) {
+              if (frame.prevKey != null && Util.compareStringsByCodepoint(key, frame.prevKey) <= 0)
+                Error.fail(
+                  s"""Internal error: Unexpected key "$key" after "${frame.prevKey}" in sorted object materialization""",
+                  childVal.pos
+                )
+              frame.prevKey = key
+            }
+
+            ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
+            frame.index += 1
+
+            val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+            materializeChild(childVal, sub, ov, stack, ctx)
+          } else {
+            val result = ov.visitEnd(-1)
+            stack.removeFirst()
+            if (stack.isEmpty) return result
+            feedResult(stack.peekFirst(), result)
+          }
+
+        case frame: Materializer.MaterializeArrFrame[T @unchecked] =>
+          val arr = frame.arr
+          val av = frame.arrVisitor
+          if (frame.index < arr.length) {
+            val childVal = arr.value(frame.index)
+            frame.index += 1
+
+            val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
+            materializeChild(childVal, sub, av, stack, ctx)
+          } else {
+            val result = av.visitEnd(-1)
+            stack.removeFirst()
+            if (stack.isEmpty) return result
+            feedResult(stack.peekFirst(), result)
+          }
+      }
+    }
+
+    null.asInstanceOf[T] // unreachable — while(true) exits via return
+  }
+
+  // Materialize a child value in iterative mode. Single match dispatches leaf values directly
+  // and pushes a new stack frame for containers. Maintains the same match ordering as the
+  // recursive path: Val.Str first for optimal performance on the most common leaf type.
+  @inline private def materializeChild[T](
+      childVal: Val,
+      childVisitor: Visitor[T, T],
+      parentVisitor: upickle.core.ObjArrVisitor[T, T],
+      stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    childVal match {
+      case Val.Str(pos, s) =>
+        storePos(pos); parentVisitor.visitValue(childVisitor.visitString(s, -1), -1)
+      case obj: Val.Obj =>
+        pushObjFrame(obj, childVisitor, stack, ctx)
+      case Val.Num(pos, _) =>
+        storePos(pos);
+        parentVisitor.visitValue(childVisitor.visitFloat64(childVal.asDouble, -1), -1)
+      case xs: Val.Arr =>
+        pushArrFrame(xs, childVisitor, stack, ctx)
+      case Val.True(pos) =>
+        storePos(pos); parentVisitor.visitValue(childVisitor.visitTrue(-1), -1)
+      case Val.False(pos) =>
+        storePos(pos); parentVisitor.visitValue(childVisitor.visitFalse(-1), -1)
+      case Val.Null(pos) =>
+        storePos(pos); parentVisitor.visitValue(childVisitor.visitNull(-1), -1)
+      case mat: Materializer.Materializable =>
+        storePos(childVal.pos); parentVisitor.visitValue(mat.materialize(childVisitor), -1)
+      case s: Val.Func =>
+        Error.fail(
+          "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
+          childVal.pos
+        )
+      case tc: TailCall =>
+        Error.fail(
+          "Internal error: TailCall sentinel leaked into materialization. " +
+          "This indicates a bug in the TCO protocol — a TailCall was not resolved before " +
+          "reaching the Materializer.",
+          tc.pos
+        )
+      case vv: Val =>
+        Error.fail("Unknown value type " + vv.prettyName, vv.pos)
+      case null =>
+        Error.fail("Unknown value type " + childVal)
+    }
+  }
+
+  @inline private def pushObjFrame[T](
+      obj: Val.Obj,
+      visitor: Visitor[T, T],
+      stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    checkDepth(obj.pos, stack.size, ctx.maxDepth)
+    storePos(obj.pos)
+    obj.triggerAllAsserts(ctx.brokenAssertionLogic)
+    val keyNames =
+      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      else obj.visibleKeyNames
+    val objVisitor = visitor.visitObject(keyNames.length, jsonableKeys = true, -1)
+    stack.push(
+      new Materializer.MaterializeObjFrame[T](objVisitor, keyNames, obj, ctx.sort, 0, null)
+    )
+  }
+
+  @inline private def pushArrFrame[T](
+      xs: Val.Arr,
+      visitor: Visitor[T, T],
+      stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    checkDepth(xs.pos, stack.size, ctx.maxDepth)
+    storePos(xs.pos)
+    val arrVisitor = visitor.visitArray(xs.length, -1)
+    stack.push(new Materializer.MaterializeArrFrame[T](arrVisitor, xs, 0))
+  }
+
+  // Feed a completed child result into the parent frame's visitor.
+  @inline private def feedResult[T](parentFrame: Materializer.MaterializeFrame, result: T): Unit =
+    parentFrame match {
+      case f: Materializer.MaterializeObjFrame[T @unchecked] =>
+        f.objVisitor.visitValue(result, -1)
+      case f: Materializer.MaterializeArrFrame[T @unchecked] =>
+        f.arrVisitor.visitValue(result, -1)
+    }
+
+  @inline private def checkDepth(pos: Position, stackSize: Int, maxDepth: Int)(implicit
+      ev: EvalErrorScope): Unit =
+    if (stackSize >= maxDepth)
+      Error.fail(
+        "Stackoverflow while materializing, possibly due to recursive value",
+        pos
+      )
 
   def reverse(pos: Position, v: ujson.Value): Val = v match {
     case ujson.True    => Val.True(pos)
@@ -155,6 +397,48 @@ object Materializer extends Materializer {
 
   final val emptyStringArray = new Array[String](0)
   final val emptyLazyArray = new Array[Eval](0)
+
+  /**
+   * Immutable snapshot of all settings needed during a single materialization pass. Created once
+   * per top-level call and threaded through recursive/iterative helpers, avoiding repeated field
+   * lookups on the [[Settings]] object on every frame.
+   */
+  private[sjsonnet] final class MaterializeContext(
+      val sort: Boolean,
+      val brokenAssertionLogic: Boolean,
+      val emptyPos: Position,
+      val recursiveDepthLimit: Int,
+      val maxDepth: Int)
+
+  private[sjsonnet] object MaterializeContext {
+    def apply(ev: EvalScope): MaterializeContext = new MaterializeContext(
+      sort = !ev.settings.preserveOrder,
+      brokenAssertionLogic = ev.settings.brokenAssertionLogic,
+      emptyPos = ev.emptyMaterializeFileScopePos,
+      recursiveDepthLimit = ev.settings.materializeRecursiveDepthLimit,
+      maxDepth = ev.settings.maxMaterializeDepth
+    )
+  }
+
+  /** Common parent for stack frames used in iterative materialization. */
+  private[sjsonnet] sealed trait MaterializeFrame
+
+  /** Stack frame for in-progress object materialization. */
+  private[sjsonnet] final class MaterializeObjFrame[T](
+      val objVisitor: ObjVisitor[T, T],
+      val keys: Array[String],
+      val obj: Val.Obj,
+      val sort: Boolean,
+      var index: Int,
+      var prevKey: String)
+      extends MaterializeFrame
+
+  /** Stack frame for in-progress array materialization. */
+  private[sjsonnet] final class MaterializeArrFrame[T](
+      val arrVisitor: ArrVisitor[T, T],
+      val arr: Val.Arr,
+      var index: Int)
+      extends MaterializeFrame
 
   /**
    * Trait for providing custom materialization logic to the Materializer.
