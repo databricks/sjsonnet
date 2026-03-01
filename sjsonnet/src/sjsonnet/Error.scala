@@ -17,14 +17,18 @@ class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Thro
   def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
     if (stack.isEmpty || alwaysAddPos(expr)) {
       val exprErrorString = if (expr == null) null else expr.exprErrorString
-      val newFrame = new Error.Frame(pos, exprErrorString)
-      stack match {
-        case s :: ss if s.pos == pos =>
-          if (s.exprErrorString == null && exprErrorString != null) copy(stack = newFrame :: ss)
-          else this
-        case _ => copy(stack = newFrame :: stack)
-      }
+      addFrameString(pos, exprErrorString)
     } else this
+  }
+
+  def addFrameString(pos: Position, exprErrorString: String)(implicit ev: EvalErrorScope): Error = {
+    val newFrame = new Error.Frame(pos, exprErrorString)
+    stack match {
+      case s :: ss if s.pos == pos =>
+        if (s.exprErrorString == null && exprErrorString != null) copy(stack = newFrame :: ss)
+        else this
+      case _ => copy(stack = newFrame :: stack)
+    }
   }
 
   def asSeenFrom(ev: EvalErrorScope): Error =

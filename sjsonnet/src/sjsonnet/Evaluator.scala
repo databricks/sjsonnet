@@ -202,13 +202,22 @@ class Evaluator(
     }
   }
 
+  /**
+   * Function application entry points (visitApply/visitApply0-3 for user functions,
+   * visitApplyBuiltin/visitApplyBuiltin0-4 for built-in functions).
+   *
+   * When `e.tailstrict` is true, the result is wrapped in `TailCall.resolve()` which iteratively
+   * resolves any [[TailCall]] chain. When false, arguments are wrapped as lazy thunks to preserve
+   * Jsonnet's default lazy evaluation semantics, and `Val.Func.apply` resolves any TailCall
+   * internally via `TailCall.resolve` before returning.
+   */
   protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
     if (e.tailstrict) {
-      lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos)
+      TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
     } else {
       lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
     }
@@ -218,7 +227,11 @@ class Evaluator(
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
-    lhs.cast[Val.Func].apply0(e.pos)
+    if (e.tailstrict) {
+      TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos))
+    } else {
+      lhs.cast[Val.Func].apply0(e.pos)
+    }
   }
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
@@ -226,7 +239,7 @@ class Evaluator(
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
     if (e.tailstrict) {
-      lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos)
+      TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos))
     } else {
       val l1 = visitAsLazy(e.a1)
       lhs.cast[Val.Func].apply1(l1, e.pos)
@@ -239,7 +252,7 @@ class Evaluator(
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
     if (e.tailstrict) {
-      lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos)
+      TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
@@ -253,7 +266,9 @@ class Evaluator(
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
     if (e.tailstrict) {
-      lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+      TailCall.resolve(
+        lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+      )
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
@@ -262,11 +277,14 @@ class Evaluator(
     }
   }
 
-  protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = e.func.evalRhs(this, e.pos)
+  protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = {
+    val result = e.func.evalRhs(this, e.pos)
+    if (e.tailstrict) TailCall.resolve(result) else result
+  }
 
   protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
     if (e.tailstrict) {
-      e.func.evalRhs(visitExpr(e.a1), this, e.pos)
+      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
     }
@@ -274,7 +292,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
     if (e.tailstrict) {
-      e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos)
+      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
     }
@@ -282,7 +300,9 @@ class Evaluator(
 
   protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
     if (e.tailstrict) {
-      e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+      TailCall.resolve(
+        e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+      )
     } else {
       e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
     }
@@ -290,13 +310,15 @@ class Evaluator(
 
   protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
     if (e.tailstrict) {
-      e.func.evalRhs(
-        visitExpr(e.a1),
-        visitExpr(e.a2),
-        visitExpr(e.a3),
-        visitExpr(e.a4),
-        this,
-        e.pos
+      TailCall.resolve(
+        e.func.evalRhs(
+          visitExpr(e.a1),
+          visitExpr(e.a2),
+          visitExpr(e.a3),
+          visitExpr(e.a4),
+          this,
+          e.pos
+        )
       )
     } else {
       e.func.evalRhs(
@@ -319,7 +341,7 @@ class Evaluator(
         arr(idx) = visitExpr(e.argExprs(idx))
         idx += 1
       }
-      e.func.evalRhs(arr, this, e.pos)
+      TailCall.resolve(e.func.evalRhs(arr, this, e.pos))
     } else {
       while (idx < e.argExprs.length) {
         val boundIdx = idx
@@ -638,9 +660,106 @@ class Evaluator(
       scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
-        visitExpr(rhs)(vs)
+        visitExprWithTailCallSupport(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = visitExpr(expr)(vs)
     }
+
+  /**
+   * Evaluate an expression with tail-call support. When a `tailstrict` call is encountered at a
+   * potential tail position, returns a [[TailCall]] sentinel instead of recursing, enabling
+   * `TailCall.resolve` in `visitApply*` to iterate rather than grow the JVM stack.
+   *
+   * Potential tail positions are propagated through: IfElse (both branches), LocalExpr (returned),
+   * and AssertExpr (returned). All other expression types delegate to normal `visitExpr`.
+   */
+  @tailrec
+  private def visitExprWithTailCallSupport(e: Expr)(implicit scope: ValScope): Val = e match {
+    case e: IfElse =>
+      visitExpr(e.cond) match {
+        case Val.True(_)  => visitExprWithTailCallSupport(e.`then`)
+        case Val.False(_) =>
+          e.`else` match {
+            case null => Val.Null(e.pos)
+            case v    => visitExprWithTailCallSupport(v)
+          }
+        case v => Error.fail("Need boolean, found " + v.prettyName, e.pos)
+      }
+    case e: LocalExpr =>
+      val bindings = e.bindings
+      val s =
+        if (bindings == null) scope
+        else {
+          val base = scope.length
+          val newScope = scope.extendBy(bindings.length)
+          var i = 0
+          while (i < bindings.length) {
+            val b = bindings(i)
+            newScope.bindings(base + i) = b.args match {
+              case null    => visitAsLazy(b.rhs)(newScope)
+              case argSpec =>
+                new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+            }
+            i += 1
+          }
+          newScope
+        }
+      visitExprWithTailCallSupport(e.returned)(s)
+    case e: AssertExpr =>
+      if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
+        e.asserted.msg match {
+          case null => Error.fail("Assertion failed", e)
+          case msg  =>
+            Error.fail("Assertion failed: " + materializeError(visitExpr(msg)), e)
+        }
+      }
+      visitExprWithTailCallSupport(e.returned)
+    // Tail-position tailstrict calls: match TailstrictableExpr to unify the tailstrict guard,
+    // then dispatch by concrete type.
+    //
+    // - Apply* (user function calls): construct a TailCall sentinel that the caller's
+    //   TailCall.resolve loop will resolve iteratively, avoiding JVM stack growth for
+    //   tail-recursive calls.
+    // - ApplyBuiltin* (built-in function calls): fall through to visitExpr, which dispatches to
+    //   visitApplyBuiltin*. Those methods already wrap their result in TailCall.resolve() when
+    //   tailstrict=true, resolving any TailCall that a user-defined callback (e.g. the function
+    //   argument to std.makeArray or std.sort) may have returned.
+    case e: TailstrictableExpr if e.tailstrict =>
+      e match {
+        case e: Apply =>
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]], e.namedNames, e)
+          } catch Error.withStackFrame(e)
+        case e: Apply0 =>
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Evaluator.emptyLazyArray, null, e)
+          } catch Error.withStackFrame(e)
+        case e: Apply1 =>
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Array[Eval](visitExpr(e.a1)), null, e)
+          } catch Error.withStackFrame(e)
+        case e: Apply2 =>
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Array[Eval](visitExpr(e.a1), visitExpr(e.a2)), null, e)
+          } catch Error.withStackFrame(e)
+        case e: Apply3 =>
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(
+              func,
+              Array[Eval](visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3)),
+              null,
+              e
+            )
+          } catch Error.withStackFrame(e)
+        case _ => visitExpr(e)
+      }
+    case _ =>
+      visitExpr(e)
+  }
 
   def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Eval] = {
     val arrF = new Array[Eval](bindings.length)
