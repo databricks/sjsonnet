@@ -664,6 +664,12 @@ object Val {
 
     def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val
 
+    // Convenience wrapper: evaluates the function body and resolves any TailCall sentinel.
+    // Use this instead of raw `evalRhs` at call sites that bypass `apply*` and consume
+    // the result directly (e.g. stdlib scope-reuse fast paths).
+    final def evalRhsResolved(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val =
+      TailCall.resolve(evalRhs(scope, ev, fs, pos))(ev)
+
     def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = null
 
     def prettyName = "function"
@@ -672,6 +678,15 @@ object Val {
 
     override def asFunc: Func = this
 
+    /**
+     * Core function application with tail call optimization (TCO) support.
+     *
+     * TCO protocol: when `tailstrictMode == TailstrictModeEnabled`, `evalRhs` may return a
+     * [[TailCall]] sentinel which is propagated back to the caller's [[TailCall.resolve]] loop
+     * without resolution. When `tailstrictMode == TailstrictModeDisabled` (the common case — called
+     * from std library, object fields, etc.), any TailCall is resolved here via `TailCall.resolve`
+     * to prevent sentinel leakage.
+     */
     def apply(argsL: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
@@ -680,13 +695,13 @@ object Val {
         case null => outerPos.fileScope
         case p    => p.fileScope
       }
-      // println(s"apply: argsL: ${argsL.length}, namedNames: $namedNames, paramNames: ${params.names.mkString(",")}")
       if (simple) {
         if (tailstrictMode == TailstrictModeEnabled) {
           argsL.foreach(_.value)
         }
         val newScope = defSiteValScope.extendSimple(argsL)
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       } else {
         val newScopeLen = math.max(params.names.length, argsL.length)
         // Initialize positional args
@@ -743,10 +758,16 @@ object Val {
         if (tailstrictMode == TailstrictModeEnabled) {
           argVals.foreach(_.value)
         }
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
 
+    // apply0–apply3: fast paths for the most common call arities, called from
+    // Evaluator.visitApply0–visitApply3. When the arity matches exactly and there are
+    // no named/default arguments, these skip the general-purpose scope-extension logic
+    // in `apply` (named-arg mapping, defaults filling, arraycopy) and use the cheaper
+    // `ValScope.extendSimple` instead.
     def apply0(outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
       else {
@@ -754,7 +775,8 @@ object Val {
           case null => outerPos.fileScope
           case p    => p.fileScope
         }
-        evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
 
@@ -771,7 +793,8 @@ object Val {
           argVal.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal)
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
 
@@ -789,7 +812,8 @@ object Val {
           argVal2.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
 
@@ -808,12 +832,22 @@ object Val {
           argVal3.value
         }
         val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
-        evalRhs(newScope, ev, funDefFileScope, outerPos)
+        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
   }
 
-  /** Superclass for standard library functions */
+  /**
+   * Superclass for standard library functions.
+   *
+   * TCO note: the arity-specialized overrides (`apply1`–`apply3`) intentionally omit the
+   * `TailCall.resolve` guard present in [[Func.apply1]]–[[Func.apply3]]. This is safe because
+   * built-in `evalRhs` implementations are concrete Scala code that never produce [[TailCall]]
+   * sentinels directly. When a built-in internally invokes a user-defined callback (e.g.
+   * `std.makeArray`, `std.sort`), it passes `TailstrictModeDisabled` explicitly, so the callback's
+   * own `Val.Func.apply*` resolves any TailCall before returning.
+   */
   abstract class Builtin(
       val functionName: String,
       paramNames: Array[String],
@@ -837,6 +871,9 @@ object Val {
 
     def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val
 
+    // No TailCall.resolve needed: Builtin evalRhs is pure Scala and never produces TailCall.
+    // When builtins invoke user callbacks internally, they pass TailstrictModeDisabled,
+    // so the callback's own Func.apply* resolves any TailCall before returning.
     override def apply1(argVal: Eval, outerPos: Position)(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
@@ -991,9 +1028,67 @@ object Val {
   }
 }
 
+/**
+ * Discriminator for the TCO protocol, passed as an implicit through the call chain.
+ *
+ * Using a sealed trait (rather than a plain Boolean) gives the JVM JIT better type-profile
+ * information at `if` guards, and makes the two modes self-documenting at call sites.
+ *
+ *   - [[TailstrictModeEnabled]]: caller will handle TailCall via [[TailCall.resolve]]; sentinels
+ *     may be returned without resolution.
+ *   - [[TailstrictModeDisabled]]: normal call; any TailCall must be resolved before returning.
+ */
 sealed trait TailstrictMode
 case object TailstrictModeEnabled extends TailstrictMode
 case object TailstrictModeDisabled extends TailstrictMode
+
+/**
+ * Sentinel value for tail call optimization of `tailstrict` calls. When a function body's tail
+ * position is a `tailstrict` call, the evaluator returns a [[TailCall]] instead of recursing into
+ * the callee. [[TailCall.resolve]] then re-invokes the target function iteratively, eliminating
+ * native stack growth.
+ *
+ * This is an internal protocol value and must never escape to user-visible code paths (e.g.
+ * materialization, object field access). Every call site that may produce a TailCall must either
+ * pass `TailstrictModeEnabled` (so the caller resolves it) or guard the result with
+ * [[TailCall.resolve]].
+ */
+final class TailCall(
+    val func: Val.Func,
+    val args: Array[Eval],
+    val namedNames: Array[String],
+    val callSiteExpr: Expr)
+    extends Val {
+  def pos: Position = callSiteExpr.pos
+  def prettyName = "tailcall"
+  def exprErrorString: String = callSiteExpr.exprErrorString
+}
+
+object TailCall {
+
+  /**
+   * Iteratively resolve a [[TailCall]] chain (trampoline loop). If `current` is not a TailCall, it
+   * is returned immediately. Otherwise, each TailCall's target function is re-invoked with
+   * `TailstrictModeEnabled` until a non-TailCall result is produced.
+   *
+   * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
+   * not alter user-visible stack traces.
+   */
+  @tailrec
+  def resolve(current: Val)(implicit ev: EvalScope): Val = current match {
+    case tc: TailCall =>
+      implicit val tailstrictMode: TailstrictMode = TailstrictModeEnabled
+      val next =
+        try {
+          tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)
+        } catch {
+          case e: Error =>
+            throw e.addFrame(tc.callSiteExpr.pos, tc.callSiteExpr)
+        }
+      resolve(next)
+    case result => result
+  }
+}
 
 /**
  * [[EvalScope]] models the per-evaluator context that is propagated throughout the Jsonnet
