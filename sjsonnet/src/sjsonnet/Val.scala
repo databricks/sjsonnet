@@ -666,6 +666,19 @@ object Val {
 
     def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = null
 
+    /** Override to provide a function name for error messages. Only called on error paths. */
+    def functionName: String = null
+
+    private def functionNamePrefix: String = {
+      val name = functionName
+      if (name != null) s" $name" else ""
+    }
+
+    private def functionNameSuffix: String = {
+      val name = functionName
+      if (name != null) s" in function $name" else ""
+    }
+
     def prettyName = "function"
 
     override def exprErrorString: String = "Function"
@@ -701,10 +714,16 @@ object Val {
           while (i < namedNames.length) {
             val idx = params.paramMap.getOrElse(
               namedNames(i),
-              Error.fail(s"Function has no parameter ${namedNames(i)}", outerPos)
+              Error.fail(
+                s"Function$functionNamePrefix has no parameter ${namedNames(i)}",
+                outerPos
+              )
             )
             if (argVals(base + idx) != null)
-              Error.fail(s"binding parameter a second time: ${namedNames(i)}", outerPos)
+              Error.fail(
+                s"binding parameter a second time: ${namedNames(i)}$functionNameSuffix",
+                outerPos
+              )
             argVals(base + idx) = argsL(j)
             i += 1
             j += 1
@@ -712,7 +731,7 @@ object Val {
         }
         if (argsL.length > params.names.length)
           Error.fail(
-            "Too many args, function has " + params.names.length + " parameter(s)",
+            "Too many args, function" + functionNamePrefix + " has " + params.names.length + " parameter(s)",
             outerPos
           )
         if (params.names.length != argsL.length) { // Args missing -> add defaults
@@ -735,7 +754,7 @@ object Val {
           if (missing != null) {
             val plural = if (missing.size > 1) "s" else ""
             Error.fail(
-              s"Function parameter$plural ${missing.mkString(", ")} not bound in call",
+              s"Function$functionNamePrefix parameter$plural ${missing.mkString(", ")} not bound in call",
               outerPos
             )
           }
@@ -815,7 +834,7 @@ object Val {
 
   /** Superclass for standard library functions */
   abstract class Builtin(
-      val functionName: String,
+      override val functionName: String,
       paramNames: Array[String],
       defaults: Array[Expr] = null)
       extends Func(
