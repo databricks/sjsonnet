@@ -164,21 +164,55 @@ final case class Config(
 ) {
 
   /**
-   * Returns the sequence of jpaths specified on the command line, ordered according to the flags.
+   * Returns the sequence of jpaths, combining command-line flags and the JSONNET_PATH environment
+   * variable.
    *
-   * Historically, sjsonnet evaluated jpaths in left-to-right order, which is also the order of
-   * evaluation in the core. However, in gojsonnet, the arguments are prioritized right to left, and
-   * the reverse-jpaths-priority flag was introduced for possible consistency across the two
+   * JSONNET_PATH directories always have lower priority than --jpath flags. Within JSONNET_PATH,
+   * the left-most entry has the highest priority, matching the behavior of the C++ and Go
    * implementations.
+   *
+   * The --reverse-jpaths-priority flag only affects the ordering of --jpath flags (reversing them
+   * so that the rightmost wins, matching go-jsonnet behavior). JSONNET_PATH entries are always
+   * appended after the (possibly reversed) --jpath flags.
+   *
+   * For example, `JSONNET_PATH=a:b sjsonnet -J c -J d` results in search order: c, d, a, b (default
+   * mode). With --reverse-jpaths-priority, the order becomes: d, c, a, b.
    *
    * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for
    * details.
    */
-  def getOrderedJpaths: Seq[String] = {
-    if (reverseJpathsPriority.value) {
-      jpaths.reverse
-    } else {
-      jpaths
+  def getOrderedJpaths: Seq[String] = getOrderedJpaths(jsonnetPathEnv = None)
+
+  /**
+   * Returns the sequence of jpaths, combining command-line flags and the JSONNET_PATH environment
+   * variable.
+   *
+   * @param jsonnetPathEnv
+   *   If Some(value), use the given value instead of reading from the JSONNET_PATH environment
+   *   variable. If None, read from System.getenv("JSONNET_PATH").
+   */
+  def getOrderedJpaths(jsonnetPathEnv: Option[String]): Seq[String] = {
+    val envValue = jsonnetPathEnv.getOrElse(System.getenv("JSONNET_PATH"))
+    val envPaths = Config.jsonnetPathEntries(envValue)
+    val orderedJpaths = if (reverseJpathsPriority.value) jpaths.reverse else jpaths
+    orderedJpaths ++ envPaths
+  }
+}
+
+object Config {
+
+  /**
+   * Parses the JSONNET_PATH value into a sequence of directory paths. Entries are kept in their
+   * original order so that, with sjsonnet's default left-to-right search, the left-most entry in
+   * the environment variable has the highest priority among the JSONNET_PATH entries, matching the
+   * behavior of the C++ and Go implementations.
+   *
+   * The separator is colon on Unix and semicolon on Windows ({@code java.io.File.pathSeparator}).
+   */
+  private[sjsonnet] def jsonnetPathEntries(envValue: String): Seq[String] = {
+    if (envValue == null || envValue.isEmpty) Nil
+    else {
+      envValue.split(java.io.File.pathSeparator).filter(_.nonEmpty).toSeq
     }
   }
 }

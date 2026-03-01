@@ -13,7 +13,8 @@ public class Example {
             os.package$.MODULE$.pwd(),
             scala.None$.empty(),
             scala.None$.empty(),
-            new sjsonnet.stdlib.StdLibModule(Map$.MODULE$.empty(), Map$.MODULE$.empty()).module()
+            new sjsonnet.stdlib.StdLibModule(Map$.MODULE$.empty(), Map$.MODULE$.empty()).module(),
+            scala.None$.empty()
         );
     }
 }
