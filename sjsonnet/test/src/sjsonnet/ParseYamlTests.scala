@@ -35,5 +35,14 @@ object ParseYamlTests extends TestSuite {
         """{"a":"\"\\n\n\r\f\b\t""" + "\u263A" + """","l":9}""" // <doublequote> <backslash> <n> <\n> <\r> <\f> <\b> <\t> <smiley>
       )
     }
+    test {
+      // Regression test for https://github.com/google/jsonnet/issues/1148
+      // Empty document after --- should be treated as null
+      eval("std.parseYaml('1\\n---')") ==> ujson.Value("""[1,null]""")
+    }
+    test {
+      // Test that trailing empty document with whitespace is handled
+      eval("std.parseYaml('1\\n---\\n')") ==> ujson.Value("""[1,null]""")
+    }
   }
 }

@@ -1,0 +1,7 @@
+# Files to ignore when syncing from google/jsonnet (C++ test suite).
+# One .jsonnet filename per line. Lines starting with '#' are comments.
+# Corresponding .golden files are also automatically ignored.
+#
+# error.std_parseYaml1.jsonnet: sjsonnet uses SnakeYAML/scala-yaml which
+# successfully parses 'a: b:' as {"a":"b:"}, unlike RapidYAML which errors.
+error.std_parseYaml1.jsonnet
