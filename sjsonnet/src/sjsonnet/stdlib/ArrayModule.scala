@@ -127,13 +127,13 @@ object ArrayModule extends AbstractFunctionModule {
         val scopeIdx = newScope.length - 1
         while (i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
-          if (!func.evalRhs(newScope, ev, funDefFileScope, p).asBoolean) {
+          if (!func.evalRhsResolved(newScope, ev, funDefFileScope, p).asBoolean) {
             var b = new Array[Eval](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
               newScope.bindings(scopeIdx) = a(j)
-              if (func.evalRhs(newScope, ev, funDefFileScope, p).asBoolean) {
+              if (func.evalRhsResolved(newScope, ev, funDefFileScope, p).asBoolean) {
                 b(i) = a(j)
                 i += 1
               }

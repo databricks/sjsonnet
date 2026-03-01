@@ -10,7 +10,9 @@ final case class Settings(
     throwErrorForInvalidSets: Boolean = false,
     useNewEvaluator: Boolean = false,
     maxParserRecursionDepth: Int = 1000,
-    brokenAssertionLogic: Boolean = false
+    brokenAssertionLogic: Boolean = false,
+    maxMaterializeDepth: Int = 1000,
+    materializeRecursiveDepthLimit: Int = 64
 )
 
 object Settings {
