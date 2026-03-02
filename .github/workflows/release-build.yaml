@@ -44,7 +44,7 @@ jobs:
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/client/assembly.dest/out.jar ./release/sjsonnet-client-$VERSION.jar
           cp ./out/sjsonnet/jvm/$SCALA_VERSION/server/assembly.dest/out.jar ./release/sjsonnet-server-$VERSION.jar
           cp ./out/playground/bundle.dest/index.html ./release/sjsonnet-playground-$VERSION.html
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         name: Upload Artifacts
         with:
           name: sjsonnet-${{ env.VERSION }}-jvmjswasm
@@ -87,7 +87,7 @@ jobs:
           mkdir release
           cp ./out/sjsonnet/native/$SCALA_VERSION/nativeLink.dest/out ./release/sjsonnet-$VERSION-${{ matrix.platform.name }}
           cp ./out/sjsonnet/graal/nativeImage.dest/native-executable ./release/sjsonnet-graalvm-$VERSION-${{ matrix.platform.name }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         name: Upload Native Binary
         with:
           name: sjsonnet-${{ env.VERSION }}-${{ matrix.platform.name }}
@@ -118,7 +118,7 @@ jobs:
           ls -la
           sha256sum sjsonnet-* > sums.sha256
           popd
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         name: Upload Package
         with:
           name: sjsonnet-${{ env.VERSION }}-release
