@@ -107,7 +107,7 @@ jobs:
         run: |
           echo "VERSION=$(cat sjsonnet/version)" >> $GITHUB_ENV
           mkdir -p release
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         name: Download Artifacts
         with:
           path: release
