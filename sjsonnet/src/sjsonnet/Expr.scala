@@ -23,6 +23,27 @@ trait Expr {
 
   override def toString: String = s"$exprErrorString@$pos"
 }
+
+/**
+ * Marker trait for [[Expr]] nodes that represent function calls eligible for tail-call
+ * optimization. All Apply* (user function calls) and ApplyBuiltin* (built-in function calls) mix in
+ * this trait, providing a uniform `tailstrict` flag. The evaluator handles the two families
+ * differently when `tailstrict` is true:
+ *
+ *   - '''User function calls''' (Apply*) in tail position: the evaluator constructs a [[TailCall]]
+ *     sentinel and returns it to the caller's [[TailCall.resolve]] trampoline loop, avoiding JVM
+ *     stack growth for tail-recursive calls.
+ *   - '''Built-in function calls''' (ApplyBuiltin*): the evaluator wraps the result in
+ *     [[TailCall.resolve]] at the call site, resolving any [[TailCall]] that a user-defined
+ *     callback (e.g. the function argument to `std.makeArray` or `std.sort`) may have returned.
+ *
+ * @see
+ *   [[TailCall]] for the sentinel value used in the TCO protocol
+ */
+trait TailstrictableExpr extends Expr {
+  def tailstrict: Boolean
+}
+
 object Expr {
   private final def arrStr(a: Array[?]): String = {
     if (a == null) "null" else a.mkString("[", ", ", "]")
@@ -189,17 +210,19 @@ object Expr {
       args: Array[Expr],
       namedNames: Array[String],
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply
   }
-  final case class Apply0(pos: Position, value: Expr, tailstrict: Boolean) extends Expr {
+  final case class Apply0(pos: Position, value: Expr, tailstrict: Boolean)
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply0
   }
-  final case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean) extends Expr {
+  final case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply1
   }
   final case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply2
   }
   final case class Apply3(
@@ -209,7 +232,7 @@ object Expr {
       a2: Expr,
       a3: Expr,
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply3
   }
   final case class ApplyBuiltin(
@@ -217,17 +240,17 @@ object Expr {
       func: Val.Builtin,
       argExprs: Array[Expr],
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   final case class ApplyBuiltin0(pos: Position, func: Val.Builtin0, tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin0
     override def exprErrorString: String = s"std.${func.functionName}"
   }
   final case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr, tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin1
     override def exprErrorString: String = s"std.${func.functionName}"
   }
@@ -237,7 +260,7 @@ object Expr {
       a1: Expr,
       a2: Expr,
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin2
     override def exprErrorString: String = s"std.${func.functionName}"
   }
@@ -248,7 +271,7 @@ object Expr {
       a2: Expr,
       a3: Expr,
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin3
     override def exprErrorString: String = s"std.${func.functionName}"
   }
@@ -260,7 +283,7 @@ object Expr {
       a3: Expr,
       a4: Expr,
       tailstrict: Boolean)
-      extends Expr {
+      extends TailstrictableExpr {
     override private[sjsonnet] def tag = ExprTags.ApplyBuiltin4
     override def exprErrorString: String = s"std.${func.functionName}"
   }

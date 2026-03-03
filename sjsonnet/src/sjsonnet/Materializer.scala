@@ -54,16 +54,23 @@ abstract class Materializer {
           i += 1
         }
         arrVisitor.visitEnd(-1)
-      case Val.True(pos)  => storePos(pos); visitor.visitTrue(-1)
-      case Val.False(pos) => storePos(pos); visitor.visitFalse(-1)
-      case Val.Null(pos)  => storePos(pos); visitor.visitNull(-1)
-      case s: Val.Func    =>
+      case Val.True(pos)                    => storePos(pos); visitor.visitTrue(-1)
+      case Val.False(pos)                   => storePos(pos); visitor.visitFalse(-1)
+      case Val.Null(pos)                    => storePos(pos); visitor.visitNull(-1)
+      case mat: Materializer.Materializable => storePos(v.pos); mat.materialize(visitor)
+      case s: Val.Func                      =>
         Error.fail(
           "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
           v.pos
         )
-      case mat: Materializer.Materializable => storePos(v.pos); mat.materialize(visitor)
-      case vv: Val                          =>
+      case tc: TailCall =>
+        Error.fail(
+          "Internal error: TailCall sentinel leaked into materialization. " +
+          "This indicates a bug in the TCO protocol — a TailCall was not resolved before " +
+          "reaching the Materializer.",
+          tc.pos
+        )
+      case vv: Val =>
         Error.fail("Unknown value type " + vv.prettyName, vv.pos)
       case null =>
         Error.fail("Unknown value type " + v)
