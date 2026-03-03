@@ -197,7 +197,10 @@ object ManifestModule extends AbstractFunctionModule {
       q.add(value)
       while (!q.isEmpty) {
         q.removeFirst().value match {
-          case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
+          case v: Val.Arr =>
+            val inner = v.asLazyArray
+            var i = inner.length - 1
+            while (i >= 0) { q.push(inner(i)); i -= 1 }
           case s: Val.Str => out.write(s.str)
           case s          => Error.fail("Cannot call deepJoin on " + s.prettyName)
         }

@@ -233,8 +233,11 @@ object ArrayModule extends AbstractFunctionModule {
       lazyArray.foreach(q.add)
       while (!q.isEmpty) {
         q.removeFirst().value match {
-          case v: Val.Arr => v.asLazyArray.reverseIterator.foreach(q.push)
-          case x          => out += x
+          case v: Val.Arr =>
+            val inner = v.asLazyArray
+            var i = inner.length - 1
+            while (i >= 0) { q.push(inner(i)); i -= 1 }
+          case x => out += x
         }
       }
       Val.Arr(pos, out.result())
@@ -317,9 +320,12 @@ object ArrayModule extends AbstractFunctionModule {
       arr.value match {
         case arr: Val.Arr =>
           var current = init.value
-          for (item <- arr.asLazyArray.reverse) {
+          val lazyArr = arr.asLazyArray
+          var i = lazyArr.length - 1
+          while (i >= 0) {
             val c = current
-            current = func.apply2(item, c, pos.noOffset)(ev, TailstrictModeDisabled)
+            current = func.apply2(lazyArr(i), c, pos.noOffset)(ev, TailstrictModeDisabled)
+            i -= 1
           }
           current
         case s: Val.Str =>
