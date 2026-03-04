@@ -292,6 +292,25 @@ To generate the static files without starting a server:
 
 The output is a single `index.html` file (with the Sjsonnet JS engine inlined) written to `out/playground/bundle.dest/`. You can open it directly in a browser — no server needed — or serve it with any static file server. The editor UI (CodeMirror) is loaded from a CDN at runtime, so an internet connection is required.
 
+## Development
+To compile the JVM version:
+
+```bash
+./mill 'sjsonnet.jvm[3.3.7]'.compile
+```
+
+To run the tests:
+
+```bash
+./mill 'sjsonnet.jvm[3.3.7]'.test
+```
+
+If you want to test for all platforms and versions, you can run
+
+```bash
+./mill __.test
+```
+
 ## Client-Server
 
 Sjsonnet comes with a built in thin-client and background server, to help
