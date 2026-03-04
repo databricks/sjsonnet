@@ -675,6 +675,12 @@ object Val {
     /** Override to provide a function name for error messages. Only called on error paths. */
     def functionName: String = null
 
+    /**
+     * Extension point: override to customize the prefix in error messages (e.g. "mylib." instead of
+     * "std.").
+     */
+    def qualifiedName: String = s"std.$functionName"
+
     private def functionNamePrefix: String = {
       val name = functionName
       if (name != null) s" $name" else ""

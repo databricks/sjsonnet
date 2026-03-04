@@ -242,17 +242,17 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin0(pos: Position, func: Val.Builtin0, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin0
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin1
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin2(
       pos: Position,
@@ -262,7 +262,7 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin2
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin3(
       pos: Position,
@@ -273,7 +273,7 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin3
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin4(
       pos: Position,
@@ -285,7 +285,7 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     override private[sjsonnet] def tag = ExprTags.ApplyBuiltin4
-    override def exprErrorString: String = s"std.${func.functionName}"
+    override def exprErrorString: String = func.qualifiedName
   }
   final case class Select(pos: Position, value: Expr, name: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Select

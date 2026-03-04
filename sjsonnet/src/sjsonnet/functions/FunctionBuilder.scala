@@ -7,12 +7,20 @@ import sjsonnet._
  */
 trait FunctionBuilder {
 
+  /**
+   * Extension point: override to customize the qualified name used in error messages for builatins
+   * created by this builder. Defaults to "std.<name>".
+   */
+  protected def builtinQualifiedName(name: String): String = s"std.$name"
+
   def builtin(obj: Val.Builtin): (String, Val.Builtin) = (obj.functionName, obj)
 
   def builtin[R: ReadWriter](name: String)(eval: (Position, EvalScope) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     (
       name,
       new Val.Builtin0(name) {
+        override def qualifiedName: String = qn
         def evalRhs(ev: EvalScope, outerPos: Position): Val = {
           // println("--- calling builtin: "+name)
           implicitly[ReadWriter[R]].write(outerPos, eval(outerPos, ev))
@@ -23,9 +31,11 @@ trait FunctionBuilder {
 
   def builtin[R: ReadWriter, T1: ReadWriter](name: String, p1: String)(
       eval: (Position, EvalScope, T1) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     (
       name,
       new Val.Builtin1(name, p1) {
+        override def qualifiedName: String = qn
         def evalRhs(arg1: Eval, ev: EvalScope, outerPos: Position): Val = {
           // println("--- calling builtin: "+name)
           val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1.value)
@@ -37,9 +47,11 @@ trait FunctionBuilder {
 
   def builtin[R: ReadWriter, T1: ReadWriter, T2: ReadWriter](name: String, p1: String, p2: String)(
       eval: (Position, EvalScope, T1, T2) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     (
       name,
       new Val.Builtin2(name, p1, p2) {
+        override def qualifiedName: String = qn
         def evalRhs(arg1: Eval, arg2: Eval, ev: EvalScope, outerPos: Position): Val = {
           // println("--- calling builtin: "+name)
           val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1.value)
@@ -55,9 +67,11 @@ trait FunctionBuilder {
       p1: String,
       p2: String,
       p3: String)(eval: (Position, EvalScope, T1, T2, T3) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     (
       name,
       new Val.Builtin3(name, p1, p2, p3) {
+        override def qualifiedName: String = qn
         def evalRhs(arg1: Eval, arg2: Eval, arg3: Eval, ev: EvalScope, outerPos: Position): Val = {
           // println("--- calling builtin: "+name)
           val v1: T1 = implicitly[ReadWriter[T1]].apply(arg1.value)
@@ -75,9 +89,11 @@ trait FunctionBuilder {
       p2: String,
       p3: String,
       p4: String)(eval: (Position, EvalScope, T1, T2, T3, T4) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     (
       name,
       new Val.Builtin4(name, p1, p2, p3, p4) {
+        override def qualifiedName: String = qn
         def evalRhs(
             arg1: Eval,
             arg2: Eval,
@@ -103,7 +119,9 @@ trait FunctionBuilder {
    */
   def builtinWithDefaults[R: ReadWriter](name: String, params: (String, Val.Literal)*)(
       eval: (Array[Val], Position, EvalScope) => R): (String, Val.Func) = {
+    val qn = builtinQualifiedName(name)
     name -> new Val.Builtin(name, params.map(_._1).toArray, params.map(_._2).toArray) {
+      override def qualifiedName: String = qn
       def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val =
         implicitly[ReadWriter[R]].write(pos, eval(args.map(_.value), pos, ev))
     }
