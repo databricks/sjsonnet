@@ -24,11 +24,19 @@ object CustomValTests extends TestSuite {
     }
   }
 
+  private final class TbTypeOf extends Val.Builtin1("typeof", "x") {
+    override def qualifiedName: String = s"tb.$functionName"
+    def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val =
+      Error.fail("not implemented")
+  }
+
   private def variableResolve(name: String): Option[Expr] = {
     if (name == "message") {
       Some(ImportantString(new Position(null, 0), "message", 2))
     } else if (name == "increaseImportance") {
       Some(new IncreaseImportance().asFunc)
+    } else if (name == "tbTypeof") {
+      Some(new TbTypeOf().asFunc)
     } else {
       None
     }
@@ -63,6 +71,17 @@ object CustomValTests extends TestSuite {
       check(s"""increaseImportance(message)""") {
         case ujson.Str(v) => v == "message!!!"
         case _            => false
+      }
+    }
+
+    test("test custom qualifiedName prefix in error messages") {
+      val result = interpreter.interpret("tbTypeof(1)", DummyPath("(memory)"))
+      result match {
+        case Left(err) =>
+          assert(err.contains("tb.typeof"))
+          assert(!err.contains("std.typeof"))
+        case Right(v) =>
+          throw new Exception(s"Expected error but got: $v")
       }
     }
   }
