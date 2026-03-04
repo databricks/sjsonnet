@@ -78,8 +78,9 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
         "-feature",
         "-opt-inline-from:sjsonnet.*,sjsonnet.**",
         "-Xsource:3",
-        "-Xlint:_",
-      ) ++ (if (scalaVersion().startsWith("2.13")) Seq("-Wopt", "-Wconf:origin=scala.collection.compat.*:s")
+        "-Xlint:_"
+      ) ++ (if (scalaVersion().startsWith("2.13"))
+              Seq("-Wopt", "-Wconf:origin=scala.collection.compat.*:s")
             else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )

@@ -9,8 +9,8 @@ import ScopedExprTransform.*
  * StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope indices)
  * plus additional optimizations (post-order) and static checking (pre-order).
  *
- * When `aggressiveStaticOptimization` is enabled, the optimizer additionally performs during
- * the optimization phase:
+ * When `aggressiveStaticOptimization` is enabled, the optimizer additionally performs during the
+ * optimization phase:
  *   - Constant folding for arithmetic (+, -, *, /, %), comparison (<, >, <=, >=, ==, !=), bitwise
  *     (&, ^, |), shift (<<, >>), and unary (!, -, ~, +) operators.
  *   - Branch elimination for if-else with constant conditions.
