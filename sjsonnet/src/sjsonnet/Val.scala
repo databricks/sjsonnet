@@ -18,23 +18,15 @@ trait Eval {
 }
 
 /**
- * Thread-safe lazy evaluation implementation that discards the compute function after
- * initialization. Lazily evaluated dictionary values, array contents, or function parameters are
- * all wrapped in [[Lazy]] and only truly evaluated on-demand.
+ * Lazily evaluated dictionary values, array contents, or function parameters are all wrapped in
+ * [[Lazy]] and only truly evaluated on-demand.
  */
-final class Lazy(@volatile private var computeFunc: () => Val) extends Eval {
+final class Lazy(private var computeFunc: () => Val) extends Eval {
   private var cached: Val = _
   def value: Val = {
     if (cached != null) return cached
-    val f = computeFunc
-    if (f != null) { // we won the race to initialize
-      val result = f()
-      cached = result
-      computeFunc = null // allow closure to be GC'd
-    }
-    // else: we lost the race to compute, but `cached` is already set and
-    // is visible in this thread due to the volatile read and writes via
-    // piggybacking; see https://stackoverflow.com/a/8769692 for background
+    cached = computeFunc()
+    computeFunc = null // allow closure to be GC'd
     cached
   }
 }

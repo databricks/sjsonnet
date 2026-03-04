@@ -19,7 +19,8 @@ class Evaluator(
     val extVars: String => Option[Expr],
     val wd: Path,
     val settings: Settings,
-    logger: Evaluator.Logger = null)
+    logger: Evaluator.Logger = null,
+    val debugStats: DebugStats = null)
     extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
@@ -90,7 +91,9 @@ class Evaluator(
 
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Eval = e match {
     case v: Val => v
-    case e      => new Lazy(() => visitExpr(e))
+    case e      =>
+      if (debugStats != null) debugStats.lazyCreated += 1
+      new Lazy(() => visitExpr(e))
   }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
@@ -212,6 +215,7 @@ class Evaluator(
    * internally via `TailCall.resolve` before returning.
    */
   protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
@@ -224,6 +228,7 @@ class Evaluator(
   }
 
   protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
@@ -235,6 +240,7 @@ class Evaluator(
   }
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
@@ -247,6 +253,7 @@ class Evaluator(
   }
 
   protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
@@ -261,6 +268,7 @@ class Evaluator(
   }
 
   protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
@@ -278,11 +286,13 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     val result = e.func.evalRhs(this, e.pos)
     if (e.tailstrict) TailCall.resolve(result) else result
   }
 
   protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     if (e.tailstrict) {
       TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
     } else {
@@ -291,6 +301,7 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     if (e.tailstrict) {
       TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
     } else {
@@ -299,6 +310,7 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     if (e.tailstrict) {
       TailCall.resolve(
         e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
@@ -309,6 +321,7 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     if (e.tailstrict) {
       TailCall.resolve(
         e.func.evalRhs(
@@ -333,6 +346,7 @@ class Evaluator(
   }
 
   protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
+    if (debugStats != null) debugStats.builtinCalls += 1
     val arr = new Array[Eval](e.argExprs.length)
     var idx = 0
 
@@ -418,13 +432,14 @@ class Evaluator(
     sup.value(key.str, e.pos)
   }
 
-  def visitImportStr(e: ImportStr): Val.Str =
+  def visitImportStr(e: ImportStr): Val.Str = {
     Val.Str(
       e.pos,
       importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)._2.readString()
     )
+  }
 
-  def visitImportBin(e: ImportBin): Val.Arr =
+  def visitImportBin(e: ImportBin): Val.Arr = {
     Val.Arr(
       e.pos,
       importer
@@ -433,11 +448,15 @@ class Evaluator(
         .readRawBytes()
         .map(x => Val.Num(e.pos, (x & 0xff).doubleValue))
     )
+  }
 
   def visitImport(e: Import): Val = {
     val (p, str) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)
+    val cached = cachedImports.contains(p)
+    if (debugStats != null && cached) debugStats.importCacheHits += 1
     cachedImports.getOrElseUpdate(
       p, {
+        if (debugStats != null) debugStats.importCalls += 1
         val doc = resolver.parse(p, str) match {
           case Right((expr, _)) => expr
           case Left(err)        => throw err.asSeenFrom(this)
@@ -763,6 +782,7 @@ class Evaluator(
   }
 
   def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Eval] = {
+    if (debugStats != null) debugStats.lazyCreated += bindings.length
     val arrF = new Array[Eval](bindings.length)
     var i = 0
     while (i < bindings.length) {
@@ -896,7 +916,9 @@ class Evaluator(
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope // .clearSuper
     val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
-    for (s <- visitComp(e.first :: e.rest, Array(compScope))) {
+    val compScopes = visitComp(e.first :: e.rest, Array(compScope))
+    if (debugStats != null) debugStats.objectCompIterations += compScopes.length
+    for (s <- compScopes) {
       visitExpr(e.key)(s) match {
         case Val.Str(_, k) =>
           val previousValue = builder.put(
@@ -937,6 +959,7 @@ class Evaluator(
         val s = scopes(i)
         visitExpr(expr)(s) match {
           case a: Val.Arr =>
+            if (debugStats != null) debugStats.arrayCompIterations += a.length
             val lazyArr = a.asLazyArray
             var j = 0
             while (j < lazyArr.length) {
@@ -1042,8 +1065,9 @@ class NewEvaluator(
     private val e: String => Option[Expr],
     private val w: Path,
     private val s: Settings,
-    private val wa: Evaluator.Logger = null)
-    extends Evaluator(r, e, w, s, wa) {
+    private val wa: Evaluator.Logger = null,
+    ds: DebugStats = null)
+    extends Evaluator(r, e, w, s, wa, ds) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     (e.tag: @switch) match {

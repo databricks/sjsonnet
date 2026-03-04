@@ -298,6 +298,8 @@ object sjsonnet extends VersionFileModule {
       "src-jvm-native"
     )
     def sources = Task.Sources(sourceDirs.map(d => this.moduleDir / d)*)
+    def forkArgs =
+      Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
 
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.11",

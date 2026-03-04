@@ -371,6 +371,66 @@ object MainTests extends TestSuite {
       assert(out.trim == "\"from_jflag\"")
     }
 
+    test("debugStats") {
+      val source = """local add(x, y) = x + y; add(1, 2) + add(3, 4)"""
+      val (res, out, err) = runMain(source, "--exec", "--debug-stats")
+      assert(res == 0)
+      assert(out.trim == "10")
+      assert(err.contains("=== sjsonnet debug stats ==="))
+      assert(err.contains("function_calls"))
+      assert(err.contains("builtin_calls"))
+      assert(err.contains("eval_time"))
+      assert(err.contains("materialize_time"))
+      assert(err.contains("total_time"))
+      assert(err.contains("heap_used"))
+      assert(err.contains("heap_max"))
+    }
+
+    test("debugStatsCounters") {
+      val source = """local xs = [1, 2, 3]; [x * 2 for x in xs]"""
+      val (res, out, err) = runMain(source, "--exec", "--debug-stats")
+      assert(res == 0)
+      assert(out.trim == """[
+   2,
+   4,
+   6
+]""")
+      val lines = err.linesIterator.map(_.trim).toSeq
+      def counterValue(name: String): Long = {
+        lines.find(_.startsWith(name)).map(_.split("\\s+").last.toLong).getOrElse(-1L)
+      }
+      assert(counterValue("array_comp_iterations") == 3)
+      assert(counterValue("files_parsed") >= 1)
+    }
+
+    test("debugStatsImports") {
+      val libDir = os.temp.dir()
+      os.write(libDir / "helper.libsonnet", """{ double(x):: x * 2 }""")
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(
+        mainFile,
+        """local h = import 'helper.libsonnet';
+          |local h2 = import 'helper.libsonnet';
+          |h.double(21) + h2.double(0)""".stripMargin
+      )
+      val (res, out, err) = runMain("-J", libDir, mainFile, "--debug-stats")
+      assert(res == 0)
+      assert(out.trim == "42")
+      val lines = err.linesIterator.map(_.trim).toSeq
+      def counterValue(name: String): Long = {
+        lines.find(_.startsWith(name)).map(_.split("\\s+").last.toLong).getOrElse(-1L)
+      }
+      assert(counterValue("import_calls") == 1)
+      assert(counterValue("import_cache_hits") == 1)
+    }
+
+    test("debugStatsDisabledByDefault") {
+      val source = "42"
+      val (res, out, err) = runMain(source, "--exec")
+      assert(res == 0)
+      assert(!err.contains("sjsonnet debug stats"))
+    }
+
     test("jsonnetPathReverseJpathsPriority") {
       // With --reverse-jpaths-priority, rightmost -J wins, but -J still beats JSONNET_PATH
       val libDirEnv = os.temp.dir()
