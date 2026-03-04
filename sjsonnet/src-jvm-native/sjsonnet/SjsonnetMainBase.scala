@@ -125,6 +125,8 @@ object SjsonnetMainBase {
         |    JSONNET_PATH=d:c:a:b sjsonnet
         |    sjsonnet -J b -J a -J c -J d""".stripMargin
 
+    var statsToReport: DebugStats = null
+
     val result = for {
       config <- parser
         .constructEither(
@@ -142,6 +144,9 @@ object SjsonnetMainBase {
         else Right(())
       }
       file <- Right(config.file)
+      debugStats =
+        if (config.debugStats.value) { val s = new DebugStats; statsToReport = s; s }
+        else null
       outputStr <- mainConfigured(
         file,
         config,
@@ -162,13 +167,16 @@ object SjsonnetMainBase {
           )
         },
         warn,
-        std
+        std,
+        debugStats = debugStats
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
         else Right(outputStr)
       }
     } yield (config, res)
+
+    if (statsToReport != null) stderr.print(statsToReport.format())
 
     result match {
       case Left(err) =>
@@ -308,7 +316,8 @@ object SjsonnetMainBase {
       importer: Importer,
       warnLogger: Evaluator.Logger,
       std: Val.Obj,
-      evaluatorOverride: Option[Evaluator] = None): Either[String, String] = {
+      evaluatorOverride: Option[Evaluator] = None,
+      debugStats: DebugStats = null): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -348,7 +357,8 @@ object SjsonnetMainBase {
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       logger = warnLogger,
       std = std,
-      variableResolver = _ => None
+      variableResolver = _ => None,
+      debugStats = debugStats
     ) {
       override def createEvaluator(
           resolver: CachedResolver,

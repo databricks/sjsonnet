@@ -157,6 +157,11 @@ final case class Config(
     )
     brokenAssertionLogic: Flag = Flag(),
     @arg(
+      name = "debug-stats",
+      doc = "Print runtime statistics (thunks, calls, imports, timing) to stderr after evaluation"
+    )
+    debugStats: Flag = Flag(),
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )

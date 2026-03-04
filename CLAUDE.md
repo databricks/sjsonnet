@@ -23,6 +23,20 @@ Uses [Mill](https://mill-build.org/) 1.1.2. Cross-built for Scala 3.3.7, 2.13.18
 
 The assembly JAR is at `out/sjsonnet/jvm/3.3.7/assembly.dest/out.jar`. Run it with `java -Xss100m -jar out.jar`.
 
+## Formatting
+
+Scala sources are formatted with [scalafmt](https://scalameta.org/scalafmt/) (config in `.scalafmt.conf`). The `SjsonnetCrossModule` and `bench` modules mix in `ScalafmtModule`.
+
+```bash
+# Format all sources
+./mill __.reformat
+
+# Check formatting without changing files
+./mill __.checkFormat
+```
+
+CI checks formatting on PRs, so run `reformat` before committing.
+
 ## Test Structure
 
 - **Framework**: uTest
@@ -56,6 +70,16 @@ Every bug fix should include a regression test:
    - Success tests: JSON output followed by a newline, using `std.assertEqual` chains ending in `true`.
    - Error tests (filename starts with `error.`): expected stderr including stack traces.
 3. Run `./mill 'sjsonnet.jvm[3.3.7]'.test` to verify.
+
+## Debug Stats
+
+The `--debug-stats` flag prints runtime counters and timing to stderr after evaluation:
+
+```bash
+sjsonnet --debug-stats myfile.jsonnet
+```
+
+Output includes thunk creation counts, function/builtin call counts, comprehension iterations, import/parse counts, and phase timing (eval, materialize). Counters are formatted with stable labels for machine parsing. The `DebugStats` class (`sjsonnet/src/sjsonnet/DebugStats.scala`) is wired through `Interpreter` -> `Evaluator`, with parse counting handled by `CountingParseCache`.
 
 ## Benchmarks
 

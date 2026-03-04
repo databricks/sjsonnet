@@ -44,7 +44,8 @@ class Interpreter(
     storePos: Position => Unit,
     logger: Evaluator.Logger,
     std: Val.Obj,
-    variableResolver: String => Option[Expr]
+    variableResolver: String => Option[Expr],
+    val debugStats: DebugStats
 ) { self =>
 
   def this(
@@ -68,7 +69,8 @@ class Interpreter(
       storePos,
       logger,
       std,
-      variableResolver
+      variableResolver,
+      null
     )
 
   private val noOffsetPos = new Position(new FileScope(wd), -1)
@@ -80,7 +82,9 @@ class Interpreter(
     java.util.LinkedHashMap[String, java.lang.Boolean]
   ]
 
-  val resolver: CachedResolver = createResolver(parseCache)
+  val resolver: CachedResolver = createResolver(
+    if (debugStats != null) new CountingParseCache(parseCache, debugStats) else parseCache
+  )
 
   val varResolver: CachedResolver = createResolver(createVarParseCache)
 
@@ -131,9 +135,9 @@ class Interpreter(
       extVars: String => Option[Expr],
       wd: Path,
       settings: Settings): Evaluator = if (settings.useNewEvaluator)
-    new NewEvaluator(resolver, extVars, wd, settings, logger)
+    new NewEvaluator(resolver, extVars, wd, settings, logger, debugStats)
   else
-    new Evaluator(resolver, extVars, wd, settings, logger)
+    new Evaluator(resolver, extVars, wd, settings, logger, debugStats)
 
   /**
    * Evaluate a variable to an `Expr`.
@@ -188,6 +192,13 @@ class Interpreter(
   }
 
   def evaluate(txt: String, path: Path): Either[Error, Val] = {
+    val t0 = if (debugStats != null) System.nanoTime() else 0L
+    val result = evaluateImpl(txt, path)
+    if (debugStats != null) debugStats.evalTimeNs += System.nanoTime() - t0
+    result
+  }
+
+  private def evaluateImpl(txt: String, path: Path): Either[Error, Val] = {
     val resolvedImport = StaticResolvedFile(txt)
     resolver.cache(path) = resolvedImport
     resolver.parse(path, resolvedImport)(evaluator) flatMap { case (expr, _) =>
@@ -222,6 +233,7 @@ class Interpreter(
   }
 
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
+    val t0 = if (debugStats != null) System.nanoTime() else 0L
     val m =
       if (storePos == null) Materializer
       else
@@ -237,6 +249,8 @@ class Interpreter(
             )
           }
         }
-    handleException(m.apply0(res, visitor)(evaluator))
+    val result = handleException(m.apply0(res, visitor)(evaluator))
+    if (debugStats != null) debugStats.materializeTimeNs += System.nanoTime() - t0
+    result
   }
 }
