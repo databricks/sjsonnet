@@ -69,6 +69,21 @@ object Error {
       throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, expr)
   }
 
+  /**
+   * Wraps a callback invocation from a builtin (e.g. the user function passed to `std.map`). On
+   * error, adds a frame pointing to the callback function's definition site so the stack trace
+   * shows that the error originated inside a callback.
+   */
+  def withCallbackFrame[T](func: Val.Func, builtinName: String, callPos: Position)(body: => T)(
+      implicit ev: EvalErrorScope): T = {
+    try body
+    catch {
+      case e: Error =>
+        val framePos = if (func.pos != null) func.pos else callPos
+        throw e.addFrameString(framePos, s"function passed to $builtinName")
+    }
+  }
+
   def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing =
     fail(msg, expr.pos, expr.exprErrorString)
 

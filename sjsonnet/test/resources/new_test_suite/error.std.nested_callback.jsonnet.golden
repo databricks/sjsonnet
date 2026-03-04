@@ -1,0 +1,5 @@
+sjsonnet.Error: nested
+    at [Error].(error.std.nested_callback.jsonnet:1:45)
+    at [function passed to std.filter].(error.std.nested_callback.jsonnet:1:33)
+    at [std.filter].(error.std.nested_callback.jsonnet:1:32)
+    at [function passed to std.map].(error.std.nested_callback.jsonnet:1:9)

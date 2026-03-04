@@ -98,14 +98,27 @@ object ArrayModule extends AbstractFunctionModule {
       val a = arr.value.asArr.asLazyArray
       var i = 0
       val func = _func.value.asFunc
+      implicit val ees: EvalErrorScope = ev
       if (func.isInstanceOf[Val.Builtin] || func.params.names.length != 1) {
         while (i < a.length) {
-          if (!func.apply1(a(i), p)(ev, TailstrictModeDisabled).asBoolean) {
+          if (
+            !Error
+              .withCallbackFrame(func, "std.filter", pos) {
+                func.apply1(a(i), p)(ev, TailstrictModeDisabled)
+              }
+              .asBoolean
+          ) {
             var b = new Array[Eval](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
-              if (func.apply1(a(j), p)(ev, TailstrictModeDisabled).asBoolean) {
+              if (
+                Error
+                  .withCallbackFrame(func, "std.filter", pos) {
+                    func.apply1(a(j), p)(ev, TailstrictModeDisabled)
+                  }
+                  .asBoolean
+              ) {
                 b(i) = a(j)
                 i += 1
               }
@@ -117,8 +130,6 @@ object ArrayModule extends AbstractFunctionModule {
           i += 1
         }
       } else {
-        // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
-        // the function, there's no risk of the scope leaking (and being invalid at a later point)
         val funDefFileScope: FileScope = func.pos match {
           case null => p.fileScope
           case pp   => pp.fileScope
@@ -127,13 +138,25 @@ object ArrayModule extends AbstractFunctionModule {
         val scopeIdx = newScope.length - 1
         while (i < a.length) {
           newScope.bindings(scopeIdx) = a(i)
-          if (!func.evalRhsResolved(newScope, ev, funDefFileScope, p).asBoolean) {
+          if (
+            !Error
+              .withCallbackFrame(func, "std.filter", pos) {
+                func.evalRhsResolved(newScope, ev, funDefFileScope, p)
+              }
+              .asBoolean
+          ) {
             var b = new Array[Eval](a.length - 1)
             System.arraycopy(a, 0, b, 0, i)
             var j = i + 1
             while (j < a.length) {
               newScope.bindings(scopeIdx) = a(j)
-              if (func.evalRhsResolved(newScope, ev, funDefFileScope, p).asBoolean) {
+              if (
+                Error
+                  .withCallbackFrame(func, "std.filter", pos) {
+                    func.evalRhsResolved(newScope, ev, funDefFileScope, p)
+                  }
+                  .asBoolean
+              ) {
                 b(i) = a(j)
                 i += 1
               }
@@ -164,9 +187,16 @@ object ArrayModule extends AbstractFunctionModule {
         arg: Array[Eval],
         ev: EvalScope,
         pos: Position): Val.Arr = {
+      implicit val ees: EvalErrorScope = ev
       Val.Arr(
         pos,
-        arg.map(v => new Lazy(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)))
+        arg.map(v =>
+          new Lazy(() =>
+            Error.withCallbackFrame(_func, "std.map", pos) {
+              _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
+            }
+          )
+        )
       )
     }
 
@@ -284,12 +314,15 @@ object ArrayModule extends AbstractFunctionModule {
   private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
     def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
+      implicit val ees: EvalErrorScope = ev
       arr.value match {
         case arr: Val.Arr =>
           var current = init.value
           for (item <- arr.asLazyArray) {
             val c = current
-            current = func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
+            current = Error.withCallbackFrame(func, "std.foldl", pos) {
+              func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
+            }
           }
           current
 
@@ -300,10 +333,12 @@ object ArrayModule extends AbstractFunctionModule {
           while (i < str.length) {
             val c = current
             val codePoint = str.codePointAt(i)
-            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), pos.noOffset)(
-              ev,
-              TailstrictModeDisabled
-            )
+            current = Error.withCallbackFrame(func, "std.foldl", pos) {
+              func.apply2(c, Val.Str(pos, Character.toString(codePoint)), pos.noOffset)(
+                ev,
+                TailstrictModeDisabled
+              )
+            }
             i += Character.charCount(codePoint)
           }
           current
