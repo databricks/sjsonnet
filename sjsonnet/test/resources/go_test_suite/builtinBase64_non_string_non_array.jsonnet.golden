@@ -1,3 +1,4 @@
 sjsonnet.Error: Cannot base64 encode number
     at [std.base64].(builtinBase64_non_string_non_array.jsonnet:1:11)
+    at [<root>].(builtinBase64_non_string_non_array.jsonnet:1:11)
 

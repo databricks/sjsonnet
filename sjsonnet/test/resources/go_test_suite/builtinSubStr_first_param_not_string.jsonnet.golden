@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected String, got number
     at [std.substr].(builtinSubStr_first_param_not_string.jsonnet:1:11)
+    at [<root>].(builtinSubStr_first_param_not_string.jsonnet:1:11)
 

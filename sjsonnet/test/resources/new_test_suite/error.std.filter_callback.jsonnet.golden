@@ -1,4 +1,5 @@
 sjsonnet.Error: oops
-    at [Error].(error.std.filter_callback.jsonnet:1:24)
-    at [function passed to std.filter].(error.std.filter_callback.jsonnet:1:12)
-    at [std.filter].(error.std.filter_callback.jsonnet:1:11)
+    at [anonymous].(error.std.filter_callback.jsonnet:1:24)
+    at [std.filter]
+    at [<root>].(error.std.filter_callback.jsonnet:1:11)
+

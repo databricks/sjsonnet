@@ -1,3 +1,4 @@
 sjsonnet.Error: binding parameter a second time: x
-    at [Apply].(optional_args9.jsonnet:1:16)
+    at [anonymous].(optional_args9.jsonnet:1:16)
+    at [<root>].(optional_args9.jsonnet:1:16)
 

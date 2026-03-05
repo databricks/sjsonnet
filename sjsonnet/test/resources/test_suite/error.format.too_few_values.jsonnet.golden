@@ -1,3 +1,4 @@
 sjsonnet.Error: Too few values to format: 1, expected at least 2
     at [std.format].(error.format.too_few_values.jsonnet:1:12)
+    at [<root>].(error.format.too_few_values.jsonnet:1:12)
 

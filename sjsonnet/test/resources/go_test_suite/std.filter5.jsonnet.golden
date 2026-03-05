@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Array, got number
     at [std.filter].(std.filter5.jsonnet:1:11)
+    at [<root>].(std.filter5.jsonnet:1:11)
 

@@ -1,3 +1,5 @@
 sjsonnet.Error: oops
-    at [Error].(error.std.map_callback.jsonnet:1:21)
-    at [function passed to std.map].(error.std.map_callback.jsonnet:1:9)
+    at [anonymous].(error.std.map_callback.jsonnet:1:21)
+    at [std.map]
+    at [<root>].(error.std.map_callback.jsonnet:1:8)
+

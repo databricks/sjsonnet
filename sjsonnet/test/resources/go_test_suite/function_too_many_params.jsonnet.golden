@@ -1,2 +1,4 @@
 sjsonnet.Error: Function parameter x not bound in call
-    at .(function_too_many_params.jsonnet:1:1)
+    at [anonymous].(function_too_many_params.jsonnet:1:1)
+    at [<root>].(function_too_many_params.jsonnet:1:1)
+

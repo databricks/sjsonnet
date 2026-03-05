@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Object, got null
     at [std.manifestTomlEx].(builtin_manifestTomlEx_null.jsonnet:2:29)
+    at [<root>].(builtin_manifestTomlEx_null.jsonnet:1:1)
 

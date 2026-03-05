@@ -1,5 +1,6 @@
 sjsonnet.Error: a
-    at [Error].(std.flatmap5.jsonnet:1:21)
-    at [std.flatMap].(std.flatmap5.jsonnet:2:21)
-    at [std.type].(std.flatmap5.jsonnet:2:9)
+    at [anonymous].(std.flatmap5.jsonnet:1:21)
+    at [std.flatMap]
+    at [std.type]
+    at [<root>].(std.flatmap5.jsonnet:1:7)
 

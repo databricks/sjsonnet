@@ -1,3 +1,3 @@
 sjsonnet.Error: my error message
-    at [Error].(error.invariant.simple3.jsonnet:18:10)
+    at [<root>].(error.invariant.simple3.jsonnet:18:10)
 

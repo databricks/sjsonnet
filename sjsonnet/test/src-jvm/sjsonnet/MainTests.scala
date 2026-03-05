@@ -436,7 +436,7 @@ object MainTests extends TestSuite {
       val (res, _, err) = runMain(source, "--exec")
       assert(res == 1)
       assert(err.contains("oops"))
-      assert(err.contains("function passed to std.filter"))
+      assert(err.contains("[std.filter]"))
     }
 
     test("callbackStackMap") {
@@ -444,7 +444,7 @@ object MainTests extends TestSuite {
       val (res, _, err) = runMain(source, "--exec")
       assert(res == 1)
       assert(err.contains("oops"))
-      assert(err.contains("function passed to std.map"))
+      assert(err.contains("[std.map]"))
     }
 
     test("callbackStackFoldl") {
@@ -452,7 +452,7 @@ object MainTests extends TestSuite {
       val (res, _, err) = runMain(source, "--exec")
       assert(res == 1)
       assert(err.contains("oops"))
-      assert(err.contains("function passed to std.foldl"))
+      assert(err.contains("[std.foldl]"))
     }
 
     test("callbackStackNested") {
@@ -461,8 +461,8 @@ object MainTests extends TestSuite {
       val (res, _, err) = runMain(source, "--exec")
       assert(res == 1)
       assert(err.contains("nested"))
-      assert(err.contains("function passed to std.filter"))
-      assert(err.contains("function passed to std.map"))
+      assert(err.contains("[std.filter]"))
+      assert(err.contains("[std.map]"))
     }
 
     test("jsonnetPathReverseJpathsPriority") {

@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Number, got string
     at [std.sqrt].(builtin_sqrt2.jsonnet:1:9)
+    at [<root>].(builtin_sqrt2.jsonnet:1:9)
 

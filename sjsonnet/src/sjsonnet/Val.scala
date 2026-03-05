@@ -21,13 +21,28 @@ trait Eval {
  * Lazily evaluated dictionary values, array contents, or function parameters are all wrapped in
  * [[Lazy]] and only truly evaluated on-demand.
  */
-final class Lazy(private var computeFunc: () => Val) extends Eval {
+/**
+ * Deferred value. When `frameName` / `ev` are non-null, the frame active at creation time is
+ * re-pushed on force so that errors inside lazily-evaluated callbacks (e.g. `std.map`) show the
+ * enclosing builtin in the stack trace.
+ */
+final class Lazy(
+    private var computeFunc: () => Val,
+    frameName: String,
+    framePos: Position,
+    ev: EvalScope)
+    extends Eval {
   private var cached: Val = _
   def value: Val = {
     if (cached != null) return cached
-    cached = computeFunc()
-    computeFunc = null // allow closure to be GC'd
-    cached
+    if (frameName != null) ev.pushFrame(frameName, framePos)
+    try {
+      cached = computeFunc()
+      computeFunc = null
+      cached
+    } finally {
+      if (frameName != null) ev.popFrame()
+    }
   }
 }
 
@@ -659,8 +674,16 @@ object Val {
     // Convenience wrapper: evaluates the function body and resolves any TailCall sentinel.
     // Use this instead of raw `evalRhs` at call sites that bypass `apply*` and consume
     // the result directly (e.g. stdlib scope-reuse fast paths).
-    final def evalRhsResolved(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val =
-      TailCall.resolve(evalRhs(scope, ev, fs, pos))(ev)
+    final def evalRhsResolved(
+        scope: ValScope,
+        ev: EvalScope,
+        fs: FileScope,
+        pos: Position,
+        callName: String = "anonymous"): Val = {
+      ev.pushFrame(callName, pos)
+      try TailCall.resolve(evalRhs(scope, ev, fs, pos))(ev)
+      finally ev.popFrame()
+    }
 
     def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = null
 
@@ -698,9 +721,26 @@ object Val {
      * from std library, object fields, etc.), any TailCall is resolved here via `TailCall.resolve`
      * to prevent sentinel leakage.
      */
-    def apply(argsL: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(implicit
+    def apply(
+        argsL: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
+      ev.pushFrame(callName, outerPos)
+      try {
+        applyUnchecked(argsL, namedNames, outerPos)
+      } catch {
+        case err: Error if err.trace.isEmpty =>
+          throw new Error(err.getMessage, ev.captureTrace(outerPos))
+      } finally ev.popFrame()
+    }
+
+    private def applyUnchecked(
+        argsL: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val = {
       val simple = namedNames == null && params.names.length == argsL.length
       val funDefFileScope: FileScope = pos match {
         case null => outerPos.fileScope
@@ -755,7 +795,7 @@ object Val {
             if (argVals(j) == null) {
               val default = params.defaultExprs(i)
               if (default != null) {
-                argVals(j) = new Lazy(() => evalDefault(default, newScope, ev))
+                argVals(j) = new Lazy(() => evalDefault(default, newScope, ev), null, null, null)
               } else {
                 if (missing == null) missing = new ArrayBuffer
                 missing.+=(params.names(i))
@@ -785,72 +825,93 @@ object Val {
     // no named/default arguments, these skip the general-purpose scope-extension logic
     // in `apply` (named-arg mapping, defaults filling, arraycopy) and use the cheaper
     // `ValScope.extendSimple` instead.
-    def apply0(outerPos: Position)(implicit ev: EvalScope, tailstrictMode: TailstrictMode): Val = {
-      if (params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos)
+    def apply0(outerPos: Position, callName: String = "anonymous")(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
+      if (params.names.length != 0) apply(Evaluator.emptyLazyArray, null, outerPos, callName)
       else {
-        val funDefFileScope: FileScope = pos match {
-          case null => outerPos.fileScope
-          case p    => p.fileScope
-        }
-        val result = evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
-        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        ev.pushFrame(callName, outerPos)
+        try {
+          val funDefFileScope: FileScope = pos match {
+            case null => outerPos.fileScope
+            case p    => p.fileScope
+          }
+          val result = evalRhs(defSiteValScope, ev, funDefFileScope, outerPos)
+          if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        } finally ev.popFrame()
       }
     }
 
-    def apply1(argVal: Eval, outerPos: Position)(implicit
+    def apply1(argVal: Eval, outerPos: Position, callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
-      if (params.names.length != 1) apply(Array(argVal), null, outerPos)
+      if (params.names.length != 1) apply(Array(argVal), null, outerPos, callName)
       else {
-        val funDefFileScope: FileScope = pos match {
-          case null => outerPos.fileScope
-          case p    => p.fileScope
-        }
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal.value
-        }
-        val newScope: ValScope = defSiteValScope.extendSimple(argVal)
-        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
-        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        ev.pushFrame(callName, outerPos)
+        try {
+          val funDefFileScope: FileScope = pos match {
+            case null => outerPos.fileScope
+            case p    => p.fileScope
+          }
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal.value
+          }
+          val newScope: ValScope = defSiteValScope.extendSimple(argVal)
+          val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+          if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        } finally ev.popFrame()
       }
     }
 
-    def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
+    def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position, callName: String = "anonymous")(
+        implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
-      if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
+      if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos, callName)
       else {
-        val funDefFileScope: FileScope = pos match {
-          case null => outerPos.fileScope
-          case p    => p.fileScope
-        }
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.value
-          argVal2.value
-        }
-        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
-        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
-        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        ev.pushFrame(callName, outerPos)
+        try {
+          val funDefFileScope: FileScope = pos match {
+            case null => outerPos.fileScope
+            case p    => p.fileScope
+          }
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal1.value
+            argVal2.value
+          }
+          val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2)
+          val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+          if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        } finally ev.popFrame()
       }
     }
 
-    def apply3(argVal1: Eval, argVal2: Eval, argVal3: Eval, outerPos: Position)(implicit
+    def apply3(
+        argVal1: Eval,
+        argVal2: Eval,
+        argVal3: Eval,
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
-      if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      if (params.names.length != 3)
+        apply(Array(argVal1, argVal2, argVal3), null, outerPos, callName)
       else {
-        val funDefFileScope: FileScope = pos match {
-          case null => outerPos.fileScope
-          case p    => p.fileScope
-        }
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.value
-          argVal2.value
-          argVal3.value
-        }
-        val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
-        val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
-        if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        ev.pushFrame(callName, outerPos)
+        try {
+          val funDefFileScope: FileScope = pos match {
+            case null => outerPos.fileScope
+            case p    => p.fileScope
+          }
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal1.value
+            argVal2.value
+            argVal3.value
+          }
+          val newScope: ValScope = defSiteValScope.extendSimple(argVal1, argVal2, argVal3)
+          val result = evalRhs(newScope, ev, funDefFileScope, outerPos)
+          if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
+        } finally ev.popFrame()
       }
     }
   }
@@ -888,43 +949,68 @@ object Val {
 
     def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val
 
-    // No TailCall.resolve needed: Builtin evalRhs is pure Scala and never produces TailCall.
-    // When builtins invoke user callbacks internally, they pass TailstrictModeDisabled,
-    // so the callback's own Func.apply* resolves any TailCall before returning.
-    override def apply1(argVal: Eval, outerPos: Position)(implicit
+    override def apply1(argVal: Eval, outerPos: Position, callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (params.names.length != 1) apply(Array(argVal), null, outerPos)
+      if (params.names.length != 1) apply(Array(argVal), null, outerPos, callName)
       else {
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal.value
-        }
-        evalRhs(Array(argVal), ev, outerPos)
+        ev.pushFrame(callName, outerPos)
+        try {
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal.value
+          }
+          evalRhs(Array(argVal), ev, outerPos)
+        } catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
       }
 
-    override def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
+    override def apply2(
+        argVal1: Eval,
+        argVal2: Eval,
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos)
+      if (params.names.length != 2) apply(Array(argVal1, argVal2), null, outerPos, callName)
       else {
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.value
-          argVal2.value
-        }
-        evalRhs(Array(argVal1, argVal2), ev, outerPos)
+        ev.pushFrame(callName, outerPos)
+        try {
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal1.value
+            argVal2.value
+          }
+          evalRhs(Array(argVal1, argVal2), ev, outerPos)
+        } catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
       }
 
-    override def apply3(argVal1: Eval, argVal2: Eval, argVal3: Eval, outerPos: Position)(implicit
+    override def apply3(
+        argVal1: Eval,
+        argVal2: Eval,
+        argVal3: Eval,
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      if (params.names.length != 3)
+        apply(Array(argVal1, argVal2, argVal3), null, outerPos, callName)
       else {
-        if (tailstrictMode == TailstrictModeEnabled) {
-          argVal1.value
-          argVal2.value
-          argVal3.value
-        }
-        evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
+        ev.pushFrame(callName, outerPos)
+        try {
+          if (tailstrictMode == TailstrictModeEnabled) {
+            argVal1.value
+            argVal2.value
+            argVal3.value
+          }
+          evalRhs(Array(argVal1, argVal2, argVal3), ev, outerPos)
+        } catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
       }
 
     /**
@@ -948,13 +1034,21 @@ object Val {
 
     def evalRhs(ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
-        implicit
+    override def apply(
+        argVals: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 0)
-        evalRhs(ev, outerPos)
-      else super.apply(argVals, namedNames, outerPos)
+      if (namedNames == null && argVals.length == 0) {
+        ev.pushFrame(callName, outerPos)
+        try evalRhs(ev, outerPos)
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(argVals, namedNames, outerPos, callName)
   }
 
   abstract class Builtin1(fn: String, pn1: String, def1: Expr = null)
@@ -964,12 +1058,21 @@ object Val {
 
     def evalRhs(arg1: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
-        implicit
+    override def apply(
+        argVals: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).value, ev, outerPos)
-      else super.apply(argVals, namedNames, outerPos)
+      if (namedNames == null && argVals.length == 1) {
+        ev.pushFrame(callName, outerPos)
+        try evalRhs(argVals(0).value, ev, outerPos)
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(argVals, namedNames, outerPos, callName)
   }
 
   abstract class Builtin2(fn: String, pn1: String, pn2: String, defs: Array[Expr] = null)
@@ -979,19 +1082,37 @@ object Val {
 
     def evalRhs(arg1: Eval, arg2: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
-        implicit
+    override def apply(
+        argVals: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 2)
-        evalRhs(argVals(0).value, argVals(1).value, ev, outerPos)
-      else super.apply(argVals, namedNames, outerPos)
+      if (namedNames == null && argVals.length == 2) {
+        ev.pushFrame(callName, outerPos)
+        try evalRhs(argVals(0).value, argVals(1).value, ev, outerPos)
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(argVals, namedNames, outerPos, callName)
 
-    override def apply2(argVal1: Eval, argVal2: Eval, outerPos: Position)(implicit
+    override def apply2(
+        argVal1: Eval,
+        argVal2: Eval,
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (params.names.length == 2) evalRhs(argVal1.value, argVal2.value, ev, outerPos)
-      else super.apply(Array(argVal1, argVal2), null, outerPos)
+      if (params.names.length == 2) {
+        ev.pushFrame(callName, outerPos)
+        try evalRhs(argVal1.value, argVal2.value, ev, outerPos)
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(Array(argVal1, argVal2), null, outerPos, callName)
   }
 
   abstract class Builtin3(
@@ -1006,13 +1127,21 @@ object Val {
 
     def evalRhs(arg1: Eval, arg2: Eval, arg3: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
-        implicit
+    override def apply(
+        argVals: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 3)
-        evalRhs(argVals(0).value, argVals(1).value, argVals(2).value, ev, outerPos)
-      else super.apply(argVals, namedNames, outerPos)
+      if (namedNames == null && argVals.length == 3) {
+        ev.pushFrame(callName, outerPos)
+        try evalRhs(argVals(0).value, argVals(1).value, argVals(2).value, ev, outerPos)
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(argVals, namedNames, outerPos, callName)
   }
 
   abstract class Builtin4(
@@ -1028,20 +1157,29 @@ object Val {
 
     def evalRhs(arg1: Eval, arg2: Eval, arg3: Eval, arg4: Eval, ev: EvalScope, pos: Position): Val
 
-    override def apply(argVals: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
-        implicit
+    override def apply(
+        argVals: Array[? <: Eval],
+        namedNames: Array[String],
+        outerPos: Position,
+        callName: String = "anonymous")(implicit
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val =
-      if (namedNames == null && argVals.length == 4)
-        evalRhs(
-          argVals(0).value,
-          argVals(1).value,
-          argVals(2).value,
-          argVals(3).value,
-          ev,
-          outerPos
-        )
-      else super.apply(argVals, namedNames, outerPos)
+      if (namedNames == null && argVals.length == 4) {
+        ev.pushFrame(callName, outerPos)
+        try
+          evalRhs(
+            argVals(0).value,
+            argVals(1).value,
+            argVals(2).value,
+            argVals(3).value,
+            ev,
+            outerPos
+          )
+        catch {
+          case err: Error if err.trace.isEmpty =>
+            throw new Error(err.getMessage, ev.captureTrace(outerPos))
+        } finally ev.popFrame()
+      } else super.apply(argVals, namedNames, outerPos, callName)
   }
 }
 
@@ -1096,12 +1234,7 @@ object TailCall {
     case tc: TailCall =>
       implicit val tailstrictMode: TailstrictMode = TailstrictModeEnabled
       val next =
-        try {
-          tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)
-        } catch {
-          case e: Error =>
-            throw e.addFrame(tc.callSiteExpr.pos, tc.callSiteExpr)
-        }
+        tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos, tc.callSiteExpr.exprErrorString)
       resolve(next)
     case result => result
   }
@@ -1126,4 +1259,66 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   def settings: Settings
   def trace(msg: String): Unit
   def warn(e: Error): Unit
+
+  // ---- Call stack for error reporting ----
+  private var _stackSize: Int = 0
+  private var _stackNames: Array[String] = new Array[String](64)
+  private var _stackPositions: Array[Position] = new Array[Position](64)
+
+  /** Create a [[Lazy]] that captures the current top-of-stack frame. */
+  final def lazyInContext(f: () => Val): Lazy = {
+    if (_stackSize > 0)
+      new Lazy(f, _stackNames(_stackSize - 1), _stackPositions(_stackSize - 1), this)
+    else
+      new Lazy(f, null, null, null)
+  }
+
+  final def pushRootFrame(pos: Position): Unit = {
+    _stackSize = 0
+    pushFrame(Util.wrapInLessThanGreaterThan("root"), pos)
+  }
+
+  final def popRootFrame(): Unit = {
+    _stackSize = 0
+  }
+
+  final def pushFrame(name: String, pos: Position): Unit = {
+    if (_stackSize >= _stackNames.length) {
+      _stackNames = java.util.Arrays.copyOf(_stackNames, _stackSize * 2)
+      _stackPositions = java.util.Arrays.copyOf(_stackPositions, _stackSize * 2)
+    }
+    _stackNames(_stackSize) = name
+    _stackPositions(_stackSize) = pos
+    _stackSize += 1
+  }
+
+  final def popFrame(): Unit = {
+    _stackSize -= 1
+    _stackNames(_stackSize) = null
+    _stackPositions(_stackSize) = null
+  }
+
+  override def captureTrace(throwPos: Position): Array[StackTrace] = {
+    val n = _stackSize
+    val result = new Array[StackTrace](n)
+    var i = 0
+    while (i < n) {
+      val idx = n - 1 - i // innermost first
+      val name = _stackNames(idx)
+      val pos = if (i == 0 && throwPos != null) throwPos else _stackPositions(idx)
+      result(i) = resolveFrame(name, pos)
+      i += 1
+    }
+    result
+  }
+
+  private def resolveFrame(name: String, pos: Position): StackTrace = {
+    if (pos == null || pos.offset < 0) return new StackTrace(name, null, 0, 0)
+    prettyIndex(pos) match {
+      case Some((line, col)) =>
+        new StackTrace(name, pos.currentFile.relativeToString(wd), line, col)
+      case None =>
+        new StackTrace(name, null, 0, 0)
+    }
+  }
 }

@@ -203,9 +203,7 @@ abstract class BaseFileTests extends TestSuite {
       fileName: String,
       goldenContent: String,
       testSuite: String): Unit = {
-    val expected = goldenContent
-      .replaceAll("    at", "  at")
-      .strip()
+    val expected = goldenContent.strip()
 
     try {
       val result = ujson.WebJson.transform(eval(files, fileName, testSuite), ujson.Value)

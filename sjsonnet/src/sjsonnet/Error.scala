@@ -1,137 +1,102 @@
 package sjsonnet
 
 import java.io.{PrintWriter, StringWriter}
-import scala.util.control.NonFatal
 
 /**
- * An exception that can keep track of the Sjsonnet call-stack while it is propagating upwards. This
- * helps provide good error messages with line numbers pointing towards user code.
+ * Resolved stack frame captured at error-throw time. Positions are pre-resolved to file:line:col so
+ * that rendering does not need access to the evaluator.
  */
-class Error(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
+final class StackTrace(val name: String, val file: String, val line: Int, val col: Int)
+
+/**
+ * An exception carrying a Jsonnet-level stack trace. The trace is captured from the evaluator's
+ * live call stack when the error is thrown (via [[Error.fail]]).
+ */
+class Error(
+    msg: String,
+    private[sjsonnet] val trace: Array[StackTrace] = Array.empty,
+    underlying: Option[Throwable] = None)
     extends Exception(msg, underlying.orNull) {
 
-  setStackTrace(stack.reverseIterator.map(_.ste).toArray)
-
   override def fillInStackTrace: Throwable = this
-
-  def addFrame(pos: Position, expr: Expr = null)(implicit ev: EvalErrorScope): Error = {
-    if (stack.isEmpty || alwaysAddPos(expr)) {
-      val exprErrorString = if (expr == null) null else expr.exprErrorString
-      addFrameString(pos, exprErrorString)
-    } else this
-  }
-
-  def addFrameString(pos: Position, exprErrorString: String)(implicit ev: EvalErrorScope): Error = {
-    val newFrame = new Error.Frame(pos, exprErrorString)
-    stack match {
-      case s :: ss if s.pos == pos =>
-        if (s.exprErrorString == null && exprErrorString != null) copy(stack = newFrame :: ss)
-        else this
-      case _ => copy(stack = newFrame :: stack)
-    }
-  }
-
-  def asSeenFrom(ev: EvalErrorScope): Error =
-    copy(stack = stack.map(_.asSeenFrom(ev)))
-
-  protected def copy(
-      msg: String = msg,
-      stack: List[Error.Frame] = stack,
-      underlying: Option[Throwable] = underlying) =
-    new Error(msg, stack, underlying)
-
-  private def alwaysAddPos(expr: Expr): Boolean = expr match {
-    case _: Expr.LocalExpr | _: Expr.Arr | _: Expr.ObjExtend | _: Expr.ObjBody | _: Expr.IfElse =>
-      false
-    case _ => true
-  }
 }
 
 object Error {
-  final class Frame(val pos: Position, val exprErrorString: String)(implicit ev: EvalErrorScope) {
-    val ste: StackTraceElement = {
-      val cl = if (exprErrorString == null) "" else s"[$exprErrorString]"
-      val (frameFile, frameLine) = ev.prettyIndex(pos) match {
-        case None              => (pos.currentFile.relativeToString(ev.wd) + " offset", pos.offset)
-        case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col)
-      }
-      new StackTraceElement(cl, "", frameFile, frameLine)
-    }
-
-    def asSeenFrom(ev: EvalErrorScope): Frame =
-      if (ev eq this.ev) this else new Frame(pos, exprErrorString)(ev)
-  }
-
-  def withStackFrame[T](expr: Expr)(implicit
-      evaluator: EvalErrorScope): PartialFunction[Throwable, Nothing] = {
-    case e: Error    => throw e.addFrame(expr.pos, expr)
-    case NonFatal(e) =>
-      throw new Error("Internal Error", Nil, Some(e)).addFrame(expr.pos, expr)
-  }
-
-  /**
-   * Wraps a callback invocation from a builtin (e.g. the user function passed to `std.map`). On
-   * error, adds a frame pointing to the callback function's definition site so the stack trace
-   * shows that the error originated inside a callback.
-   */
-  def withCallbackFrame[T](func: Val.Func, builtinName: String, callPos: Position)(body: => T)(
-      implicit ev: EvalErrorScope): T = {
-    try body
-    catch {
-      case e: Error =>
-        val framePos = if (func.pos != null) func.pos else callPos
-        throw e.addFrameString(framePos, s"function passed to $builtinName")
-    }
-  }
+  def fail(msg: String, pos: Position)(implicit ev: EvalErrorScope): Nothing =
+    throw new Error(msg, ev.captureTrace(pos))
 
   def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing =
-    fail(msg, expr.pos, expr.exprErrorString)
-
-  def fail(msg: String, pos: Position, cl: String = null)(implicit ev: EvalErrorScope): Nothing =
-    throw new Error(msg, new Frame(pos, cl) :: Nil, None)
+    fail(msg, expr.pos)
 
   def fail(msg: String): Nothing =
     throw new Error(msg)
 
-  def formatError(e: Throwable): String = {
-    val s = new StringWriter()
-    val p = new PrintWriter(s)
-    try {
-      e.printStackTrace(p)
-      s.toString.replace("\t", "    ")
-    } finally {
-      p.close()
-    }
+  private def errorPrefix(err: Error): String = err match {
+    case _: ParseError  => "sjsonnet.ParseError: "
+    case _: StaticError => "sjsonnet.StaticError: "
+    case _              => "sjsonnet.Error: "
+  }
+
+  def formatError(e: Throwable): String = e match {
+    case err: Error if err.trace.nonEmpty =>
+      val sb = new StringBuilder
+      sb.append(errorPrefix(err)).append(err.getMessage)
+      for (frame <- err.trace) {
+        sb.append("\n    at [").append(frame.name).append(']')
+        if (frame.file != null) {
+          sb.append(".(")
+            .append(frame.file)
+            .append(':')
+            .append(frame.line)
+            .append(':')
+            .append(frame.col)
+            .append(')')
+        }
+      }
+      sb.append('\n')
+      sb.toString
+    case err: Error =>
+      errorPrefix(err) + err.getMessage + '\n'
+    case _ =>
+      val s = new StringWriter()
+      val p = new PrintWriter(s)
+      try { e.printStackTrace(p); s.toString.replace("\t", "    ") }
+      finally p.close()
   }
 }
 
 class ParseError(
     msg: String,
-    stack: List[Error.Frame] = Nil,
+    _trace: Array[StackTrace] = Array.empty,
     underlying: Option[Throwable] = None,
     val offset: Int = -1)
-    extends Error(msg, stack, underlying) {
+    extends Error(msg, _trace, underlying)
 
-  override protected def copy(
-      msg: String = msg,
-      stack: List[Error.Frame] = stack,
-      underlying: Option[Throwable] = underlying): sjsonnet.ParseError =
-    new ParseError(msg, stack, underlying, offset)
-}
-
-class StaticError(msg: String, stack: List[Error.Frame] = Nil, underlying: Option[Throwable] = None)
-    extends Error(msg, stack, underlying) {
-
-  override protected def copy(
-      msg: String = msg,
-      stack: List[Error.Frame] = stack,
-      underlying: Option[Throwable] = underlying): sjsonnet.StaticError =
-    new StaticError(msg, stack, underlying)
-}
+class StaticError(
+    msg: String,
+    _trace: Array[StackTrace] = Array.empty,
+    underlying: Option[Throwable] = None)
+    extends Error(msg, _trace, underlying)
 
 object StaticError {
-  def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing =
-    throw new StaticError(msg, new Error.Frame(expr.pos, expr.exprErrorString) :: Nil, None)
+  def fail(msg: String, expr: Expr)(implicit ev: EvalErrorScope): Nothing = {
+    var trace = ev.captureTrace(expr.pos)
+    if (trace.isEmpty && expr.pos != null) {
+      ev.prettyIndex(expr.pos) match {
+        case Some((line, col)) =>
+          trace = Array(
+            new StackTrace(
+              Util.wrapInLessThanGreaterThan("root"),
+              expr.pos.currentFile.relativeToString(ev.wd),
+              line,
+              col
+            )
+          )
+        case None =>
+      }
+    }
+    throw new StaticError(msg, trace)
+  }
 }
 
 trait EvalErrorScope {
@@ -149,4 +114,6 @@ trait EvalErrorScope {
       (splitted(0).toInt, splitted(1).toInt)
     }
   }
+
+  def captureTrace(throwPos: Position): Array[StackTrace] = Array.empty
 }

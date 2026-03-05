@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Number, got string
     at [std.pow].(pow9.jsonnet:1:8)
+    at [<root>].(pow9.jsonnet:1:8)
 
