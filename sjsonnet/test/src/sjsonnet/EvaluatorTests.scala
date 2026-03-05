@@ -942,6 +942,39 @@ object EvaluatorTests extends TestSuite {
       }
     }
 
+    test("maxStack") {
+      test("recursiveFunction") {
+        val err = evalErr(
+          "local f(x) = f(x + 1); f(0)",
+          useNewEvaluator = useNewEvaluator,
+          maxStack = 10
+        )
+        assert(err.contains("Max stack frames exceeded."))
+      }
+      test("deepButWithinLimit") {
+        eval(
+          "local f(x) = if x <= 0 then 0 else f(x - 1); f(5)",
+          useNewEvaluator = useNewEvaluator,
+          maxStack = 10
+        ) ==> ujson.Num(0)
+      }
+      test("mutualRecursion") {
+        val err = evalErr(
+          "local a(x) = b(x + 1), b(x) = a(x + 1); a(0)",
+          useNewEvaluator = useNewEvaluator,
+          maxStack = 10
+        )
+        assert(err.contains("Max stack frames exceeded."))
+      }
+      test("builtinCallsCounted") {
+        eval(
+          "std.length([1, 2, 3])",
+          useNewEvaluator = useNewEvaluator,
+          maxStack = 5
+        ) ==> ujson.Num(3)
+      }
+    }
+
   }
   def tests: Tests = allTests(false).prefix("Evaluator") ++ allTests(true).prefix("NewEvaluator")
 }

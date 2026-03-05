@@ -162,6 +162,12 @@ final case class Config(
     )
     debugStats: Flag = Flag(),
     @arg(
+      name = "max-stack",
+      short = 's',
+      doc = "Number of allowed stack frames (default 500)"
+    )
+    maxStack: Int = 500,
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )
