@@ -1,3 +1,3 @@
-sjsonnet.Error: Wrong parameter type: expected Int, got string
-    at [std.char].(builtinChar7.jsonnet:1:9)
+sjsonnet.Error: [std.char] Wrong parameter type: expected Int, got string
+    at [<root>].(builtinChar7.jsonnet:1:9)
 

@@ -1,4 +1,3 @@
-sjsonnet.Error: Too many args, function trace has 2 parameter(s)
-    at [Apply3].(error.trace_three_param.jsonnet:17:20)
-    at [ValidId v].(error.trace_three_param.jsonnet:19:6)
+sjsonnet.Error: [std.trace] Too many args, has 2 parameter(s)
+    at [<root>].(error.trace_three_param.jsonnet:17:7)
 

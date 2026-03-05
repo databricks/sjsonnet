@@ -1,4 +1,3 @@
 sjsonnet.Error: xxx
-    at [Error].(<ext-var errorVar> offset:0)
-    at [std.extVar].(extvar_error.jsonnet:1:11)
-
+    at [std.extVar].(<ext-var errorVar> offset:0)
+    at [<root>].(extvar_error.jsonnet:1:11)

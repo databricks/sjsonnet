@@ -20,7 +20,7 @@ object StdFlatMapTests extends TestSuite {
       assert(
         evalErr("std.flatMap(function(x) 123, 'Hello')")
           .startsWith(
-            "sjsonnet.Error: std.flatMap on strings, provided function must return a string, got number"
+            "sjsonnet.Error: [std.flatMap] std.flatMap on strings, provided function must return a string, got number"
           )
       )
 

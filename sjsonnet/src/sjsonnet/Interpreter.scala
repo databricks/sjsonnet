@@ -180,7 +180,7 @@ class Interpreter(
     (for {
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
-    } yield r).left.map(Error.formatError)
+    } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
 
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)
@@ -198,11 +198,41 @@ class Interpreter(
     result
   }
 
+  private val rootName = Util.wrapInLessThanGreaterThan("root")
+
+  @volatile private var lastTopLevelPos: Position = _
+
+  private def addRootFrame(e: Error, expr: Expr): Error = {
+    implicit val ev: EvalErrorScope = evaluator
+    e.forceAddFrame(expr.pos, rootName)
+  }
+
+  private def ensureRootFrame(e: Error): Error = {
+    if (e.stack.exists(_.exprErrorString == rootName)) e
+    else {
+      implicit val ev: EvalErrorScope = evaluator
+      val pos = lastTopLevelPos
+      if (pos == null) e
+      else e.forceAddFrame(pos, rootName)
+    }
+  }
+
   private def evaluateImpl(txt: String, path: Path): Either[Error, Val] = {
     val resolvedImport = StaticResolvedFile(txt)
     resolver.cache(path) = resolvedImport
     resolver.parse(path, resolvedImport)(evaluator) flatMap { case (expr, _) =>
-      handleException(evaluator.visitExpr(expr)(ValScope.empty)) flatMap {
+      lastTopLevelPos = expr.pos
+      handleException {
+        try evaluator.visitExpr(expr)(ValScope.empty)
+        catch {
+          case e: Error    => throw addRootFrame(e, expr)
+          case NonFatal(e) =>
+            throw addRootFrame(
+              new Error("Internal Error", Nil, Some(e)),
+              expr
+            )
+        }
+      } flatMap {
         case f: Val.Func =>
           val defaults2 = f.params.defaultExprs.clone()
           val tlaExpressions = collection.mutable.Set.empty[Expr]
@@ -226,7 +256,23 @@ class Interpreter(
               )
             }
           }
-          handleException(out.apply0(f.pos)(evaluator, TailstrictModeDisabled))
+          handleException {
+            implicit val ev: EvalErrorScope = evaluator
+            val funcName = {
+              val n = f.functionName
+              if (n != null) n else "anonymous"
+            }
+            try out.apply0(f.pos)(evaluator, TailstrictModeDisabled)
+            catch {
+              case e: Error =>
+                throw addRootFrame(e.addFrameString(f.pos, funcName), expr)
+              case NonFatal(e) =>
+                throw addRootFrame(
+                  new Error("Internal Error", Nil, Some(e)).addFrameString(f.pos, funcName),
+                  expr
+                )
+            }
+          }
         case x => Right(x)
       }
     }

@@ -1,3 +1,4 @@
 sjsonnet.Error: xxx
-    at [Error].(tailstrict3.jsonnet:1:16)
-    at [Apply1].(tailstrict3.jsonnet:2:4)
+    at [foo].(tailstrict3.jsonnet:1:16)
+    at [<root>].(tailstrict3.jsonnet:1:7)
+

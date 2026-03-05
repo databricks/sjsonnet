@@ -1,11 +1,9 @@
 sjsonnet.Error: xxx
-    at [Error].(recursive_thunk.jsonnet:1:35)
-    at [Apply2].(recursive_thunk.jsonnet:2:19)
-    at [Apply1].(recursive_thunk.jsonnet:2:23)
-    at [ValidId th].(recursive_thunk.jsonnet:1:52)
-    at [Apply2].(recursive_thunk.jsonnet:2:19)
-    at [Apply1].(recursive_thunk.jsonnet:2:23)
-    at [ValidId th].(recursive_thunk.jsonnet:1:52)
-    at [Apply2].(recursive_thunk.jsonnet:2:19)
-    at [Apply1].(recursive_thunk.jsonnet:3:4)
+    at [bar].(recursive_thunk.jsonnet:1:35)
+    at [foo].(recursive_thunk.jsonnet:2:23)
+    at [bar].(recursive_thunk.jsonnet:2:19)
+    at [foo].(recursive_thunk.jsonnet:2:23)
+    at [bar].(recursive_thunk.jsonnet:2:19)
+    at [foo].(recursive_thunk.jsonnet:3:4)
+    at [<root>].(recursive_thunk.jsonnet:1:7)
 

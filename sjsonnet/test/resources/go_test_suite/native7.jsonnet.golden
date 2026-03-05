@@ -1,3 +1,2 @@
-sjsonnet.Error: Function jsonToString has no parameter y
-    at [Apply].(native7.jsonnet:1:27)
-
+sjsonnet.Error: [std.jsonToString] has no parameter y
+    at [<root>].(native7.jsonnet:1:27)

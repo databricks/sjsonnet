@@ -1,3 +1,3 @@
-sjsonnet.Error: Wrong parameter type: expected Boolean, got string
-    at [std.objectHasEx].(builtinObjectHasExBadBoolean.jsonnet:1:16)
+sjsonnet.Error: [std.objectHasEx] Wrong parameter type: expected Boolean, got string
+    at [<root>].(builtinObjectHasExBadBoolean.jsonnet:1:16)
 
