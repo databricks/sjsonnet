@@ -1,3 +1,4 @@
 sjsonnet.Error: foo
-    at [<root>].(error.03.jsonnet:17:21)
+    at [Error].(error.03.jsonnet:17:21)
+    at [Select x].(error.03.jsonnet:18:7)
 

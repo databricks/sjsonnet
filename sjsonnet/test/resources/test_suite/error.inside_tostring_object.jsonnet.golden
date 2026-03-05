@@ -1,3 +1,4 @@
 sjsonnet.Error: foobar
-    at [<root>].(error.inside_tostring_object.jsonnet:17:12)
+    at [Error].(error.inside_tostring_object.jsonnet:17:12)
+    at [BinaryOp +].(error.inside_tostring_object.jsonnet:17:29)
 

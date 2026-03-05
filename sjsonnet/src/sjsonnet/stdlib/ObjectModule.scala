@@ -107,7 +107,7 @@ object ObjectModule extends AbstractFunctionModule {
           def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
             func.apply2(
               Val.Str(pos, k),
-              new Lazy(() => obj.value(k, pos.noOffset)(ev), null, null, null),
+              new Lazy(() => obj.value(k, pos.noOffset)(ev)),
               pos.noOffset
             )(
               ev,
@@ -139,7 +139,7 @@ object ObjectModule extends AbstractFunctionModule {
     Val.Arr(
       pos,
       keys.map { k =>
-        new Lazy(() => v1.value(k, pos.noOffset)(ev), null, null, null)
+        new Lazy(() => v1.value(k, pos.noOffset)(ev))
       }
     )
 

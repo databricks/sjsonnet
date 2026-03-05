@@ -1,5 +1,0 @@
-sjsonnet.Error: oops
-    at [anonymous].(error.std.foldl_callback.jsonnet:1:28)
-    at [std.foldl]
-    at [<root>].(error.std.foldl_callback.jsonnet:1:10)
-

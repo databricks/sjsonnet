@@ -1,3 +1,4 @@
 sjsonnet.Error: should happen
-    at [<root>].(lazy_operator2.jsonnet:1:9)
+    at [Error].(lazy_operator2.jsonnet:1:9)
+    at [And].(lazy_operator2.jsonnet:1:6)
 

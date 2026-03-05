@@ -45,15 +45,6 @@ trait TailstrictableExpr extends Expr {
 }
 
 object Expr {
-
-  /** Extracts a human-readable function name from the callee expression of an Apply node. */
-  private[sjsonnet] def callTargetName(value: Expr): String = value match {
-    case v: ValidId                            => v.name
-    case s: Select                             => s.name
-    case f: Val.Func if f.functionName != null => f.qualifiedName
-    case _                                     => "anonymous"
-  }
-
   private final def arrStr(a: Array[?]): String = {
     if (a == null) "null" else a.mkString("[", ", ", "]")
   }
@@ -221,22 +212,18 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply
-    override def exprErrorString: String = callTargetName(value)
   }
   final case class Apply0(pos: Position, value: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply0
-    override def exprErrorString: String = callTargetName(value)
   }
   final case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply1
-    override def exprErrorString: String = callTargetName(value)
   }
   final case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply2
-    override def exprErrorString: String = callTargetName(value)
   }
   final case class Apply3(
       pos: Position,
@@ -247,7 +234,6 @@ object Expr {
       tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply3
-    override def exprErrorString: String = callTargetName(value)
   }
   final case class ApplyBuiltin(
       pos: Position,

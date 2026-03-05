@@ -1,3 +1,3 @@
 sjsonnet.Error: Unknown binary operation: string / number
-    at [<root>].(string_divided_by_number.jsonnet:1:7)
+    at [BinaryOp /].(string_divided_by_number.jsonnet:1:7)
 

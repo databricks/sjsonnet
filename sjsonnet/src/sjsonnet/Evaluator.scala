@@ -32,7 +32,7 @@ class Evaluator(
   val cachedImports: collection.mutable.HashMap[Path, Val] =
     collection.mutable.HashMap.empty[Path, Val]
 
-  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = {
+  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     e match {
       case e: ValidId            => visitValidId(e)
       case e: BinaryOp           => visitBinaryOp(e)
@@ -72,6 +72,8 @@ class Evaluator(
       case e: Expr.Error         => visitError(e)
       case e                     => visitInvalid(e)
     }
+  } catch {
+    Error.withStackFrame(e)
   }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
   def visitInvalid(e: Expr): Nothing = e match {
@@ -91,7 +93,7 @@ class Evaluator(
     case v: Val => v
     case e      =>
       if (debugStats != null) debugStats.lazyCreated += 1
-      new Lazy(() => visitExpr(e), null, null, null)
+      new Lazy(() => visitExpr(e))
   }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
@@ -117,7 +119,7 @@ class Evaluator(
           newScope.bindings(base + i) = b.args match {
             case null    => visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(newScope), null, null, null)
+              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(newScope))
           }
           i += 1
         }
@@ -215,194 +217,153 @@ class Evaluator(
   protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
-    val name = e.exprErrorString
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+
     if (e.tailstrict) {
-      TailCall.resolve(
-        lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos, name)
-      )
+      TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
     } else {
-      lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos, name)
+      lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
     }
   }
 
   protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
-    val name = e.exprErrorString
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
     if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos, name))
+      TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos))
     } else {
-      lhs.cast[Val.Func].apply0(e.pos, name)
+      lhs.cast[Val.Func].apply0(e.pos)
     }
   }
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
-    val name = e.exprErrorString
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
     if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos, name))
+      TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos))
     } else {
       val l1 = visitAsLazy(e.a1)
-      lhs.cast[Val.Func].apply1(l1, e.pos, name)
+      lhs.cast[Val.Func].apply1(l1, e.pos)
     }
   }
 
   protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
-    val name = e.exprErrorString
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+
     if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos, name))
+      TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
-      lhs.cast[Val.Func].apply2(l1, l2, e.pos, name)
+      lhs.cast[Val.Func].apply2(l1, l2, e.pos)
     }
   }
 
   protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
     val lhs = visitExpr(e.value)
-    val name = e.exprErrorString
     implicit val tailstrictMode: TailstrictMode =
       if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+
     if (e.tailstrict) {
       TailCall.resolve(
-        lhs
-          .cast[Val.Func]
-          .apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos, name)
+        lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
       )
     } else {
       val l1 = visitAsLazy(e.a1)
       val l2 = visitAsLazy(e.a2)
       val l3 = visitAsLazy(e.a3)
-      lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos, name)
+      lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
     }
   }
 
   protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      val result = e.func.evalRhs(this, e.pos)
-      if (e.tailstrict) TailCall.resolve(result) else result
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+    val result = e.func.evalRhs(this, e.pos)
+    if (e.tailstrict) TailCall.resolve(result) else result
   }
 
   protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      if (e.tailstrict) {
-        TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
-      } else {
-        e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
-      }
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+    if (e.tailstrict) {
+      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
+    }
   }
 
   protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      if (e.tailstrict) {
-        TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
-      } else {
-        e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
-      }
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+    if (e.tailstrict) {
+      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
+    }
   }
 
   protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      if (e.tailstrict) {
-        TailCall.resolve(
-          e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
-        )
-      } else {
-        e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
-      }
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+    if (e.tailstrict) {
+      TailCall.resolve(
+        e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+      )
+    } else {
+      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
+    }
   }
 
   protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      if (e.tailstrict) {
-        TailCall.resolve(
-          e.func.evalRhs(
-            visitExpr(e.a1),
-            visitExpr(e.a2),
-            visitExpr(e.a3),
-            visitExpr(e.a4),
-            this,
-            e.pos
-          )
-        )
-      } else {
+    if (e.tailstrict) {
+      TailCall.resolve(
         e.func.evalRhs(
-          visitAsLazy(e.a1),
-          visitAsLazy(e.a2),
-          visitAsLazy(e.a3),
-          visitAsLazy(e.a4),
+          visitExpr(e.a1),
+          visitExpr(e.a2),
+          visitExpr(e.a3),
+          visitExpr(e.a4),
           this,
           e.pos
         )
-      }
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+      )
+    } else {
+      e.func.evalRhs(
+        visitAsLazy(e.a1),
+        visitAsLazy(e.a2),
+        visitAsLazy(e.a3),
+        visitAsLazy(e.a4),
+        this,
+        e.pos
+      )
+    }
   }
 
   protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    pushFrame(e.exprErrorString, null)
-    try {
-      val arr = new Array[Eval](e.argExprs.length)
-      var idx = 0
-      if (e.tailstrict) {
-        while (idx < e.argExprs.length) {
-          arr(idx) = visitExpr(e.argExprs(idx))
-          idx += 1
-        }
-        TailCall.resolve(e.func.evalRhs(arr, this, e.pos))
-      } else {
-        while (idx < e.argExprs.length) {
-          val boundIdx = idx
-          arr(idx) = visitAsLazy(e.argExprs(boundIdx))
-          idx += 1
-        }
-        e.func.evalRhs(arr, this, e.pos)
+    val arr = new Array[Eval](e.argExprs.length)
+    var idx = 0
+
+    if (e.tailstrict) {
+      while (idx < e.argExprs.length) {
+        arr(idx) = visitExpr(e.argExprs(idx))
+        idx += 1
       }
-    } catch {
-      case err: Error if err.trace.isEmpty =>
-        throw new Error(err.getMessage, captureTrace(e.pos))
-    } finally popFrame()
+      TailCall.resolve(e.func.evalRhs(arr, this, e.pos))
+    } else {
+      while (idx < e.argExprs.length) {
+        val boundIdx = idx
+        arr(idx) = visitAsLazy(e.argExprs(boundIdx))
+        idx += 1
+      }
+      e.func.evalRhs(arr, this, e.pos)
+    }
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
@@ -498,7 +459,7 @@ class Evaluator(
         if (debugStats != null) debugStats.importCalls += 1
         val doc = resolver.parse(p, str) match {
           case Right((expr, _)) => expr
-          case Left(err)        => throw err
+          case Left(err)        => throw err.asSeenFrom(this)
         }
         visitExpr(doc)(ValScope.empty)
       }
@@ -756,7 +717,7 @@ class Evaluator(
             newScope.bindings(base + i) = b.args match {
               case null    => visitAsLazy(b.rhs)(newScope)
               case argSpec =>
-                new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope), null, null, null)
+                new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
             }
             i += 1
           }
@@ -785,25 +746,35 @@ class Evaluator(
     case e: TailstrictableExpr if e.tailstrict =>
       e match {
         case e: Apply =>
-          val func = visitExpr(e.value).cast[Val.Func]
-          new TailCall(func, e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]], e.namedNames, e)
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]], e.namedNames, e)
+          } catch Error.withStackFrame(e)
         case e: Apply0 =>
-          val func = visitExpr(e.value).cast[Val.Func]
-          new TailCall(func, Evaluator.emptyLazyArray, null, e)
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Evaluator.emptyLazyArray, null, e)
+          } catch Error.withStackFrame(e)
         case e: Apply1 =>
-          val func = visitExpr(e.value).cast[Val.Func]
-          new TailCall(func, Array[Eval](visitExpr(e.a1)), null, e)
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Array[Eval](visitExpr(e.a1)), null, e)
+          } catch Error.withStackFrame(e)
         case e: Apply2 =>
-          val func = visitExpr(e.value).cast[Val.Func]
-          new TailCall(func, Array[Eval](visitExpr(e.a1), visitExpr(e.a2)), null, e)
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(func, Array[Eval](visitExpr(e.a1), visitExpr(e.a2)), null, e)
+          } catch Error.withStackFrame(e)
         case e: Apply3 =>
-          val func = visitExpr(e.value).cast[Val.Func]
-          new TailCall(
-            func,
-            Array[Eval](visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3)),
-            null,
-            e
-          )
+          try {
+            val func = visitExpr(e.value).cast[Val.Func]
+            new TailCall(
+              func,
+              Array[Eval](visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3)),
+              null,
+              e
+            )
+          } catch Error.withStackFrame(e)
         case _ => visitExpr(e)
       }
     case _ =>
@@ -818,9 +789,9 @@ class Evaluator(
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          new Lazy(() => visitExpr(b.rhs)(scope), null, null, null)
+          new Lazy(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(scope), null, null, null)
+          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(scope))
       }
       i += 1
     }
@@ -855,11 +826,12 @@ class Evaluator(
         val a = asserts(i)
         if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
           a.msg match {
-            case null => Error.fail("Assertion failed", a.value.pos)
+            case null => Error.fail("Assertion failed", a.value.pos, "Assert")
             case msg  =>
               Error.fail(
                 "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].str,
-                a.value.pos
+                a.value.pos,
+                "Assert"
               )
           }
         }
@@ -884,7 +856,7 @@ class Evaluator(
             case null =>
               visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope), null, null, null)
+              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
           j += 1
@@ -1097,7 +1069,7 @@ class NewEvaluator(
     ds: DebugStats = null)
     extends Evaluator(r, e, w, s, wa, ds) {
 
-  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = {
+  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     (e.tag: @switch) match {
       case ExprTags.ValidId       => visitValidId(e.asInstanceOf[ValidId])
       case ExprTags.BinaryOp      => visitBinaryOp(e.asInstanceOf[BinaryOp])
@@ -1142,6 +1114,8 @@ class NewEvaluator(
       case ExprTags.Error             => visitError(e.asInstanceOf[Expr.Error])
       case _                          => visitInvalid(e)
     }
+  } catch {
+    Error.withStackFrame(e)
   }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
   override def visitInvalid(e: Expr): Nothing = (e.tag: @switch) match {

@@ -1,3 +1,3 @@
-sjsonnet.Error: Internal error: java.lang.RuntimeException: native function panic
-    at [<root>].(native_panic.jsonnet:1:26)
-
+sjsonnet.Error: Internal Error
+    at [std.nativePanic].(native_panic.jsonnet:1:26)
+Caused by: java.lang.RuntimeException: native function panic

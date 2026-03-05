@@ -1,4 +1,2 @@
 sjsonnet.Error: Function parameter name not bound in call
-    at [anonymous].(error.top_level_func.jsonnet:17:1)
-    at [<root>].(error.top_level_func.jsonnet:17:1)
-
+    at .(error.top_level_func.jsonnet:17:1)
