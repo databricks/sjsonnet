@@ -12,7 +12,8 @@ final case class Settings(
     maxParserRecursionDepth: Int = 1000,
     brokenAssertionLogic: Boolean = false,
     maxMaterializeDepth: Int = 1000,
-    materializeRecursiveDepthLimit: Int = 128
+    materializeRecursiveDepthLimit: Int = 128,
+    maxStack: Int = 500
 )
 
 object Settings {

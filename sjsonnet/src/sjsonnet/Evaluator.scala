@@ -28,6 +28,18 @@ class Evaluator(
   def trace(e: String): Unit = if (logger != null) logger(true, e)
   def warn(e: Error): Unit = if (logger != null) logger(false, Error.formatError(e))
 
+  private[this] var stackDepth: Int = 0
+  private[this] val maxStack: Int = settings.maxStack
+
+  @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
+    stackDepth += 1
+    if (stackDepth > maxStack)
+      Error.fail("Max stack frames exceeded.", pos)
+  }
+
+  @inline private[sjsonnet] final def decrementStackDepth(): Unit =
+    stackDepth -= 1
+
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
     collection.mutable.HashMap.empty[Path, Val]
@@ -216,154 +228,187 @@ class Evaluator(
    */
   protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    val lhs = visitExpr(e.value)
-    implicit val tailstrictMode: TailstrictMode =
-      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+    checkStackDepth(e.pos)
+    try {
+      val lhs = visitExpr(e.value)
+      implicit val tailstrictMode: TailstrictMode =
+        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
-    if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
-    } else {
-      lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
-    }
+      if (e.tailstrict) {
+        TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
+      } else {
+        lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    val lhs = visitExpr(e.value)
-    implicit val tailstrictMode: TailstrictMode =
-      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
-    if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos))
-    } else {
-      lhs.cast[Val.Func].apply0(e.pos)
-    }
+    checkStackDepth(e.pos)
+    try {
+      val lhs = visitExpr(e.value)
+      implicit val tailstrictMode: TailstrictMode =
+        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+      if (e.tailstrict) {
+        TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos))
+      } else {
+        lhs.cast[Val.Func].apply0(e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    val lhs = visitExpr(e.value)
-    implicit val tailstrictMode: TailstrictMode =
-      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
-    if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos))
-    } else {
-      val l1 = visitAsLazy(e.a1)
-      lhs.cast[Val.Func].apply1(l1, e.pos)
-    }
+    checkStackDepth(e.pos)
+    try {
+      val lhs = visitExpr(e.value)
+      implicit val tailstrictMode: TailstrictMode =
+        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+      if (e.tailstrict) {
+        TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos))
+      } else {
+        val l1 = visitAsLazy(e.a1)
+        lhs.cast[Val.Func].apply1(l1, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    val lhs = visitExpr(e.value)
-    implicit val tailstrictMode: TailstrictMode =
-      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+    checkStackDepth(e.pos)
+    try {
+      val lhs = visitExpr(e.value)
+      implicit val tailstrictMode: TailstrictMode =
+        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
-    if (e.tailstrict) {
-      TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
-    } else {
-      val l1 = visitAsLazy(e.a1)
-      val l2 = visitAsLazy(e.a2)
-      lhs.cast[Val.Func].apply2(l1, l2, e.pos)
-    }
+      if (e.tailstrict) {
+        TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
+      } else {
+        val l1 = visitAsLazy(e.a1)
+        val l2 = visitAsLazy(e.a2)
+        lhs.cast[Val.Func].apply2(l1, l2, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    val lhs = visitExpr(e.value)
-    implicit val tailstrictMode: TailstrictMode =
-      if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+    checkStackDepth(e.pos)
+    try {
+      val lhs = visitExpr(e.value)
+      implicit val tailstrictMode: TailstrictMode =
+        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
-    if (e.tailstrict) {
-      TailCall.resolve(
-        lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
-      )
-    } else {
-      val l1 = visitAsLazy(e.a1)
-      val l2 = visitAsLazy(e.a2)
-      val l3 = visitAsLazy(e.a3)
-      lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
-    }
+      if (e.tailstrict) {
+        TailCall.resolve(
+          lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+        )
+      } else {
+        val l1 = visitAsLazy(e.a1)
+        val l2 = visitAsLazy(e.a2)
+        val l3 = visitAsLazy(e.a3)
+        lhs.cast[Val.Func].apply3(l1, l2, l3, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    val result = e.func.evalRhs(this, e.pos)
-    if (e.tailstrict) TailCall.resolve(result) else result
+    checkStackDepth(e.pos)
+    try {
+      val result = e.func.evalRhs(this, e.pos)
+      if (e.tailstrict) TailCall.resolve(result) else result
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    if (e.tailstrict) {
-      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
-    } else {
-      e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
-    }
+    checkStackDepth(e.pos)
+    try {
+      if (e.tailstrict) {
+        TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
+      } else {
+        e.func.evalRhs(visitAsLazy(e.a1), this, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    if (e.tailstrict) {
-      TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
-    } else {
-      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
-    }
+    checkStackDepth(e.pos)
+    try {
+      if (e.tailstrict) {
+        TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
+      } else {
+        e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), this, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    if (e.tailstrict) {
-      TailCall.resolve(
-        e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
-      )
-    } else {
-      e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
-    }
+    checkStackDepth(e.pos)
+    try {
+      if (e.tailstrict) {
+        TailCall.resolve(
+          e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), this, e.pos)
+        )
+      } else {
+        e.func.evalRhs(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), this, e.pos)
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    if (e.tailstrict) {
-      TailCall.resolve(
+    checkStackDepth(e.pos)
+    try {
+      if (e.tailstrict) {
+        TailCall.resolve(
+          e.func.evalRhs(
+            visitExpr(e.a1),
+            visitExpr(e.a2),
+            visitExpr(e.a3),
+            visitExpr(e.a4),
+            this,
+            e.pos
+          )
+        )
+      } else {
         e.func.evalRhs(
-          visitExpr(e.a1),
-          visitExpr(e.a2),
-          visitExpr(e.a3),
-          visitExpr(e.a4),
+          visitAsLazy(e.a1),
+          visitAsLazy(e.a2),
+          visitAsLazy(e.a3),
+          visitAsLazy(e.a4),
           this,
           e.pos
         )
-      )
-    } else {
-      e.func.evalRhs(
-        visitAsLazy(e.a1),
-        visitAsLazy(e.a2),
-        visitAsLazy(e.a3),
-        visitAsLazy(e.a4),
-        this,
-        e.pos
-      )
-    }
+      }
+    } finally decrementStackDepth()
   }
 
   protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    val arr = new Array[Eval](e.argExprs.length)
-    var idx = 0
+    checkStackDepth(e.pos)
+    try {
+      val arr = new Array[Eval](e.argExprs.length)
+      var idx = 0
 
-    if (e.tailstrict) {
-      while (idx < e.argExprs.length) {
-        arr(idx) = visitExpr(e.argExprs(idx))
-        idx += 1
+      if (e.tailstrict) {
+        while (idx < e.argExprs.length) {
+          arr(idx) = visitExpr(e.argExprs(idx))
+          idx += 1
+        }
+        TailCall.resolve(e.func.evalRhs(arr, this, e.pos))
+      } else {
+        while (idx < e.argExprs.length) {
+          val boundIdx = idx
+          arr(idx) = visitAsLazy(e.argExprs(boundIdx))
+          idx += 1
+        }
+        e.func.evalRhs(arr, this, e.pos)
       }
-      TailCall.resolve(e.func.evalRhs(arr, this, e.pos))
-    } else {
-      while (idx < e.argExprs.length) {
-        val boundIdx = idx
-        arr(idx) = visitAsLazy(e.argExprs(boundIdx))
-        idx += 1
-      }
-      e.func.evalRhs(arr, this, e.pos)
-    }
+    } finally decrementStackDepth()
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
@@ -457,11 +502,14 @@ class Evaluator(
     cachedImports.getOrElseUpdate(
       p, {
         if (debugStats != null) debugStats.importCalls += 1
-        val doc = resolver.parse(p, str) match {
-          case Right((expr, _)) => expr
-          case Left(err)        => throw err.asSeenFrom(this)
-        }
-        visitExpr(doc)(ValScope.empty)
+        checkStackDepth(e.pos)
+        try {
+          val doc = resolver.parse(p, str) match {
+            case Right((expr, _)) => expr
+            case Left(err)        => throw err.asSeenFrom(this)
+          }
+          visitExpr(doc)(ValScope.empty)
+        } finally decrementStackDepth()
       }
     )
   }
@@ -681,7 +729,11 @@ class Evaluator(
       override def functionName: String = name
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExprWithTailCallSupport(rhs)(vs)
-      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = visitExpr(expr)(vs)
+      override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
+        checkStackDepth(expr.pos)
+        try visitExpr(expr)(vs)
+        finally decrementStackDepth()
+      }
     }
 
   /**
@@ -871,7 +923,9 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              visitExpr(rhs)(makeNewScope(self, sup))
+              checkStackDepth(rhs.pos)
+              try visitExpr(rhs)(makeNewScope(self, sup))
+              finally decrementStackDepth()
             }
           }
           val previousValue = builder.put(k, v)
@@ -884,7 +938,9 @@ class Evaluator(
         if (k != null) {
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+              checkStackDepth(rhs.pos)
+              try visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
+              finally decrementStackDepth()
             }
           }
           val previousValue = builder.put(k, v)
@@ -924,12 +980,12 @@ class Evaluator(
             k,
             new Val.Obj.Member(e.plus, Visibility.Normal, deprecatedSkipAsserts = true) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-                // There is a circular dependency between `newScope` and `newBindings` because
-                // bindings may refer to other bindings (e.g. chains of locals that build on
-                // each other):
-                lazy val newScope: ValScope = s.extend(newBindings, self, sup)
-                lazy val newBindings = visitBindings(binds, newScope)
-                visitExpr(e.value)(newScope)
+                checkStackDepth(e.value.pos)
+                try {
+                  lazy val newScope: ValScope = s.extend(newBindings, self, sup)
+                  lazy val newBindings = visitBindings(binds, newScope)
+                  visitExpr(e.value)(newScope)
+                } finally decrementStackDepth()
               }
             }
           )
