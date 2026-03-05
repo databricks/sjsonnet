@@ -1,4 +1,3 @@
 sjsonnet.Error: Cannot join array
     at [std.join].(error.std_join_types1.jsonnet:17:9)
-    at [<root>].(error.std_join_types1.jsonnet:17:9)
 

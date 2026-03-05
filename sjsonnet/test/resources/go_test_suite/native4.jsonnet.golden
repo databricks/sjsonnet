@@ -1,4 +1,4 @@
 sjsonnet.Error: xxx
-    at [std.jsonToString].(native4.jsonnet:1:28)
-    at [<root>].(native4.jsonnet:1:27)
+    at [Error].(native4.jsonnet:1:28)
+    at [std.jsonToString].(native4.jsonnet:1:27)
 

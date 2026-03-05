@@ -19,7 +19,7 @@ object EvaluatorTests extends TestSuite {
       eval("([1, 2, 3] + [4, 5, 6])[3]", useNewEvaluator = useNewEvaluator) ==> ujson.Num(4)
       evalErr("[][0]", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: array bounds error: array is empty
-        |at [<root>].(:1:3)""".stripMargin
+        |at [Lookup].(:1:3)""".stripMargin
       eval("std.slice(std.range(1,4), 0, null, 2)", useNewEvaluator = useNewEvaluator) ==> ujson
         .Arr(1, 3)
       eval("std.slice(std.range(1,4), null, null, 2)", useNewEvaluator = useNewEvaluator) ==> ujson
@@ -216,7 +216,7 @@ object EvaluatorTests extends TestSuite {
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Field name must be string or null, not number
-          |at [<root>].(:1:1)""".stripMargin
+          |at .(:1:1)""".stripMargin
       // Basic function support:
       eval(
         """
@@ -333,7 +333,9 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator
         ) ==>
         """sjsonnet.Error: Attempt to use `super` when there is no super class
-          |at [<root>].(:1:68)""".stripMargin
+          |at [SelectSuper b].(:1:68)
+          |at [Select c].(:1:70)
+          |at [BinaryOp *].(:1:73)""".stripMargin
       }
     }
     test("hidden") {
@@ -479,16 +481,16 @@ object EvaluatorTests extends TestSuite {
     test("unknownVariable") {
       evalErr("x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Unknown variable: x
-        |at [<root>].(:1:1)""".stripMargin
+        |at [Id x].(:1:1)""".stripMargin
       evalErr("self.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use self outside of an object
-        |at [<root>].(:1:1)""".stripMargin
+        |at [Self].(:1:1)""".stripMargin
       evalErr("$.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use $ outside of an object
-        |at [<root>].(:1:1)""".stripMargin
+        |at [$].(:1:1)""".stripMargin
       evalErr("super.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use super outside of an object
-        |at [<root>].(:1:1)""".stripMargin
+        |at [Super].(:1:1)""".stripMargin
     }
 
     test("validParam") {
@@ -593,7 +595,7 @@ object EvaluatorTests extends TestSuite {
         .Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", strict = true, useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-        |at [<root>].(:1:11)""".stripMargin
+        |at [ObjExtend].(:1:11)""".stripMargin
       eval(
         "local x = { c: 3 }; (x { a: 1 } { b: 2 }).a",
         strict = false,
@@ -610,7 +612,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-        |at [<root>].(:1:31)""".stripMargin
+        |at [ObjExtend].(:1:31)""".stripMargin
     }
     test("objectDeclaration") {
       eval("{ ['foo']: x for x in  []}", false, useNewEvaluator = useNewEvaluator) ==> ujson.Obj()
@@ -643,7 +645,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
-        |at [<root>].(:1:1)""".stripMargin
+        |at .(:1:1)""".stripMargin
     }
     test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
       evalErr(
@@ -653,7 +655,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
-        |at [<root>].(:3:1)""".stripMargin
+        |at .(:3:1)""".stripMargin
     }
     test("functionEqualsNull") {
       eval("""local f(x)=null; f == null""", useNewEvaluator = useNewEvaluator) ==> ujson.False
@@ -668,15 +670,15 @@ object EvaluatorTests extends TestSuite {
       // Cases where StaticOptimizer replaces the dynamic field names with fixed ones:
       test - (evalErr("""{ ["k"]: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at [<root>].(:1:13)""".stripMargin)
+          |at .(:1:13)""".stripMargin)
 
       test - (evalErr("""{ k: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at [<root>].(:1:9)""".stripMargin)
+          |at .(:1:9)""".stripMargin)
 
       test - (evalErr("""{ ["k"]: 1, k: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at [<root>].(:1:13)""".stripMargin)
+          |at .(:1:13)""".stripMargin)
 
       // Test that lazy evaluation is preserved - duplicate fields should only error when accessed
       test - (eval(
@@ -690,12 +692,13 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at [<root>].(:1:17)""".stripMargin)
+          |at .(:1:17)
+          |at [Select x].(:1:34)""".stripMargin)
 
       // Non-StaticOptimizable case:
       test - (evalErr("""{ k: 1, ["k" + ""]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at [<root>].(:1:9)""".stripMargin)
+          |at .(:1:9)""".stripMargin)
     }
 
     test("identifierStartsWithKeyword") {

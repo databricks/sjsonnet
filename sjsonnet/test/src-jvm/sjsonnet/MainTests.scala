@@ -431,40 +431,6 @@ object MainTests extends TestSuite {
       assert(!err.contains("sjsonnet debug stats"))
     }
 
-    test("callbackStackFilter") {
-      val source = """std.filter(function(x) error "oops", [1, 2, 3])"""
-      val (res, _, err) = runMain(source, "--exec")
-      assert(res == 1)
-      assert(err.contains("oops"))
-      assert(err.contains("[std.filter]"))
-    }
-
-    test("callbackStackMap") {
-      val source = """std.map(function(x) error "oops", [1, 2, 3])"""
-      val (res, _, err) = runMain(source, "--exec")
-      assert(res == 1)
-      assert(err.contains("oops"))
-      assert(err.contains("[std.map]"))
-    }
-
-    test("callbackStackFoldl") {
-      val source = """std.foldl(function(acc, x) error "oops", [1, 2, 3], 0)"""
-      val (res, _, err) = runMain(source, "--exec")
-      assert(res == 1)
-      assert(err.contains("oops"))
-      assert(err.contains("[std.foldl]"))
-    }
-
-    test("callbackStackNested") {
-      val source =
-        """std.map(function(xs) std.filter(function(x) error "nested", xs), [[1,2,3]])"""
-      val (res, _, err) = runMain(source, "--exec")
-      assert(res == 1)
-      assert(err.contains("nested"))
-      assert(err.contains("[std.filter]"))
-      assert(err.contains("[std.map]"))
-    }
-
     test("jsonnetPathReverseJpathsPriority") {
       // With --reverse-jpaths-priority, rightmost -J wins, but -J still beats JSONNET_PATH
       val libDirEnv = os.temp.dir()

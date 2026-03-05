@@ -1,3 +1,3 @@
 sjsonnet.Error: Assertion failed
-    at [<root>].(supersugar8.jsonnet:1:14)
+    at [Assert].(supersugar8.jsonnet:1:14)
 

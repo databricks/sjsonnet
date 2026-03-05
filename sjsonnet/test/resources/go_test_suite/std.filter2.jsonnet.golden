@@ -1,4 +1,4 @@
 sjsonnet.Error: x
-    at [std.filter].(std.filter2.jsonnet:1:12)
-    at [<root>].(std.filter2.jsonnet:1:11)
+    at [Error].(std.filter2.jsonnet:1:12)
+    at [std.filter].(std.filter2.jsonnet:1:11)
 

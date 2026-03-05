@@ -1,4 +1,4 @@
 sjsonnet.Error: xxx
-    at [std.type].(type_error.jsonnet:1:10)
-    at [<root>].(type_error.jsonnet:1:9)
+    at [Error].(type_error.jsonnet:1:10)
+    at [std.type].(type_error.jsonnet:1:9)
 

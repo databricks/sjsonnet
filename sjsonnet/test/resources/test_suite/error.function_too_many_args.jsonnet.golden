@@ -1,4 +1,3 @@
 sjsonnet.Error: Too many args, function foo has 2 parameter(s)
-    at [foo].(error.function_too_many_args.jsonnet:19:4)
-    at [<root>].(error.function_too_many_args.jsonnet:17:7)
+    at [Apply3].(error.function_too_many_args.jsonnet:19:4)
 

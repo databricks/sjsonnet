@@ -1,4 +1,2 @@
 sjsonnet.Error: Expected a number for offset in substr, got string
     at [std.substr].(builtinSubStr_second_parameter_not_number.jsonnet:1:11)
-    at [<root>].(builtinSubStr_second_parameter_not_number.jsonnet:1:11)
-

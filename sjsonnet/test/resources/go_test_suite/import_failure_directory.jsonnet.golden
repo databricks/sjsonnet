@@ -1,3 +1,3 @@
 sjsonnet.Error: Couldn't import file: "."
-    at [<root>].(import_failure_directory.jsonnet:3:1)
+    at [Import].(import_failure_directory.jsonnet:3:1)
 

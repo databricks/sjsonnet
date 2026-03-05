@@ -1,5 +1,0 @@
-sjsonnet.Error: oops
-    at [anonymous].(error.std.filter_callback.jsonnet:1:24)
-    at [std.filter]
-    at [<root>].(error.std.filter_callback.jsonnet:1:11)
-

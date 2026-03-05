@@ -1,4 +1,3 @@
 sjsonnet.Error: Function makeArray has no parameter blahblah
-    at [std.makeArray].(std.makeArrayNamed3.jsonnet:1:14)
-    at [<root>].(std.makeArrayNamed3.jsonnet:1:14)
+    at [Apply].(std.makeArrayNamed3.jsonnet:1:14)
 

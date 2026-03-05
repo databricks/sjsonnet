@@ -1,4 +1,4 @@
 sjsonnet.Error: x
-    at [std.primitiveEquals].(std.primitiveEquals9.jsonnet:1:25)
-    at [<root>].(std.primitiveEquals9.jsonnet:1:20)
+    at [Error].(std.primitiveEquals9.jsonnet:1:25)
+    at [std.primitiveEquals].(std.primitiveEquals9.jsonnet:1:20)
 

@@ -1,3 +1,4 @@
 sjsonnet.Error: x
-    at [<root>].(bitwise_and4.jsonnet:1:5)
+    at [Error].(bitwise_and4.jsonnet:1:5)
+    at [BinaryOp &].(bitwise_and4.jsonnet:1:3)
 

@@ -1,3 +1,5 @@
 sjsonnet.Error: Assertion failed: foo was not equal to bar
-    at [<root>].(error.obj_assert.fail2.jsonnet:20:25)
+    at [Assert].(error.obj_assert.fail2.jsonnet:20:25)
+    at [BinaryOp ==].(error.obj_assert.fail2.jsonnet:20:74)
+    at [And].(error.obj_assert.fail2.jsonnet:20:86)
 

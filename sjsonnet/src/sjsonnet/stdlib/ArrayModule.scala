@@ -117,6 +117,8 @@ object ArrayModule extends AbstractFunctionModule {
           i += 1
         }
       } else {
+        // Single-param non-builtin can benefit from scope reuse: We compute a strict boolean from
+        // the function, there's no risk of the scope leaking (and being invalid at a later point)
         val funDefFileScope: FileScope = func.pos match {
           case null => p.fileScope
           case pp   => pp.fileScope
@@ -164,9 +166,7 @@ object ArrayModule extends AbstractFunctionModule {
         pos: Position): Val.Arr = {
       Val.Arr(
         pos,
-        arg.map(v =>
-          ev.lazyInContext(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled))
-        )
+        arg.map(v => new Lazy(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)))
       )
     }
 
@@ -184,7 +184,7 @@ object ArrayModule extends AbstractFunctionModule {
       while (i < a.length) {
         val x = arr(i)
         val idx = Val.Num(pos, i)
-        a(i) = ev.lazyInContext(() => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled))
+        a(i) = new Lazy(() => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled))
         i += 1
       }
       Val.Arr(pos, a)
@@ -433,7 +433,7 @@ object ArrayModule extends AbstractFunctionModule {
               None
             } else {
               Some[Eval](
-                ev.lazyInContext(() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
+                new Lazy(() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
               )
             }
           }
@@ -471,7 +471,7 @@ object ArrayModule extends AbstractFunctionModule {
           var i = 0
           while (i < sz) {
             val forcedI = i
-            a(i) = ev.lazyInContext(() =>
+            a(i) = new Lazy(() =>
               func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
             )
             i += 1

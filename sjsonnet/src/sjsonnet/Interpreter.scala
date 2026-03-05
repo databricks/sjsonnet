@@ -148,7 +148,7 @@ class Interpreter(
       case ExternalVariable(ExternalVariableKind.Expr, v: Expr)       => v
       case ExternalVariable(ExternalVariableKind.Variable, v: String) => Val.Str(noOffsetPos, v)
       case _                                                          =>
-        throw new Error(s"Unsupported external variable kind: ${externalVariable.kind}")
+        throw new Error(s"Unsupported external variable kind: ${externalVariable.kind}", Nil, None)
     }
 
   /**
@@ -176,23 +176,18 @@ class Interpreter(
   def interpret0[T](
       txt: String,
       path: Path,
-      visitor: upickle.core.Visitor[T, T]): Either[String, T] = {
-    val result = (for {
+      visitor: upickle.core.Visitor[T, T]): Either[String, T] =
+    (for {
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
     } yield r).left.map(Error.formatError)
-    evaluator.popRootFrame()
-    result
-  }
 
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)
     catch {
-      case e: Error =>
-        if (e.trace.isEmpty) Left(new Error(e.getMessage, evaluator.captureTrace(null), None))
-        else Left(e)
+      case e: Error    => Left(e)
       case NonFatal(e) =>
-        Left(new Error("Internal error: " + e.toString, evaluator.captureTrace(null), Some(e)))
+        Left(new Error("Internal error: " + e.toString, Nil, Some(e)))
     }
   }
 
@@ -207,9 +202,7 @@ class Interpreter(
     val resolvedImport = StaticResolvedFile(txt)
     resolver.cache(path) = resolvedImport
     resolver.parse(path, resolvedImport)(evaluator) flatMap { case (expr, _) =>
-      evaluator.pushRootFrame(expr.pos)
-      val res = handleException(evaluator.visitExpr(expr)(ValScope.empty))
-      res flatMap {
+      handleException(evaluator.visitExpr(expr)(ValScope.empty)) flatMap {
         case f: Val.Func =>
           val defaults2 = f.params.defaultExprs.clone()
           val tlaExpressions = collection.mutable.Set.empty[Expr]

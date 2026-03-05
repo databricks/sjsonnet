@@ -1,3 +1,2 @@
 sjsonnet.ParseError: Expected object comprehension cannot have asserts:1:46, found "}\n"
-    at [<root>].(object_comp_assert.jsonnet:1:46)
-
+    at .(object_comp_assert.jsonnet:1:46)
