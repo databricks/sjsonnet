@@ -1,4 +1,5 @@
-//| mill-version: 1.1.2-jvm
+//| mill-version: 1.1.2
+//| mill-jvm-opts: ["-XX:+UseG1GC", "-Xmx4G", "--enable-native-access=ALL-UNNAMED"]
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
