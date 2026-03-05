@@ -826,12 +826,11 @@ class Evaluator(
         val a = asserts(i)
         if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
           a.msg match {
-            case null => Error.fail("Assertion failed", a.value.pos, "Assert")
+            case null => Error.fail("Assertion failed", a.value.pos)
             case msg  =>
               Error.fail(
                 "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].str,
-                a.value.pos,
-                "Assert"
+                a.value.pos
               )
           }
         }

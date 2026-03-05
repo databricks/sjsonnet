@@ -1,3 +1,2 @@
-sjsonnet.Error: Unknown extVar: UNKNOWN
-    at [std.extVar].(extvar_unknown.jsonnet:1:11)
-
+sjsonnet.Error: [std.extVar] Unknown extVar: UNKNOWN
+    at [<root>].(extvar_unknown.jsonnet:1:11)

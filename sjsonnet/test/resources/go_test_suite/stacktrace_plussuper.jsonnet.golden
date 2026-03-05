@@ -1,3 +1,3 @@
 sjsonnet.Error: Cannot merge null with object
-    at .((materialize) offset)
+    at [<root>].(stacktrace_plussuper.jsonnet:1:7)
 

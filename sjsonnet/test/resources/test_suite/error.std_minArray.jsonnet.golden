@@ -1,3 +1,3 @@
-sjsonnet.Error: Expected at least one element in array. Got none
-    at [std.minArray].(error.std_minArray.jsonnet:1:13)
+sjsonnet.Error: [std.minArray] Expected at least one element in array. Got none
+    at [<root>].(error.std_minArray.jsonnet:1:13)
 

@@ -196,7 +196,9 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.isEmpty("non-empty string")""") ==> ujson.Bool(false)
       assert(
         evalErr("""std.isEmpty(10)""")
-          .startsWith("sjsonnet.Error: Wrong parameter type: expected String, got number")
+          .startsWith(
+            "sjsonnet.Error: [std.isEmpty] Wrong parameter type: expected String, got number"
+          )
       )
     }
 
@@ -211,7 +213,7 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.trim("string with tabs at end\t\t")""") ==> ujson.Str("string with tabs at end")
       assert(
         evalErr("""std.trim(10)""").startsWith(
-          "sjsonnet.Error: Wrong parameter type: expected String, got number"
+          "sjsonnet.Error: [std.trim] Wrong parameter type: expected String, got number"
         )
       )
     }
@@ -221,7 +223,9 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.xnor(false, false)""") ==> ujson.True
       assert(
         evalErr("""std.xnor("false", false)""")
-          .startsWith("sjsonnet.Error: Wrong parameter type: expected Boolean, got string")
+          .startsWith(
+            "sjsonnet.Error: [std.xnor] Wrong parameter type: expected Boolean, got string"
+          )
       )
     }
 
@@ -230,7 +234,9 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.xor(true, true)""") ==> ujson.False
       assert(
         evalErr("""std.xor("false", false)""")
-          .startsWith("sjsonnet.Error: Wrong parameter type: expected Boolean, got string")
+          .startsWith(
+            "sjsonnet.Error: [std.xor] Wrong parameter type: expected Boolean, got string"
+          )
       )
     }
 

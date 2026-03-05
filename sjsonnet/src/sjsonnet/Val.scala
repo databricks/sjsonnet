@@ -673,11 +673,6 @@ object Val {
      */
     def qualifiedName: String = s"std.$functionName"
 
-    private def functionNamePrefix: String = {
-      val name = functionName
-      if (name != null) s" $name" else ""
-    }
-
     private def functionNameSuffix: String = {
       val name = functionName
       if (name != null) s" in function $name" else ""
@@ -728,7 +723,7 @@ object Val {
             val idx = params.paramMap.getOrElse(
               namedNames(i),
               Error.fail(
-                s"Function$functionNamePrefix has no parameter ${namedNames(i)}",
+                s"has no parameter ${namedNames(i)}",
                 outerPos
               )
             )
@@ -744,7 +739,7 @@ object Val {
         }
         if (argsL.length > params.names.length)
           Error.fail(
-            "Too many args, function" + functionNamePrefix + " has " + params.names.length + " parameter(s)",
+            "Too many args, has " + params.names.length + " parameter(s)",
             outerPos
           )
         if (params.names.length != argsL.length) { // Args missing -> add defaults
@@ -767,7 +762,7 @@ object Val {
           if (missing != null) {
             val plural = if (missing.size > 1) "s" else ""
             Error.fail(
-              s"Function$functionNamePrefix parameter$plural ${missing.mkString(", ")} not bound in call",
+              s"parameter$plural ${missing.mkString(", ")} not bound in call",
               outerPos
             )
           }

@@ -1,2 +1,3 @@
-sjsonnet.Error: std.flatMap second param must be array / string, got object
-    at [std.flatMap].(error.flatMap_seq_typecheck.jsonnet:1:12)
+sjsonnet.Error: [std.flatMap] std.flatMap second param must be array / string, got object
+    at [<root>].(error.flatMap_seq_typecheck.jsonnet:1:12)
+

@@ -1,2 +1,3 @@
 sjsonnet.ParseError: text block indentation mismatch: expected at least 4 spaces, found 2 spaces
-    at .(error.parse.text_block_indent_spaces.jsonnet:19:3)
+    at [<root>].(error.parse.text_block_indent_spaces.jsonnet:19:3)
+

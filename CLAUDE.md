@@ -25,6 +25,8 @@ The assembly JAR is at `out/sjsonnet/jvm/3.3.7/assembly.dest/out.jar`. Run it wi
 
 ## Formatting
 
+We follow the Databricks [Scala style guide](https://raw.githubusercontent.com/databricks/scala-style-guide/refs/heads/master/README.md).
+
 Scala sources are formatted with [scalafmt](https://scalameta.org/scalafmt/) (config in `.scalafmt.conf`). The `SjsonnetCrossModule` and `bench` modules mix in `ScalafmtModule`.
 
 ```bash

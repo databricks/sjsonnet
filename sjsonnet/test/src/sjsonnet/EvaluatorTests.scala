@@ -19,7 +19,7 @@ object EvaluatorTests extends TestSuite {
       eval("([1, 2, 3] + [4, 5, 6])[3]", useNewEvaluator = useNewEvaluator) ==> ujson.Num(4)
       evalErr("[][0]", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: array bounds error: array is empty
-        |at [Lookup].(:1:3)""".stripMargin
+        |at [<root>].(:1:3)""".stripMargin
       eval("std.slice(std.range(1,4), 0, null, 2)", useNewEvaluator = useNewEvaluator) ==> ujson
         .Arr(1, 3)
       eval("std.slice(std.range(1,4), null, null, 2)", useNewEvaluator = useNewEvaluator) ==> ujson
@@ -216,7 +216,7 @@ object EvaluatorTests extends TestSuite {
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Field name must be string or null, not number
-          |at .(:1:1)""".stripMargin
+          |at [<root>].(:1:1)""".stripMargin
       // Basic function support:
       eval(
         """
@@ -333,9 +333,7 @@ object EvaluatorTests extends TestSuite {
           useNewEvaluator = useNewEvaluator
         ) ==>
         """sjsonnet.Error: Attempt to use `super` when there is no super class
-          |at [SelectSuper b].(:1:68)
-          |at [Select c].(:1:70)
-          |at [BinaryOp *].(:1:73)""".stripMargin
+          |at [<root>].(:1:7)""".stripMargin
       }
     }
     test("hidden") {
@@ -457,7 +455,7 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("Function newParams parameter y not bound in call"))
+      assert(ex.getMessage.contains("parameter y not bound in call"))
     }
 
     test("invalidParam") {
@@ -475,22 +473,22 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("Function Person has no parameter hello"))
+      assert(ex.getMessage.contains("has no parameter hello"))
     }
 
     test("unknownVariable") {
       evalErr("x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Unknown variable: x
-        |at [Id x].(:1:1)""".stripMargin
+        |at [<root>].(:1:1)""".stripMargin
       evalErr("self.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use self outside of an object
-        |at [Self].(:1:1)""".stripMargin
+        |at [<root>].(:1:1)""".stripMargin
       evalErr("$.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use $ outside of an object
-        |at [$].(:1:1)""".stripMargin
+        |at [<root>].(:1:1)""".stripMargin
       evalErr("super.x", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Can't use super outside of an object
-        |at [Super].(:1:1)""".stripMargin
+        |at [<root>].(:1:1)""".stripMargin
     }
 
     test("validParam") {
@@ -595,7 +593,7 @@ object EvaluatorTests extends TestSuite {
         .Num(1)
       evalErr("({ a: 1 } { b: 2 }).a", strict = true, useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-        |at [ObjExtend].(:1:11)""".stripMargin
+        |at [<root>].(:1:11)""".stripMargin
       eval(
         "local x = { c: 3 }; (x { a: 1 } { b: 2 }).a",
         strict = false,
@@ -612,7 +610,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.StaticError: Adjacent object literals not allowed in strict mode - Use '+' to concatenate objects
-        |at [ObjExtend].(:1:31)""".stripMargin
+        |at [<root>].(:1:31)""".stripMargin
     }
     test("objectDeclaration") {
       eval("{ ['foo']: x for x in  []}", false, useNewEvaluator = useNewEvaluator) ==> ujson.Obj()
@@ -645,7 +643,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
-        |at .(:1:1)""".stripMargin
+        |at [<root>].(:1:1)""".stripMargin
     }
     test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
       evalErr(
@@ -655,7 +653,7 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
-        |at .(:3:1)""".stripMargin
+        |at [<root>].(:1:7)""".stripMargin
     }
     test("functionEqualsNull") {
       eval("""local f(x)=null; f == null""", useNewEvaluator = useNewEvaluator) ==> ujson.False
@@ -670,15 +668,15 @@ object EvaluatorTests extends TestSuite {
       // Cases where StaticOptimizer replaces the dynamic field names with fixed ones:
       test - (evalErr("""{ ["k"]: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at .(:1:13)""".stripMargin)
+          |at [<root>].(:1:1)""".stripMargin)
 
       test - (evalErr("""{ k: 1, ["k"]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at .(:1:9)""".stripMargin)
+          |at [<root>].(:1:1)""".stripMargin)
 
       test - (evalErr("""{ ["k"]: 1, k: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at .(:1:13)""".stripMargin)
+          |at [<root>].(:1:1)""".stripMargin)
 
       // Test that lazy evaluation is preserved - duplicate fields should only error when accessed
       test - (eval(
@@ -692,13 +690,12 @@ object EvaluatorTests extends TestSuite {
         useNewEvaluator = useNewEvaluator
       ) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at .(:1:17)
-          |at [Select x].(:1:34)""".stripMargin)
+          |at [<root>].(:1:34)""".stripMargin)
 
       // Non-StaticOptimizable case:
       test - (evalErr("""{ k: 1, ["k" + ""]: 2 }""", useNewEvaluator = useNewEvaluator) ==>
       """sjsonnet.Error: Duplicate key k in evaluated object.
-          |at .(:1:9)""".stripMargin)
+          |at [<root>].(:1:1)""".stripMargin)
     }
 
     test("identifierStartsWithKeyword") {
@@ -874,7 +871,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.length([1], [2])", useNewEvaluator = useNewEvaluator)
         }
-        assert(ex.getMessage.contains("Too many args, function length has"))
+        assert(ex.getMessage.contains("Too many args, has"))
       }
 
       // Parameter not bound in call (missing required arg)
@@ -882,7 +879,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.substr('hello')", useNewEvaluator = useNewEvaluator)
         }
-        assert(ex.getMessage.contains("Function substr parameter"))
+        assert(ex.getMessage.contains("parameter"))
         assert(ex.getMessage.contains("not bound in call"))
       }
 
@@ -891,7 +888,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.length(x=[1], noSuchParam=2)", useNewEvaluator = useNewEvaluator)
         }
-        assert(ex.getMessage.contains("Function length has no parameter noSuchParam"))
+        assert(ex.getMessage.contains("has no parameter noSuchParam"))
       }
 
       // Binding parameter a second time
@@ -912,7 +909,7 @@ object EvaluatorTests extends TestSuite {
             useNewEvaluator = useNewEvaluator
           )
         }
-        assert(ex.getMessage.contains("Function myFunc parameter y not bound in call"))
+        assert(ex.getMessage.contains("parameter y not bound in call"))
       }
 
       // User-defined function: too many args should include function name
@@ -925,7 +922,7 @@ object EvaluatorTests extends TestSuite {
             useNewEvaluator = useNewEvaluator
           )
         }
-        assert(ex.getMessage.contains("Too many args, function add has 2 parameter(s)"))
+        assert(ex.getMessage.contains("Too many args, has 2 parameter(s)"))
       }
 
       // Anonymous function should NOT include function name in error message
@@ -933,8 +930,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("(function(x, y) x + y)('a')", useNewEvaluator = useNewEvaluator)
         }
-        // Should be exactly "Function parameter..." without a function name inserted
-        assert(ex.getMessage.contains("Function parameter y not bound in call"))
+        assert(ex.getMessage.contains("parameter y not bound in call"))
       }
 
       // Anonymous function: too many args should NOT include function name
@@ -942,7 +938,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("(function(x) x)(1, 2)", useNewEvaluator = useNewEvaluator)
         }
-        assert(ex.getMessage.contains("Too many args, function has 1 parameter(s)"))
+        assert(ex.getMessage.contains("Too many args, has 1 parameter(s)"))
       }
     }
 

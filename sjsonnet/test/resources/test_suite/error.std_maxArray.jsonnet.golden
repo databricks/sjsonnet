@@ -1,3 +1,3 @@
-sjsonnet.Error: Expected at least one element in array. Got none
-    at [std.maxArray].(error.std_maxArray.jsonnet:1:13)
+sjsonnet.Error: [std.maxArray] Expected at least one element in array. Got none
+    at [<root>].(error.std_maxArray.jsonnet:1:13)
 
