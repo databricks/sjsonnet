@@ -215,7 +215,7 @@ object EvaluatorTests extends TestSuite {
       ) ==> ujson.Obj("x" -> ujson.Num(3))
       // Regression test for a bug in handling of non-string field names:
       evalErr("{[k]: k for k in [1]}", useNewEvaluator = useNewEvaluator) ==>
-      """sjsonnet.Error: Field name must be string or null, not number
+      """sjsonnet.Error: [object comprehension] Field name must be string or null, not number
           |at [<root>].(:1:1)""".stripMargin
       // Basic function support:
       eval(
@@ -642,7 +642,7 @@ object EvaluatorTests extends TestSuite {
         """{ [x]: x for x in ["A", "A"]}""",
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+      """sjsonnet.Error: [object comprehension] Duplicate key A in evaluated object comprehension.
         |at [<root>].(:1:1)""".stripMargin
     }
     test("givenDuplicateFieldsInIndirectListComprehension_expectFailure") {
@@ -652,7 +652,7 @@ object EvaluatorTests extends TestSuite {
           |{ [x.a]: x for x in [y, z]}""".stripMargin,
         useNewEvaluator = useNewEvaluator
       ) ==>
-      """sjsonnet.Error: Duplicate key A in evaluated object comprehension.
+      """sjsonnet.Error: [object comprehension] Duplicate key A in evaluated object comprehension.
         |at [<root>].(:1:7)""".stripMargin
     }
     test("functionEqualsNull") {

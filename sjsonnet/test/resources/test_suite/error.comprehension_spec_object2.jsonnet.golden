@@ -1,3 +1,4 @@
 sjsonnet.Error: In comprehension, can only iterate over array, not object
+    at [object comprehension].(error.comprehension_spec_object2.jsonnet:17:13)
     at [<root>].(error.comprehension_spec_object2.jsonnet:17:1)
 

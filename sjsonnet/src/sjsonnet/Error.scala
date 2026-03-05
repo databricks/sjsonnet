@@ -54,7 +54,8 @@ class Error(msg: String, val stack: List[Error.Frame] = Nil, underlying: Option[
   private def isApplyOrBuiltin(expr: Expr): Boolean = expr match {
     case _: Expr.Apply | _: Expr.Apply0 | _: Expr.Apply1 | _: Expr.Apply2 | _: Expr.Apply3 |
         _: Expr.ApplyBuiltin | _: Expr.ApplyBuiltin0 | _: Expr.ApplyBuiltin1 |
-        _: Expr.ApplyBuiltin2 | _: Expr.ApplyBuiltin3 | _: Expr.ApplyBuiltin4 =>
+        _: Expr.ApplyBuiltin2 | _: Expr.ApplyBuiltin3 | _: Expr.ApplyBuiltin4 | _: Expr.Comp |
+        _: Expr.ObjBody.ObjComp =>
       true
     case _ => false
   }

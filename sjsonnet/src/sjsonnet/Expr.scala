@@ -343,6 +343,7 @@ object Expr {
   final case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec])
       extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Comp
+    override def exprErrorString: String = "array comprehension"
   }
   final case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.ObjExtend
@@ -371,6 +372,7 @@ object Expr {
         rest: List[CompSpec])
         extends ObjBody {
       final override private[sjsonnet] def tag = ExprTags.`ObjBody.ObjComp`
+      override def exprErrorString: String = "object comprehension"
       override def toString: String =
         s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
     }
