@@ -1,0 +1,7 @@
+sjsonnet.Error: nested
+    at [anonymous].(error.std.nested_callback.jsonnet:1:45)
+    at [std.filter]
+    at [anonymous]
+    at [std.map]
+    at [<root>].(error.std.nested_callback.jsonnet:1:8)
+

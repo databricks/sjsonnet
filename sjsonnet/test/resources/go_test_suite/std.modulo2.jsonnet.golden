@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Number, got string
     at [std.modulo].(std.modulo2.jsonnet:1:11)
+    at [<root>].(std.modulo2.jsonnet:1:11)
 

@@ -1,3 +1,4 @@
 sjsonnet.Error: assertEqual failed: {"x":1} != {"x":2}
     at [std.assertEqual].(assert_equal4.jsonnet:1:16)
+    at [<root>].(assert_equal4.jsonnet:1:16)
 

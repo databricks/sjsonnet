@@ -1,3 +1,4 @@
 sjsonnet.Error: expected a single character string, got ą
     at [std.codepoint].(std.codepoint7.jsonnet:2:14)
+    at [<root>].(std.codepoint7.jsonnet:2:14)
 

@@ -1,3 +1,4 @@
 sjsonnet.Error: overflow
     at [std.pow].(pow7.jsonnet:2:8)
+    at [<root>].(pow7.jsonnet:2:8)
 

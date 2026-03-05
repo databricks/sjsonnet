@@ -1,2 +1,3 @@
 sjsonnet.ParseError: Expected finite number required:17:6, found "\n"
-    at .(error.overflow.jsonnet:17:6)
+    at [<root>].(error.overflow.jsonnet:17:6)
+

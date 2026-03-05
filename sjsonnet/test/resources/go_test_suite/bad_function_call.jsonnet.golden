@@ -1,3 +1,4 @@
 sjsonnet.Error: Function parameter x not bound in call
-    at [Apply0].(bad_function_call.jsonnet:1:16)
+    at [anonymous].(bad_function_call.jsonnet:1:16)
+    at [<root>].(bad_function_call.jsonnet:1:16)
 

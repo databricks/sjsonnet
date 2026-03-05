@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected String, got number
     at [std.extVar].(extvar_not_a_string.jsonnet:1:11)
+    at [<root>].(extvar_not_a_string.jsonnet:1:11)
 

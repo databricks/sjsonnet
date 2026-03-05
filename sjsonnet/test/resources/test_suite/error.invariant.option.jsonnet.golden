@@ -1,2 +1,3 @@
 sjsonnet.Error: Assertion failed: Option "d" not in ["a", "b", "c"].
-    at [Assert].(error.invariant.option.jsonnet:19:57)
+    at [<root>].(error.invariant.option.jsonnet:19:57)
+

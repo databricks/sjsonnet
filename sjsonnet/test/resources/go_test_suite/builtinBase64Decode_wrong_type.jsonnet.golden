@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected String, got number
     at [std.base64Decode].(builtinBase64Decode_wrong_type.jsonnet:1:17)
+    at [<root>].(builtinBase64Decode_wrong_type.jsonnet:1:17)
 

@@ -1,3 +1,4 @@
 sjsonnet.Error: Tried to manifest "null"
     at [std.manifestTomlEx].(error.manifest_toml_null_value.jsonnet:17:19)
+    at [<root>].(error.manifest_toml_null_value.jsonnet:17:19)
 

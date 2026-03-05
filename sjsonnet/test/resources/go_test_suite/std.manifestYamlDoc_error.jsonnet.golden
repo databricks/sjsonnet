@@ -1,4 +1,4 @@
 sjsonnet.Error: foo
-    at [Error].(std.manifestYamlDoc_error.jsonnet:1:31)
-    at [std.manifestYamlDoc].(std.manifestYamlDoc_error.jsonnet:1:20)
+    at [std.manifestYamlDoc].(std.manifestYamlDoc_error.jsonnet:1:31)
+    at [<root>].(std.manifestYamlDoc_error.jsonnet:1:20)
 

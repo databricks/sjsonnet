@@ -1,3 +1,4 @@
 sjsonnet.Error: Wrong parameter type: expected Object, got number
     at [std.objectFieldsEx].(builtinObjectFieldsEx_bad.jsonnet:1:19)
+    at [<root>].(builtinObjectFieldsEx_bad.jsonnet:1:19)
 

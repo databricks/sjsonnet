@@ -1,3 +1,4 @@
 sjsonnet.Error: Function foo has no parameter y
-    at [Apply].(optional_args8.jsonnet:2:4)
+    at [foo].(optional_args8.jsonnet:2:4)
+    at [<root>].(optional_args8.jsonnet:1:7)
 

@@ -218,13 +218,13 @@ class CachedResolver(
               case f @ Parsed.Failure(_, _, _) =>
                 val traced = f.trace()
                 val pos = new Position(new FileScope(path), traced.index)
-                Left(new ParseError(traced.msg).addFrame(pos))
+                Left(new ParseError(traced.msg, traceWithFallback(pos, ev), offset = traced.index))
               case Parsed.Success(r, _) => Right(r)
             }
           } catch {
             case e: ParseError if e.offset >= 0 =>
               val pos = new Position(new FileScope(path), e.offset)
-              Left(new ParseError(e.getMessage).addFrame(pos))
+              Left(new ParseError(e.getMessage, traceWithFallback(pos, ev), offset = e.offset))
             case e: ParseError =>
               Left(e)
           }
@@ -234,6 +234,24 @@ class CachedResolver(
   }
 
   def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))
+
+  private def traceWithFallback(pos: Position, ev: EvalErrorScope): Array[StackTrace] = {
+    val trace = ev.captureTrace(pos)
+    if (trace.nonEmpty) trace
+    else
+      ev.prettyIndex(pos) match {
+        case Some((line, col)) =>
+          Array(
+            new StackTrace(
+              Util.wrapInLessThanGreaterThan("root"),
+              pos.currentFile.relativeToString(ev.wd),
+              line,
+              col
+            )
+          )
+        case None => Array.empty
+      }
+  }
 
   /**
    * Creates a parser instance for the given path. This method can be overridden to provide custom
