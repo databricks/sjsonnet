@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         lang: ['jvm', 'js', 'wasm', 'native']
-        java: ['17', '21', '25']
+        java: ['21', '25']
     name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
     steps:
       - uses: actions/checkout@v6
