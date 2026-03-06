@@ -711,14 +711,14 @@ class Evaluator(
       case Expr.BinaryOp.OP_^ =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asLong ^ r.asLong).toDouble)
+            Val.Num(pos, (l.asSafeLong ^ r.asSafeLong).toDouble)
           case _ => fail()
         }
 
       case Expr.BinaryOp.OP_| =>
         (l, r) match {
           case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asLong | r.asLong).toDouble)
+            Val.Num(pos, (l.asSafeLong | r.asSafeLong).toDouble)
           case _ => fail()
         }
 
