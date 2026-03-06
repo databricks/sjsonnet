@@ -33,6 +33,8 @@ class Evaluator(
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
     stackDepth += 1
+    if (debugStats != null && stackDepth > debugStats.maxStackDepth)
+      debugStats.maxStackDepth = stackDepth
     if (stackDepth > maxStack)
       Error.fail("Max stack frames exceeded.", pos)
   }

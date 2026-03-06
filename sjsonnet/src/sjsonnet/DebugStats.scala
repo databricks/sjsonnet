@@ -16,6 +16,9 @@ final class DebugStats {
   var functionCalls: Long = 0
   var builtinCalls: Long = 0
 
+  // -- Stack --
+  var maxStackDepth: Int = 0
+
   // -- Comprehensions --
   var arrayCompIterations: Long = 0
   var objectCompIterations: Long = 0
@@ -39,6 +42,7 @@ final class DebugStats {
     sb.append(formatLine("lazy_created", lazyCreated))
     sb.append(formatLine("function_calls", functionCalls))
     sb.append(formatLine("builtin_calls", builtinCalls))
+    sb.append(formatLine("max_stack_depth", maxStackDepth))
     sb.append(formatLine("array_comp_iterations", arrayCompIterations))
     sb.append(formatLine("object_comp_iterations", objectCompIterations))
     sb.append(formatLine("files_parsed", filesParsed))
