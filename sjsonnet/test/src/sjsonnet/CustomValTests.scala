@@ -4,7 +4,7 @@ import upickle.core.Visitor
 import utest._
 
 object CustomValTests extends TestSuite {
-  private final case class ImportantString(pos: Position, str: String, importance: Int)
+  private final case class ImportantString(var pos: Position, str: String, importance: Int)
       extends Val.Literal
       with Materializer.Materializable {
     override def prettyName: String = "Important string"

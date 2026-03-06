@@ -9,8 +9,7 @@ import ScopedExprTransform.*
  * StaticOptimizer performs necessary transformations for the evaluator (assigning ValScope indices)
  * plus additional optimizations (post-order) and static checking (pre-order).
  *
- * When `aggressiveStaticOptimization` is enabled, the optimizer additionally performs during the
- * optimization phase:
+ * The optimizer performs:
  *   - Constant folding for arithmetic (+, -, *, /, %), comparison (<, >, <=, >=, ==, !=), bitwise
  *     (&, ^, |), shift (<<, >>), and unary (!, -, ~, +) operators.
  *   - Branch elimination for if-else with constant conditions.
@@ -31,8 +30,6 @@ class StaticOptimizer(
     ])
     extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
-
-  private val aggressiveOptimization = ev.settings.aggressiveStaticOptimization
 
   override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
     case a: Apply => transformApply(a)
@@ -104,18 +101,8 @@ class StaticOptimizer(
       if (binds == null && asserts == null && allFieldsStaticAndUniquelyNamed)
         Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
       else m
-
     // Aggressive optimizations: constant folding, branch elimination, short-circuit elimination.
     // These reduce AST node count at parse time, benefiting long-running Jsonnet programs.
-    case e => if (aggressiveOptimization) tryAggressiveOptimize(e) else e
-  }
-
-  /**
-   * Aggressive static optimizations that benefit long-running programs by reducing AST size.
-   * Includes: branch elimination, short-circuit elimination, constant folding for arithmetic,
-   * comparison, bitwise, and shift operators.
-   */
-  private def tryAggressiveOptimize(e: Expr): Expr = e match {
     // Constant folding: BinaryOp with two constant operands (most common case first)
     case e @ BinaryOp(pos, lhs: Val, op, rhs: Val) => tryFoldBinaryOp(pos, lhs, op, rhs, e)
 
@@ -123,9 +110,11 @@ class StaticOptimizer(
     case e @ UnaryOp(pos, op, v: Val) => tryFoldUnaryOp(pos, op, v, e)
 
     // Branch elimination: constant condition in if-else
-    case IfElse(_, _: Val.True, thenExpr, _)    => thenExpr
+    case IfElse(pos, _: Val.True, thenExpr, _) =>
+      thenExpr.pos = pos; thenExpr
     case IfElse(pos, _: Val.False, _, elseExpr) =>
-      if (elseExpr == null) Val.Null(pos) else elseExpr
+      if (elseExpr == null) Val.Null(pos)
+      else { elseExpr.pos = pos; elseExpr }
 
     // Short-circuit elimination for And/Or with constant lhs.
     //
@@ -135,12 +124,11 @@ class StaticOptimizer(
     // into just `rhs` without the Bool guard, we silently remove that runtime type check,
     // causing programs like `true && "hello"` to return "hello" instead of erroring.
     // See: Evaluator.visitAnd / Evaluator.visitOr for the authoritative runtime semantics.
-    case And(_, _: Val.True, rhs: Val.Bool) => rhs
-    case And(pos, _: Val.False, _)          => Val.False(pos)
-    case Or(pos, _: Val.True, _)            => Val.True(pos)
-    case Or(_, _: Val.False, rhs: Val.Bool) => rhs
-
-    case _ => e
+    case And(pos, _: Val.True, rhs: Val.Bool) => rhs.pos = pos; rhs
+    case And(pos, _: Val.False, _)            => Val.False(pos)
+    case Or(pos, _: Val.True, _)              => Val.True(pos)
+    case Or(pos, _: Val.False, rhs: Val.Bool) => rhs.pos = pos; rhs
+    case e                                    => e
   }
 
   private object ValidSuper {
@@ -400,25 +388,20 @@ class StaticOptimizer(
           }
         case BinaryOp.OP_& =>
           (lhs, rhs) match {
-            case (Val.Num(_, _), Val.Num(_, _)) =>
-              Val.Num(
-                pos,
-                (lhs.asInstanceOf[Val.Num].asSafeLong & rhs
-                  .asInstanceOf[Val.Num]
-                  .asSafeLong).toDouble
-              )
+            case (l: Val.Num, r: Val.Num) =>
+              Val.Num(pos, (l.asSafeLong & r.asSafeLong).toDouble)
             case _ => fallback
           }
         case BinaryOp.OP_^ =>
           (lhs, rhs) match {
-            case (Val.Num(_, _), Val.Num(_, _)) =>
-              Val.Num(pos, (lhs.asLong ^ rhs.asLong).toDouble)
+            case (l: Val.Num, r: Val.Num) =>
+              Val.Num(pos, (l.asSafeLong ^ r.asSafeLong).toDouble)
             case _ => fallback
           }
         case BinaryOp.OP_| =>
           (lhs, rhs) match {
-            case (Val.Num(_, _), Val.Num(_, _)) =>
-              Val.Num(pos, (lhs.asLong | rhs.asLong).toDouble)
+            case (l: Val.Num, r: Val.Num) =>
+              Val.Num(pos, (l.asSafeLong | r.asSafeLong).toDouble)
             case _ => fallback
           }
         case _ => fallback

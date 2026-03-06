@@ -84,20 +84,20 @@ object Val {
 
   def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
 
-  final case class True(pos: Position) extends Bool {
+  final case class True(var pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  final case class False(pos: Position) extends Bool {
+  final case class False(var pos: Position) extends Bool {
     def prettyName = "boolean"
   }
-  final case class Null(pos: Position) extends Literal {
+  final case class Null(var pos: Position) extends Literal {
     def prettyName = "null"
   }
-  final case class Str(pos: Position, str: String) extends Literal {
+  final case class Str(var pos: Position, str: String) extends Literal {
     def prettyName = "string"
     override def asString: String = str
   }
-  final case class Num(pos: Position, private val num: Double) extends Literal {
+  final case class Num(var pos: Position, private val num: Double) extends Literal {
     if (num.isInfinite) {
       Error.fail("overflow")
     }
@@ -137,7 +137,7 @@ object Val {
     }
   }
 
-  final case class Arr(pos: Position, private val arr: Array[? <: Eval]) extends Literal {
+  final case class Arr(var pos: Position, private val arr: Array[? <: Eval]) extends Literal {
     def prettyName = "array"
 
     override def asArr: Arr = this
@@ -254,7 +254,7 @@ object Val {
    *   objects, it is dynamically computed only if the object has a `super`
    */
   final class Obj(
-      val pos: Position,
+      var pos: Position,
       private var value0: util.LinkedHashMap[String, Obj.Member],
       private val static: Boolean,
       private val triggerAsserts: (Val.Obj, Val.Obj) => Unit,
@@ -649,7 +649,7 @@ object Val {
     )
   }
 
-  abstract class Func(val pos: Position, val defSiteValScope: ValScope, val params: Params)
+  abstract class Func(var pos: Position, val defSiteValScope: ValScope, val params: Params)
       extends Val
       with Expr {
     final override private[sjsonnet] def tag = ExprTags.`Val.Func`

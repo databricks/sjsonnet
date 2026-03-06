@@ -13,14 +13,7 @@ final case class Settings(
     brokenAssertionLogic: Boolean = false,
     maxMaterializeDepth: Int = 1000,
     materializeRecursiveDepthLimit: Int = 128,
-    maxStack: Int = 500,
-    /**
-     * Enable aggressive static optimizations in the optimization phase, including: constant folding
-     * for arithmetic, comparison, bitwise, and shift operators; branch elimination for if-else with
-     * constant conditions; short-circuit elimination for And/Or with constant lhs. These reduce AST
-     * node count, benefiting long-running Jsonnet programs.
-     */
-    aggressiveStaticOptimization: Boolean = false
+    maxStack: Int = 500
 )
 
 object Settings {
