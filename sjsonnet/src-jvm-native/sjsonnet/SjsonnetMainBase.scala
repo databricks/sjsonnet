@@ -170,7 +170,7 @@ object SjsonnetMainBase {
         warn,
         std,
         debugStats = debugStats,
-        flamegraphFile = config.flamegraph
+        profileOpt = config.profile
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -320,7 +320,7 @@ object SjsonnetMainBase {
       std: Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
-      flamegraphFile: Option[String] = None): Either[String, String] = {
+      profileOpt: Option[String] = None): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -349,8 +349,19 @@ object SjsonnetMainBase {
       wd
     )
 
+    val (profileFormat, profileFile) = profileOpt match {
+      case Some(s) if s.startsWith("flamegraph:") =>
+        (Some(ProfileOutputFormat.FlameGraph), Some(s.stripPrefix("flamegraph:")))
+      case Some(s) if s.startsWith("text:") =>
+        (Some(ProfileOutputFormat.Text), Some(s.stripPrefix("text:")))
+      case Some(s) =>
+        (Some(ProfileOutputFormat.Text), Some(s))
+      case None =>
+        (None, None)
+    }
+
     var currentPos: Position = null
-    var profiler: FlameGraphProfiler = null
+    var profilerInstance: Profiler = null
     val interp = new Interpreter(
       queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
       queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
@@ -372,9 +383,9 @@ object SjsonnetMainBase {
         val ev = evaluatorOverride.getOrElse(
           super.createEvaluator(resolver, extVars, wd, settings)
         )
-        if (flamegraphFile.isDefined) {
-          profiler = new FlameGraphProfiler
-          ev.flameGraphProfiler = profiler
+        profileFormat.foreach { fmt =>
+          profilerInstance = new Profiler(fmt, wd)
+          ev.profiler = profilerInstance
         }
         ev
       }
@@ -448,8 +459,10 @@ object SjsonnetMainBase {
       case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
     }
 
-    if (profiler != null)
-      flamegraphFile.foreach(profiler.writeTo)
+    if (profilerInstance != null)
+      profileFile.foreach(f =>
+        profilerInstance.writeTo(f, pos => interp.evaluator.prettyIndex(pos))
+      )
 
     result
   }

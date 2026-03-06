@@ -30,7 +30,7 @@ class Evaluator(
 
   private[this] var stackDepth: Int = 0
   private[this] val maxStack: Int = settings.maxStack
-  private[sjsonnet] var flameGraphProfiler: FlameGraphProfiler = _
+  private[sjsonnet] var profiler: Profiler = _
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
     stackDepth += 1
@@ -42,21 +42,18 @@ class Evaluator(
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position, expr: Expr): Unit = {
     stackDepth += 1
-    if (flameGraphProfiler != null) flameGraphProfiler.push(expr.exprErrorString)
     if (stackDepth > maxStack)
       Error.fail("Max stack frames exceeded.", pos)
   }
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position, name: String): Unit = {
     stackDepth += 1
-    if (flameGraphProfiler != null) flameGraphProfiler.push(name)
     if (stackDepth > maxStack)
       Error.fail("Max stack frames exceeded.", pos)
   }
 
   @inline private[sjsonnet] final def decrementStackDepth(): Unit = {
     stackDepth -= 1
-    if (flameGraphProfiler != null) flameGraphProfiler.pop()
   }
 
   def materialize(v: Val): Value = Materializer.apply(v)
@@ -64,45 +61,49 @@ class Evaluator(
     collection.mutable.HashMap.empty[Path, Val]
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
-    e match {
-      case e: ValidId            => visitValidId(e)
-      case e: BinaryOp           => visitBinaryOp(e)
-      case e: Select             => visitSelect(e)
-      case e: Val                => e
-      case e: ApplyBuiltin0      => visitApplyBuiltin0(e)
-      case e: ApplyBuiltin1      => visitApplyBuiltin1(e)
-      case e: ApplyBuiltin2      => visitApplyBuiltin2(e)
-      case e: ApplyBuiltin3      => visitApplyBuiltin3(e)
-      case e: ApplyBuiltin4      => visitApplyBuiltin4(e)
-      case e: And                => visitAnd(e)
-      case e: Or                 => visitOr(e)
-      case e: UnaryOp            => visitUnaryOp(e)
-      case e: Apply1             => visitApply1(e)
-      case e: Lookup             => visitLookup(e)
-      case e: Function           => visitMethod(e.body, e.params, e.pos)
-      case e: LocalExpr          => visitLocalExpr(e)
-      case e: Apply              => visitApply(e)
-      case e: IfElse             => visitIfElse(e)
-      case e: Apply3             => visitApply3(e)
-      case e: ObjBody.MemberList => visitMemberList(e.pos, e, null)
-      case e: Apply2             => visitApply2(e)
-      case e: AssertExpr         => visitAssert(e)
-      case e: ApplyBuiltin       => visitApplyBuiltin(e)
-      case e: Comp               => visitComp(e)
-      case e: Arr                => visitArr(e)
-      case e: SelectSuper        => visitSelectSuper(e)
-      case e: LookupSuper        => visitLookupSuper(e)
-      case e: InSuper            => visitInSuper(e)
-      case e: ObjExtend          => visitObjExtend(e)
-      case e: ObjBody.ObjComp    => visitObjComp(e, null)
-      case e: Slice              => visitSlice(e)
-      case e: Import             => visitImport(e)
-      case e: Apply0             => visitApply0(e)
-      case e: ImportStr          => visitImportStr(e)
-      case e: ImportBin          => visitImportBin(e)
-      case e: Expr.Error         => visitError(e)
-      case e                     => visitInvalid(e)
-    }
+    val p = profiler
+    val saved: (AnyRef, Int) = if (p != null) p.enter(e) else null
+    try {
+      e match {
+        case e: ValidId            => visitValidId(e)
+        case e: BinaryOp           => visitBinaryOp(e)
+        case e: Select             => visitSelect(e)
+        case e: Val                => e
+        case e: ApplyBuiltin0      => visitApplyBuiltin0(e)
+        case e: ApplyBuiltin1      => visitApplyBuiltin1(e)
+        case e: ApplyBuiltin2      => visitApplyBuiltin2(e)
+        case e: ApplyBuiltin3      => visitApplyBuiltin3(e)
+        case e: ApplyBuiltin4      => visitApplyBuiltin4(e)
+        case e: And                => visitAnd(e)
+        case e: Or                 => visitOr(e)
+        case e: UnaryOp            => visitUnaryOp(e)
+        case e: Apply1             => visitApply1(e)
+        case e: Lookup             => visitLookup(e)
+        case e: Function           => visitMethod(e.body, e.params, e.pos)
+        case e: LocalExpr          => visitLocalExpr(e)
+        case e: Apply              => visitApply(e)
+        case e: IfElse             => visitIfElse(e)
+        case e: Apply3             => visitApply3(e)
+        case e: ObjBody.MemberList => visitMemberList(e.pos, e, null)
+        case e: Apply2             => visitApply2(e)
+        case e: AssertExpr         => visitAssert(e)
+        case e: ApplyBuiltin       => visitApplyBuiltin(e)
+        case e: Comp               => visitComp(e)
+        case e: Arr                => visitArr(e)
+        case e: SelectSuper        => visitSelectSuper(e)
+        case e: LookupSuper        => visitLookupSuper(e)
+        case e: InSuper            => visitInSuper(e)
+        case e: ObjExtend          => visitObjExtend(e)
+        case e: ObjBody.ObjComp    => visitObjComp(e, null)
+        case e: Slice              => visitSlice(e)
+        case e: Import             => visitImport(e)
+        case e: Apply0             => visitApply0(e)
+        case e: ImportStr          => visitImportStr(e)
+        case e: ImportBin          => visitImportBin(e)
+        case e: Expr.Error         => visitError(e)
+        case e                     => visitInvalid(e)
+      }
+    } finally if (p != null) p.exit(saved)
   } catch {
     Error.withStackFrame(e)
   }
