@@ -1,3 +1,4 @@
 sjsonnet.Error: xxx
+    at [object comprehension].(object_comp_err_index.jsonnet:1:4)
     at [<root>].(object_comp_err_index.jsonnet:1:1)
 
