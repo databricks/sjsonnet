@@ -12,7 +12,7 @@ for suite in bench/resources/*_suite; do
   echo "Refreshing golden outputs for suite: $suite_name"
   for f in "$suite"/*.jsonnet; do
     echo "  Processing file: $f"
-    java -Xss100m -Xmx2g -jar "$SJSONNET" -J "$suite" "$f" > "$f.golden"
+    java -Xss100m -Xmx2g -jar "$SJSONNET" --max-stack 100000 -J "$suite" "$f" > "$f.golden"
   done
 done
 

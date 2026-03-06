@@ -336,7 +336,7 @@ abstract class Materializer {
       var i = 0
       while (i < len) {
         val x = xs(i)
-        res(i) = new Lazy(() => reverse(pos, x))
+        res(i) = new LazyFunc(() => reverse(pos, x))
         i += 1
       }
       Val.Arr(pos, res)

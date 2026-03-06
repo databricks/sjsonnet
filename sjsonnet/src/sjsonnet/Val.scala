@@ -18,16 +18,126 @@ trait Eval {
 }
 
 /**
- * Lazily evaluated dictionary values, array contents, or function parameters are all wrapped in
- * [[Lazy]] and only truly evaluated on-demand.
+ * Abstract marker base for deferred (lazy) evaluation. Contains no fields — subclasses manage their
+ * own caching to minimize per-instance memory.
+ *
+ * Hierarchy (allocation percentages measured across 591 test and benchmark files; actual
+ * distribution varies by workload):
+ *   - [[LazyFunc]] — wraps a `() => Val` closure with a separate `cached` field (~0.1%)
+ *   - [[LazyExpr]] — closure-free `visitExpr` thunk, repurposes fields for caching (~91%)
+ *   - [[LazyApply1]] — closure-free `func.apply1` thunk (~9%)
+ *   - [[LazyApply2]] — closure-free `func.apply2` thunk (<1%)
+ *
+ * @see
+ *   [[Eval]] the parent trait shared with [[Val]] (eager values).
  */
-final class Lazy(private var computeFunc: () => Val) extends Eval {
+abstract class Lazy extends Eval
+
+/**
+ * Closure-based [[Lazy]]: wraps an arbitrary `() => Val` thunk.
+ *
+ * Used for deferred evaluations that don't fit the specialized [[LazyExpr]]/[[LazyApply1]]/
+ * [[LazyApply2]] patterns, e.g. `visitMethod` (local function defs), `visitBindings` (object field
+ * bindings), and default parameter evaluation. These account for <1% of all deferred evaluations
+ * (profiled across 591 benchmark and test files).
+ *
+ * Thread-safety: `f` is `@volatile` so that concurrent readers see a consistent state. If two
+ * threads race to initialize, the loser sees `f == null` and falls through to read `cached`, which
+ * is visible due to piggybacking on the volatile write to `f`; see
+ * https://stackoverflow.com/a/8769692 for background.
+ */
+final class LazyFunc(@volatile private var f: () => Val) extends Lazy {
   private var cached: Val = _
   def value: Val = {
     if (cached != null) return cached
-    cached = computeFunc()
-    computeFunc = null // allow closure to be GC'd
+    val func = f
+    if (func != null) {
+      cached = func()
+      f = null // volatile write publishes `cached` to other threads
+    }
+    // else: lost the race to compute, but `cached` is already set and visible
+    // in this thread due to the volatile read of `f` (piggybacking)
     cached
+  }
+}
+
+/**
+ * Closure-free [[Lazy]] that defers `evaluator.visitExpr(expr)(scope)`.
+ *
+ * Used in [[Evaluator.visitAsLazy]] instead of `new LazyFunc(() => visitExpr(e)(scope))`. By
+ * storing (expr, scope, evaluator) as fields rather than capturing them in a closure, this cuts
+ * per-thunk allocation from 2 JVM objects (LazyFunc + closure) to 1 (LazyExpr), and from 56B to 24B
+ * (compressed oops).
+ *
+ * Profiling across all benchmark and test suites (591 files) shows [[Evaluator.visitAsLazy]]
+ * produces ~91% of all deferred evaluations.
+ *
+ * After computation, the cached [[Val]] is stored in the `exprOrVal` field (which originally held
+ * the [[Expr]]), and `ev` is nulled as a sentinel. `scope` is also cleared to allow GC.
+ */
+final class LazyExpr(
+    private var exprOrVal: AnyRef, // Expr before compute, Val after
+    private var scope: ValScope,
+    private var ev: Evaluator)
+    extends Lazy {
+  def value: Val = {
+    if (ev == null) exprOrVal.asInstanceOf[Val]
+    else {
+      val r = ev.visitExpr(exprOrVal.asInstanceOf[Expr])(scope)
+      exprOrVal = r // cache result
+      scope = null.asInstanceOf[sjsonnet.ValScope] // allow GC
+      ev = null // sentinel: marks as computed
+      r
+    }
+  }
+}
+
+/**
+ * Closure-free [[Lazy]] that defers `func.apply1(arg, pos)(ev, TailstrictModeDisabled)`.
+ *
+ * Used in stdlib builtins (`std.map`, `std.filterMap`, `std.makeArray`, etc.) to eliminate the
+ * 2-object allocation (LazyFunc + Function0 closure), cutting from 56B to 32B per instance. After
+ * computation, `funcOrVal` caches the result, `ev == null` serves as the computed sentinel, and
+ * remaining fields are cleared for GC.
+ */
+final class LazyApply1(
+    private var funcOrVal: AnyRef, // Val.Func before compute, Val after
+    private var arg: Eval,
+    private var pos: Position,
+    private var ev: EvalScope)
+    extends Lazy {
+  def value: Val = {
+    if (ev == null) funcOrVal.asInstanceOf[Val]
+    else {
+      val r = funcOrVal.asInstanceOf[Val.Func].apply1(arg, pos)(ev, TailstrictModeDisabled)
+      funcOrVal = r
+      arg = null; pos = null; ev = null
+      r
+    }
+  }
+}
+
+/**
+ * Closure-free [[Lazy]] that defers `func.apply2(arg1, arg2, pos)(ev, TailstrictModeDisabled)`.
+ *
+ * Used in stdlib builtins (`std.mapWithIndex`, etc.). Same field-repurposing strategy as
+ * [[LazyApply1]], cutting from 56B to 32B per instance.
+ */
+final class LazyApply2(
+    private var funcOrVal: AnyRef, // Val.Func before compute, Val after
+    private var arg1: Eval,
+    private var arg2: Eval,
+    private var pos: Position,
+    private var ev: EvalScope)
+    extends Lazy {
+  def value: Val = {
+    if (ev == null) funcOrVal.asInstanceOf[Val]
+    else {
+      val r = funcOrVal.asInstanceOf[Val.Func].apply2(arg1, arg2, pos)(ev, TailstrictModeDisabled)
+      funcOrVal = r
+      arg1 = null; arg2 = null; pos = null; ev = null
+      r
+    }
   }
 }
 
@@ -750,7 +860,7 @@ object Val {
             if (argVals(j) == null) {
               val default = params.defaultExprs(i)
               if (default != null) {
-                argVals(j) = new Lazy(() => evalDefault(default, newScope, ev))
+                argVals(j) = new LazyFunc(() => evalDefault(default, newScope, ev))
               } else {
                 if (missing == null) missing = new ArrayBuffer
                 missing.+=(params.names(i))
