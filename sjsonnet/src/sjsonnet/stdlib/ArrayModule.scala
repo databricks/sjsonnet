@@ -164,9 +164,10 @@ object ArrayModule extends AbstractFunctionModule {
         arg: Array[Eval],
         ev: EvalScope,
         pos: Position): Val.Arr = {
+      val noOff = pos.noOffset
       Val.Arr(
         pos,
-        arg.map(v => new Lazy(() => _func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)))
+        arg.map(v => new LazyApply1(_func, v, noOff, ev))
       )
     }
 
@@ -180,11 +181,12 @@ object ArrayModule extends AbstractFunctionModule {
       val func = _func.value.asFunc
       val arr = _arr.value.asArr.asLazyArray
       val a = new Array[Eval](arr.length)
+      val noOff = pos.noOffset
       var i = 0
       while (i < a.length) {
         val x = arr(i)
         val idx = Val.Num(pos, i)
-        a(i) = new Lazy(() => func.apply2(idx, x, pos.noOffset)(ev, TailstrictModeDisabled))
+        a(i) = new LazyApply2(func, idx, x, noOff, ev)
         i += 1
       }
       Val.Arr(pos, a)
@@ -425,16 +427,15 @@ object ArrayModule extends AbstractFunctionModule {
     },
     builtin("filterMap", "filter_func", "map_func", "arr") {
       (pos, ev, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
+        val noOff = pos.noOffset
         Val.Arr(
           pos,
           arr.asLazyArray.flatMap { i =>
             i.value
-            if (!filter_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled).asBoolean) {
+            if (!filter_func.apply1(i, noOff)(ev, TailstrictModeDisabled).asBoolean) {
               None
             } else {
-              Some[Eval](
-                new Lazy(() => map_func.apply1(i, pos.noOffset)(ev, TailstrictModeDisabled))
-              )
+              Some[Eval](new LazyApply1(map_func, i, noOff, ev))
             }
           }
         )
@@ -468,12 +469,10 @@ object ArrayModule extends AbstractFunctionModule {
         pos, {
           val sz = size.cast[Val.Num].asPositiveInt
           val a = new Array[Eval](sz)
+          val noOff = pos.noOffset
           var i = 0
           while (i < sz) {
-            val forcedI = i
-            a(i) = new Lazy(() =>
-              func.apply1(Val.Num(pos, forcedI), pos.noOffset)(ev, TailstrictModeDisabled)
-            )
+            a(i) = new LazyApply1(func, Val.Num(pos, i), noOff, ev)
             i += 1
           }
           a
