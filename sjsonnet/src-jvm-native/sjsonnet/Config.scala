@@ -168,11 +168,11 @@ final case class Config(
     )
     maxStack: Int = 500,
     @arg(
-      name = "flamegraph",
+      name = "profile",
       doc =
-        "Write a flame graph profile in folded stack format to the given file. Use with https://github.com/brendangregg/FlameGraph"
+        "Profile evaluation and write results to a file. Format: --profile <file> or --profile <format>:<file> where format is 'text' (default) or 'flamegraph'"
     )
-    flamegraph: Option[String] = None,
+    profile: Option[String] = None,
     @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
