@@ -30,6 +30,7 @@ class Evaluator(
 
   private[this] var stackDepth: Int = 0
   private[this] val maxStack: Int = settings.maxStack
+  private[sjsonnet] var flameGraphProfiler: FlameGraphProfiler = _
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
     stackDepth += 1
@@ -37,8 +38,24 @@ class Evaluator(
       Error.fail("Max stack frames exceeded.", pos)
   }
 
-  @inline private[sjsonnet] final def decrementStackDepth(): Unit =
+  @inline private[sjsonnet] final def checkStackDepth(pos: Position, expr: Expr): Unit = {
+    stackDepth += 1
+    if (flameGraphProfiler != null) flameGraphProfiler.push(expr.exprErrorString)
+    if (stackDepth > maxStack)
+      Error.fail("Max stack frames exceeded.", pos)
+  }
+
+  @inline private[sjsonnet] final def checkStackDepth(pos: Position, name: String): Unit = {
+    stackDepth += 1
+    if (flameGraphProfiler != null) flameGraphProfiler.push(name)
+    if (stackDepth > maxStack)
+      Error.fail("Max stack frames exceeded.", pos)
+  }
+
+  @inline private[sjsonnet] final def decrementStackDepth(): Unit = {
     stackDepth -= 1
+    if (flameGraphProfiler != null) flameGraphProfiler.pop()
+  }
 
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
@@ -228,7 +245,7 @@ class Evaluator(
    */
   protected def visitApply(e: Apply)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
@@ -244,7 +261,7 @@ class Evaluator(
 
   protected def visitApply0(e: Apply0)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
@@ -259,7 +276,7 @@ class Evaluator(
 
   protected def visitApply1(e: Apply1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
@@ -275,7 +292,7 @@ class Evaluator(
 
   protected def visitApply2(e: Apply2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
@@ -293,7 +310,7 @@ class Evaluator(
 
   protected def visitApply3(e: Apply3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.functionCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
@@ -314,7 +331,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin0(e: ApplyBuiltin0): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val result = e.func.evalRhs(this, e.pos)
       if (e.tailstrict) TailCall.resolve(result) else result
@@ -323,7 +340,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin1(e: ApplyBuiltin1)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       if (e.tailstrict) {
         TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), this, e.pos))
@@ -335,7 +352,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin2(e: ApplyBuiltin2)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       if (e.tailstrict) {
         TailCall.resolve(e.func.evalRhs(visitExpr(e.a1), visitExpr(e.a2), this, e.pos))
@@ -347,7 +364,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin3(e: ApplyBuiltin3)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       if (e.tailstrict) {
         TailCall.resolve(
@@ -361,7 +378,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin4(e: ApplyBuiltin4)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       if (e.tailstrict) {
         TailCall.resolve(
@@ -389,7 +406,7 @@ class Evaluator(
 
   protected def visitApplyBuiltin(e: ApplyBuiltin)(implicit scope: ValScope): Val = {
     if (debugStats != null) debugStats.builtinCalls += 1
-    checkStackDepth(e.pos)
+    checkStackDepth(e.pos, e)
     try {
       val arr = new Array[Eval](e.argExprs.length)
       var idx = 0
@@ -502,7 +519,7 @@ class Evaluator(
     cachedImports.getOrElseUpdate(
       p, {
         if (debugStats != null) debugStats.importCalls += 1
-        checkStackDepth(e.pos)
+        checkStackDepth(e.pos, e)
         try {
           val doc = resolver.parse(p, str) match {
             case Right((expr, _)) => expr
@@ -730,7 +747,7 @@ class Evaluator(
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExprWithTailCallSupport(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
-        checkStackDepth(expr.pos)
+        checkStackDepth(expr.pos, "default")
         try visitExpr(expr)(vs)
         finally decrementStackDepth()
       }
@@ -921,9 +938,10 @@ class Evaluator(
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
+          val fieldKey = k
           val v = new Val.Obj.Member(plus, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos)
+              checkStackDepth(rhs.pos, fieldKey)
               try visitExpr(rhs)(makeNewScope(self, sup))
               finally decrementStackDepth()
             }
@@ -936,9 +954,10 @@ class Evaluator(
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
+          val fieldKey = k
           val v = new Val.Obj.Member(false, sep) {
             def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos)
+              checkStackDepth(rhs.pos, fieldKey)
               try visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
               finally decrementStackDepth()
             }
@@ -980,7 +999,7 @@ class Evaluator(
             k,
             new Val.Obj.Member(e.plus, Visibility.Normal, deprecatedSkipAsserts = true) {
               def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-                checkStackDepth(e.value.pos)
+                checkStackDepth(e.value.pos, "object comprehension")
                 try {
                   lazy val newScope: ValScope = s.extend(newBindings, self, sup)
                   lazy val newBindings = visitBindings(binds, newScope)
