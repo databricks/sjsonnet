@@ -1,1 +1,3 @@
-4611686018427387904
+sjsonnet.Error: numeric value outside safe integer range for bitwise operation
+    at [<root>].(bitwise_or9.jsonnet:1:11)
+

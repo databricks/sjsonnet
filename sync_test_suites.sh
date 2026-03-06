@@ -10,6 +10,13 @@
 # A .jsonnet file is only synced if it has a
 # corresponding valid .golden file (upstream or already present locally), so that
 # Scala tests always find a matching .jsonnet.golden for each .jsonnet file.
+#
+# Golden file sync strategy:
+#   - Both success (JSON output): exact compare, update when different.
+#   - Success<->error transition: always update (behavioral change).
+#   - Both error: skip (sjsonnet and upstream have different error messages/formats).
+#   - New golden files (no local copy): copied from upstream directly.
+#
 # For new .jsonnet files that have no golden file after syncing,
 # golden files are generated using sjsonnet via the per-suite refresh_golden.sh scripts.
 #
@@ -26,6 +33,10 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+# Collect .jsonnet files whose golden files need regeneration via refresh_golden_outputs.sh
+GOLDEN_REFRESH_FILES=$(mktemp)
+trap_cleanup() { rm -rf "$TEMP_DIR" "$GOLDEN_REFRESH_FILES"; }
+
 # --- Configuration ---
 CPP_TEST_SUITE_DIR="sjsonnet/test/resources/test_suite"
 GO_TEST_SUITE_DIR="sjsonnet/test/resources/go_test_suite"
@@ -33,13 +44,31 @@ GO_TEST_SUITE_DIR="sjsonnet/test/resources/go_test_suite"
 # --- Step 1: Clone upstream repositories into a temporary directory ---
 echo "=== Cloning upstream repositories ==="
 TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'rm -rf "$TEMP_DIR"; rm -f "$GOLDEN_REFRESH_FILES"' EXIT
 
 echo "  Cloning google/jsonnet (depth=1)..."
 git clone --depth=1 --quiet https://github.com/google/jsonnet.git "$TEMP_DIR/jsonnet"
 
 echo "  Cloning google/go-jsonnet (depth=1)..."
 git clone --depth=1 --quiet https://github.com/google/go-jsonnet.git "$TEMP_DIR/go-jsonnet"
+
+# --- Helper: Check if a golden file contains successful (non-error) output ---
+# Success tests output valid JSON: objects, arrays, strings, numbers, booleans, null.
+# Returns 0 (true) if the output looks like JSON success, 1 (false) if it looks like an error.
+is_success_golden() {
+  local file="$1"
+  local first_line
+  first_line=$(head -1 "$file")
+  case "$first_line" in
+    "{"*|"["*|'"'*|"true"|"false"|"null")
+      return 0 ;;
+  esac
+  # Numbers (including negative, decimal, scientific notation)
+  if [[ "$first_line" =~ ^-?[0-9] ]]; then
+    return 0
+  fi
+  return 1
+}
 
 # --- Step 2: Sync .jsonnet and .golden files (excluding lint-related golden) ---
 echo ""
@@ -62,7 +91,7 @@ sync_test_files() {
   ignore_stems_file=$(mktemp)
   if [ -f "$ignore_file" ]; then
     # Strip comments and blank lines, extract stems (remove .jsonnet extension)
-    grep -v '^\s*#' "$ignore_file" | grep -v '^\s*$' | sed 's/\.jsonnet$//' > "$ignore_stems_file"
+    { grep -v '^\s*#' "$ignore_file" | grep -v '^\s*$' | sed 's/\.jsonnet$//' || true; } > "$ignore_stems_file"
     local ignore_count
     ignore_count=$(wc -l < "$ignore_stems_file" | tr -d ' ')
     echo "  Syncing $suite_name... ($ignore_count file(s) in .sync_ignore)"
@@ -182,8 +211,10 @@ sync_test_files() {
   done
 
   # --- Phase 3: Sync golden files ---
-  # Never overwrite existing golden files — sjsonnet golden files use a different error
-  # format than upstream C++/Go implementations, so existing files must be preserved.
+  # Golden files are synced based on error/success classification:
+  #   - Both non-error: exact compare, update when different.
+  #   - One error + one non-error (success<->error change): always update.
+  #   - Both error: skip (sjsonnet and upstream have different error messages/formats).
 
   # 1) Sync *.jsonnet.golden files (already in correct naming format, skip directories)
   for src_file in "$source_dir"/*.jsonnet.golden; do
@@ -208,10 +239,29 @@ sync_test_files() {
 
     local dest_file="$target_dir/$basename"
 
-    # Only copy new golden files, never overwrite existing ones
     if [ ! -e "$dest_file" ]; then
       cp -r "$src_file" "$dest_file"
       new_golden=$((new_golden + 1))
+    elif ! diff -q "$src_file" "$dest_file" > /dev/null 2>&1; then
+      local src_ok=0 dest_ok=0
+      is_success_golden "$src_file" && src_ok=1
+      is_success_golden "$dest_file" && dest_ok=1
+
+      if [ "$src_ok" -eq 0 ] && [ "$dest_ok" -eq 0 ]; then
+        # Both are error tests — keep sjsonnet's version (different error formats)
+        true
+      elif [ "$src_ok" -eq 1 ] && [ "$dest_ok" -eq 1 ]; then
+        # Both success with different content — copy upstream golden
+        cp -r "$src_file" "$dest_file"
+        updated_golden=$((updated_golden + 1))
+      else
+        # Success<->error transition — regenerate golden with sjsonnet
+        local jsonnet_file="$target_dir/${stem}.jsonnet"
+        if [ -f "$jsonnet_file" ]; then
+          echo "$jsonnet_file" >> "$GOLDEN_REFRESH_FILES"
+          updated_golden=$((updated_golden + 1))
+        fi
+      fi
     fi
   done
 
@@ -248,10 +298,28 @@ sync_test_files() {
     if [ -f "$jsonnet_file" ]; then
       local dest_file="$target_dir/${stem}.jsonnet.golden"
 
-      # Only copy new golden files, never overwrite existing ones
       if [ ! -e "$dest_file" ]; then
         cp -r "$src_entry" "$dest_file"
         new_golden=$((new_golden + 1))
+      elif ! diff -q "$src_entry" "$dest_file" > /dev/null 2>&1; then
+        local src_ok=0 dest_ok=0
+        is_success_golden "$src_entry" && src_ok=1
+        is_success_golden "$dest_file" && dest_ok=1
+
+        if [ "$src_ok" -eq 0 ] && [ "$dest_ok" -eq 0 ]; then
+          true
+        elif [ "$src_ok" -eq 1 ] && [ "$dest_ok" -eq 1 ]; then
+          # Both success with different content — copy upstream golden
+          cp -r "$src_entry" "$dest_file"
+          updated_golden=$((updated_golden + 1))
+        else
+          # Success<->error transition — regenerate golden with sjsonnet
+          local local_jsonnet="$target_dir/${stem}.jsonnet"
+          if [ -f "$local_jsonnet" ]; then
+            echo "$local_jsonnet" >> "$GOLDEN_REFRESH_FILES"
+            updated_golden=$((updated_golden + 1))
+          fi
+        fi
       fi
     fi
   done
@@ -325,6 +393,24 @@ generate_missing_golden() {
 
 generate_missing_golden "$CPP_TEST_SUITE_DIR" "C++ test suite"
 generate_missing_golden "$GO_TEST_SUITE_DIR" "Go test suite"
+
+# --- Step 3b: Refresh golden files for success<->error transitions ---
+if [ -s "$GOLDEN_REFRESH_FILES" ]; then
+  # Deduplicate
+  sort -u "$GOLDEN_REFRESH_FILES" -o "$GOLDEN_REFRESH_FILES"
+  local_refresh_count=$(wc -l < "$GOLDEN_REFRESH_FILES" | tr -d ' ')
+  echo ""
+  echo "=== Refreshing $local_refresh_count golden file(s) for success<->error transitions ==="
+  REFRESH_SCRIPT="$ROOT_DIR/sjsonnet/test/resources/refresh_golden_outputs.sh"
+  if [ -x "$REFRESH_SCRIPT" ]; then
+    # shellcheck disable=SC2046
+    "$REFRESH_SCRIPT" $(cat "$GOLDEN_REFRESH_FILES")
+  else
+    echo "  WARNING: refresh_golden_outputs.sh not found or not executable at $REFRESH_SCRIPT"
+    echo "  Files needing refresh:"
+    cat "$GOLDEN_REFRESH_FILES" | while read -r f; do echo "    $f"; done
+  fi
+fi
 
 # --- Step 4: Final summary ---
 echo ""
