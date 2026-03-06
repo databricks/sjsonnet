@@ -251,7 +251,7 @@ class Interpreter(
               f.evalRhs(vs, es, fs, pos)
 
             override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
-              evaluator.checkStackDepth(expr.pos)
+              evaluator.checkStackDepth(expr.pos, "default")
               try
                 evaluator.visitExpr(expr)(
                   if (tlaExpressions.exists(_ eq expr)) ValScope.empty else vs

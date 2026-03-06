@@ -169,7 +169,8 @@ object SjsonnetMainBase {
         },
         warn,
         std,
-        debugStats = debugStats
+        debugStats = debugStats,
+        flamegraphFile = config.flamegraph
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -318,7 +319,8 @@ object SjsonnetMainBase {
       warnLogger: Evaluator.Logger,
       std: Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
-      debugStats: DebugStats = null): Either[String, String] = {
+      debugStats: DebugStats = null,
+      flamegraphFile: Option[String] = None): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -348,6 +350,7 @@ object SjsonnetMainBase {
     )
 
     var currentPos: Position = null
+    var profiler: FlameGraphProfiler = null
     val interp = new Interpreter(
       queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
       queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
@@ -365,13 +368,19 @@ object SjsonnetMainBase {
           resolver: CachedResolver,
           extVars: String => Option[Expr],
           wd: Path,
-          settings: Settings): Evaluator =
-        evaluatorOverride.getOrElse(
+          settings: Settings): Evaluator = {
+        val ev = evaluatorOverride.getOrElse(
           super.createEvaluator(resolver, extVars, wd, settings)
         )
+        if (flamegraphFile.isDefined) {
+          profiler = new FlameGraphProfiler
+          ev.flameGraphProfiler = profiler
+        }
+        ev
+      }
     }
 
-    (config.multi, config.yamlStream.value) match {
+    val result = (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
         val trailingNewline = !config.noTrailingNewline.value
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
@@ -437,8 +446,12 @@ object SjsonnetMainBase {
           case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
         }
       case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
-
     }
+
+    if (profiler != null)
+      flamegraphFile.foreach(profiler.writeTo)
+
+    result
   }
 
   /**
