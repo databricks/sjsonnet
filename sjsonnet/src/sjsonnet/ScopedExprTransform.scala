@@ -13,7 +13,7 @@ class ScopedExprTransform extends ExprTransform {
 
   // Marker for Exprs in the scope that should not be used because they need to be evaluated in a different scope
   val dynamicExpr: Expr = new Expr {
-    def pos: Position = ???; override def toString = "dynamicExpr"
+    var pos: Position = null; override def toString = "dynamicExpr"
   }
 
   def transform(e: Expr): Expr = e match {

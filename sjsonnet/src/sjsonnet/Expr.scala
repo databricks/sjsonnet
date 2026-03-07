@@ -12,7 +12,17 @@ import scala.collection.immutable.IntMap
  * into the file that is later used to provide error messages.
  */
 trait Expr {
-  def pos: Position
+
+  /**
+   * Source position of this expression, used for error messages.
+   *
+   * This is a `var` (not `val` or `def`) so that [[StaticOptimizer]] can update positions in-place
+   * when it replaces an expression with a sub-expression (e.g. branch elimination:
+   * `IfElse(pos, true, thenExpr, _)` → `thenExpr` with `thenExpr.pos = pos`). Without mutable
+   * `pos`, the optimizer would need to wrap the result in a `LocalExpr` just to carry the original
+   * position, adding unnecessary AST nodes. Do not change this to `val` or `def`.
+   */
+  var pos: Position
   private[sjsonnet] def tag: Byte = ExprTags.UNTAGGED
 
   /** The name of this expression type to be shown in error messages */
@@ -60,26 +70,26 @@ object Expr {
     if (a == null) "null" else a.mkString("[", ", ", "]")
   }
 
-  final case class Self(pos: Position) extends Expr {
+  final case class Self(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Self
   }
-  final case class Super(pos: Position) extends Expr {
+  final case class Super(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Super
   }
-  final case class $(pos: Position) extends Expr {
+  final case class $(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.`$`
   }
 
-  final case class Id(pos: Position, name: String) extends Expr {
+  final case class Id(var pos: Position, name: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Id
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
 
-  final case class ValidId(pos: Position, name: String, nameIdx: Int) extends Expr {
+  final case class ValidId(var pos: Position, name: String, nameIdx: Int) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.ValidId
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
-  final case class Arr(pos: Position, value: Array[Expr]) extends Expr {
+  final case class Arr(var pos: Position, value: Array[Expr]) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Arr
     override def toString: String = s"Arr($pos, ${arrStr(value)})"
   }
@@ -101,7 +111,7 @@ object Expr {
       case object Unhide extends Visibility
     }
     final case class Field(
-        pos: Position,
+        var pos: Position,
         fieldName: FieldName,
         plus: Boolean, // see https://jsonnet.org/ref/language.html#nested-field-inheritance
         args: Params,
@@ -120,7 +130,7 @@ object Expr {
     override def toString: String = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
 
-  final case class UnaryOp(pos: Position, op: Int, value: Expr) extends Expr {
+  final case class UnaryOp(var pos: Position, op: Int, value: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.UnaryOp
     override def exprErrorString: String = s"${super.exprErrorString} ${UnaryOp.name(op)}"
   }
@@ -132,13 +142,13 @@ object Expr {
     private val names = IntMap(OP_! -> "!", OP_- -> "-", OP_~ -> "~", OP_+ -> "+")
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
-  final case class And(pos: Position, lhs: Expr, rhs: Expr) extends Expr {
+  final case class And(var pos: Position, lhs: Expr, rhs: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.And
   }
-  final case class Or(pos: Position, lhs: Expr, rhs: Expr) extends Expr {
+  final case class Or(var pos: Position, lhs: Expr, rhs: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Or
   }
-  final case class BinaryOp(pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr {
+  final case class BinaryOp(var pos: Position, lhs: Expr, op: Int, rhs: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.BinaryOp
     override def exprErrorString: String = s"${super.exprErrorString} ${BinaryOp.name(op)}"
   }
@@ -185,11 +195,12 @@ object Expr {
     )
     def name(op: Int): String = names.getOrElse(op, "<unknown>")
   }
-  final case class AssertExpr(pos: Position, asserted: Member.AssertStmt, returned: Expr)
+  final case class AssertExpr(var pos: Position, asserted: Member.AssertStmt, returned: Expr)
       extends Expr {
     final override private[sjsonnet] def tag = ExprTags.AssertExpr
   }
-  final case class LocalExpr(pos: Position, bindings: Array[Bind], returned: Expr) extends Expr {
+  final case class LocalExpr(var pos: Position, bindings: Array[Bind], returned: Expr)
+      extends Expr {
     final override private[sjsonnet] def tag = ExprTags.LocalExpr
     override def toString: String = s"LocalExpr($pos, ${arrStr(bindings)}, $returned)"
     override def equals(o: Any): Boolean = o match {
@@ -202,21 +213,21 @@ object Expr {
     }
   }
 
-  final case class Bind(pos: Position, name: String, args: Params, rhs: Expr) extends Member
-  final case class Import(pos: Position, value: String) extends Expr {
+  final case class Bind(var pos: Position, name: String, args: Params, rhs: Expr) extends Member
+  final case class Import(var pos: Position, value: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Import
   }
-  final case class ImportStr(pos: Position, value: String) extends Expr {
+  final case class ImportStr(var pos: Position, value: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.ImportStr
   }
-  final case class ImportBin(pos: Position, value: String) extends Expr {
+  final case class ImportBin(var pos: Position, value: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.ImportBin
   }
-  final case class Error(pos: Position, value: Expr) extends Expr {
+  final case class Error(var pos: Position, value: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Error
   }
   final case class Apply(
-      pos: Position,
+      var pos: Position,
       value: Expr,
       args: Array[Expr],
       namedNames: Array[String],
@@ -225,23 +236,23 @@ object Expr {
     final override private[sjsonnet] def tag = ExprTags.Apply
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply0(pos: Position, value: Expr, tailstrict: Boolean)
+  final case class Apply0(var pos: Position, value: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply0
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply1(pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
+  final case class Apply1(var pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply1
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply2(pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
+  final case class Apply2(var pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply2
     override def exprErrorString: String = Expr.callTargetName(value)
   }
   final case class Apply3(
-      pos: Position,
+      var pos: Position,
       value: Expr,
       a1: Expr,
       a2: Expr,
@@ -252,7 +263,7 @@ object Expr {
     override def exprErrorString: String = Expr.callTargetName(value)
   }
   final case class ApplyBuiltin(
-      pos: Position,
+      var pos: Position,
       func: Val.Builtin,
       argExprs: Array[Expr],
       tailstrict: Boolean)
@@ -260,18 +271,22 @@ object Expr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin
     override def exprErrorString: String = func.qualifiedName
   }
-  final case class ApplyBuiltin0(pos: Position, func: Val.Builtin0, tailstrict: Boolean)
+  final case class ApplyBuiltin0(var pos: Position, func: Val.Builtin0, tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin0
     override def exprErrorString: String = func.qualifiedName
   }
-  final case class ApplyBuiltin1(pos: Position, func: Val.Builtin1, a1: Expr, tailstrict: Boolean)
+  final case class ApplyBuiltin1(
+      var pos: Position,
+      func: Val.Builtin1,
+      a1: Expr,
+      tailstrict: Boolean)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.ApplyBuiltin1
     override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin2(
-      pos: Position,
+      var pos: Position,
       func: Val.Builtin2,
       a1: Expr,
       a2: Expr,
@@ -281,7 +296,7 @@ object Expr {
     override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin3(
-      pos: Position,
+      var pos: Position,
       func: Val.Builtin3,
       a1: Expr,
       a2: Expr,
@@ -292,7 +307,7 @@ object Expr {
     override def exprErrorString: String = func.qualifiedName
   }
   final case class ApplyBuiltin4(
-      pos: Position,
+      var pos: Position,
       func: Val.Builtin4,
       a1: Expr,
       a2: Expr,
@@ -303,25 +318,25 @@ object Expr {
     override private[sjsonnet] def tag = ExprTags.ApplyBuiltin4
     override def exprErrorString: String = func.qualifiedName
   }
-  final case class Select(pos: Position, value: Expr, name: String) extends Expr {
+  final case class Select(var pos: Position, value: Expr, name: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Select
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
-  final case class SelectSuper(pos: Position, selfIdx: Int, name: String) extends Expr {
+  final case class SelectSuper(var pos: Position, selfIdx: Int, name: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.SelectSuper
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
-  final case class InSuper(pos: Position, value: Expr, selfIdx: Int) extends Expr {
+  final case class InSuper(var pos: Position, value: Expr, selfIdx: Int) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.InSuper
   }
-  final case class Lookup(pos: Position, value: Expr, index: Expr) extends Expr {
+  final case class Lookup(var pos: Position, value: Expr, index: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Lookup
   }
-  final case class LookupSuper(pos: Position, selfIdx: Int, index: Expr) extends Expr {
+  final case class LookupSuper(var pos: Position, selfIdx: Int, index: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.LookupSuper
   }
   final case class Slice(
-      pos: Position,
+      var pos: Position,
       value: Expr,
       start: Option[Expr],
       end: Option[Expr],
@@ -329,30 +344,30 @@ object Expr {
       extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Slice
   }
-  final case class Function(pos: Position, params: Params, body: Expr) extends Expr {
+  final case class Function(var pos: Position, params: Params, body: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Function
   }
-  final case class IfElse(pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr {
+  final case class IfElse(var pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.IfElse
   }
 
   sealed trait CompSpec extends Expr
-  final case class IfSpec(pos: Position, cond: Expr) extends CompSpec
-  final case class ForSpec(pos: Position, name: String, cond: Expr) extends CompSpec
+  final case class IfSpec(var pos: Position, cond: Expr) extends CompSpec
+  final case class ForSpec(var pos: Position, name: String, cond: Expr) extends CompSpec
 
-  final case class Comp(pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec])
+  final case class Comp(var pos: Position, value: Expr, first: ForSpec, rest: Array[CompSpec])
       extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Comp
     override def exprErrorString: String = "array comprehension"
   }
-  final case class ObjExtend(pos: Position, base: Expr, ext: ObjBody) extends Expr {
+  final case class ObjExtend(var pos: Position, base: Expr, ext: ObjBody) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.ObjExtend
   }
 
   trait ObjBody extends Expr
   object ObjBody {
     final case class MemberList(
-        pos: Position,
+        var pos: Position,
         binds: Array[Bind],
         fields: Array[Member.Field],
         asserts: Array[Member.AssertStmt])
@@ -362,7 +377,7 @@ object Expr {
         s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
     }
     final case class ObjComp(
-        pos: Position,
+        var pos: Position,
         preLocals: Array[Bind],
         key: Expr,
         value: Expr,
