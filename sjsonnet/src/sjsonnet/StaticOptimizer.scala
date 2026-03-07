@@ -79,8 +79,7 @@ class StaticOptimizer(
       else ObjBody.MemberList(memberList.pos, binds2, fields3, asserts2)
 
     case ExprTags.Function =>
-      val function = e.asInstanceOf[Function]
-      nestedNames(function.params.names)(rec(e))
+      transformFunction(e.asInstanceOf[Function], -1)
 
     case ExprTags.`ObjBody.ObjComp` =>
       val objComp = e.asInstanceOf[ObjBody.ObjComp]
@@ -326,37 +325,37 @@ class StaticOptimizer(
       if (x2 eq x) expr
       else Select(pos, x2, name)
 
-    case Apply(pos, x, y, namedNames, tailstrict) =>
+    case Apply(pos, x, y, namedNames, tailstrict, tailrec) =>
       val x2 = transform(x)
       val y2 = transformArr(y)
       if ((x2 eq x) && (y2 eq y)) expr
-      else Apply(pos, x2, y2, namedNames, tailstrict)
+      else Apply(pos, x2, y2, namedNames, tailstrict, tailrec)
 
-    case Apply0(pos, x, tailstrict) =>
+    case Apply0(pos, x, tailstrict, tailrec) =>
       val x2 = transform(x)
       if (x2 eq x) expr
-      else Apply0(pos, x2, tailstrict)
+      else Apply0(pos, x2, tailstrict, tailrec)
 
-    case Apply1(pos, x, y, tailstrict) =>
+    case Apply1(pos, x, y, tailstrict, tailrec) =>
       val x2 = transform(x)
       val y2 = transform(y)
       if ((x2 eq x) && (y2 eq y)) expr
-      else Apply1(pos, x2, y2, tailstrict)
+      else Apply1(pos, x2, y2, tailstrict, tailrec)
 
-    case Apply2(pos, x, y, z, tailstrict) =>
+    case Apply2(pos, x, y, z, tailstrict, tailrec) =>
       val x2 = transform(x)
       val y2 = transform(y)
       val z2 = transform(z)
       if ((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
-      else Apply2(pos, x2, y2, z2, tailstrict)
+      else Apply2(pos, x2, y2, z2, tailstrict, tailrec)
 
-    case Apply3(pos, x, y, z, a, tailstrict) =>
+    case Apply3(pos, x, y, z, a, tailstrict, tailrec) =>
       val x2 = transform(x)
       val y2 = transform(y)
       val z2 = transform(z)
       val a2 = transform(a)
       if ((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
-      else Apply3(pos, x2, y2, z2, a2, tailstrict)
+      else Apply3(pos, x2, y2, z2, a2, tailstrict, tailrec)
 
     case ApplyBuiltin(pos, func, x, tailstrict) =>
       val x2 = transformArr(x)
@@ -538,13 +537,27 @@ class StaticOptimizer(
     transformGenericArr(a)(transformAssert)
 
   private def transformBind(b: Bind): Bind = {
-    val args = b.args
-    val rhs = b.rhs
-    nestedNames(if (args == null) null else args.names) {
-      val args2 = transformParams(args)
-      val rhs2 = transform(rhs)
-      if ((args2 eq args) && (rhs2 eq rhs)) b
-      else b.copy(args = args2, rhs = rhs2)
+    val selfTailrecNameIdx = scope.get(b.name).idx
+    b.args match {
+      case null =>
+        b.rhs match {
+          case function: Function =>
+            val rhs2 = transformFunction(function, selfTailrecNameIdx)
+            if (rhs2 eq function) b
+            else b.copy(rhs = rhs2)
+          case rhs =>
+            val rhs2 = transform(rhs)
+            if (rhs2 eq rhs) b
+            else b.copy(rhs = rhs2)
+        }
+      case args =>
+        val rhs = b.rhs
+        nestedNames(args.names) {
+          val args2 = transformParams(args)
+          val rhs2 = markDirectSelfTailCalls(transform(rhs), selfTailrecNameIdx)
+          if ((args2 eq args) && (rhs2 eq rhs)) b
+          else b.copy(args = args2, rhs = rhs2)
+        }
     }
   }
 
@@ -816,7 +829,7 @@ class StaticOptimizer(
   }
 
   private def transformApply(a: Apply): Expr = {
-    val rebound = rebindApply(a.pos, a.value, a.args, a.namedNames, a.tailstrict) match {
+    val rebound = rebindApply(a.pos, a.value, a.args, a.namedNames, a.tailstrict, a.tailrec) match {
       case null => a
       case a    => a
     }
@@ -843,10 +856,10 @@ class StaticOptimizer(
     if (a.namedNames != null) a
     else
       a.args.length match {
-        case 0 => Apply0(a.pos, a.value, a.tailstrict)
-        case 1 => Apply1(a.pos, a.value, a.args(0), a.tailstrict)
-        case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1), a.tailstrict)
-        case 3 => Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2), a.tailstrict)
+        case 0 => Apply0(a.pos, a.value, a.tailstrict, a.tailrec)
+        case 1 => Apply1(a.pos, a.value, a.args(0), a.tailstrict, a.tailrec)
+        case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1), a.tailstrict, a.tailrec)
+        case 3 => Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2), a.tailstrict, a.tailrec)
         case _ => a
       }
   }
@@ -856,7 +869,8 @@ class StaticOptimizer(
       lhs: Expr,
       args: Array[Expr],
       names: Array[String],
-      tailstrict: Boolean): Expr = lhs match {
+      tailstrict: Boolean,
+      tailrec: Boolean): Expr = lhs match {
     case f: Val.Builtin =>
       rebind(args, names, f.params) match {
         case null    => null
@@ -891,12 +905,12 @@ class StaticOptimizer(
         case ScopedVal(Function(_, params, _), _, _) =>
           rebind(args, names, params) match {
             case null    => null
-            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict)
+            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict, tailrec)
           }
         case ScopedVal(Bind(_, _, params, _), _, _) =>
           rebind(args, names, params) match {
             case null    => null
-            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict)
+            case newArgs => Apply(pos, lhs, newArgs, null, tailstrict, tailrec)
           }
         case _ => null
       }
@@ -933,6 +947,61 @@ class StaticOptimizer(
       i += 1
     }
     target
+  }
+
+  private def transformFunction(function: Function, selfTailrecNameIdx: Int): Function =
+    nestedNames(function.params.names) {
+      val params = function.params
+      val body = function.body
+      val params2 = transformParams(params)
+      val body2 =
+        if (selfTailrecNameIdx == -1) transform(body)
+        else markDirectSelfTailCalls(transform(body), selfTailrecNameIdx)
+      if ((params2 eq params) && (body2 eq body)) function
+      else Function(function.pos, params2, body2)
+    }
+
+  private def markDirectSelfTailCalls(e: Expr, selfTailrecNameIdx: Int): Expr = e match {
+    case IfElse(pos, cond, thenExpr, elseExpr) =>
+      val thenExpr2 = markDirectSelfTailCalls(thenExpr, selfTailrecNameIdx)
+      val elseExpr2 =
+        if (elseExpr == null) null
+        else markDirectSelfTailCalls(elseExpr, selfTailrecNameIdx)
+      if ((thenExpr2 eq thenExpr) && (elseExpr2 eq elseExpr)) e
+      else IfElse(pos, cond, thenExpr2, elseExpr2)
+
+    case LocalExpr(pos, bindings, returned) =>
+      val returned2 = markDirectSelfTailCalls(returned, selfTailrecNameIdx)
+      if (returned2 eq returned) e
+      else LocalExpr(pos, bindings, returned2)
+
+    case AssertExpr(pos, asserted, returned) =>
+      val returned2 = markDirectSelfTailCalls(returned, selfTailrecNameIdx)
+      if (returned2 eq returned) e
+      else AssertExpr(pos, asserted, returned2)
+
+    case apply @ Apply(_, value, _, _, tailstrict, _)
+        if !tailstrict && isDirectSelfCall(value, selfTailrecNameIdx) =>
+      apply.copy(tailrec = true)
+    case apply @ Apply0(_, value, tailstrict, _)
+        if !tailstrict && isDirectSelfCall(value, selfTailrecNameIdx) =>
+      apply.copy(tailrec = true)
+    case apply @ Apply1(_, value, _, tailstrict, _)
+        if !tailstrict && isDirectSelfCall(value, selfTailrecNameIdx) =>
+      apply.copy(tailrec = true)
+    case apply @ Apply2(_, value, _, _, tailstrict, _)
+        if !tailstrict && isDirectSelfCall(value, selfTailrecNameIdx) =>
+      apply.copy(tailrec = true)
+    case apply @ Apply3(_, value, _, _, _, tailstrict, _)
+        if !tailstrict && isDirectSelfCall(value, selfTailrecNameIdx) =>
+      apply.copy(tailrec = true)
+
+    case _ => e
+  }
+
+  private def isDirectSelfCall(value: Expr, selfTailrecNameIdx: Int): Boolean = value match {
+    case ValidId(_, _, nameIdx) => nameIdx == selfTailrecNameIdx
+    case _                      => false
   }
 
   private def tryFoldUnaryOp(pos: Position, op: Int, v: Val, fallback: Expr): Expr =

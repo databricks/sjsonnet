@@ -1,10 +1,162 @@
 package sjsonnet
 
+import scala.collection.mutable
 import utest._
+import Expr.*
 import TestUtils.{eval, evalErr}
 
 object TailCallOptimizationTests extends TestSuite {
+  private def optimize(s: String): Expr = {
+    val interpreter = new Interpreter(Map(), Map(), DummyPath(), Importer.empty, new DefaultParseCache)
+    val parsed = fastparse
+      .parse(
+        s,
+        new Parser(DummyPath("(memory)"), mutable.HashMap.empty, mutable.HashMap.empty).document(_)
+      )
+      .get
+      .value
+      ._1
+    new StaticOptimizer(
+      interpreter.evaluator,
+      _ => None,
+      sjsonnet.stdlib.StdLibModule.Default.module,
+      mutable.HashMap.empty,
+      mutable.HashMap.empty
+    ).optimize(parsed)
+  }
+
   val tests: Tests = Tests {
+    test("optimizerMarksDirectSelfTailCall") {
+      val optimized = optimize(
+        """
+          |local f(n) =
+          |  if n <= 0 then 0
+          |  else f(n - 1);
+          |
+          |f(10)
+          |""".stripMargin
+      ).asInstanceOf[LocalExpr]
+
+      val bind = optimized.bindings(0)
+      val recursiveCall = bind.rhs.asInstanceOf[IfElse].`else`.asInstanceOf[Apply1]
+      val outerCall = optimized.returned.asInstanceOf[Apply1]
+
+      assert(recursiveCall.tailrec)
+      assert(!recursiveCall.tailstrict)
+      assert(!outerCall.tailrec)
+      assert(recursiveCall.value.asInstanceOf[ValidId].name == "f")
+    }
+
+    test("optimizerDoesNotMarkNonTailSelfCall") {
+      val optimized = optimize(
+        """
+          |local f(n) =
+          |  if n <= 0 then 0
+          |  else 1 + f(n - 1);
+          |
+          |f(10)
+          |""".stripMargin
+      ).asInstanceOf[LocalExpr]
+
+      val recursiveCall = optimized
+        .bindings(0)
+        .rhs
+        .asInstanceOf[IfElse]
+        .`else`
+        .asInstanceOf[BinaryOp]
+        .rhs
+        .asInstanceOf[Apply1]
+
+      assert(!recursiveCall.tailrec)
+      assert(!recursiveCall.tailstrict)
+    }
+
+    test("directSelfTailrecWithoutTailstrict") {
+      eval(
+        """
+          |local countdown(n) =
+          |  if n <= 0 then 0
+          |  else countdown(n - 1);
+          |
+          |countdown(10000)
+          |""".stripMargin,
+        maxStack = 100
+      ) ==> ujson.Num(0)
+    }
+
+    test("directSelfTailrecPreservesLazyArgs") {
+      eval(
+        """
+          |local loop(n, ignored=0) =
+          |  if n <= 0 then 0
+          |  else loop(n - 1, error "kaboom");
+          |
+          |loop(10000)
+          |""".stripMargin,
+        maxStack = 100
+      ) ==> ujson.Num(0)
+    }
+
+    test("directSelfTailrecWithNamedAndDefaultArgs") {
+      eval(
+        """
+          |local f(n, step=1, accum=0) =
+          |  if n <= 0 then accum
+          |  else f(accum=accum + n, n=n - step);
+          |
+          |f(100)
+          |""".stripMargin,
+        maxStack = 100
+      ) ==> ujson.Num(5050)
+    }
+
+    test("directSelfTailrecInsideNestedFunction") {
+      eval(
+        """
+          |local outer(n) =
+          |  local inner(remaining, accum=0) =
+          |    if remaining <= 0 then accum
+          |    else
+          |      local next = remaining - 1;
+          |      inner(next, accum + remaining);
+          |  inner(n);
+          |
+          |outer(1000)
+          |""".stripMargin,
+        maxStack = 100
+      ) ==> ujson.Num(500500)
+    }
+
+    test("nonTailSelfRecursionStillOverflows") {
+      val err = evalErr(
+        """
+          |local f(n) =
+          |  if n <= 0 then 0
+          |  else 1 + f(n - 1);
+          |
+          |f(1000)
+          |""".stripMargin,
+        maxStack = 100
+      )
+      assert(err.contains("Max stack frames exceeded."))
+    }
+
+    test("objectMethodSelfCallIsNotImplicitTailrec") {
+      val err = evalErr(
+        """
+          |local fns = {
+          |  countdown(n)::
+          |    if n <= 0 then 0
+          |    else self.countdown(n - 1),
+          |};
+          |
+          |fns.countdown(1000)
+          |""".stripMargin,
+        maxStack = 100
+      )
+      assert(err.contains("Max stack frames exceeded."))
+    }
+
     test("tailstrictFactorialSmall") {
       eval(
         """

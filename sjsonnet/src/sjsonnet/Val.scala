@@ -1166,10 +1166,11 @@ case object TailstrictModeEnabled extends TailstrictMode
 case object TailstrictModeDisabled extends TailstrictMode
 
 /**
- * Sentinel value for tail call optimization of `tailstrict` calls. When a function body's tail
- * position is a `tailstrict` call, the evaluator returns a [[TailCall]] instead of recursing into
- * the callee. [[TailCall.resolve]] then re-invokes the target function iteratively, eliminating
- * native stack growth.
+ * Sentinel value for tail call optimization. When a function body's tail position is either an
+ * explicit `tailstrict` call or an optimizer-marked direct self-tail-call, the evaluator returns a
+ * [[TailCall]] instead of recursing into the callee. [[TailCall.resolve]] then re-invokes the
+ * target function iteratively, eliminating native stack growth while preserving the call's original
+ * argument-evaluation mode.
  *
  * This is an internal protocol value and must never escape to user-visible code paths (e.g.
  * materialization, object field access). Every call site that may produce a TailCall must either
@@ -1180,7 +1181,8 @@ final class TailCall(
     val func: Val.Func,
     val args: Array[Eval],
     val namedNames: Array[String],
-    val callSiteExpr: Expr)
+    val callSiteExpr: Expr,
+    val tailstrictMode: TailstrictMode)
     extends Val {
   def pos: Position = callSiteExpr.pos
   def prettyName = "tailcall"
@@ -1191,8 +1193,8 @@ object TailCall {
 
   /**
    * Iteratively resolve a [[TailCall]] chain (trampoline loop). If `current` is not a TailCall, it
-   * is returned immediately. Otherwise, each TailCall's target function is re-invoked with
-   * `TailstrictModeEnabled` until a non-TailCall result is produced.
+   * is returned immediately. Otherwise, each TailCall's target function is re-invoked with the
+   * original call's tailstrict mode until a non-TailCall result is produced.
    *
    * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
    * not alter user-visible stack traces.
@@ -1200,7 +1202,7 @@ object TailCall {
   @tailrec
   def resolve(current: Val)(implicit ev: EvalScope): Val = current match {
     case tc: TailCall =>
-      implicit val tailstrictMode: TailstrictMode = TailstrictModeEnabled
+      implicit val tailstrictMode: TailstrictMode = tc.tailstrictMode
       val next =
         try {
           tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)

@@ -24,6 +24,7 @@ trait Expr {
    */
   var pos: Position
   private[sjsonnet] def tag: Byte = ExprTags.UNTAGGED
+  private[sjsonnet] def isInvalidVisitTag: Boolean = false
 
   /** The name of this expression type to be shown in error messages */
   def exprErrorString: String = {
@@ -72,16 +73,20 @@ object Expr {
 
   final case class Self(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Self
+    final override private[sjsonnet] def isInvalidVisitTag = true
   }
   final case class Super(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Super
+    final override private[sjsonnet] def isInvalidVisitTag = true
   }
   final case class $(var pos: Position) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.`$`
+    final override private[sjsonnet] def isInvalidVisitTag = true
   }
 
   final case class Id(var pos: Position, name: String) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Id
+    final override private[sjsonnet] def isInvalidVisitTag = true
     override def exprErrorString: String = s"${super.exprErrorString} $name"
   }
 
@@ -231,22 +236,38 @@ object Expr {
       value: Expr,
       args: Array[Expr],
       namedNames: Array[String],
-      tailstrict: Boolean)
+      tailstrict: Boolean,
+      tailrec: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply0(var pos: Position, value: Expr, tailstrict: Boolean)
+  final case class Apply0(
+      var pos: Position,
+      value: Expr,
+      tailstrict: Boolean,
+      tailrec: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply0
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply1(var pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
+  final case class Apply1(
+      var pos: Position,
+      value: Expr,
+      a1: Expr,
+      tailstrict: Boolean,
+      tailrec: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply1
     override def exprErrorString: String = Expr.callTargetName(value)
   }
-  final case class Apply2(var pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
+  final case class Apply2(
+      var pos: Position,
+      value: Expr,
+      a1: Expr,
+      a2: Expr,
+      tailstrict: Boolean,
+      tailrec: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply2
     override def exprErrorString: String = Expr.callTargetName(value)
@@ -257,7 +278,8 @@ object Expr {
       a1: Expr,
       a2: Expr,
       a3: Expr,
-      tailstrict: Boolean)
+      tailstrict: Boolean,
+      tailrec: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply3
     override def exprErrorString: String = Expr.callTargetName(value)

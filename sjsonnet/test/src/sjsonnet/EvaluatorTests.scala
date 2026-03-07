@@ -944,7 +944,7 @@ object EvaluatorTests extends TestSuite {
     test("maxStack") {
       test("recursiveFunction") {
         val err = evalErr(
-          "local f(x) = f(x + 1); f(0)",
+          "local f(x) = 1 + f(x + 1); f(0)",
           useNewEvaluator = useNewEvaluator,
           maxStack = 10
         )

@@ -123,20 +123,20 @@ class OptimizerBenchmark {
     }
 
     private def rec(e: Expr): Unit = e match {
-      case Expr.Select(_, x, _)      => transform(x)
-      case Expr.Apply(_, x, y, _, _) =>
+      case Expr.Select(_, x, _)         => transform(x)
+      case Expr.Apply(_, x, y, _, _, _) =>
         transform(x)
         transformArr(y)
-      case Expr.Apply0(_, x, _) =>
+      case Expr.Apply0(_, x, _, _) =>
         transform(x)
-      case Expr.Apply1(_, x, y, _) =>
+      case Expr.Apply1(_, x, y, _, _) =>
         transform(x)
         transform(y)
-      case Expr.Apply2(_, x, y, z, _) =>
+      case Expr.Apply2(_, x, y, z, _, _) =>
         transform(x)
         transform(y)
         transform(z)
-      case Expr.Apply3(_, x, y, z, a, _) =>
+      case Expr.Apply3(_, x, y, z, a, _, _) =>
         transform(x)
         transform(y)
         transform(z)

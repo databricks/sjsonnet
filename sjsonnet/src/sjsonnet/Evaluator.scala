@@ -32,6 +32,8 @@ class Evaluator(
 
   private[this] var stackDepth: Int = 0
   private[this] val maxStack: Int = settings.maxStack
+  private[sjsonnet] val astVisitProfiler: AstVisitProfiler =
+    if (debugStats == null) null else debugStats.astVisitProfiler
   private[sjsonnet] var profiler: Profiler = _
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
@@ -63,6 +65,8 @@ class Evaluator(
     collection.mutable.HashMap.empty[Path, Val]
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+    val av = astVisitProfiler
+    if (av != null) av.countVisit(e)
     val p = profiler
     val saved: (AnyRef, Int) = if (p != null) p.enter(e) else null
     try {
@@ -1028,8 +1032,9 @@ class Evaluator(
         }
       }
       visitExprWithTailCallSupport(e.returned)
-    // Tail-position tailstrict calls: match TailstrictableExpr to unify the tailstrict guard,
-    // then dispatch by concrete type.
+    // Tail-position calls eligible for TCO: explicit `tailstrict` calls and optimizer-marked direct
+    // self-tail-calls. The latter preserve default Jsonnet laziness by carrying lazy args through
+    // the TailCall sentinel.
     //
     // - Apply* (user function calls): construct a TailCall sentinel that the caller's
     //   TailCall.resolve loop will resolve iteratively, avoiding JVM stack growth for
@@ -1038,40 +1043,47 @@ class Evaluator(
     //   visitApplyBuiltin*. Those methods already wrap their result in TailCall.resolve() when
     //   tailstrict=true, resolving any TailCall that a user-defined callback (e.g. the function
     //   argument to std.makeArray or std.sort) may have returned.
+    case e: Apply if e.tailstrict || e.tailrec =>
+      try {
+        val func = visitExpr(e.value).cast[Val.Func]
+        val mode = if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        val args =
+          if (e.tailstrict) e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
+          else e.args.map(visitAsLazy(_))
+        new TailCall(func, args, e.namedNames, e, mode)
+      } catch Error.withStackFrame(e)
+    case e: Apply0 if e.tailstrict || e.tailrec =>
+      try {
+        val func = visitExpr(e.value).cast[Val.Func]
+        val mode = if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        new TailCall(func, Evaluator.emptyLazyArray, null, e, mode)
+      } catch Error.withStackFrame(e)
+    case e: Apply1 if e.tailstrict || e.tailrec =>
+      try {
+        val func = visitExpr(e.value).cast[Val.Func]
+        val mode = if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        val arg1: Eval = if (e.tailstrict) visitExpr(e.a1) else visitAsLazy(e.a1)
+        new TailCall(func, Array[Eval](arg1), null, e, mode)
+      } catch Error.withStackFrame(e)
+    case e: Apply2 if e.tailstrict || e.tailrec =>
+      try {
+        val func = visitExpr(e.value).cast[Val.Func]
+        val mode = if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        val arg1: Eval = if (e.tailstrict) visitExpr(e.a1) else visitAsLazy(e.a1)
+        val arg2: Eval = if (e.tailstrict) visitExpr(e.a2) else visitAsLazy(e.a2)
+        new TailCall(func, Array[Eval](arg1, arg2), null, e, mode)
+      } catch Error.withStackFrame(e)
+    case e: Apply3 if e.tailstrict || e.tailrec =>
+      try {
+        val func = visitExpr(e.value).cast[Val.Func]
+        val mode = if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        val arg1: Eval = if (e.tailstrict) visitExpr(e.a1) else visitAsLazy(e.a1)
+        val arg2: Eval = if (e.tailstrict) visitExpr(e.a2) else visitAsLazy(e.a2)
+        val arg3: Eval = if (e.tailstrict) visitExpr(e.a3) else visitAsLazy(e.a3)
+        new TailCall(func, Array[Eval](arg1, arg2, arg3), null, e, mode)
+      } catch Error.withStackFrame(e)
     case e: TailstrictableExpr if e.tailstrict =>
-      e match {
-        case e: Apply =>
-          try {
-            val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]], e.namedNames, e)
-          } catch Error.withStackFrame(e)
-        case e: Apply0 =>
-          try {
-            val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Evaluator.emptyLazyArray, null, e)
-          } catch Error.withStackFrame(e)
-        case e: Apply1 =>
-          try {
-            val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Array[Eval](visitExpr(e.a1)), null, e)
-          } catch Error.withStackFrame(e)
-        case e: Apply2 =>
-          try {
-            val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Array[Eval](visitExpr(e.a1), visitExpr(e.a2)), null, e)
-          } catch Error.withStackFrame(e)
-        case e: Apply3 =>
-          try {
-            val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(
-              func,
-              Array[Eval](visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3)),
-              null,
-              e
-            )
-          } catch Error.withStackFrame(e)
-        case _ => visitExpr(e)
-      }
+      visitExpr(e)
     case _ =>
       visitExpr(e)
   }
@@ -1372,6 +1384,8 @@ class NewEvaluator(
     extends Evaluator(r, e, w, s, wa, ds) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+    val av = astVisitProfiler
+    if (av != null) av.countVisit(e)
     (e.tag: @switch) match {
       case ExprTags.ValidId       => visitValidId(e.asInstanceOf[ValidId])
       case ExprTags.BinaryOp      => visitBinaryOp(e.asInstanceOf[BinaryOp])

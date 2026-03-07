@@ -9,6 +9,8 @@ package sjsonnet
  */
 final class DebugStats {
 
+  var astVisitProfiler: AstVisitProfiler = _
+
   // -- Lazy --
   var lazyCreated: Long = 0
 
