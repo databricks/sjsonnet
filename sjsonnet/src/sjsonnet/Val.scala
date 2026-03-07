@@ -172,8 +172,8 @@ object PrettyNamed {
 object Val {
   // Constants for safe double-to-int conversion
   // IEEE 754 doubles precisely represent integers up to 2^53, beyond which precision is lost
-  private val DOUBLE_MAX_SAFE_INTEGER = (1L << 53) - 1
-  private val DOUBLE_MIN_SAFE_INTEGER = -((1L << 53) - 1)
+  private[sjsonnet] final val DOUBLE_MAX_SAFE_INTEGER = (1L << 53) - 1
+  private[sjsonnet] final val DOUBLE_MIN_SAFE_INTEGER = -((1L << 53) - 1)
 
   abstract class Literal extends Val with Expr {
     final override private[sjsonnet] def tag = ExprTags.`Val.Literal`
