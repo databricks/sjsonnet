@@ -4,6 +4,8 @@ import sjsonnet.Expr.Member.Visibility
 import sjsonnet.Expr.{Error as _, *}
 import ujson.Value
 
+import sjsonnet.Evaluator.SafeDoubleOps
+
 import scala.annotation.{switch, tailrec}
 
 /**
@@ -234,35 +236,109 @@ class Evaluator(
   }
 
   def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
-    val v = visitExpr(e.value)
     val pos = e.pos
-    def fail() =
-      Error.fail(s"Unknown unary operation: ${Expr.UnaryOp.name(e.op)} ${v.prettyName}", pos)
-    e.op match {
+    (e.op: @switch) match {
+      case Expr.UnaryOp.OP_+ => Val.Num(pos, visitExprAsDouble(e.value))
+      case Expr.UnaryOp.OP_- => Val.Num(pos, -visitExprAsDouble(e.value))
+      case Expr.UnaryOp.OP_~ => Val.Num(pos, (~visitExprAsDouble(e.value).toSafeLong(pos)).toDouble)
       case Expr.UnaryOp.OP_! =>
-        v match {
+        visitExpr(e.value) match {
           case Val.True(_)  => Val.False(pos)
           case Val.False(_) => Val.True(pos)
-          case _            => fail()
+          case v            =>
+            Error.fail(s"Unknown unary operation: ! ${v.prettyName}", pos)
         }
-      case Expr.UnaryOp.OP_- =>
-        v match {
-          case Val.Num(_, v) => Val.Num(pos, -v)
-          case _             => fail()
-        }
-      case Expr.UnaryOp.OP_~ =>
-        v match {
-          case Val.Num(_, v) => Val.Num(pos, (~v.toLong).toDouble)
-          case _             => fail()
-        }
-      case Expr.UnaryOp.OP_+ =>
-        v match {
-          case Val.Num(_, v) => Val.Num(pos, v)
-          case _             => fail()
-        }
-      case _ => fail()
+      case _ =>
+        val v = visitExpr(e.value)
+        Error.fail(s"Unknown unary operation: ${Expr.UnaryOp.name(e.op)} ${v.prettyName}", pos)
     }
   }
+
+  /**
+   * Fast path: evaluate an expression expected to produce a Double, avoiding intermediate
+   * [[Val.Num]] allocation. When a numeric expression chain like `a + b * c - d` is evaluated,
+   * intermediate results stay as raw JVM `double` primitives (zero allocation) instead of being
+   * boxed into `Val.Num` objects (~24-32 bytes each) at every step.
+   *
+   * Only the outermost operation (in [[visitBinaryOp]]) boxes the final result into a `Val.Num`.
+   */
+  private def visitExprAsDouble(e: Expr)(implicit scope: ValScope): Double = try {
+    e match {
+      case v: Val.Num => v.asDouble
+      case v: Val     => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+      case e: ValidId =>
+        scope.bindings(e.nameIdx).value match {
+          case n: Val.Num => n.asDouble
+          case v          => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+        }
+      case e: BinaryOp => visitBinaryOpAsDouble(e)
+      case e: UnaryOp  => visitUnaryOpAsDouble(e)
+      case e           =>
+        visitExpr(e) match {
+          case n: Val.Num => n.asDouble
+          case v          => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+        }
+    }
+  } catch {
+    Error.withStackFrame(e)
+  }
+
+  private def visitBinaryOpAsDouble(e: BinaryOp)(implicit scope: ValScope): Double = {
+    val pos = e.pos
+    (e.op: @switch) match {
+      case Expr.BinaryOp.OP_* =>
+        val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
+        if (r.isInfinite) Error.fail("overflow", pos); r
+      case Expr.BinaryOp.OP_/ =>
+        val l = visitExprAsDouble(e.lhs)
+        val r = visitExprAsDouble(e.rhs)
+        if (r == 0) Error.fail("division by zero", pos)
+        val result = l / r
+        if (result.isInfinite) Error.fail("overflow", pos); result
+      case Expr.BinaryOp.OP_% =>
+        visitExprAsDouble(e.lhs) % visitExprAsDouble(e.rhs)
+      case Expr.BinaryOp.OP_+ =>
+        val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
+        if (r.isInfinite) Error.fail("overflow", pos); r
+      case Expr.BinaryOp.OP_- =>
+        val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
+        if (r.isInfinite) Error.fail("overflow", pos); r
+      case Expr.BinaryOp.OP_<< =>
+        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
+        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
+          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+        (ll << rr).toDouble
+      case Expr.BinaryOp.OP_>> =>
+        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
+        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        (ll >> rr).toDouble
+      case Expr.BinaryOp.OP_& =>
+        (visitExprAsDouble(e.lhs).toSafeLong(pos) & visitExprAsDouble(e.rhs).toSafeLong(
+          pos
+        )).toDouble
+      case Expr.BinaryOp.OP_^ =>
+        (visitExprAsDouble(e.lhs).toSafeLong(pos) ^ visitExprAsDouble(e.rhs).toSafeLong(
+          pos
+        )).toDouble
+      case Expr.BinaryOp.OP_| =>
+        (visitExprAsDouble(e.lhs).toSafeLong(pos) | visitExprAsDouble(e.rhs).toSafeLong(
+          pos
+        )).toDouble
+      case _ =>
+        visitBinaryOp(e).asDouble
+    }
+  }
+
+  private def visitUnaryOpAsDouble(e: UnaryOp)(implicit scope: ValScope): Double =
+    (e.op: @switch) match {
+      case Expr.UnaryOp.OP_- => -visitExprAsDouble(e.value)
+      case Expr.UnaryOp.OP_+ => visitExprAsDouble(e.value)
+      case Expr.UnaryOp.OP_~ => (~visitExprAsDouble(e.value).toSafeLong(e.pos)).toDouble
+      case _                 => visitUnaryOp(e).asDouble
+    }
 
   /**
    * Function application entry points (visitApply/visitApply0-3 for user functions,
@@ -601,28 +677,31 @@ class Evaluator(
   }
 
   def visitBinaryOp(e: BinaryOp)(implicit scope: ValScope): Val.Literal = {
-    val l = visitExpr(e.lhs)
-    val r = visitExpr(e.rhs)
     val pos = e.pos
-    def fail() = Error.fail(
-      s"Unknown binary operation: ${l.prettyName} ${Expr.BinaryOp.name(e.op)} ${r.prettyName}",
-      pos
-    )
-    e.op match {
-
-      case Expr.BinaryOp.OP_== =>
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-          Error.fail("cannot test equality of functions", pos)
+    (e.op: @switch) match {
+      // Pure numeric fast path: avoid intermediate Val.Num allocation
+      case Expr.BinaryOp.OP_* =>
+        Val.Num(pos, visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs))
+      case Expr.BinaryOp.OP_- =>
+        Val.Num(pos, visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs))
+      case Expr.BinaryOp.OP_/ =>
+        val l = visitExprAsDouble(e.lhs)
+        val r = visitExprAsDouble(e.rhs)
+        if (r == 0) Error.fail("division by zero", pos)
+        Val.Num(pos, l / r)
+      // Polymorphic ops: need visitExpr for type dispatch
+      case Expr.BinaryOp.OP_% =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
+        (l, r) match {
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
+          case (Val.Str(_, l), r)             => Val.Str(pos, Format.format(l, r, pos))
+          case _                              => failBinOp(l, e.op, r, pos)
         }
-        Val.bool(pos, equal(l, r))
-
-      case Expr.BinaryOp.OP_!= =>
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func]) {
-          Error.fail("cannot test equality of functions", pos)
-        }
-        Val.bool(pos, !equal(l, r))
 
       case Expr.BinaryOp.OP_+ =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
           case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
@@ -630,129 +709,127 @@ class Evaluator(
           case (l, Val.Str(_, r))             => Val.Str(pos, Materializer.stringify(l) + r)
           case (l: Val.Obj, r: Val.Obj)       => r.addSuper(pos, l)
           case (l: Val.Arr, r: Val.Arr)       => l.concat(pos, r)
-          case _                              => fail()
+          case _                              => failBinOp(l, e.op, r, pos)
         }
 
-      case Expr.BinaryOp.OP_- =>
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l - r)
-          case _                              => fail()
-        }
+      // Shift ops: pure numeric with safe-integer range check
+      case Expr.BinaryOp.OP_<< =>
+        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
+        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
+          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+        else
+          Val.Num(pos, (ll << rr).toDouble)
 
-      case Expr.BinaryOp.OP_* =>
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l * r)
-          case _                              => fail()
-        }
+      case Expr.BinaryOp.OP_>> =>
+        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
+        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        Val.Num(pos, (ll >> rr).toDouble)
 
-      case Expr.BinaryOp.OP_/ =>
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) =>
-            if (r == 0) Error.fail("division by zero", pos)
-            Val.Num(pos, l / r)
-          case _ => fail()
-        }
-
-      case Expr.BinaryOp.OP_% =>
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
-          case (Val.Str(_, l), r)             => Val.Str(pos, Format.format(l, r, pos))
-          case _                              => fail()
-        }
-
+      // Comparison ops: polymorphic (Num/Str/Arr)
       case Expr.BinaryOp.OP_< =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
             Val.bool(pos, Util.compareStringsByCodepoint(l, r) < 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) < 0)
-          case _                              => fail()
+          case _                              => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_> =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
             Val.bool(pos, Util.compareStringsByCodepoint(l, r) > 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) > 0)
-          case _                              => fail()
+          case _                              => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_<= =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
             Val.bool(pos, Util.compareStringsByCodepoint(l, r) <= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) <= 0)
-          case _                              => fail()
+          case _                              => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_>= =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
             Val.bool(pos, Util.compareStringsByCodepoint(l, r) >= 0)
           case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
           case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) >= 0)
-          case _                              => fail()
-        }
-
-      case Expr.BinaryOp.OP_<< =>
-        (l, r) match {
-          case (l: Val.Num, r: Val.Num) =>
-            val ll = l.asSafeLong
-            val rr = r.asSafeLong
-            if (rr < 0) {
-              Error.fail("shift by negative exponent", pos)
-            }
-            if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
-              Error.fail("numeric value outside safe integer range for bitwise operation", pos)
-            else
-              Val.Num(pos, (ll << rr).toDouble)
-          case _ => fail()
-        }
-
-      case Expr.BinaryOp.OP_>> =>
-        (l, r) match {
-          case (l: Val.Num, r: Val.Num) =>
-            val ll = l.asSafeLong
-            val rr = r.asSafeLong
-            if (rr < 0) {
-              Error.fail("shift by negative exponent", pos)
-            }
-            Val.Num(pos, (ll >> rr).toDouble)
-          case _ => fail()
+          case _                              => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_in =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), o: Val.Obj) => Val.bool(pos, o.containsKey(l))
-          case _                           => fail()
+          case _                           => failBinOp(l, e.op, r, pos)
         }
 
+      // Equality ops
+      case Expr.BinaryOp.OP_== =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
+        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+          Error.fail("cannot test equality of functions", pos)
+        Val.bool(pos, equal(l, r))
+
+      case Expr.BinaryOp.OP_!= =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
+        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+          Error.fail("cannot test equality of functions", pos)
+        Val.bool(pos, !equal(l, r))
+
+      // Bitwise ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_& =>
-        (l, r) match {
-          case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong & r.asSafeLong).toDouble)
-          case _ => fail()
-        }
+        Val.Num(
+          pos,
+          (visitExprAsDouble(e.lhs).toSafeLong(pos) &
+          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
+        )
 
       case Expr.BinaryOp.OP_^ =>
-        (l, r) match {
-          case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong ^ r.asSafeLong).toDouble)
-          case _ => fail()
-        }
+        Val.Num(
+          pos,
+          (visitExprAsDouble(e.lhs).toSafeLong(pos) ^
+          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
+        )
 
       case Expr.BinaryOp.OP_| =>
-        (l, r) match {
-          case (l: Val.Num, r: Val.Num) =>
-            Val.Num(pos, (l.asSafeLong | r.asSafeLong).toDouble)
-          case _ => fail()
-        }
+        Val.Num(
+          pos,
+          (visitExprAsDouble(e.lhs).toSafeLong(pos) |
+          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
+        )
 
-      case _ => fail()
+      case _ =>
+        val l = visitExpr(e.lhs)
+        val r = visitExpr(e.rhs)
+        failBinOp(l, e.op, r, pos)
     }
   }
+
+  @inline private def failBinOp(l: Val, op: Int, r: Val, pos: Position): Nothing =
+    Error.fail(
+      s"Unknown binary operation: ${l.prettyName} ${Expr.BinaryOp.name(op)} ${r.prettyName}",
+      pos
+    )
 
   def visitFieldName(fieldName: FieldName, pos: Position)(implicit scope: ValScope): String = {
     fieldName match {
@@ -1239,6 +1316,14 @@ class NewEvaluator(
 }
 
 object Evaluator {
+
+  implicit class SafeDoubleOps(private val d: Double) extends AnyVal {
+    @inline def toSafeLong(pos: Position)(implicit ev: EvalErrorScope): Long = {
+      if (d < Val.DOUBLE_MIN_SAFE_INTEGER || d > Val.DOUBLE_MAX_SAFE_INTEGER)
+        Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+      d.toLong
+    }
+  }
 
   /**
    * Logger, used for warnings and trace. The first argument is true if the message is a trace
