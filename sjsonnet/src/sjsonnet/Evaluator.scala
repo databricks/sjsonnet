@@ -238,9 +238,9 @@ class Evaluator(
   def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
     val pos = e.pos
     (e.op: @switch) match {
-      case Expr.UnaryOp.OP_+ => Val.Num(pos, visitExprAsDouble(e.value))
-      case Expr.UnaryOp.OP_- => Val.Num(pos, -visitExprAsDouble(e.value))
-      case Expr.UnaryOp.OP_~ => Val.Num(pos, (~visitExprAsDouble(e.value).toSafeLong(pos)).toDouble)
+      case Expr.UnaryOp.OP_+ => Val.Num(pos, visitUnaryOpAsDouble(e))
+      case Expr.UnaryOp.OP_- => Val.Num(pos, visitUnaryOpAsDouble(e))
+      case Expr.UnaryOp.OP_~ => Val.Num(pos, visitUnaryOpAsDouble(e))
       case Expr.UnaryOp.OP_! =>
         visitExpr(e.value) match {
           case Val.True(_)  => Val.False(pos)
@@ -264,80 +264,222 @@ class Evaluator(
    */
   private def visitExprAsDouble(e: Expr)(implicit scope: ValScope): Double = try {
     e match {
-      case v: Val.Num => v.asDouble
-      case v: Val     => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+      case v: Val.Num => v.rawDouble
+      case v: Val     => throw new Evaluator.NonNumericValue(v)
       case e: ValidId =>
         scope.bindings(e.nameIdx).value match {
-          case n: Val.Num => n.asDouble
-          case v          => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+          case n: Val.Num => n.rawDouble
+          case v          => throw new Evaluator.NonNumericValue(v)
         }
       case e: BinaryOp => visitBinaryOpAsDouble(e)
       case e: UnaryOp  => visitUnaryOpAsDouble(e)
       case e           =>
         visitExpr(e) match {
-          case n: Val.Num => n.asDouble
-          case v          => Error.fail("Expected Number, got " + v.prettyName, e.pos)
+          case n: Val.Num => n.rawDouble
+          case v          => throw new Evaluator.NonNumericValue(v)
         }
     }
   } catch {
     Error.withStackFrame(e)
   }
 
+  @inline private def nonNumericOperand(expr: Expr, numeric: Double, value: Val): Val =
+    if (value == null) Val.Num(expr.pos, numeric) else value
+
   private def visitBinaryOpAsDouble(e: BinaryOp)(implicit scope: ValScope): Double = {
     val pos = e.pos
     (e.op: @switch) match {
       case Expr.BinaryOp.OP_* =>
-        val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        val r = lNum * rNum
         if (r.isInfinite) Error.fail("overflow", pos); r
       case Expr.BinaryOp.OP_/ =>
-        val l = visitExprAsDouble(e.lhs)
-        val r = visitExprAsDouble(e.rhs)
-        if (r == 0) Error.fail("division by zero", pos)
-        val result = l / r
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        if (rNum == 0) Error.fail("division by zero", pos)
+        val result = lNum / rNum
         if (result.isInfinite) Error.fail("overflow", pos); result
       case Expr.BinaryOp.OP_% =>
-        visitExprAsDouble(e.lhs) % visitExprAsDouble(e.rhs)
-      case Expr.BinaryOp.OP_+ =>
-        val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        lNum % rNum
       case Expr.BinaryOp.OP_- =>
-        val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        val r = lNum - rNum
         if (r.isInfinite) Error.fail("overflow", pos); r
       case Expr.BinaryOp.OP_<< =>
-        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
-        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        val ll = lNum.toSafeLong(pos)
+        val rr = rNum.toSafeLong(pos)
         if (rr < 0) Error.fail("shift by negative exponent", pos)
         if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
           Error.fail("numeric value outside safe integer range for bitwise operation", pos)
         (ll << rr).toDouble
       case Expr.BinaryOp.OP_>> =>
-        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
-        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        val ll = lNum.toSafeLong(pos)
+        val rr = rNum.toSafeLong(pos)
         if (rr < 0) Error.fail("shift by negative exponent", pos)
         (ll >> rr).toDouble
       case Expr.BinaryOp.OP_& =>
-        (visitExprAsDouble(e.lhs).toSafeLong(pos) & visitExprAsDouble(e.rhs).toSafeLong(
-          pos
-        )).toDouble
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        (lNum.toSafeLong(pos) & rNum.toSafeLong(pos)).toDouble
       case Expr.BinaryOp.OP_^ =>
-        (visitExprAsDouble(e.lhs).toSafeLong(pos) ^ visitExprAsDouble(e.rhs).toSafeLong(
-          pos
-        )).toDouble
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        (lNum.toSafeLong(pos) ^ rNum.toSafeLong(pos)).toDouble
       case Expr.BinaryOp.OP_| =>
-        (visitExprAsDouble(e.lhs).toSafeLong(pos) | visitExprAsDouble(e.rhs).toSafeLong(
-          pos
-        )).toDouble
+        var lNum = 0.0
+        var rNum = 0.0
+        var lVal: Val = null
+        var rVal: Val = null
+        try lNum = visitExprAsDouble(e.lhs)
+        catch { case n: Evaluator.NonNumericValue => lVal = n.value }
+        try rNum = visitExprAsDouble(e.rhs)
+        catch { case n: Evaluator.NonNumericValue => rVal = n.value }
+        if ((lVal ne null) || (rVal ne null))
+          failBinOp(
+            nonNumericOperand(e.lhs, lNum, lVal),
+            e.op,
+            nonNumericOperand(e.rhs, rNum, rVal),
+            pos
+          )
+        (lNum.toSafeLong(pos) | rNum.toSafeLong(pos)).toDouble
       case _ =>
-        visitBinaryOp(e).asDouble
+        visitExpr(e) match {
+          case n: Val.Num => n.rawDouble
+          case v          => throw new Evaluator.NonNumericValue(v)
+        }
     }
   }
 
   private def visitUnaryOpAsDouble(e: UnaryOp)(implicit scope: ValScope): Double =
-    (e.op: @switch) match {
-      case Expr.UnaryOp.OP_- => -visitExprAsDouble(e.value)
-      case Expr.UnaryOp.OP_+ => visitExprAsDouble(e.value)
-      case Expr.UnaryOp.OP_~ => (~visitExprAsDouble(e.value).toSafeLong(e.pos)).toDouble
-      case _                 => visitUnaryOp(e).asDouble
+    try {
+      (e.op: @switch) match {
+        case Expr.UnaryOp.OP_- => -visitExprAsDouble(e.value)
+        case Expr.UnaryOp.OP_+ => visitExprAsDouble(e.value)
+        case Expr.UnaryOp.OP_~ => (~visitExprAsDouble(e.value).toLong).toDouble
+        case _                 =>
+          visitExpr(e) match {
+            case n: Val.Num => n.rawDouble
+            case v          => throw new Evaluator.NonNumericValue(v)
+          }
+      }
+    } catch {
+      case n: Evaluator.NonNumericValue =>
+        Error.fail(
+          s"Unknown unary operation: ${Expr.UnaryOp.name(e.op)} ${n.value.prettyName}",
+          e.pos
+        )
     }
 
   /**
@@ -681,14 +823,11 @@ class Evaluator(
     (e.op: @switch) match {
       // Pure numeric fast path: avoid intermediate Val.Num allocation
       case Expr.BinaryOp.OP_* =>
-        Val.Num(pos, visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs))
+        Val.Num(pos, visitBinaryOpAsDouble(e))
       case Expr.BinaryOp.OP_- =>
-        Val.Num(pos, visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs))
+        Val.Num(pos, visitBinaryOpAsDouble(e))
       case Expr.BinaryOp.OP_/ =>
-        val l = visitExprAsDouble(e.lhs)
-        val r = visitExprAsDouble(e.rhs)
-        if (r == 0) Error.fail("division by zero", pos)
-        Val.Num(pos, l / r)
+        Val.Num(pos, visitBinaryOpAsDouble(e))
       // Polymorphic ops: need visitExpr for type dispatch
       case Expr.BinaryOp.OP_% =>
         val l = visitExpr(e.lhs)
@@ -714,19 +853,10 @@ class Evaluator(
 
       // Shift ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_<< =>
-        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
-        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
-        if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
-          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
-        else
-          Val.Num(pos, (ll << rr).toDouble)
+        Val.Num(pos, visitBinaryOpAsDouble(e))
 
       case Expr.BinaryOp.OP_>> =>
-        val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
-        val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
-        Val.Num(pos, (ll >> rr).toDouble)
+        Val.Num(pos, visitBinaryOpAsDouble(e))
 
       // Comparison ops: polymorphic (Num/Str/Arr)
       case Expr.BinaryOp.OP_< =>
@@ -798,25 +928,13 @@ class Evaluator(
 
       // Bitwise ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_& =>
-        Val.Num(
-          pos,
-          (visitExprAsDouble(e.lhs).toSafeLong(pos) &
-          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
-        )
+        Val.Num(pos, visitBinaryOpAsDouble(e))
 
       case Expr.BinaryOp.OP_^ =>
-        Val.Num(
-          pos,
-          (visitExprAsDouble(e.lhs).toSafeLong(pos) ^
-          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
-        )
+        Val.Num(pos, visitBinaryOpAsDouble(e))
 
       case Expr.BinaryOp.OP_| =>
-        Val.Num(
-          pos,
-          (visitExprAsDouble(e.lhs).toSafeLong(pos) |
-          visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
-        )
+        Val.Num(pos, visitBinaryOpAsDouble(e))
 
       case _ =>
         val l = visitExpr(e.lhs)
@@ -1317,8 +1435,12 @@ class NewEvaluator(
 
 object Evaluator {
 
+  final class NonNumericValue(val value: Val) extends scala.util.control.ControlThrowable
+
   implicit class SafeDoubleOps(private val d: Double) extends AnyVal {
     @inline def toSafeLong(pos: Position)(implicit ev: EvalErrorScope): Long = {
+      if (d.isInfinite || d.isNaN)
+        Error.fail("numeric value is not finite", pos)
       if (d < Val.DOUBLE_MIN_SAFE_INTEGER || d > Val.DOUBLE_MAX_SAFE_INTEGER)
         Error.fail("numeric value outside safe integer range for bitwise operation", pos)
       d.toLong

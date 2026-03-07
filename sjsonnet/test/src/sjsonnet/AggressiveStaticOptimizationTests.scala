@@ -217,27 +217,52 @@ object AggressiveStaticOptimizationTests extends TestSuite {
     // Error cases: runtime errors must still be raised correctly
     // -------------------------------------------------------------------------
     test("runtimeErrorsPreserved") {
+      def assertErrContainsBoth(input: String, expected: String): Unit = {
+        val err = evalErr(input)
+        assert(err.contains(expected))
+
+        val newEvaluatorErr = evalErr(input, useNewEvaluator = true)
+        assert(newEvaluatorErr.contains(expected))
+      }
+
       test("divisionByZeroNotFolded") {
         // Division by zero: the optimizer must NOT fold `1 / 0` into a value;
         // it should fall back to the runtime error path.
-        val err = evalErr("1 / 0")
-        assert(err.contains("sjsonnet.Error"))
+        assertErrContainsBoth("1 / 0", "sjsonnet.Error")
       }
       test("negativeShiftNotFolded") {
         // Negative shift amounts must not be constant-folded; runtime error expected.
-        val err = evalErr("1 << -1")
-        assert(err.contains("sjsonnet.Error"))
+        assertErrContainsBoth("1 << -1", "sjsonnet.Error")
+      }
+      test("moduloByZeroNotFolded") {
+        assertErrContainsBoth("1 % 0", "not a number")
       }
       test("andWithNonBoolRhsStillErrors") {
         // `true && "hello"` must still error: the optimizer only short-circuits when
         // rhs is a Val.Bool. If rhs is not a Bool, the BinaryOp is left intact and
         // the runtime type-check fires.
-        val err = evalErr(""" true && "hello" """)
-        assert(err.contains("binary operator &&"))
+        assertErrContainsBoth(""" true && "hello" """, "binary operator &&")
       }
       test("orWithNonBoolRhsStillErrors") {
-        val err = evalErr(""" false || "hello" """)
-        assert(err.contains("binary operator ||"))
+        assertErrContainsBoth(""" false || "hello" """, "binary operator ||")
+      }
+      test("constantBitwiseNaNStillErrors") {
+        assertErrContainsBoth("0 & (0 % 0)", "numeric value is not finite")
+      }
+      test("dynamicBitwiseNaNStillErrors") {
+        assertErrContainsBoth("local x = 0; 0 & (x % x)", "numeric value is not finite")
+      }
+      test("constantShiftNaNStillErrors") {
+        assertErrContainsBoth("1 << (0 % 0)", "numeric value is not finite")
+      }
+      test("rhsErrorsStillWinOverTypeMismatch") {
+        assertErrContainsBoth(""" "a" * error "boom" """, "boom")
+      }
+      test("binaryTypeErrorsStayOperatorSpecific") {
+        assertErrContainsBoth(""" "a" * 1 """, "Unknown binary operation: string * number")
+      }
+      test("unaryTypeErrorsStayOperatorSpecific") {
+        assertErrContainsBoth(""" +{} """, "Unknown unary operation: + object")
       }
     }
 

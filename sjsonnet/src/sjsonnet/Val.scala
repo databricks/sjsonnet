@@ -213,6 +213,7 @@ object Val {
     }
 
     def prettyName = "number"
+    private[sjsonnet] def rawDouble: Double = num
     override def asInt: Int = num.toInt
 
     def asPositiveInt: Int = {

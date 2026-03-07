@@ -69,12 +69,13 @@ class OptimizerBenchmark {
     })
   }
 
-  class Counter extends ExprTransform {
+  class Counter {
     var total, vals, exprs, arrVals, staticArrExprs, otherArrExprs, staticObjs, missedStaticObjs,
         otherObjs, namedApplies, applies, arityApplies, builtin = 0
     val applyArities = new mutable.LongMap[Int]()
     val ifElseChains = new mutable.LongMap[Int]()
     val selectChains = new mutable.LongMap[Int]()
+
     def transform(e: Expr): Expr = {
       total += 1
       if (e.isInstanceOf[Val]) vals += 1
@@ -95,7 +96,6 @@ class OptimizerBenchmark {
             val a = e.args.length
             applyArities.put(a.toLong, applyArities.getOrElse(a.toLong, 0) + 1)
           } else namedApplies += 1
-
         case _: Expr.Apply0 | _: Expr.Apply1 | _: Expr.Apply2 | _: Expr.Apply3 => arityApplies += 1
         case _: Expr.ApplyBuiltin | _: Expr.ApplyBuiltin1 | _: Expr.ApplyBuiltin2 => builtin += 1
         case _                                                                    =>
@@ -119,7 +119,149 @@ class OptimizerBenchmark {
           )
       }
       rec(e)
+      e
     }
+
+    private def rec(e: Expr): Unit = e match {
+      case Expr.Select(_, x, _)      => transform(x)
+      case Expr.Apply(_, x, y, _, _) =>
+        transform(x)
+        transformArr(y)
+      case Expr.Apply0(_, x, _) =>
+        transform(x)
+      case Expr.Apply1(_, x, y, _) =>
+        transform(x)
+        transform(y)
+      case Expr.Apply2(_, x, y, z, _) =>
+        transform(x)
+        transform(y)
+        transform(z)
+      case Expr.Apply3(_, x, y, z, a, _) =>
+        transform(x)
+        transform(y)
+        transform(z)
+        transform(a)
+      case Expr.ApplyBuiltin(_, _, x, _) =>
+        transformArr(x)
+      case Expr.ApplyBuiltin1(_, _, x, _) =>
+        transform(x)
+      case Expr.ApplyBuiltin2(_, _, x, y, _) =>
+        transform(x)
+        transform(y)
+      case Expr.ApplyBuiltin3(_, _, x, y, z, _) =>
+        transform(x)
+        transform(y)
+        transform(z)
+      case Expr.ApplyBuiltin4(_, _, x, y, z, a, _) =>
+        transform(x)
+        transform(y)
+        transform(z)
+        transform(a)
+      case Expr.UnaryOp(_, _, x) =>
+        transform(x)
+      case Expr.BinaryOp(_, x, _, y) =>
+        transform(x)
+        transform(y)
+      case Expr.And(_, x, y) =>
+        transform(x)
+        transform(y)
+      case Expr.Or(_, x, y) =>
+        transform(x)
+        transform(y)
+      case Expr.InSuper(_, x, _) =>
+        transform(x)
+      case Expr.Lookup(_, x, y) =>
+        transform(x)
+        transform(y)
+      case Expr.LookupSuper(_, _, x) =>
+        transform(x)
+      case Expr.Function(_, params, body) =>
+        transformParams(params)
+        transform(body)
+      case Expr.LocalExpr(_, binds, returned) =>
+        transformBinds(binds)
+        transform(returned)
+      case Expr.IfElse(_, cond, thenExpr, elseExpr) =>
+        transform(cond)
+        transform(thenExpr)
+        transform(elseExpr)
+      case Expr.ObjBody.MemberList(_, binds, fields, asserts) =>
+        transformBinds(binds)
+        transformFields(fields)
+        transformAsserts(asserts)
+      case Expr.AssertExpr(_, assertion, returned) =>
+        transform(assertion.value)
+        if (assertion.msg != null) transform(assertion.msg)
+        transform(returned)
+      case Expr.Comp(_, value, first, rest) =>
+        transform(value)
+        transform(first)
+        transformArr(rest)
+      case Expr.Arr(_, values) =>
+        transformArr(values)
+      case Expr.ObjExtend(_, base, ext) =>
+        transform(base)
+        transform(ext)
+      case Expr.ObjBody.ObjComp(_, preLocals, key, value, _, postLocals, first, rest) =>
+        transformBinds(preLocals)
+        transform(key)
+        transform(value)
+        transformBinds(postLocals)
+        transform(first)
+        transformList(rest)
+      case Expr.Slice(_, value, start, end, stride) =>
+        transform(value)
+        transformOption(start)
+        transformOption(end)
+        transformOption(stride)
+      case Expr.IfSpec(_, cond) =>
+        transform(cond)
+      case Expr.ForSpec(_, _, cond) =>
+        transform(cond)
+      case Expr.Error(_, value) =>
+        transform(value)
+      case _ =>
+    }
+
+    private def transformArr[T <: Expr](values: Array[T]): Unit = {
+      if (values != null) values.foreach(transform)
+    }
+
+    private def transformOption(value: Option[Expr]): Unit = value.foreach(transform)
+
+    private def transformList(values: List[Expr]): Unit = values.foreach(transform)
+
+    private def transformParams(params: Expr.Params): Unit = {
+      if (params != null && params.defaultExprs != null) transformArr(params.defaultExprs)
+    }
+
+    private def transformBinds(binds: Array[Expr.Bind]): Unit = {
+      if (binds != null) binds.foreach { bind =>
+        transformParams(bind.args)
+        transform(bind.rhs)
+      }
+    }
+
+    private def transformFieldName(fieldName: Expr.FieldName): Unit = fieldName match {
+      case Expr.FieldName.Dyn(expr) => transform(expr)
+      case _                        =>
+    }
+
+    private def transformFields(fields: Array[Expr.Member.Field]): Unit = {
+      if (fields != null) fields.foreach { field =>
+        transformFieldName(field.fieldName)
+        transformParams(field.args)
+        transform(field.rhs)
+      }
+    }
+
+    private def transformAsserts(asserts: Array[Expr.Member.AssertStmt]): Unit = {
+      if (asserts != null) asserts.foreach { assertion =>
+        transform(assertion.value)
+        if (assertion.msg != null) transform(assertion.msg)
+      }
+    }
+
     def countIfElse(e: Expr): Int = e match {
       case Expr.IfElse(_, _, _, else0) =>
         countIfElse(else0) + 1
