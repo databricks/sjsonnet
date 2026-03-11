@@ -268,12 +268,18 @@ final case class MaterializeJsonRenderer(
 
 object RenderUtils {
 
+  // Pre-cached string representations of small integers (0-255)
+  private val intStrCache: Array[String] = Array.tabulate(256)(_.toString)
+
   /**
    * Custom rendering of Doubles used in rendering
    */
   def renderDouble(d: Double): String = {
-    if (d.toLong == d) d.toLong.toString
-    else if (d % 1 == 0) {
+    val l = d.toLong
+    if (l.toDouble == d) {
+      if (l >= 0 && l < 256) intStrCache(l.toInt)
+      else l.toString
+    } else if (d % 1 == 0) {
       BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
     } else d.toString
   }

@@ -1869,6 +1869,15 @@ object Val {
         tailstrictMode: TailstrictMode): Val =
       if (namedNames == null && argVals.length == 1) evalRhs(argVals(0).value, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
+
+    override def apply1(argVal: Eval, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
+      if (params.names.length != 1) apply(Array(argVal), null, outerPos)
+      else {
+        if (tailstrictMode == TailstrictModeEnabled) argVal.value
+        evalRhs(argVal.value, ev, outerPos)
+      }
   }
 
   abstract class Builtin2(fn: String, pn1: String, pn2: String, defs: Array[Expr] = null)
@@ -1912,6 +1921,19 @@ object Val {
       if (namedNames == null && argVals.length == 3)
         evalRhs(argVals(0).value, argVals(1).value, argVals(2).value, ev, outerPos)
       else super.apply(argVals, namedNames, outerPos)
+
+    override def apply3(argVal1: Eval, argVal2: Eval, argVal3: Eval, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val =
+      if (params.names.length != 3) apply(Array(argVal1, argVal2, argVal3), null, outerPos)
+      else {
+        if (tailstrictMode == TailstrictModeEnabled) {
+          argVal1.value
+          argVal2.value
+          argVal3.value
+        }
+        evalRhs(argVal1.value, argVal2.value, argVal3.value, ev, outerPos)
+      }
   }
 
   abstract class Builtin4(
