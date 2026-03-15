@@ -53,11 +53,7 @@ final class DebugStats {
     sb.append(formatTimeLine("materialize_time", materializeTimeNs))
     sb.append(formatTimeLine("total_time", totalTimeNs))
 
-    val rt = Runtime.getRuntime
-    val usedBytes = rt.totalMemory() - rt.freeMemory()
-    val maxBytes = rt.maxMemory()
-    sb.append(formatBytesLine("heap_used", usedBytes))
-    sb.append(formatBytesLine("heap_max", maxBytes))
+    Platform.appendMemoryStats(sb)
 
     sb.toString
   }
@@ -68,21 +64,11 @@ final class DebugStats {
   private def formatTimeLine(label: String, ns: Long): String =
     f"$label%-25s ${formatNs(ns)}%s%n"
 
-  private def formatBytesLine(label: String, bytes: Long): String =
-    f"$label%-25s ${formatBytes(bytes)}%s%n"
-
   private def formatNs(ns: Long): String = {
     if (ns < 1000L) s"${ns}ns"
     else if (ns < 1000000L) f"${ns / 1000.0}%.1fμs"
     else if (ns < 1000000000L) f"${ns / 1000000.0}%.1fms"
     else f"${ns / 1000000000.0}%.3fs"
-  }
-
-  private def formatBytes(bytes: Long): String = {
-    if (bytes < 1024L) s"${bytes}B"
-    else if (bytes < 1024L * 1024) f"${bytes / 1024.0}%.1fKB"
-    else if (bytes < 1024L * 1024 * 1024) f"${bytes / (1024.0 * 1024)}%.1fMB"
-    else f"${bytes / (1024.0 * 1024 * 1024)}%.2fGB"
   }
 }
 

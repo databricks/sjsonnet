@@ -165,4 +165,22 @@ object Platform {
       quote
     }
   }
+
+  def appendMemoryStats(sb: StringBuilder): Unit = {
+    val rt = Runtime.getRuntime
+    val usedBytes = rt.totalMemory() - rt.freeMemory()
+    val maxBytes = rt.maxMemory()
+    sb.append(formatBytesLine("heap_used", usedBytes))
+    sb.append(formatBytesLine("heap_max", maxBytes))
+  }
+
+  private def formatBytesLine(label: String, bytes: Long): String =
+    f"$label%-25s ${formatBytes(bytes)}%s%n"
+
+  private def formatBytes(bytes: Long): String = {
+    if (bytes < 1024L) s"${bytes}B"
+    else if (bytes < 1024L * 1024) f"${bytes / 1024.0}%.1fKB"
+    else if (bytes < 1024L * 1024 * 1024) f"${bytes / (1024.0 * 1024)}%.1fMB"
+    else f"${bytes / (1024.0 * 1024 * 1024)}%.2fGB"
+  }
 }
