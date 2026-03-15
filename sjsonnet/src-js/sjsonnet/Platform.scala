@@ -144,4 +144,6 @@ object Platform {
   }
 
   def regexQuote(s: String): String = Pattern.quote(s)
+
+  def appendMemoryStats(sb: StringBuilder): Unit = {}
 }

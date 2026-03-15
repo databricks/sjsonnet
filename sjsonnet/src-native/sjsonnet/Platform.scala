@@ -188,4 +188,6 @@ object Platform {
       quote
     }
   }
+
+  def appendMemoryStats(sb: StringBuilder): Unit = {}
 }
