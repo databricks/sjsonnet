@@ -78,66 +78,66 @@ object Platform {
   }
 
   def yamlToJson(s: String): ujson.Value = {
-    // Split YAML multi-document stream manually, similar to SnakeYAML's loadAll
-    // since parseManyYamls doesn't handle all cases correctly
-    val documents = splitYamlDocuments(s)
+    if (s.trim.isEmpty) return ujson.Null
 
-    documents.size match {
-      case 0 => ujson.Null
-      case 1 => parseSingleDocument(documents.head)
-      case _ =>
-        val buf = new mutable.ArrayBuffer[ujson.Value](documents.size)
-        for (doc <- documents) {
-          buf += parseSingleDocument(doc)
+    // Preprocess to add explicit nulls for empty documents,
+    // since scala-yaml's parseManyYamls can't handle empty documents
+    // (DocumentStart immediately followed by DocumentEnd).
+    val preprocessed = addExplicitNullsForEmptyDocs(s)
+
+    parseManyYamls(preprocessed) match {
+      case Right(documents) =>
+        documents.size match {
+          case 0 => ujson.Null
+          case 1 => nodeToJson(documents.head)
+          case _ =>
+            val buf = new mutable.ArrayBuffer[ujson.Value](documents.size)
+            for (doc <- documents) {
+              buf += nodeToJson(doc)
+            }
+            ujson.Arr(buf)
         }
-        ujson.Arr(buf)
+      case Left(e) => Error.fail("Error converting YAML to JSON: " + e.getMessage)
     }
   }
 
-  private def splitYamlDocuments(s: String): List[String] = {
-    if (s.trim.isEmpty) return Nil
-
-    // Split on document separator "---" at line start
-    // But only if it's followed by whitespace or end of line
+  /**
+   * Inserts explicit "null" content for empty YAML documents. An empty document is one where a
+   * "---" marker has no content before the next "---" marker or end of input.
+   */
+  private def addExplicitNullsForEmptyDocs(s: String): String = {
     val lines = s.split("\n", -1).toList
-    val documents = mutable.ArrayBuffer[String]()
-    val currentDoc = mutable.ArrayBuffer[String]()
-    var isFirstDoc = true
+    val result = new mutable.ArrayBuffer[String](lines.size + 4)
+    var pendingEmptySep = false
 
     for (line <- lines) {
       val trimmed = line.trim
-      // Check if this line starts with "---" and is followed by whitespace or end
-      if (trimmed.startsWith("---") && (trimmed.length == 3 || trimmed.charAt(3).isWhitespace)) {
-        // Save previous document if not empty
-        if (currentDoc.nonEmpty || !isFirstDoc) {
-          documents += currentDoc.mkString("\n")
+      val isSep =
+        trimmed.startsWith("---") && (trimmed.length == 3 || trimmed.charAt(3).isWhitespace)
+
+      if (isSep) {
+        if (pendingEmptySep) {
+          // Previous "---" had no content after it; insert explicit null
+          result += "null"
         }
-        currentDoc.clear()
-        isFirstDoc = false
+        result += line
+        // Check if this separator has inline content (e.g. "--- 3", "--- >")
+        val afterMarker = trimmed.substring(3).trim
+        pendingEmptySep = afterMarker.isEmpty
       } else {
-        currentDoc += line
+        if (pendingEmptySep && trimmed.nonEmpty) {
+          pendingEmptySep = false
+        }
+        result += line
       }
     }
 
-    // Add last document
-    if (currentDoc.nonEmpty || documents.nonEmpty) {
-      documents += currentDoc.mkString("\n")
+    // Handle trailing "---" with no content
+    if (pendingEmptySep) {
+      result += "null"
     }
 
-    documents.toList
-  }
-
-  private def parseSingleDocument(doc: String): ujson.Value = {
-    val trimmed = doc.trim
-    if (trimmed.isEmpty) {
-      ujson.Null
-    } else {
-      // Use parseYaml for single document
-      parseYaml(trimmed) match {
-        case Right(node) => nodeToJson(node)
-        case Left(e)     => Error.fail("Error converting YAML to JSON: " + e.getMessage)
-      }
-    }
+    result.mkString("\n")
   }
 
   private def computeHash(algorithm: String, s: String) = {

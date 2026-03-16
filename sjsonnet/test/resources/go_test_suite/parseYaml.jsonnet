@@ -32,7 +32,7 @@
     |||
       ---
       a: 1
-      ---   
+      ---
       a: 2
     |||,
 
@@ -42,5 +42,23 @@
       ---a: 2
       a---: 3
     |||,
+
+    // Scalar documents can start on the same line as the document-start marker
+    |||
+      a: 1
+      --- >
+        hello
+        world
+      --- 3
+    |||,
+
+    // Documents can be empty; this is interpreted as null
+    |||
+      a: 1
+      ---
+      --- 2
+    |||,
+
+    "---",
   ]
 ]

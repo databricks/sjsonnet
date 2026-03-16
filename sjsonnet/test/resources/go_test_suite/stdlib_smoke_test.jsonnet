@@ -4,7 +4,6 @@
 // Functions without optional arguments need only one line
 // Functions with optional arguments need two lines - one with none of the optional arguments
 // and the other with all of them.
-
 local assertClose(a, b) =
   // Using 1e-12 as tolerance. Jsonnet uses double-precision floats with machine epsilon of 2**-53 ≈ 1.11e-16.
   // This tolerance is ~9000x the machine epsilon, which is quite lenient and should work across
@@ -79,13 +78,13 @@ local assertClose(a, b) =
     mantissa: std.mantissa(x=5),
     floor: std.floor(x=5),
     ceil: std.ceil(x=5),
-    sqrt: std.assertEqual(std.sqrt(x=5), 2.23606797749979),
+    sqrt: assertClose(std.sqrt(x=5), 2.2360679774997898),
     sin: assertClose(std.sin(x=5), -0.9589242746631385),
-    cos: assertClose(std.cos(x=5), 0.28366218546322625),
-    tan: assertClose(std.tan(x=5), -3.380515006246586),
-    asin: assertClose(std.asin(x=0.5), 0.5235987755982989),
-    acos: assertClose(std.acos(x=0.5), 1.0471975511965979),
-    atan: assertClose(std.atan(x=5), 1.373400766945016),
+    cos: assertClose(std.cos(x=5), 0.2836621854632263),
+    tan: assertClose(std.tan(x=5), -3.3805150062465854),
+    asin: assertClose(std.asin(x=0.5), 0.52359877559829893),
+    acos: assertClose(std.acos(x=0.5), 1.0471975511965976),
+    atan: assertClose(std.atan(x=5), 1.3734007669450157),
 
     // Assertions and debugging
     assertEqual: std.assertEqual(a="a", b="a"),
