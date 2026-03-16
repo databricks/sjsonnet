@@ -121,11 +121,37 @@ class Evaluator(
       Error.fail("Should not have happened.", e.pos)
   }
 
+  /**
+   * Convert an expression to an [[Eval]] for deferred evaluation.
+   *
+   * Three fast paths eliminate or reduce allocation vs the naive
+   * `new LazyFunc(() => visitExpr(e))`:
+   *
+   *   1. [[Val]] literals — already evaluated, return as-is (zero cost).
+   *   2. [[ValidId]] (variable reference) where the binding slot is non-null — reuse the existing
+   *      [[Eval]] from scope directly (zero allocation). Covers ~18% of calls. When the slot IS
+   *      null (self-recursive local, e.g. `local a = [a[1], 0]`), the binding hasn't been written
+   *      yet, so we must create a deferred thunk to defer the lookup.
+   *   3. All other expressions — [[LazyExpr]] stores (Expr, ValScope, Evaluator) as fields instead
+   *      of capturing them in a closure: 1 JVM object vs 2. Covers ~76% of calls (dominated by
+   *      BinaryOp).
+   *
+   * PERF: Do not revert to `new LazyFunc(() => visitExpr(e))` — profiling across all benchmark
+   * suites shows this method produces ~93% of deferred evaluations. The fast paths eliminate 242K
+   * allocations (bench.02) and improve wall-clock time ~5% (comparison2).
+   */
   def visitAsLazy(e: Expr)(implicit scope: ValScope): Eval = e match {
-    case v: Val => v
-    case e      =>
+    case v: Val     => v
+    case e: ValidId =>
+      val binding = scope.bindings(e.nameIdx)
+      if (binding != null) binding
+      else {
+        if (debugStats != null) debugStats.lazyCreated += 1
+        new LazyExpr(e, scope, this)
+      }
+    case e =>
       if (debugStats != null) debugStats.lazyCreated += 1
-      new Lazy(() => visitExpr(e))
+      new LazyExpr(e, scope, this)
   }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
@@ -151,7 +177,8 @@ class Evaluator(
           newScope.bindings(base + i) = b.args match {
             case null    => visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(newScope))
+              if (debugStats != null) debugStats.lazyCreated += 1
+              new LazyFunc(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(newScope))
           }
           i += 1
         }
@@ -789,7 +816,8 @@ class Evaluator(
             newScope.bindings(base + i) = b.args match {
               case null    => visitAsLazy(b.rhs)(newScope)
               case argSpec =>
-                new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+                if (debugStats != null) debugStats.lazyCreated += 1
+                new LazyFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
             }
             i += 1
           }
@@ -853,6 +881,7 @@ class Evaluator(
       visitExpr(e)
   }
 
+  // Note: can't use LazyExpr here — `scope` is by-name (=> ValScope), must remain lazy.
   def visitBindings(bindings: Array[Bind], scope: => ValScope): Array[Eval] = {
     if (debugStats != null) debugStats.lazyCreated += bindings.length
     val arrF = new Array[Eval](bindings.length)
@@ -861,9 +890,9 @@ class Evaluator(
       val b = bindings(i)
       arrF(i) = b.args match {
         case null =>
-          new Lazy(() => visitExpr(b.rhs)(scope))
+          new LazyFunc(() => visitExpr(b.rhs)(scope))
         case argSpec =>
-          new Lazy(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(scope))
+          new LazyFunc(() => visitMethod(b.rhs, argSpec, b.pos, b.name)(scope))
       }
       i += 1
     }
@@ -927,7 +956,8 @@ class Evaluator(
             case null =>
               visitAsLazy(b.rhs)(newScope)
             case argSpec =>
-              new Lazy(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
+              if (debugStats != null) debugStats.lazyCreated += 1
+              new LazyFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
           }
           i += 1
           j += 1

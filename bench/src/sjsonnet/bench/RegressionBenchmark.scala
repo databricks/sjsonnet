@@ -11,6 +11,9 @@ object RegressionBenchmark {
   private val testSuiteRoot: os.Path =
     sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
 
+  /** Shared CLI args passed to every benchmark invocation (e.g. bench.07 needs deep recursion). */
+  private val defaultArgs: Array[String] = Array("--max-stack", "100000")
+
   private def createDummyOut = new PrintStream(new OutputStream {
     def write(b: Int): Unit = ()
     override def write(b: Array[Byte]): Unit = ()
@@ -36,7 +39,7 @@ class RegressionBenchmark {
     val baos = new ByteArrayOutputStream()
     val ps = new PrintStream(baos)
     SjsonnetMainBase.main0(
-      Array(path),
+      RegressionBenchmark.defaultArgs :+ path,
       new DefaultParseCache,
       System.in,
       ps,
@@ -61,7 +64,7 @@ class RegressionBenchmark {
   def main(bh: Blackhole): Unit = {
     bh.consume(
       SjsonnetMainBase.main0(
-        Array(path),
+        RegressionBenchmark.defaultArgs :+ path,
         new DefaultParseCache,
         System.in,
         dummyOut,
