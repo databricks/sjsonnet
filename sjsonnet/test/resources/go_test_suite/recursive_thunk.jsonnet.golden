@@ -1,9 +1,7 @@
 sjsonnet.Error: xxx
     at [bar].(recursive_thunk.jsonnet:1:35)
-    at [foo].(recursive_thunk.jsonnet:2:23)
-    at [bar].(recursive_thunk.jsonnet:2:19)
-    at [foo].(recursive_thunk.jsonnet:2:23)
-    at [bar].(recursive_thunk.jsonnet:2:19)
-    at [foo].(recursive_thunk.jsonnet:3:4)
-    at [<root>].(recursive_thunk.jsonnet:1:7)
+    at [foo].(recursive_thunk.jsonnet:2:19)
+    at [bar].(recursive_thunk.jsonnet:2:23)
+    at [foo].(recursive_thunk.jsonnet:2:19)
+    at [<root>].(recursive_thunk.jsonnet:3:4)
 

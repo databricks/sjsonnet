@@ -1,0 +1,5 @@
+sjsonnet.Error: [search] Max stack frames exceeded.
+    at [method].(error.max_stack_cross_file_helper.libsonnet:5:37)
+    at [m].(error.max_stack_cross_file.jsonnet:5:23)
+    at [<root>].(error.max_stack_cross_file.jsonnet:9:2)
+
