@@ -1,3 +1,3 @@
 sjsonnet.Error: [f] Max stack frames exceeded.
-    at [f].(error.recursive_function_nonterm.jsonnet:20:2)
-    at [<root>].(error.recursive_function_nonterm.jsonnet:17:7)
+    at [<root>].(error.recursive_function_nonterm.jsonnet:20:2)
+

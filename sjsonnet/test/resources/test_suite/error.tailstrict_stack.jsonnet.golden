@@ -1,6 +1,5 @@
 sjsonnet.Error: n is 0
     at [sum_from_one_to_n].(error.tailstrict_stack.jsonnet:10:9)
-    at [sum_from_one_to_n].(error.tailstrict_stack.jsonnet:14:37)
-    at [foo].(error.tailstrict_stack.jsonnet:19:18)
-    at [<root>].(error.tailstrict_stack.jsonnet:1:7)
+    at [foo].(error.tailstrict_stack.jsonnet:14:37)
+    at [<root>].(error.tailstrict_stack.jsonnet:19:18)
 

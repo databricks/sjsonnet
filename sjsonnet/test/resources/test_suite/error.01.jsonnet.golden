@@ -1,6 +1,5 @@
 sjsonnet.Error: foo
     at [bananas].(error.01.jsonnet:17:29)
-    at [oranges].(error.01.jsonnet:19:35)
-    at [apples].(error.01.jsonnet:20:7)
-    at [<root>].(error.01.jsonnet:17:7)
+    at [apples].(error.01.jsonnet:19:35)
+    at [<root>].(error.01.jsonnet:20:7)
 

@@ -105,40 +105,51 @@ object Error {
 
       val allFrames = err.stack.reverse
       val namedFrames = allFrames.filter(_.exprErrorString != null)
-      val frames = if (namedFrames.nonEmpty) namedFrames else allFrames
+      val rawFrames = if (namedFrames.nonEmpty) namedFrames else allFrames
+
+      // Compute enclosing function scope for each frame by scanning from
+      // outermost to innermost. Each frame's callee name tells us what function
+      // was entered; builtin calls (std.*) are transparent and don't change scope.
+      val scopeNames = new Array[String](rawFrames.length)
+      var currentScope: String = rootName
+      var si = rawFrames.length - 1
+      while (si >= 0) {
+        scopeNames(si) = currentScope
+        val frameName = rawFrames(si).exprErrorString
+        if (frameName != null && !isBuiltinName(frameName)) {
+          currentScope = frameName
+        }
+        si -= 1
+      }
+      if (rawFrames.nonEmpty) {
+        scopeNames(0) = Option(rawFrames(0).exprErrorString).getOrElse(rootName)
+      }
+
+      // Deduplicate consecutive same-scope frames, keeping the innermost (first)
+      val frames = new java.util.ArrayList[(Frame, String)](rawFrames.length)
+      si = 0
+      while (si < rawFrames.length) {
+        val name = scopeNames(si)
+        if (frames.isEmpty || frames.get(frames.size - 1)._2 != name) {
+          frames.add((rawFrames(si), name))
+        }
+        si += 1
+      }
 
       var msg = err.getMessage
       var frameStart = 0
-      while (
-        frameStart < frames.length - 1 &&
-        (frames(frameStart).collapseIntoMessage ||
-        frames(frameStart).pos == frames(frameStart + 1).pos)
-      ) {
-        val name = Option(frames(frameStart).exprErrorString).getOrElse(rootName)
-        msg = "[" + name + "] " + msg
-        frameStart += 1
+      // Collapse innermost frame name into message when flagged, hiding it from "at" lines
+      if (frames.size > 0 && rawFrames(0).collapseIntoMessage) {
+        msg = "[" + frames.get(0)._2 + "] " + msg
+        frameStart = 1
       }
 
-      if (frameStart < frames.length && frames(frameStart).collapseIntoMessage) {
-        val f = frames(frameStart)
-        val name = Option(f.exprErrorString).getOrElse(rootName)
-        msg = "[" + name + "] " + msg
-        sb.append(msg)
-        appendFrame(sb, f, rootName)
-      } else {
-        sb.append(msg)
-        var i = frameStart
-        while (i < frames.length) {
-          val f = frames(i)
-          val name =
-            if (i == frames.length - 1) {
-              val n = f.exprErrorString
-              if (n == null || n == rootName) rootName else n
-            } else
-              Option(f.exprErrorString).getOrElse(rootName)
-          appendFrame(sb, f, name)
-          i += 1
-        }
+      sb.append(msg)
+      var i = frameStart
+      while (i < frames.size) {
+        val (f, name) = frames.get(i)
+        appendFrame(sb, f, name)
+        i += 1
       }
       if (err.getCause != null) {
         sb.append("\nCaused by: ")
@@ -165,6 +176,10 @@ object Error {
         p.close()
       }
   }
+
+  private def isBuiltinName(name: String): Boolean =
+    name.startsWith("std.") || name == "default" ||
+    name == "object comprehension" || name == "array comprehension"
 
   private def appendFrame(sb: StringBuilder, f: Frame, name: String): Unit = {
     sb.append("\n    at [").append(name).append("]")
