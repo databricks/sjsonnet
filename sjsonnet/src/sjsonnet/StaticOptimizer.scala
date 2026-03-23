@@ -1,8 +1,10 @@
 package sjsonnet
 
+import scala.annotation.switch
 import scala.collection.mutable
 
 import Expr.*
+import Evaluator.SafeDoubleOps
 import ScopedExprTransform.*
 
 /**
@@ -31,105 +33,183 @@ class StaticOptimizer(
     extends ScopedExprTransform {
   def optimize(e: Expr): Expr = transform(e)
 
-  override def transform(_e: Expr): Expr = super.transform(check(_e)) match {
-    case a: Apply => transformApply(a)
+  override def transform(_e: Expr): Expr = {
+    // Fast path: fold pure numeric literal chains as raw doubles before the bottom-up transform.
+    // This avoids intermediate Val.Num + BinaryOp allocations for chains like `60 * 60 * 24`.
+    _e match {
+      case _: BinaryOp | _: UnaryOp =>
+        val d = tryFoldAsDouble(_e)
+        if (!d.isNaN) return Val.Num(_e.pos, d)
+      case _ =>
+    }
+    super.transform(check(_e)) match {
+      case a: Apply => transformApply(a)
 
-    case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
-      try obj.value(name, p)(ev).asInstanceOf[Expr]
-      catch { case _: Exception => e }
+      case e @ Select(p, obj: Val.Obj, name) if obj.containsKey(name) =>
+        try obj.value(name, p)(ev).asInstanceOf[Expr]
+        catch { case _: Exception => e }
 
-    case Select(pos, ValidSuper(_, selfIdx), name) =>
-      SelectSuper(pos, selfIdx, name)
+      case Select(pos, ValidSuper(_, selfIdx), name) =>
+        SelectSuper(pos, selfIdx, name)
 
-    case Lookup(pos, ValidSuper(_, selfIdx), index) =>
-      LookupSuper(pos, selfIdx, index)
+      case Lookup(pos, ValidSuper(_, selfIdx), index) =>
+        LookupSuper(pos, selfIdx, index)
 
-    case BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
-      InSuper(pos, lhs, selfIdx)
-    case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
-      try ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str), rhs, tailstrict = false)
-      catch { case _: Exception => b2 }
-
-    case e @ Id(pos, name) =>
-      scope.get(name) match {
-        case ScopedVal(v: Val with Expr, _, _) => v
-        case ScopedVal(_, _, idx)              => ValidId(pos, name, idx)
-        case null if name == f"$$std"          => std
-        case null if name == "std"             => std
-        case null                              =>
-          variableResolver(name) match {
-            case Some(v) => v // additional variable resolution
-            case None    =>
-              StaticError.fail(
-                "Unknown variable: " + name,
-                e
-              )(ev)
+      case BinaryOp(pos, lhs, BinaryOp.OP_in, ValidSuper(_, selfIdx)) =>
+        InSuper(pos, lhs, selfIdx)
+      case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
+        try {
+          rhs match {
+            case r: Val =>
+              val partial = new Format.PartialApplyFmt(lhs.str)
+              try partial.evalRhs(r, ev, pos).asInstanceOf[Expr]
+              catch {
+                case _: Exception =>
+                  ApplyBuiltin1(pos, partial, rhs, tailstrict = false)
+              }
+            case _ =>
+              ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str), rhs, tailstrict = false)
           }
-      }
+        } catch { case _: Exception => b2 }
 
-    case e @ Self(pos) =>
-      scope.get("self") match {
-        case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
-        case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
-      }
-
-    case e @ $(pos) =>
-      scope.get("$") match {
-        case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
-        case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
-      }
-
-    case e @ Super(_) if !scope.contains("super") =>
-      StaticError.fail("Can't use super outside of an object", e)(ev)
-
-    case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
-      Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
-
-    case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
-      // If static optimization has constant-folded originally-dynamic field names
-      // into fixed names, it's possible that we might now have duplicate names.
-      // In that case, we keep the object as a MemberList and leave it to the
-      // Evaluator to throw an error if/when the object is evaluated (in order
-      // to preserve proper laziness semantics).
-      def allFieldsStaticAndUniquelyNamed: Boolean = {
-        val seen = mutable.Set.empty[String]
-        fields.forall { f =>
-          f.isStatic && seen.add(f.fieldName.asInstanceOf[FieldName.Fixed].value)
+      case e @ Id(pos, name) =>
+        scope.get(name) match {
+          case ScopedVal(v: Val with Expr, _, _) => v
+          case ScopedVal(_, _, idx)              => ValidId(pos, name, idx)
+          case null if name == f"$$std"          => std
+          case null if name == "std"             => std
+          case null                              =>
+            variableResolver(name) match {
+              case Some(v) => v // additional variable resolution
+              case None    =>
+                StaticError.fail(
+                  "Unknown variable: " + name,
+                  e
+                )(ev)
+            }
         }
-      }
 
-      if (binds == null && asserts == null && allFieldsStaticAndUniquelyNamed)
-        Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
-      else m
-    // Aggressive optimizations: constant folding, branch elimination, short-circuit elimination.
-    // These reduce AST node count at parse time, benefiting long-running Jsonnet programs.
-    // Constant folding: BinaryOp with two constant operands (most common case first)
-    case e @ BinaryOp(pos, lhs: Val, op, rhs: Val) => tryFoldBinaryOp(pos, lhs, op, rhs, e)
+      case e @ Self(pos) =>
+        scope.get("self") match {
+          case ScopedVal(v, _, idx) if v != null => ValidId(pos, "self", idx)
+          case _ => StaticError.fail("Can't use self outside of an object", e)(ev)
+        }
 
-    // Constant folding: UnaryOp with constant operand
-    case e @ UnaryOp(pos, op, v: Val) => tryFoldUnaryOp(pos, op, v, e)
+      case e @ $(pos) =>
+        scope.get("$") match {
+          case ScopedVal(v, _, idx) if v != null => ValidId(pos, "$", idx)
+          case _ => StaticError.fail("Can't use $ outside of an object", e)(ev)
+        }
 
-    // Branch elimination: constant condition in if-else
-    case IfElse(pos, _: Val.True, thenExpr, _) =>
-      thenExpr.pos = pos; thenExpr
-    case IfElse(pos, _: Val.False, _, elseExpr) =>
-      if (elseExpr == null) Val.Null(pos)
-      else { elseExpr.pos = pos; elseExpr }
+      case e @ Super(_) if !scope.contains("super") =>
+        StaticError.fail("Can't use super outside of an object", e)(ev)
 
-    // Short-circuit elimination for And/Or with constant lhs.
-    //
-    // IMPORTANT: rhs MUST be guarded as `Val.Bool` — do NOT relax this to arbitrary Expr.
-    // The Evaluator's visitAnd/visitOr enforces that rhs evaluates to Bool, throwing
-    // "binary operator && does not operate on <type>s" otherwise. If we fold `true && rhs`
-    // into just `rhs` without the Bool guard, we silently remove that runtime type check,
-    // causing programs like `true && "hello"` to return "hello" instead of erroring.
-    // See: Evaluator.visitAnd / Evaluator.visitOr for the authoritative runtime semantics.
-    case And(pos, _: Val.True, rhs: Val.Bool) => rhs.pos = pos; rhs
-    case And(pos, _: Val.False, _)            => Val.False(pos)
-    case Or(pos, _: Val.True, _)              => Val.True(pos)
-    case Or(pos, _: Val.False, rhs: Val.Bool) => rhs.pos = pos; rhs
-    case e                                    => e
+      case a: Arr if a.value.forall(_.isInstanceOf[Val]) =>
+        Val.Arr(a.pos, a.value.map(e => e.asInstanceOf[Val]))
+
+      case m @ ObjBody.MemberList(pos, binds, fields, asserts) =>
+        // If static optimization has constant-folded originally-dynamic field names
+        // into fixed names, it's possible that we might now have duplicate names.
+        // In that case, we keep the object as a MemberList and leave it to the
+        // Evaluator to throw an error if/when the object is evaluated (in order
+        // to preserve proper laziness semantics).
+        def allFieldsStaticAndUniquelyNamed: Boolean = {
+          val seen = mutable.Set.empty[String]
+          fields.forall { f =>
+            f.isStatic && seen.add(f.fieldName.asInstanceOf[FieldName.Fixed].value)
+          }
+        }
+
+        if (binds == null && asserts == null && allFieldsStaticAndUniquelyNamed)
+          Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
+        else m
+      // Aggressive optimizations: constant folding, branch elimination, short-circuit elimination.
+      // These reduce AST node count at parse time, benefiting long-running Jsonnet programs.
+      // Constant folding: BinaryOp with two constant operands (most common case first)
+      case e @ BinaryOp(pos, lhs: Val, op, rhs: Val) => tryFoldBinaryOp(pos, lhs, op, rhs, e)
+
+      // Constant folding: UnaryOp with constant operand
+      case e @ UnaryOp(pos, op, v: Val) => tryFoldUnaryOp(pos, op, v, e)
+
+      // Branch elimination: constant condition in if-else
+      case IfElse(pos, _: Val.True, thenExpr, _) =>
+        thenExpr.pos = pos; thenExpr
+      case IfElse(pos, _: Val.False, _, elseExpr) =>
+        if (elseExpr == null) Val.Null(pos)
+        else { elseExpr.pos = pos; elseExpr }
+
+      // Short-circuit elimination for And/Or with constant lhs.
+      //
+      // IMPORTANT: rhs MUST be guarded as `Val.Bool` — do NOT relax this to arbitrary Expr.
+      // The Evaluator's visitAnd/visitOr enforces that rhs evaluates to Bool, throwing
+      // "binary operator && does not operate on <type>s" otherwise. If we fold `true && rhs`
+      // into just `rhs` without the Bool guard, we silently remove that runtime type check,
+      // causing programs like `true && "hello"` to return "hello" instead of erroring.
+      // See: Evaluator.visitAnd / Evaluator.visitOr for the authoritative runtime semantics.
+      case And(pos, _: Val.True, rhs: Val.Bool) => rhs.pos = pos; rhs
+      case And(pos, _: Val.False, _)            => Val.False(pos)
+      case Or(pos, _: Val.True, _)              => Val.True(pos)
+      case Or(pos, _: Val.False, rhs: Val.Bool) => rhs.pos = pos; rhs
+      case e                                    => e
+    }
   }
+
+  /**
+   * Try to fold a pure constant numeric expression chain as a raw double, bypassing the bottom-up
+   * tree transformer. Only handles trees of BinaryOp/UnaryOp/Val.Num with numeric-only ops.
+   *
+   * Returns `NaN` if the expression cannot be folded (non-numeric leaf, polymorphic op, error).
+   * This avoids intermediate `Val.Num` and `BinaryOp` allocations in chains like `60 * 60 * 24`.
+   */
+  private def tryFoldAsDouble(e: Expr): Double =
+    try {
+      e match {
+        case Val.Num(_, n)               => n
+        case BinaryOp(pos, lhs, op, rhs) =>
+          val l = tryFoldAsDouble(lhs)
+          if (l.isNaN) return Double.NaN
+          val r = tryFoldAsDouble(rhs)
+          if (r.isNaN) return Double.NaN
+          (op: @switch) match {
+            case BinaryOp.OP_+ =>
+              val res = l + r; if (res.isInfinite) return Double.NaN; res
+            case BinaryOp.OP_- =>
+              val res = l - r; if (res.isInfinite) return Double.NaN; res
+            case BinaryOp.OP_* =>
+              val res = l * r; if (res.isInfinite) return Double.NaN; res
+            case BinaryOp.OP_/ =>
+              if (r == 0) return Double.NaN
+              val res = l / r; if (res.isInfinite) return Double.NaN; res
+            case BinaryOp.OP_%  => l % r
+            case BinaryOp.OP_<< =>
+              val ll = l.toSafeLong(pos)(ev); val rr = r.toSafeLong(pos)(ev)
+              if (rr < 0) return Double.NaN
+              if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr))) return Double.NaN
+              (ll << rr).toDouble
+            case BinaryOp.OP_>> =>
+              val ll = l.toSafeLong(pos)(ev); val rr = r.toSafeLong(pos)(ev)
+              if (rr < 0) return Double.NaN
+              (ll >> rr).toDouble
+            case BinaryOp.OP_& =>
+              (l.toSafeLong(pos)(ev) & r.toSafeLong(pos)(ev)).toDouble
+            case BinaryOp.OP_^ =>
+              (l.toSafeLong(pos)(ev) ^ r.toSafeLong(pos)(ev)).toDouble
+            case BinaryOp.OP_| =>
+              (l.toSafeLong(pos)(ev) | r.toSafeLong(pos)(ev)).toDouble
+            case _ => Double.NaN // non-numeric op (comparison, equality, etc.)
+          }
+        case UnaryOp(pos, op, v) =>
+          val d = tryFoldAsDouble(v)
+          if (d.isNaN) return Double.NaN
+          (op: @switch) match {
+            case Expr.UnaryOp.OP_- => -d
+            case Expr.UnaryOp.OP_+ => d
+            case Expr.UnaryOp.OP_~ => (~d.toSafeLong(pos)(ev)).toDouble
+            case _                 => Double.NaN
+          }
+        case _ => Double.NaN
+      }
+    } catch { case _: Exception => Double.NaN }
 
   private object ValidSuper {
     def unapply(s: Super): Option[(Position, Int)] =
@@ -293,7 +373,7 @@ class StaticOptimizer(
 
   private def tryFoldUnaryOp(pos: Position, op: Int, v: Val, fallback: Expr): Expr =
     try {
-      op match {
+      (op: @switch) match {
         case Expr.UnaryOp.OP_! =>
           v match {
             case _: Val.True  => Val.False(pos)
@@ -307,13 +387,13 @@ class StaticOptimizer(
           }
         case Expr.UnaryOp.OP_~ =>
           v match {
-            case Val.Num(_, n) => Val.Num(pos, (~n.toLong).toDouble)
-            case _             => fallback
+            case n: Val.Num => Val.Num(pos, (~n.asSafeLong).toDouble)
+            case _          => fallback
           }
         case Expr.UnaryOp.OP_+ =>
           v match {
-            case Val.Num(_, n) => Val.Num(pos, n)
-            case _             => fallback
+            case n: Val.Num => n.pos = pos; n.asInstanceOf[Expr]
+            case _          => fallback
           }
         case _ => fallback
       }
@@ -321,7 +401,7 @@ class StaticOptimizer(
 
   private def tryFoldBinaryOp(pos: Position, lhs: Val, op: Int, rhs: Val, fallback: Expr): Expr =
     try {
-      op match {
+      (op: @switch) match {
         case BinaryOp.OP_+ =>
           (lhs, rhs) match {
             case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
@@ -368,9 +448,9 @@ class StaticOptimizer(
           }
         case BinaryOp.OP_<< =>
           (lhs, rhs) match {
-            case (Val.Num(_, l), Val.Num(_, r)) =>
-              val ll = lhs.asInstanceOf[Val.Num].asSafeLong
-              val rr = rhs.asInstanceOf[Val.Num].asSafeLong
+            case (l: Val.Num, r: Val.Num) =>
+              val ll = l.asSafeLong
+              val rr = r.asSafeLong
               if (rr < 0) fallback // negative shift → runtime error
               else if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
                 fallback // overflow → runtime error
@@ -379,9 +459,9 @@ class StaticOptimizer(
           }
         case BinaryOp.OP_>> =>
           (lhs, rhs) match {
-            case (Val.Num(_, l), Val.Num(_, r)) =>
-              val ll = lhs.asInstanceOf[Val.Num].asSafeLong
-              val rr = rhs.asInstanceOf[Val.Num].asSafeLong
+            case (l: Val.Num, r: Val.Num) =>
+              val ll = l.asSafeLong
+              val rr = r.asSafeLong
               if (rr < 0) fallback // negative shift → runtime error
               else Val.Num(pos, (ll >> rr).toDouble)
             case _ => fallback
@@ -418,7 +498,7 @@ class StaticOptimizer(
     // because compare(-0.0, 0.0) == -1 while IEEE 754 treats -0.0 == 0.0.
     (lhs, rhs) match {
       case (Val.Num(_, l), Val.Num(_, r)) if !l.isNaN && !r.isNaN =>
-        val result = op match {
+        val result = (op: @switch) match {
           case BinaryOp.OP_<  => l < r
           case BinaryOp.OP_>  => l > r
           case BinaryOp.OP_<= => l <= r
@@ -428,7 +508,7 @@ class StaticOptimizer(
         Val.bool(pos, result)
       case (Val.Str(_, l), Val.Str(_, r)) =>
         val cmp = Util.compareStringsByCodepoint(l, r)
-        val result = op match {
+        val result = (op: @switch) match {
           case BinaryOp.OP_<  => cmp < 0
           case BinaryOp.OP_>  => cmp > 0
           case BinaryOp.OP_<= => cmp <= 0
