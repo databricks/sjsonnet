@@ -36,10 +36,14 @@ trait SjsonnetPublishModule extends PublishModule {
     description = artifactName(),
     organization = "com.databricks",
     url = "https://github.com/databricks/sjsonnet",
-    licenses = Seq(License.MIT),
+    licenses = Seq(License.Apache2),
     versionControl = VersionControl.github("databricks", "sjsonnet"),
     developers = Seq(
-      Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi")
+      Developer(
+        name = "Databricks Jsonnet Team",
+        organization = "Databricks",
+        url = "https://www.databricks.com"
+      )
     )
   )
 }
