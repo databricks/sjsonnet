@@ -10,6 +10,12 @@ jobs:
     name: Sjsonnet jvm build
     steps:
       - uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'zulu'
+          cache: sbt
       - uses: sbt/setup-sbt@v1
       - name: Cache Coursier cache
         uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
@@ -32,6 +38,12 @@ jobs:
     name: Sjsonnet ${{ matrix.lang }} build
     steps:
       - uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'zulu'
+          cache: sbt
       - uses: sbt/setup-sbt@v1
       - name: Set up Node.js 24
         if: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
@@ -42,6 +54,6 @@ jobs:
         uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
-      - name: Run mill tests for ${{ matrix.lang }}\
+      - name: Run mill tests for ${{ matrix.lang }}
         timeout-minutes: 15
         run: ./mill _.${{ matrix.lang }}[_].__.test
