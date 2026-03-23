@@ -425,12 +425,39 @@ object Val {
       var i = chain.length - 1
       while (i >= 0) {
         val s = chain(i)
-        val filteredExcludedKeys = if (s.excludedKeys != null) {
+        var members = s.getValue0
+        var filteredExcludedKeys = if (s.excludedKeys != null) {
           Util.intersect(s.excludedKeys, keysInThisChain)
         } else null
+
+        // If this object has excluded keys that the LHS provides as visible,
+        // re-introduce them with synthetic members that delegate to the LHS.
+        // This ensures `lhs + removeKey(rhs, k)` preserves lhs's visible key `k`.
+        if (filteredExcludedKeys != null) {
+          val iter = filteredExcludedKeys.iterator()
+          while (iter.hasNext) {
+            val key = iter.next()
+            if (lhs.containsVisibleKey(key)) {
+              if (members eq s.getValue0) {
+                members = new util.LinkedHashMap[String, Obj.Member](s.getValue0)
+              }
+              val capturedKey = key
+              members.put(
+                key,
+                new Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
+                  def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+                    lhs.value(capturedKey, pos, self)(ev)
+                }
+              )
+              iter.remove()
+            }
+          }
+          if (filteredExcludedKeys.isEmpty) filteredExcludedKeys = null
+        }
+
         current = new Val.Obj(
           s.pos,
-          s.getValue0,
+          members,
           false,
           s.triggerAsserts,
           current,
@@ -498,30 +525,17 @@ object Val {
       val chain = builder.result()
       val chainLength = chain.length
 
-      // Collect all excluded keys, reusing the set directly when only one source has exclusions
-      var exclusionSet: java.util.Set[String] = null
-      var multipleExclusions = false
-      for (s <- chain) {
-        val keys = s.excludedKeys
-        if (Util.isNotEmpty(keys)) {
-          if (exclusionSet == null) {
-            exclusionSet = keys
-          } else {
-            if (!multipleExclusions) {
-              val merged = new util.HashSet[String](exclusionSet.size + keys.size)
-              merged.addAll(exclusionSet)
-              exclusionSet = merged
-              multipleExclusions = true
-            }
-            exclusionSet.asInstanceOf[util.HashSet[String]].addAll(keys)
-          }
-        }
-      }
-
-      // Iterate root-first (reverse of collection order) and populate the mapping
+      // Iterate root-first (reverse of collection order) and populate the mapping.
+      // Each object's excludedKeys removes keys gathered from lower levels (closer to root),
+      // but objects above it in the chain can re-introduce those keys via their own members.
       var i = chainLength - 1
       while (i >= 0) {
-        gatherKeysForSingle(chain(i), exclusionSet, mapping)
+        val s = chain(i)
+        if (Util.isNotEmpty(s.excludedKeys)) {
+          val iter = s.excludedKeys.iterator()
+          while (iter.hasNext) mapping.remove(iter.next())
+        }
+        gatherKeysForSingle(s, null, mapping)
         i -= 1
       }
     }
