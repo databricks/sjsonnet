@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache Coursier cache
-        uses: coursier/cache-action@e47d7d35a0d3a2c7f649ca5c63dfc2bbfaa002e7 # 8.0.1
+        uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Compile with mill
