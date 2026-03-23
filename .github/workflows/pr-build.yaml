@@ -5,20 +5,56 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-jvm:
+    runs-on: ubuntu-22.04
+    name: Sjsonnet jvm build
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'zulu'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
+      - name: Check Formatting
+        run: ./mill "_.jvm[_].__.checkFormat"
+      - name: Run mill tests
+        timeout-minutes: 15
+        run: ./mill "_.jvm[_].__.test"
+      - name: Run sbt tests
+        timeout-minutes: 15
+        run: sbt test
+  build-graal:
+    runs-on: ubuntu-22.04
+    name: Sjsonnet Graal Native build
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'zulu'
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
+      - name: Run Native Image Test Suites
+        timeout-minutes: 15
+        run: sjsonnet/test/graalvm/run_test_suites.py
+  build-other:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        lang: ['jvm', 'js', 'wasm', 'native']
-        java: ['21', '25']
-    name: Sjsonnet build for ${{ matrix.lang }} on JDK ${{ matrix.java }}
+        lang: ['js', 'wasm', 'native']
+    name: Sjsonnet ${{ matrix.lang }} build
     steps:
       - uses: actions/checkout@v6
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java }}
+          java-version: 21
           distribution: 'zulu'
           cache: sbt
       - uses: sbt/setup-sbt@v1
@@ -31,20 +67,6 @@ jobs:
         uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
-      - name: Compile with mill
-        timeout-minutes: 15
-        run: ./mill _.${{ matrix.lang }}[_].__.compile
       - name: Run mill tests for ${{ matrix.lang }}
+        timeout-minutes: 15
         run: ./mill _.${{ matrix.lang }}[_].__.test
-      - name: Compile with sbt
-        timeout-minutes: 15
-        if: ${{ matrix.lang == 'jvm' }}
-        run: sbt compile bench/compile bench/jmh:compile
-      - name: Run sbt tests
-        timeout-minutes: 15
-        if: ${{ matrix.lang == 'jvm' }}
-        run: sbt test
-      - name: Run Native Image Test Suites
-        timeout-minutes: 30
-        if: ${{ (matrix.lang == 'jvm') && (matrix.java == '25') }}
-        run: sjsonnet/test/graalvm/run_test_suites.py

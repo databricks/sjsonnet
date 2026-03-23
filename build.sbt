@@ -60,15 +60,3 @@ lazy val main = (project in file("sjsonnet"))
       Seq(file)
     }.taskValue
   )
-
-lazy val bench = (project in file("bench"))
-  .dependsOn(main % "compile->test")
-  .enablePlugins(JmhPlugin)
-  .settings(commonSettings: _*)
-  .settings(
-    run / fork := true,
-    run / javaOptions ++= Seq(
-      "-Xss100m",
-      "--enable-native-access=ALL-UNNAMED"
-    )
-  )

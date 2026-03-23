@@ -15,3 +15,4 @@ out/
 *.orig
 *.rej
 *.bak
+.bazelbsp/

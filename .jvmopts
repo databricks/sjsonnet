@@ -1,13 +1,3 @@
 --enable-native-access=ALL-UNNAMED
--XX:+UseG1GC
--Xms4G
 -Xmx4G
--Xss2M
--XX:+AlwaysActAsServerClassMachine
--XX:ReservedCodeCacheSize=512m
--XX:NonProfiledCodeHeapSize=256m
--XX:MaxGCPauseMillis=750
--XX:+UseCompressedOops
--XX:MetaspaceSize=512M
--XX:-ClassUnloadingWithConcurrentMark
--Djava.security.egd=file:/dev/./urandom
+-XX:+UseG1GC

@@ -14,7 +14,8 @@ jobs:
       LANG: C
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: 'zulu'
@@ -73,7 +74,8 @@ jobs:
       LANG: C
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           java-version: 21
           distribution: 'zulu'
@@ -126,5 +128,5 @@ jobs:
         with:
           name: sjsonnet-${{ env.VERSION }}-release
           path: release/*
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error

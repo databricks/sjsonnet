@@ -1,5 +1,5 @@
 //| mill-version: 1.1.2
-//| mill-jvm-opts: ["-XX:+UseG1GC", "-Xmx4G", "--enable-native-access=ALL-UNNAMED"]
+//| mill-jvm-version: zulu:21
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
 //| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
@@ -36,10 +36,14 @@ trait SjsonnetPublishModule extends PublishModule {
     description = artifactName(),
     organization = "com.databricks",
     url = "https://github.com/databricks/sjsonnet",
-    licenses = Seq(License.MIT),
+    licenses = Seq(License.Common.Apache2),
     versionControl = VersionControl.github("databricks", "sjsonnet"),
     developers = Seq(
-      Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi")
+      Developer(
+        name = "Databricks Jsonnet Team",
+        organization = Some("Databricks"),
+        organizationUrl = Some("https://www.databricks.com")
+      )
     )
   )
 }
