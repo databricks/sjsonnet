@@ -1,0 +1,37 @@
+name: Setup Build Environment
+description: Sets up JDK, Node.js, and Coursier cache for building sjsonnet
+
+inputs:
+  node:
+    description: 'Whether to install Node.js'
+    required: false
+    default: 'false'
+  coursier-cache:
+    description: 'Whether to set up Coursier cache'
+    required: false
+    default: 'false'
+  sbt:
+    description: 'Whether to install sbt'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 21
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # 5.2.0
+      with:
+        java-version: 21
+        distribution: 'zulu'
+        cache: ${{ inputs.sbt == 'true' && 'sbt' || '' }}
+    - name: Set up sbt
+      if: inputs.sbt == 'true'
+      uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # 1.1.22
+    - name: Set up Node.js 24
+      if: inputs.node == 'true'
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      with:
+        node-version: '24'
+    - name: Cache Coursier cache
+      if: inputs.coursier-cache == 'true'
+      uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
