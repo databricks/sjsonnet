@@ -182,6 +182,21 @@ object Val {
     override def asBoolean: Boolean = this.isInstanceOf[True]
   }
 
+  /**
+   * Shared singletons for runtime boolean results — avoids per-comparison allocation. WARNING:
+   * These singletons have mutable `var pos` (inherited from Expr). Their `pos` must NEVER be
+   * mutated. The evaluation model is single-threaded, but mutating shared singleton state would
+   * corrupt all subsequent uses.
+   */
+  val staticTrue: Bool = True(new Position(null, -1))
+  val staticFalse: Bool = False(new Position(null, -1))
+
+  /**
+   * Returns a shared singleton boolean. Use for runtime comparison results where position is not
+   * needed.
+   */
+  def bool(b: Boolean): Bool = if (b) staticTrue else staticFalse
+
   def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
 
   final case class True(var pos: Position) extends Bool {
