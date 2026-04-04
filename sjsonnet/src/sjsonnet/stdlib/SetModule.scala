@@ -125,17 +125,36 @@ object SetModule extends AbstractFunctionModule {
           if (!strict.forall(_.getClass == keyType))
             Error.fail("Cannot sort with values that are not all the same type")
 
+          // Sort in-place to avoid intermediate array allocations from map+sortBy
           if (keyType == classOf[Val.Str]) {
-            strict.map(_.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
+            java.util.Arrays.sort(
+              strict.asInstanceOf[Array[AnyRef]],
+              (a: AnyRef, b: AnyRef) =>
+                Util.compareStringsByCodepoint(
+                  a.asInstanceOf[Val.Str].asString,
+                  b.asInstanceOf[Val.Str].asString
+                )
+            )
           } else if (keyType == classOf[Val.Num]) {
-            strict.map(_.cast[Val.Num]).sortBy(_.asDouble)
+            java.util.Arrays.sort(
+              strict.asInstanceOf[Array[AnyRef]],
+              (a: AnyRef, b: AnyRef) =>
+                java.lang.Double.compare(
+                  a.asInstanceOf[Val.Num].asDouble,
+                  b.asInstanceOf[Val.Num].asDouble
+                )
+            )
           } else if (keyType == classOf[Val.Arr]) {
-            strict.map(_.cast[Val.Arr]).sortBy(identity)(ev.compare(_, _))
+            java.util.Arrays.sort(
+              strict.asInstanceOf[Array[AnyRef]],
+              (a: AnyRef, b: AnyRef) => ev.compare(a.asInstanceOf[Val.Arr], b.asInstanceOf[Val.Arr])
+            )
           } else if (keyType == classOf[Val.Obj]) {
             Error.fail("Unable to sort array of objects without key function")
           } else {
             Error.fail("Cannot sort array of " + strict(0).prettyName)
           }
+          strict
         }
       )
     }
