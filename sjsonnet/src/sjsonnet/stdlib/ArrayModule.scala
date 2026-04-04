@@ -165,10 +165,14 @@ object ArrayModule extends AbstractFunctionModule {
         ev: EvalScope,
         pos: Position): Val.Arr = {
       val noOff = pos.noOffset
-      Val.Arr(
-        pos,
-        arg.map(v => new LazyApply1(_func, v, noOff, ev))
-      )
+      // Pre-sized array with while-loop avoids .map closure overhead
+      val result = new Array[Eval](arg.length)
+      var i = 0
+      while (i < arg.length) {
+        result(i) = new LazyApply1(_func, arg(i), noOff, ev)
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
 
     private def evalStr(_func: Val.Func, arg: String, ev: EvalScope, pos: Position): Val.Arr = {
@@ -382,19 +386,39 @@ object ArrayModule extends AbstractFunctionModule {
     builtin("flatMap", "func", "arr") { (pos, ev, func: Val.Func, arr: Val) =>
       val res: Val = arr match {
         case a: Val.Arr =>
-          val arrResults = a.asLazyArray.flatMap { v =>
-            {
-              val fres = func.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
-              fres match {
-                case va: Val.Arr => va.asLazyArray
-                case unknown     =>
-                  Error.fail(
-                    "std.flatMap on arrays, provided function must return an array, got " + unknown.prettyName
-                  )
-              }
+          val src = a.asLazyArray
+          val noOff = pos.noOffset
+          // Two-pass: first collect sub-arrays and count total size,
+          // then copy into a single pre-sized array
+          val subArrays = new Array[Array[Eval]](src.length)
+          var totalLen = 0
+          var i = 0
+          while (i < src.length) {
+            val fres = func.apply1(src(i), noOff)(ev, TailstrictModeDisabled)
+            fres match {
+              case va: Val.Arr =>
+                val sub = va.asLazyArray
+                subArrays(i) = sub
+                totalLen += sub.length
+              case unknown =>
+                Error.fail(
+                  "std.flatMap on arrays, provided function must return an array, got " + unknown.prettyName
+                )
             }
+            i += 1
           }
-          Val.Arr(pos, arrResults)
+          val result = new Array[Eval](totalLen)
+          var offset = 0
+          i = 0
+          while (i < subArrays.length) {
+            val sub = subArrays(i)
+            if (sub != null) {
+              System.arraycopy(sub, 0, result, offset, sub.length)
+              offset += sub.length
+            }
+            i += 1
+          }
+          Val.Arr(pos, result)
 
         case s: Val.Str =>
           val builder = new java.lang.StringBuilder()
@@ -428,17 +452,20 @@ object ArrayModule extends AbstractFunctionModule {
     builtin("filterMap", "filter_func", "map_func", "arr") {
       (pos, ev, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
         val noOff = pos.noOffset
-        Val.Arr(
-          pos,
-          arr.asLazyArray.flatMap { i =>
-            i.value
-            if (!filter_func.apply1(i, noOff)(ev, TailstrictModeDisabled).asBoolean) {
-              None
-            } else {
-              Some[Eval](new LazyApply1(map_func, i, noOff, ev))
-            }
+        val src = arr.asLazyArray
+        // While-loop with ArrayBuilder avoids flatMap + Option boxing
+        val b = new mutable.ArrayBuilder.ofRef[Eval]
+        b.sizeHint(src.length) // Worst case: all elements pass filter
+        var i = 0
+        while (i < src.length) {
+          val elem = src(i)
+          elem.value
+          if (filter_func.apply1(elem, noOff)(ev, TailstrictModeDisabled).asBoolean) {
+            b += new LazyApply1(map_func, elem, noOff, ev)
           }
-        )
+          i += 1
+        }
+        Val.Arr(pos, b.result())
     },
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
       val res: Val = what match {
