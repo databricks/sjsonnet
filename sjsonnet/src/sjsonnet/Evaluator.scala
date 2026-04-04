@@ -189,11 +189,20 @@ class Evaluator(
     visitExpr(e.returned)(s)
   }
 
-  def visitComp(e: Comp)(implicit scope: ValScope): Val =
-    Val.Arr(
-      e.pos,
-      visitComp(e.first :: e.rest.toList, Array(scope)).map(s => visitAsLazy(e.value)(s))
-    )
+  def visitComp(e: Comp)(implicit scope: ValScope): Val = {
+    val scopes = visitComp(e.first :: e.rest.toList, Array(scope))
+    // Pre-sized array + while-loop avoids .map() allocation overhead.
+    // Bodies remain lazy (visitAsLazy) to preserve Jsonnet's lazy evaluation semantics:
+    // e.g. [error "x" for x in xs][0] must not trigger if element 0 isn't an error.
+    val results = new Array[Eval](scopes.length)
+    val body = e.value
+    var i = 0
+    while (i < scopes.length) {
+      results(i) = visitAsLazy(body)(scopes(i))
+      i += 1
+    }
+    Val.Arr(e.pos, results)
+  }
 
   def visitArr(e: Arr)(implicit scope: ValScope): Val =
     Val.Arr(e.pos, e.value.map(visitAsLazy))
