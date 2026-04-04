@@ -122,7 +122,7 @@ class PrettyYamlRenderer(
     mutable.HashMap.empty[Path, Array[Int]]
   def saveCurrentPos(): Unit = {
     val current = getCurrentPosition()
-    if (current != null) {
+    if (current != null && current.currentFile != null) {
       bufferedComment =
         " # " + current.currentFile.renderOffsetStr(current.offset, loadedFileContents)
     }

@@ -193,6 +193,13 @@ object Val {
   final case class Null(var pos: Position) extends Literal {
     def prettyName = "null"
   }
+
+  /**
+   * Singleton null for runtime results where position is not meaningful. Safe in single-threaded
+   * evaluation. See staticTrue/staticFalse for rationale.
+   */
+  val staticNull: Val.Null = Val.Null(Position(null, -1))
+
   final case class Str(var pos: Position, str: String) extends Literal {
     def prettyName = "string"
     override def asString: String = str
