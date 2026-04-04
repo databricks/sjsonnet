@@ -857,6 +857,7 @@ class Evaluator(
       scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
       override def functionName: String = name
+      override val bodyExpr: Expr = rhs
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExprWithTailCallSupport(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
