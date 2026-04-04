@@ -13,13 +13,56 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
   var newlineBuffered = false
+
+  // Scratch buffer for writing integer digits directly without String allocation
+  private val digitBuf = new Array[Char](20)
+
   override def visitFloat64(d: Double, index: Int): Writer = {
-    val s = RenderUtils.renderDouble(d)
     flushBuffer()
-    appendString(s)
+    val l = d.toLong
+    if (l.toDouble == d) {
+      // Fast path: integer that fits in Long — write digits directly
+      appendLong(l)
+    } else {
+      val s = RenderUtils.renderDouble(d)
+      appendString(s)
+    }
     flushCharBuilder()
     out
   }
+
+  private def appendLong(l: Long): Unit = {
+    if (l == 0L) {
+      elemBuilder.append('0')
+      return
+    }
+    // Handle Long.MIN_VALUE specially: -Long.MIN_VALUE overflows back to Long.MIN_VALUE
+    if (l == Long.MinValue) {
+      val s = "-9223372036854775808"
+      elemBuilder.ensureLength(s.length)
+      var i = 0
+      while (i < s.length) { elemBuilder.appendUnsafe(s.charAt(i)); i += 1 }
+      return
+    }
+    var n = l
+    if (n < 0L) {
+      elemBuilder.append('-')
+      n = -n
+    }
+    var pos = 20
+    while (n > 0L) {
+      pos -= 1
+      digitBuf(pos) = ('0' + (n % 10).toInt).toChar
+      n /= 10
+    }
+    val len = 20 - pos
+    elemBuilder.ensureLength(len)
+    while (pos < 20) {
+      elemBuilder.appendUnsafe(digitBuf(pos))
+      pos += 1
+    }
+  }
+
   override def flushBuffer(): Unit = {
     if (commaBuffered) {
       elemBuilder.append(',')
