@@ -11,6 +11,19 @@ package sjsonnet
  * provided Jsonnet [[Val]]s into the final string.
  */
 object Format {
+  private type ParsedFormat = (String, scala.Seq[(FormatSpec, String)])
+  private val ParsedFormatCacheMaxEntries = 256
+
+  /** LRU cache for parsed format strings, avoiding repeated fastparse invocations. */
+  private val parsedFormatCache =
+    new java.util.LinkedHashMap[String, ParsedFormat](ParsedFormatCacheMaxEntries, 0.75f, true) {
+      override def removeEldestEntry(
+          eldest: java.util.Map.Entry[String, ParsedFormat]
+      ): Boolean = {
+        size() > ParsedFormatCacheMaxEntries
+      }
+    }
+
   final case class FormatSpec(
       label: Option[String],
       alternate: Boolean,
@@ -91,8 +104,24 @@ object Format {
   }
 
   def format(s: String, values0: Val, pos: Position)(implicit evaluator: EvalScope): String = {
-    val (leading, chunks) = fastparse.parse(s, format(_)).get.value
+    val (leading, chunks) = parseFormatCached(s)
     format(leading, chunks, values0, pos)
+  }
+
+  private def parseFormatCached(s: String): ParsedFormat = {
+    val cached0 = parsedFormatCache.synchronized(parsedFormatCache.get(s))
+    if (cached0 != null) cached0
+    else {
+      val parsed = fastparse.parse(s, format(_)).get.value
+      parsedFormatCache.synchronized {
+        val cached1 = parsedFormatCache.get(s)
+        if (cached1 != null) cached1
+        else {
+          parsedFormatCache.put(s, parsed)
+          parsed
+        }
+      }
+    }
   }
 
   def format(leading: String, chunks: scala.Seq[(FormatSpec, String)], values0: Val, pos: Position)(
