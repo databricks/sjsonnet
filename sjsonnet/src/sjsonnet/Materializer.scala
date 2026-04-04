@@ -79,7 +79,7 @@ abstract class Materializer {
     storePos(obj.pos)
     obj.triggerAllAsserts(ctx.brokenAssertionLogic)
     val keys =
-      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      if (ctx.sort) obj.sortedVisibleKeyNames
       else obj.visibleKeyNames
     val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
     var i = 0
@@ -288,7 +288,7 @@ abstract class Materializer {
     storePos(obj.pos)
     obj.triggerAllAsserts(ctx.brokenAssertionLogic)
     val keyNames =
-      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      if (ctx.sort) obj.sortedVisibleKeyNames
       else obj.visibleKeyNames
     val objVisitor = visitor.visitObject(keyNames.length, jsonableKeys = true, -1)
     stack.push(

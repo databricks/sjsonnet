@@ -123,13 +123,10 @@ object ObjectModule extends AbstractFunctionModule {
   }
 
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
-    maybeSortKeys(ev, v1.visibleKeyNames)
+    if (ev.settings.preserveOrder) v1.visibleKeyNames else v1.sortedVisibleKeyNames
 
   def getAllKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
-    maybeSortKeys(ev, v1.allKeyNames)
-
-  @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
-    if (ev.settings.preserveOrder) keys else keys.sorted(Util.CodepointStringOrdering)
+    if (ev.settings.preserveOrder) v1.allKeyNames else v1.sortedAllKeyNames
 
   def getObjValuesFromKeys(
       pos: Position,

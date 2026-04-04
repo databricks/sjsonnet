@@ -95,8 +95,8 @@ object ManifestModule extends AbstractFunctionModule {
         path: Seq[String],
         indexedPath: Seq[String])(implicit ev: EvalScope): StringWriter = {
       val (sections, nonSections) =
-        v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
-      for (k <- nonSections.sorted(Util.CodepointStringOrdering)) {
+        v.sortedVisibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
+      for (k <- nonSections) {
         out.write(cumulatedIndent)
         out.write(TomlRenderer.escapeKey(k))
         out.write(" = ")
@@ -106,7 +106,7 @@ object ManifestModule extends AbstractFunctionModule {
       }
       out.write('\n')
 
-      for (k <- sections.sorted(Util.CodepointStringOrdering)) {
+      for (k <- sections) {
         val v0 = v.value(k, v.pos, v)(ev)
         if (isTableArray(v0)) {
           for (i <- 0 until v0.asArr.length) {
