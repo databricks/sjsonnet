@@ -189,11 +189,57 @@ class Evaluator(
     visitExpr(e.returned)(s)
   }
 
-  def visitComp(e: Comp)(implicit scope: ValScope): Val =
-    Val.Arr(
-      e.pos,
-      visitComp(e.first :: e.rest.toList, Array(scope)).map(s => visitAsLazy(e.value)(s))
-    )
+  def visitComp(e: Comp)(implicit scope: ValScope): Val = {
+    val body = e.value
+    val results = new collection.mutable.ArrayBuilder.ofRef[Eval]
+    results.sizeHint(256)
+    visitCompInline(e.first :: e.rest.toList, scope, body, results)
+    Val.Arr(e.pos, results.result())
+  }
+
+  /** Fused scope-building + body evaluation: eliminates intermediate scope array allocation. */
+  private def visitCompInline(
+      specs: List[CompSpec],
+      scope: ValScope,
+      body: Expr,
+      results: collection.mutable.ArrayBuilder.ofRef[Eval]): Unit = specs match {
+    case (spec @ ForSpec(_, name, expr)) :: rest =>
+      visitExpr(expr)(scope) match {
+        case a: Val.Arr =>
+          if (debugStats != null) debugStats.arrayCompIterations += a.length
+          val lazyArr = a.asLazyArray
+          var j = 0
+          while (j < lazyArr.length) {
+            val newScope = scope.extendSimple(lazyArr(j))
+            rest match {
+              case Nil => results += visitAsLazy(body)(newScope)
+              case _   => visitCompInline(rest, newScope, body, results)
+            }
+            j += 1
+          }
+        case r =>
+          Error.fail(
+            "In comprehension, can only iterate over array, not " + r.prettyName,
+            spec
+          )
+      }
+    case (spec @ IfSpec(offset, expr)) :: rest =>
+      visitExpr(expr)(scope) match {
+        case Val.True(_) =>
+          rest match {
+            case Nil => results += visitAsLazy(body)(scope)
+            case _   => visitCompInline(rest, scope, body, results)
+          }
+        case Val.False(_) => // filtered out
+        case other        =>
+          Error.fail(
+            "Condition must be boolean, got " + other.prettyName,
+            spec
+          )
+      }
+    case Nil =>
+      results += visitAsLazy(body)(scope)
+  }
 
   def visitArr(e: Arr)(implicit scope: ValScope): Val =
     Val.Arr(e.pos, e.value.map(visitAsLazy))
