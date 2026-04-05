@@ -1235,4 +1235,11 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   def settings: Settings
   def trace(msg: String): Unit
   def warn(e: Error): Unit
+
+  /**
+   * The format cache used by the `%` operator and `std.format` to avoid re-parsing format strings.
+   * Defaults to [[FormatCache.SharedDefault]] (a process-wide LRU cache), preserving the original
+   * shared caching behavior. Override to supply a custom implementation (e.g., Caffeine-based).
+   */
+  def formatCache: FormatCache = FormatCache.SharedDefault
 }

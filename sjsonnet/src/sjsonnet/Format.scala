@@ -11,6 +11,26 @@ package sjsonnet
  * provided Jsonnet [[Val]]s into the final string.
  */
 object Format {
+
+  /**
+   * Opaque marker trait for compiled format entries stored in [[FormatCache]]. The internal
+   * representation ([[RuntimeFormat]]) is package-private so that cache implementations don't
+   * depend on format internals.
+   */
+  sealed trait CompiledFormat
+
+  /**
+   * Pre-processed format string: arrays for indexed access, metadata for fast-path checks. Not a
+   * case class because Array fields have reference-based equals/hashCode.
+   */
+  private[sjsonnet] final class RuntimeFormat(
+      val leading: String,
+      val specs: Array[FormatSpec],
+      val literals: Array[String],
+      val hasAnyStar: Boolean,
+      val staticChars: Int)
+      extends CompiledFormat
+
   final case class FormatSpec(
       label: Option[String],
       alternate: Boolean,
@@ -63,7 +83,8 @@ object Format {
   )
 
   def widenRaw(formatted: FormatSpec, txt: String): String =
-    widen(formatted, "", "", txt, numeric = false, signedConversion = false)
+    if (formatted.width.isEmpty) txt // fast path: no width/padding needed
+    else widen(formatted, "", "", txt, numeric = false, signedConversion = false)
   def widen(
       formatted: FormatSpec,
       lhs: String,
@@ -79,8 +100,12 @@ object Format {
 
     val missingWidth = formatted.width.getOrElse(-1) - lhs2.length - mhs.length - rhs.length
 
-    if (missingWidth <= 0) lhs2 + mhs + rhs
-    else if (formatted.zeroPadded) {
+    if (missingWidth <= 0) {
+      // Avoid unnecessary string concatenation when parts are empty
+      if (lhs2.isEmpty && mhs.isEmpty) rhs
+      else if (lhs2.isEmpty) mhs + rhs
+      else lhs2 + mhs + rhs
+    } else if (formatted.zeroPadded) {
       if (numeric) lhs2 + mhs + "0" * missingWidth + rhs
       else {
         if (formatted.leftAdjusted) lhs2 + mhs + rhs + " " * missingWidth
@@ -91,21 +116,61 @@ object Format {
   }
 
   def format(s: String, values0: Val, pos: Position)(implicit evaluator: EvalScope): String = {
-    val (leading, chunks) = fastparse.parse(s, format(_)).get.value
-    format(leading, chunks, values0, pos)
+    val parsed = parseFormatCached(s, evaluator.formatCache)
+    format(parsed, values0, pos)
+  }
+
+  /** Look up or parse and cache a format string using the provided [[FormatCache]]. */
+  private def parseFormatCached(s: String, cache: FormatCache): RuntimeFormat = {
+    // CompiledFormat is sealed with RuntimeFormat as the only subtype, so this match is exhaustive.
+    // Using pattern match instead of asInstanceOf for explicit safety.
+    cache.getOrElseUpdate(s, lowerParsedFormat(fastparse.parse(s, format(_)).get.value)) match {
+      case rf: RuntimeFormat => rf
+    }
+  }
+
+  /** Convert a parsed format (leading + Seq of tuples) into a RuntimeFormat with arrays. */
+  private def lowerParsedFormat(
+      parsed: (String, scala.Seq[(FormatSpec, String)])): RuntimeFormat = {
+    val (leading, chunks) = parsed
+    val size = chunks.size
+    val specs = new Array[FormatSpec](size)
+    val literals = new Array[String](size)
+    var staticChars = leading.length
+    var hasAnyStar = false
+    var idx = 0
+    while (idx < size) {
+      val (formatted, literal) = chunks(idx)
+      specs(idx) = formatted
+      literals(idx) = literal
+      staticChars += literal.length
+      hasAnyStar ||= formatted.widthStar || formatted.precisionStar
+      idx += 1
+    }
+    new RuntimeFormat(leading, specs, literals, hasAnyStar, staticChars)
   }
 
   def format(leading: String, chunks: scala.Seq[(FormatSpec, String)], values0: Val, pos: Position)(
       implicit evaluator: EvalScope): String = {
+    format(lowerParsedFormat((leading, chunks)), values0, pos)
+  }
+
+  private def format(parsed: RuntimeFormat, values0: Val, pos: Position)(implicit
+      evaluator: EvalScope): String = {
     val values = values0 match {
       case x: Val.Arr => x
       case x: Val.Obj => x
       case x          => Val.Arr(pos, Array[Eval](x))
     }
-    val output = new StringBuilder
-    output.append(leading)
+    // Pre-size StringBuilder based on static chars + estimated dynamic content
+    val output = new StringBuilder(parsed.staticChars + parsed.specs.length * 8)
+    output.append(parsed.leading)
     var i = 0
-    for (((rawFormatted, literal), idx) <- chunks.zipWithIndex) {
+    var idx = 0
+    // Use while-loop instead of for/zipWithIndex to avoid iterator allocation
+    while (idx < parsed.specs.length) {
+      val rawFormatted = parsed.specs(idx)
+      val literal = parsed.literals(idx)
       var formatted = rawFormatted
       val cooked0 = formatted.conversion match {
         case '%' => widenRaw(formatted, "%")
@@ -120,53 +185,58 @@ object Format {
           }
           val raw = formatted.label match {
             case None =>
-              (formatted.widthStar, formatted.precisionStar) match {
-                case (false, false) => values.cast[Val.Arr].value(i)
-                case (true, false)  =>
-                  val width = values.cast[Val.Arr].value(i)
-                  if (!width.isInstanceOf[Val.Num]) {
-                    Error.fail(
-                      "A * was specified at position %d. An integer is expected for a width".format(
-                        idx
+              // Fast path: skip star checks when format has no * specifiers
+              if (!parsed.hasAnyStar) values.cast[Val.Arr].value(i)
+              else
+                (formatted.widthStar, formatted.precisionStar) match {
+                  case (false, false) => values.cast[Val.Arr].value(i)
+                  case (true, false)  =>
+                    val width = values.cast[Val.Arr].value(i)
+                    if (!width.isInstanceOf[Val.Num]) {
+                      Error.fail(
+                        "A * was specified at position %d. An integer is expected for a width"
+                          .format(
+                            idx
+                          )
                       )
-                    )
-                  }
-                  i += 1
-                  formatted = formatted.updateWithStarValues(Some(width.asInt), None)
-                  values.cast[Val.Arr].value(i)
-                case (false, true) =>
-                  val precision = values.cast[Val.Arr].value(i)
-                  if (!precision.isInstanceOf[Val.Num]) {
-                    Error.fail(
-                      "A * was specified at position %d. An integer is expected for a precision"
-                        .format(idx)
-                    )
-                  }
-                  i += 1
-                  formatted = formatted.updateWithStarValues(None, Some(precision.asInt))
-                  values.cast[Val.Arr].value(i)
-                case (true, true) =>
-                  val width = values.cast[Val.Arr].value(i)
-                  if (!width.isInstanceOf[Val.Num]) {
-                    Error.fail(
-                      "A * was specified at position %d. An integer is expected for a width".format(
-                        idx
+                    }
+                    i += 1
+                    formatted = formatted.updateWithStarValues(Some(width.asInt), None)
+                    values.cast[Val.Arr].value(i)
+                  case (false, true) =>
+                    val precision = values.cast[Val.Arr].value(i)
+                    if (!precision.isInstanceOf[Val.Num]) {
+                      Error.fail(
+                        "A * was specified at position %d. An integer is expected for a precision"
+                          .format(idx)
                       )
-                    )
-                  }
-                  i += 1
-                  val precision = values.cast[Val.Arr].value(i)
-                  if (!precision.isInstanceOf[Val.Num]) {
-                    Error.fail(
-                      "A * was specified at position %d. An integer is expected for a precision"
-                        .format(idx)
-                    )
-                  }
-                  i += 1
-                  formatted =
-                    formatted.updateWithStarValues(Some(width.asInt), Some(precision.asInt))
-                  values.cast[Val.Arr].value(i)
-              }
+                    }
+                    i += 1
+                    formatted = formatted.updateWithStarValues(None, Some(precision.asInt))
+                    values.cast[Val.Arr].value(i)
+                  case (true, true) =>
+                    val width = values.cast[Val.Arr].value(i)
+                    if (!width.isInstanceOf[Val.Num]) {
+                      Error.fail(
+                        "A * was specified at position %d. An integer is expected for a width"
+                          .format(
+                            idx
+                          )
+                      )
+                    }
+                    i += 1
+                    val precision = values.cast[Val.Arr].value(i)
+                    if (!precision.isInstanceOf[Val.Num]) {
+                      Error.fail(
+                        "A * was specified at position %d. An integer is expected for a precision"
+                          .format(idx)
+                      )
+                    }
+                    i += 1
+                    formatted =
+                      formatted.updateWithStarValues(Some(width.asInt), Some(precision.asInt))
+                    values.cast[Val.Arr].value(i)
+                }
             case Some(key) =>
               values match {
                 case v: Val.Arr => v.value(i)
@@ -174,18 +244,18 @@ object Format {
                 case _          => Error.fail("Invalid format values")
               }
           }
-          val value = raw.value match {
+          // Direct Val dispatch: skip Materializer for common types (Str, Num, Bool, Null).
+          // This avoids the overhead of materializing to ujson.Value and then matching on it,
+          // which is a significant cost for format-heavy workloads like large_string_template.
+          val rawVal = raw.value
+          val formattedValue = rawVal match {
             case f: Val.Func => Error.fail("Cannot format function value", f)
-            case r: Val.Arr  => Materializer.apply0(r, new Renderer(indent = -1))
-            case r: Val.Obj  => Materializer.apply0(r, new Renderer(indent = -1))
-            case raw         => Materializer(raw)
-          }
-          val formattedValue = value match {
-            case ujson.Str(s) =>
+            case vs: Val.Str =>
               if (formatted.conversion != 's' && formatted.conversion != 'c')
                 Error.fail("Format required a number at %d, got string".format(i))
-              widenRaw(formatted, s)
-            case ujson.Num(s) =>
+              widenRaw(formatted, vs.str)
+            case vn: Val.Num =>
+              val s = vn.asDouble
               formatted.conversion match {
                 case 'd' | 'i' | 'u' => formatInteger(formatted, s)
                 case 'o'             => formatOctal(formatted, s)
@@ -201,31 +271,59 @@ object Format {
                   if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
                   else widenRaw(formatted, s.toString)
                 case _ =>
-                  Error.fail("Format required a %s at %d, got string".format(raw.prettyName, i))
+                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
-            case ujson.Bool(s) =>
+            case _: Val.True =>
+              val b = 1
               formatted.conversion match {
-                case 'd' | 'i' | 'u' => formatInteger(formatted, s.compareTo(false))
-                case 'o'             => formatOctal(formatted, s.compareTo(false))
-                case 'x'             => formatHexadecimal(formatted, s.compareTo(false))
-                case 'X'             => formatHexadecimal(formatted, s.compareTo(false)).toUpperCase
-                case 'e'             => formatExponent(formatted, s.compareTo(false)).toLowerCase
-                case 'E'             => formatExponent(formatted, s.compareTo(false))
-                case 'f' | 'F'       => formatFloat(formatted, s.compareTo(false))
-                case 'g'             => formatGeneric(formatted, s.compareTo(false)).toLowerCase
-                case 'G'             => formatGeneric(formatted, s.compareTo(false))
-                case 'c' => widenRaw(formatted, Character.forDigit(s.compareTo(false), 10).toString)
-                case 's' => widenRaw(formatted, s.toString)
-                case _   =>
-                  Error.fail("Format required a %s at %d, got string".format(raw.prettyName, i))
+                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
+                case 'o'             => formatOctal(formatted, b)
+                case 'x'             => formatHexadecimal(formatted, b)
+                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
+                case 'e'             => formatExponent(formatted, b).toLowerCase
+                case 'E'             => formatExponent(formatted, b)
+                case 'f' | 'F'       => formatFloat(formatted, b)
+                case 'g'             => formatGeneric(formatted, b).toLowerCase
+                case 'G'             => formatGeneric(formatted, b)
+                case 'c'             => widenRaw(formatted, Character.forDigit(b, 10).toString)
+                case 's'             => widenRaw(formatted, "true")
+                case _               =>
+                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
-            case v => widenRaw(formatted, v.toString)
+            case _: Val.False =>
+              val b = 0
+              formatted.conversion match {
+                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
+                case 'o'             => formatOctal(formatted, b)
+                case 'x'             => formatHexadecimal(formatted, b)
+                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
+                case 'e'             => formatExponent(formatted, b).toLowerCase
+                case 'E'             => formatExponent(formatted, b)
+                case 'f' | 'F'       => formatFloat(formatted, b)
+                case 'g'             => formatGeneric(formatted, b).toLowerCase
+                case 'G'             => formatGeneric(formatted, b)
+                case 'c'             => widenRaw(formatted, Character.forDigit(b, 10).toString)
+                case 's'             => widenRaw(formatted, "false")
+                case _               =>
+                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
+              }
+            case _: Val.Null =>
+              widenRaw(formatted, "null")
+            case _ =>
+              // Complex types (Arr, Obj): materialize via Renderer
+              val value = rawVal match {
+                case r: Val.Arr => Materializer.apply0(r, new Renderer(indent = -1))
+                case r: Val.Obj => Materializer.apply0(r, new Renderer(indent = -1))
+                case _          => Materializer(rawVal)
+              }
+              widenRaw(formatted, value.toString)
           }
           i += 1
           formattedValue
       }
       output.append(cooked0)
       output.append(literal)
+      idx += 1
     }
 
     if (values.isInstanceOf[Val.Arr] && i < values.cast[Val.Arr].length) {
@@ -236,9 +334,8 @@ object Format {
     output.toString()
   }
 
-  // Truncate a double toward zero, returning the integer part as a BigInt.
-  // Uses Long as a fast path (mirrors RenderUtils.renderDouble); falls back to
-  // BigDecimal for values that exceed Long range (~9.2e18).
+  // Use Long as a fast path for integer formatting to avoid BigInt allocation.
+  // Most Jsonnet integers fit in a Long; only fall back to BigDecimal for very large values.
   private def truncateToInteger(s: Double): BigInt = {
     val sl = s.toLong
     if (sl.toDouble == s) BigInt(sl)
@@ -246,19 +343,23 @@ object Format {
   }
 
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
-    val i = truncateToInteger(s)
-    val negative = i.signum < 0
-    val lhs = if (negative) "-" else ""
-    val rhs = i.abs.toString(10)
-    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
-    widen(
-      formatted,
-      lhs,
-      "",
-      rhs2,
-      numeric = true,
-      signedConversion = !negative
-    )
+    // Fast path: if the value fits in a Long (and isn't Long.MinValue where
+    // negation overflows), avoid BigInt allocation entirely
+    val sl = s.toLong
+    if (sl.toDouble == s && sl != Long.MinValue) {
+      val negative = sl < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = java.lang.Long.toString(if (negative) -sl else sl)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(formatted, lhs, "", rhs2, numeric = true, signedConversion = !negative)
+    } else {
+      val i = BigDecimal(s).toBigInt
+      val negative = i.signum < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = i.abs.toString(10)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(formatted, lhs, "", rhs2, numeric = true, signedConversion = !negative)
+    }
   }
 
   private def formatFloat(formatted: FormatSpec, s: Double): String = {
@@ -383,9 +484,17 @@ object Format {
     )
   }
 
+  /**
+   * Pre-compiled format string for constant `"..." % expr` patterns detected by
+   * [[StaticOptimizer]]. The format is parsed once at construction time and stored directly in this
+   * instance, bypassing [[FormatCache]] since each literal format string is unique and already
+   * cached within the AST.
+   */
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
-    val (leading, chunks) = fastparse.parse(fmt, format(_)).get.value
+    // Pre-parse the format string at construction time (during static optimization).
+    // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.
+    private val parsed = lowerParsedFormat(fastparse.parse(fmt, format(_)).get.value)
     def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, format(leading, chunks, values0.value, pos)(ev))
+      Val.Str(pos, format(parsed, values0.value, pos)(ev))
   }
 }

@@ -22,7 +22,8 @@ class Evaluator(
     val wd: Path,
     val settings: Settings,
     logger: Evaluator.Logger = null,
-    val debugStats: DebugStats = null)
+    val debugStats: DebugStats = null,
+    override val formatCache: FormatCache = FormatCache.SharedDefault)
     extends EvalScope {
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
@@ -1256,8 +1257,9 @@ class NewEvaluator(
     private val w: Path,
     private val s: Settings,
     private val wa: Evaluator.Logger = null,
-    ds: DebugStats = null)
-    extends Evaluator(r, e, w, s, wa, ds) {
+    ds: DebugStats = null,
+    fc: FormatCache = FormatCache.SharedDefault)
+    extends Evaluator(r, e, w, s, wa, ds, fc) {
 
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     (e.tag: @switch) match {
