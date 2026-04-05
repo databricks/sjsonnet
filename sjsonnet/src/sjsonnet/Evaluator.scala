@@ -1197,12 +1197,70 @@ class Evaluator(
       newScope
     }
 
-    // Lazily allocate builder only when we have 2+ fields, avoiding LinkedHashMap for single-field objects
+    // Lazily allocate builder only when we have more than 8 fields,
+    // using flat arrays (single-field or inline arrays) for small objects
     var builder: java.util.LinkedHashMap[String, Val.Obj.Member] = null
-    // Track single-field optimization candidates
+    // Track inline fields: for 1 field use singleKey/singleMember, for 2-8 use arrays
     var singleKey: String = null
     var singleMember: Val.Obj.Member = null
+    var inlineKeys: Array[String] = null
+    var inlineMembers: Array[Val.Obj.Member] = null
     var fieldCount = 0
+    val maxInlineFields = 8
+
+    // Shared field-tracking logic: manages singleKey → inlineKeys → builder transitions.
+    // Handles duplicate key detection at each tier.
+    def trackField(k: String, v: Val.Obj.Member, offset: Position): Unit = {
+      if (fieldCount == 0) {
+        singleKey = k
+        singleMember = v
+      } else if (fieldCount == 1) {
+        // Moving from single-field to multi-field: allocate inline arrays
+        inlineKeys = new Array[String](math.min(fields.length, maxInlineFields))
+        inlineMembers = new Array[Val.Obj.Member](inlineKeys.length)
+        inlineKeys(0) = singleKey
+        inlineMembers(0) = singleMember
+        if (singleKey.equals(k)) {
+          Error.fail(s"Duplicate key $k in evaluated object.", offset)
+        }
+        inlineKeys(1) = k
+        inlineMembers(1) = v
+        singleKey = null
+        singleMember = null
+      } else if (fieldCount <= maxInlineFields && inlineKeys != null) {
+        // Check for duplicates in inline array
+        var di = 0
+        while (di < fieldCount) {
+          if (inlineKeys(di).equals(k)) {
+            Error.fail(s"Duplicate key $k in evaluated object.", offset)
+          }
+          di += 1
+        }
+        if (fieldCount < inlineKeys.length) {
+          inlineKeys(fieldCount) = k
+          inlineMembers(fieldCount) = v
+        } else {
+          // Overflow: move all inline fields into LinkedHashMap builder
+          builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
+          var mi = 0
+          while (mi < fieldCount) {
+            builder.put(inlineKeys(mi), inlineMembers(mi))
+            mi += 1
+          }
+          inlineKeys = null
+          inlineMembers = null
+          builder.put(k, v)
+        }
+      } else {
+        // Already using builder
+        val previousValue = builder.put(k, v)
+        if (previousValue != null) {
+          Error.fail(s"Duplicate key $k in evaluated object.", offset)
+        }
+      }
+      fieldCount += 1
+    }
+
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -1215,23 +1273,7 @@ class Evaluator(
               finally decrementStackDepth()
             }
           }
-          if (fieldCount == 0) {
-            singleKey = k
-            singleMember = v
-          } else {
-            if (fieldCount == 1) {
-              // Moving from single-field to multi-field: allocate builder and add the first field
-              builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
-              builder.put(singleKey, singleMember)
-              singleKey = null
-              singleMember = null
-            }
-            val previousValue = builder.put(k, v)
-            if (previousValue != null) {
-              Error.fail(s"Duplicate key $k in evaluated object.", offset)
-            }
-          }
-          fieldCount += 1
+          trackField(k, v, offset)
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -1244,28 +1286,13 @@ class Evaluator(
               finally decrementStackDepth()
             }
           }
-          if (fieldCount == 0) {
-            singleKey = k
-            singleMember = v
-          } else {
-            if (fieldCount == 1) {
-              builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
-              builder.put(singleKey, singleMember)
-              singleKey = null
-              singleMember = null
-            }
-            val previousValue = builder.put(k, v)
-            if (previousValue != null) {
-              Error.fail(s"Duplicate key $k in evaluated object.", offset)
-            }
-          }
-          fieldCount += 1
+          trackField(k, v, offset)
         }
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
     val valueCache = if (sup == null) {
-      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fields.length)
+      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fieldCount)
     } else {
       new java.util.HashMap[Any, Val]()
     }
@@ -1280,6 +1307,24 @@ class Evaluator(
         valueCache,
         singleFieldKey = singleKey,
         singleFieldMember = singleMember
+      )
+    } else if (inlineKeys != null && fieldCount >= 2) {
+      // Multi-field inline object: use flat arrays instead of LinkedHashMap
+      val finalKeys =
+        if (fieldCount == inlineKeys.length) inlineKeys
+        else java.util.Arrays.copyOf(inlineKeys, fieldCount)
+      val finalMembers =
+        if (fieldCount == inlineMembers.length) inlineMembers
+        else java.util.Arrays.copyOf(inlineMembers, fieldCount)
+      new Val.Obj(
+        objPos,
+        null,
+        false,
+        if (asserts != null) triggerAsserts else null,
+        sup,
+        valueCache,
+        inlineFieldKeys = finalKeys,
+        inlineFieldMembers = finalMembers
       )
     } else {
       new Val.Obj(

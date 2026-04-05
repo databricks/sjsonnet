@@ -454,7 +454,9 @@ object Val {
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null,
       private val excludedKeys: java.util.Set[String] = null,
       private val singleFieldKey: String = null,
-      private val singleFieldMember: Obj.Member = null)
+      private val singleFieldMember: Obj.Member = null,
+      private val inlineFieldKeys: Array[String] = null,
+      private val inlineFieldMembers: Array[Obj.Member] = null)
       extends Literal
       with Expr.ObjBody {
     private[sjsonnet] def valTag: Byte = TAG_OBJ
@@ -473,6 +475,18 @@ object Val {
           // Single-field object: lazily construct LinkedHashMap from inline storage
           val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](1)
           m.put(singleFieldKey, singleFieldMember)
+          this.value0 = m
+        } else if (inlineFieldKeys != null) {
+          // Multi-field inline object: lazily construct LinkedHashMap from arrays
+          val keys = inlineFieldKeys
+          val members = inlineFieldMembers
+          val n = keys.length
+          val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](n)
+          var i = 0
+          while (i < n) {
+            m.put(keys(i), members(i))
+            i += 1
+          }
           this.value0 = m
         } else {
           // value0 is always defined for non-static objects, so if we're computing it here
@@ -682,6 +696,7 @@ object Val {
 
     @inline def hasKeys: Boolean = {
       if (singleFieldKey != null) true
+      else if (inlineFieldKeys != null && `super` == null) inlineFieldKeys.length > 0
       else {
         val m = if (static || `super` != null) getAllKeys else getValue0
         !m.isEmpty
@@ -690,7 +705,16 @@ object Val {
 
     @inline def containsKey(k: String): Boolean = {
       if (singleFieldKey != null && `super` == null) singleFieldKey.equals(k)
-      else {
+      else if (inlineFieldKeys != null && `super` == null) {
+        val keys = inlineFieldKeys
+        val n = keys.length
+        var i = 0
+        while (i < n) {
+          if (keys(i).equals(k)) return true
+          i += 1
+        }
+        false
+      } else {
         val m = if (static || `super` != null) getAllKeys else getValue0
         m.containsKey(k)
       }
@@ -699,6 +723,16 @@ object Val {
     @inline def containsVisibleKey(k: String): Boolean = {
       if (static || `super` != null) {
         getAllKeys.get(k) == java.lang.Boolean.FALSE
+      } else if (inlineFieldKeys != null) {
+        val keys = inlineFieldKeys
+        val members = inlineFieldMembers
+        val n = keys.length
+        var i = 0
+        while (i < n) {
+          if (keys(i).equals(k)) return members(i).visibility != Visibility.Hidden
+          i += 1
+        }
+        false
       } else {
         val m = getValue0.get(k)
         m != null && (m.visibility != Visibility.Hidden)
@@ -706,13 +740,38 @@ object Val {
     }
 
     lazy val allKeyNames: Array[String] = {
-      val m = if (static || `super` != null) getAllKeys else getValue0
-      m.keySet().toArray(new Array[String](m.size()))
+      if (inlineFieldKeys != null && `super` == null) inlineFieldKeys.clone()
+      else {
+        val m = if (static || `super` != null) getAllKeys else getValue0
+        m.keySet().toArray(new Array[String](m.size()))
+      }
     }
 
     lazy val visibleKeyNames: Array[String] = {
       if (static) {
         allKeyNames
+      } else if (inlineFieldKeys != null && `super` == null) {
+        // Inline multi-field fast path: check if all visible (common case)
+        val keys = inlineFieldKeys
+        val members = inlineFieldMembers
+        val n = keys.length
+        var allVisible = true
+        var i = 0
+        while (allVisible && i < n) {
+          if (members(i).visibility == Visibility.Hidden) allVisible = false
+          i += 1
+        }
+        if (allVisible) keys.clone()
+        else {
+          val buf = new mutable.ArrayBuilder.ofRef[String]
+          buf.sizeHint(n)
+          var j = 0
+          while (j < n) {
+            if (members(j).visibility != Visibility.Hidden) buf += keys(j)
+            j += 1
+          }
+          buf.result()
+        }
       } else {
         val buf = new mutable.ArrayBuilder.ofRef[String]
         if (`super` == null) {
@@ -814,6 +873,31 @@ object Val {
           } else {
             if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
           }
+        } else if (inlineFieldKeys != null) {
+          // Inline multi-field fast path: linear scan over small arrays
+          val keys = inlineFieldKeys
+          val members = inlineFieldMembers
+          val n = keys.length
+          var i = 0
+          while (i < n) {
+            if (keys(i).equals(k)) {
+              val m = members(i)
+              if (!evaluator.settings.brokenAssertionLogic || !m.deprecatedSkipAsserts) {
+                self.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
+              }
+              val vv = m.invoke(self, s, pos.fileScope, evaluator)
+              val v = if (s != null && m.add) {
+                s.valueRaw(k, self, pos, null, null) match {
+                  case null     => vv
+                  case supValue => mergeMember(supValue, vv, pos)
+                }
+              } else vv
+              if (addTo != null && m.cached) addTo.put(addKey, v)
+              return v
+            }
+            i += 1
+          }
+          if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
         } else {
           getValue0.get(k) match {
             case null =>
