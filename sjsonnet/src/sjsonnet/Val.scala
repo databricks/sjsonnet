@@ -465,6 +465,33 @@ object Val {
     private val hasAnyAsserts: Boolean =
       triggerAsserts != null || (`super` != null && `super`.hasAnyAsserts)
 
+    /**
+     * Whether this object supports direct field iteration in the Materializer, bypassing the
+     * value() lookup chain (cache checks, valueRaw dispatch, key scan). Only safe when: no super
+     * chain, no excluded keys, and inline storage is present.
+     */
+    @inline private[sjsonnet] def canDirectIterate: Boolean =
+      `super` == null && excludedKeys == null && (singleFieldKey != null || inlineFieldKeys != null)
+
+    /** Raw inline field keys array (may be null for non-inline objects). */
+    @inline private[sjsonnet] def inlineKeys: Array[String] = inlineFieldKeys
+
+    /** Raw inline field members array (may be null for non-inline objects). */
+    @inline private[sjsonnet] def inlineMembers: Array[Obj.Member] = inlineFieldMembers
+
+    /** Single-field key (may be null for non-single-field objects). */
+    @inline private[sjsonnet] def singleKey: String = singleFieldKey
+
+    /** Single-field member (may be null for non-single-field objects). */
+    @inline private[sjsonnet] def singleMem: Obj.Member = singleFieldMember
+
+    /**
+     * Cached sorted field order for inline objects. Shared across all objects from the same
+     * MemberList AST node, computed once during first materialization. Array of indices into
+     * inlineFieldKeys/inlineFieldMembers, sorted by codepoint string ordering.
+     */
+    @volatile private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
+
     def getSuper: Obj = `super`
 
     private def getValue0: util.LinkedHashMap[String, Obj.Member] = {

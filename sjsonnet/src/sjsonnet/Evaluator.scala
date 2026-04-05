@@ -1292,6 +1292,47 @@ class Evaluator(
         valueCache
       )
     }
+    // Cache sorted field order on MemberList for inline objects.
+    // Only safe when all field names are Fixed (string literals) — dynamic field names
+    // (FieldName.Dyn) can evaluate to different keys across invocations, so the cached
+    // sorted order would be invalid. For dynamic fields, compute per-object instead.
+    if (cachedObj.canDirectIterate && sup == null) {
+      val allFieldsFixed = {
+        val fs = e.fields; var i = 0; var ok = true
+        while (i < fs.length && ok) { ok = fs(i).fieldName.isInstanceOf[FieldName.Fixed]; i += 1 }
+        ok
+      }
+      if (allFieldsFixed) {
+        // Static field names: cache on MemberList, shared across all instances
+        var sortedOrder = e._cachedSortedOrder
+        if (sortedOrder == null) {
+          val ik = cachedObj.inlineKeys
+          val im = cachedObj.inlineMembers
+          if (ik != null) {
+            sortedOrder = Materializer.computeSortedInlineOrder(ik, im)
+          } else {
+            val sfm = cachedObj.singleMem
+            sortedOrder =
+              if (sfm != null && sfm.visibility != Expr.Member.Visibility.Hidden) Array(0)
+              else Array.emptyIntArray
+          }
+          e._cachedSortedOrder = sortedOrder
+        }
+        cachedObj._sortedInlineOrder = sortedOrder
+      } else {
+        // Dynamic field names: compute per-object, no shared cache
+        val ik = cachedObj.inlineKeys
+        val im = cachedObj.inlineMembers
+        if (ik != null) {
+          cachedObj._sortedInlineOrder = Materializer.computeSortedInlineOrder(ik, im)
+        } else {
+          val sfm = cachedObj.singleMem
+          cachedObj._sortedInlineOrder =
+            if (sfm != null && sfm.visibility != Expr.Member.Visibility.Hidden) Array(0)
+            else Array.emptyIntArray
+        }
+      }
+    }
     cachedObj
   }
 

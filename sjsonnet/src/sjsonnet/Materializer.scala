@@ -78,30 +78,133 @@ abstract class Materializer {
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
     storePos(obj.pos)
     obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-    val keys =
-      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
-      else obj.visibleKeyNames
-    val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
-    var i = 0
-    var prevKey: String = null
-    while (i < keys.length) {
-      val key = keys(i)
-      val childVal = obj.value(key, ctx.emptyPos)
-      storePos(childVal)
-      if (ctx.sort) {
-        if (prevKey != null && Util.compareStringsByCodepoint(key, prevKey) <= 0)
-          Error.fail(
-            s"""Internal error: Unexpected key "$key" after "$prevKey" in sorted object materialization""",
-            childVal.pos
-          )
-        prevKey = key
+    if (obj.canDirectIterate) {
+      // Fast path for inline objects (single-field or multi-field with array storage):
+      // bypass visibleKeyNames allocation, value() lookup chain, and HashMap overhead
+      if (ctx.sort) materializeSortedInlineObj(obj, visitor, depth, ctx)
+      else materializeInlineObj(obj, visitor, depth, ctx)
+    } else {
+      val keys =
+        if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+        else obj.visibleKeyNames
+      val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
+      var i = 0
+      while (i < keys.length) {
+        val key = keys(i)
+        val childVal = obj.value(key, ctx.emptyPos)
+        storePos(childVal)
+        ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
+        val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+        ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+        i += 1
       }
-      ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
-      val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
-      ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
-      i += 1
+      ov.visitEnd(-1)
     }
-    ov.visitEnd(-1)
+  }
+
+  /**
+   * Direct iteration for inline objects without super chain. Bypasses value() lookup (cache checks,
+   * valueRaw dispatch, key scan), invoking members directly by array index. Applicable to
+   * comprehension-created objects where all fields are stored in flat arrays.
+   */
+  private def materializeInlineObj[T](
+      obj: Val.Obj,
+      visitor: Visitor[T, T],
+      depth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+      val rawN = rawKeys.length
+      // Count visible fields (skip Hidden)
+      var visCount = 0
+      var i = 0
+      while (i < rawN) {
+        if (rawMembers(i).visibility != Visibility.Hidden) visCount += 1
+        i += 1
+      }
+      val ov = visitor.visitObject(visCount, jsonableKeys = true, -1)
+      i = 0
+      while (i < rawN) {
+        val m = rawMembers(i)
+        if (m.visibility != Visibility.Hidden) {
+          val childVal = m.invoke(obj, null, fs, evaluator)
+          storePos(childVal)
+          ov.visitKeyValue(ov.visitKey(-1).visitString(rawKeys(i), -1))
+          val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+          ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+        }
+        i += 1
+      }
+      ov.visitEnd(-1)
+    } else {
+      // Single-field object
+      val sfm = obj.singleMem
+      if (sfm.visibility != Visibility.Hidden) {
+        val ov = visitor.visitObject(1, jsonableKeys = true, -1)
+        val childVal = sfm.invoke(obj, null, fs, evaluator)
+        storePos(childVal)
+        ov.visitKeyValue(ov.visitKey(-1).visitString(obj.singleKey, -1))
+        val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+        ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+        ov.visitEnd(-1)
+      } else {
+        visitor.visitObject(0, jsonableKeys = true, -1).visitEnd(-1)
+      }
+    }
+  }
+
+  /**
+   * Sorted direct iteration for inline objects. Uses cached sorted field order when available
+   * (shared across all objects from the same MemberList), falling back to per-object computation.
+   * Avoids: sortedVisibleKeyNames lazy val, value() linear scan, and compareStringsByCodepoint
+   * validation check overhead.
+   */
+  private def materializeSortedInlineObj[T](
+      obj: Val.Obj,
+      visitor: Visitor[T, T],
+      depth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+      // Use cached sorted order if available (shared across all objects from same MemberList),
+      // otherwise compute per-object
+      val order = {
+        val cached = obj._sortedInlineOrder
+        if (cached != null) cached
+        else Materializer.computeSortedInlineOrder(rawKeys, rawMembers)
+      }
+      val visCount = order.length
+      val ov = visitor.visitObject(visCount, jsonableKeys = true, -1)
+      var i = 0
+      while (i < visCount) {
+        val idx = order(i)
+        val childVal = rawMembers(idx).invoke(obj, null, fs, evaluator)
+        storePos(childVal)
+        ov.visitKeyValue(ov.visitKey(-1).visitString(rawKeys(idx), -1))
+        val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+        ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+        i += 1
+      }
+      ov.visitEnd(-1)
+    } else {
+      // Single-field object: sorting is trivial (same as unsorted)
+      val sfm = obj.singleMem
+      if (sfm.visibility != Visibility.Hidden) {
+        val ov = visitor.visitObject(1, jsonableKeys = true, -1)
+        val childVal = sfm.invoke(obj, null, fs, evaluator)
+        storePos(childVal)
+        ov.visitKeyValue(ov.visitKey(-1).visitString(obj.singleKey, -1))
+        val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+        ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+        ov.visitEnd(-1)
+      } else {
+        visitor.visitObject(0, jsonableKeys = true, -1).visitEnd(-1)
+      }
+    }
   }
 
   @inline private def materializeRecursiveArr[T](
@@ -458,6 +561,41 @@ object Materializer extends Materializer {
       val arr: Val.Arr,
       var index: Int)
       extends MaterializeFrame
+
+  /**
+   * Compute sorted index permutation for inline object fields. Uses insertion sort which is optimal
+   * for the typical 2-8 fields in comprehension-created objects. Returns only indices of visible
+   * fields, sorted by codepoint string ordering.
+   */
+  def computeSortedInlineOrder(keys: Array[String], members: Array[Val.Obj.Member]): Array[Int] = {
+    // First pass: collect visible field indices
+    val n = keys.length
+    val visible = new Array[Int](n)
+    var visCount = 0
+    var i = 0
+    while (i < n) {
+      if (members(i).visibility != Visibility.Hidden) {
+        visible(visCount) = i
+        visCount += 1
+      }
+      i += 1
+    }
+    val order = if (visCount == n) visible else java.util.Arrays.copyOf(visible, visCount)
+    // Insertion sort by codepoint ordering (stable, optimal for small arrays)
+    i = 1
+    while (i < visCount) {
+      val idx = order(i)
+      val key = keys(idx)
+      var j = i - 1
+      while (j >= 0 && Util.compareStringsByCodepoint(keys(order(j)), key) > 0) {
+        order(j + 1) = order(j)
+        j -= 1
+      }
+      order(j + 1) = idx
+      i += 1
+    }
+    order
+  }
 
   /**
    * Trait for providing custom materialization logic to the Materializer.
