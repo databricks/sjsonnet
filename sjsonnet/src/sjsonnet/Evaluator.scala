@@ -238,9 +238,10 @@ class Evaluator(
   def visitUnaryOp(e: UnaryOp)(implicit scope: ValScope): Val = {
     val pos = e.pos
     (e.op: @switch) match {
-      case Expr.UnaryOp.OP_+ => Val.Num(pos, visitExprAsDouble(e.value))
-      case Expr.UnaryOp.OP_- => Val.Num(pos, -visitExprAsDouble(e.value))
-      case Expr.UnaryOp.OP_~ => Val.Num(pos, (~visitExprAsDouble(e.value).toSafeLong(pos)).toDouble)
+      case Expr.UnaryOp.OP_+ => Val.cachedNum(pos, visitExprAsDouble(e.value))
+      case Expr.UnaryOp.OP_- => Val.cachedNum(pos, -visitExprAsDouble(e.value))
+      case Expr.UnaryOp.OP_~ =>
+        Val.cachedNum(pos, (~visitExprAsDouble(e.value).toSafeLong(pos)).toDouble)
       case Expr.UnaryOp.OP_! =>
         visitExpr(e.value) match {
           case Val.True(_)  => Val.False(pos)
@@ -683,24 +684,24 @@ class Evaluator(
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
         if (r.isInfinite) Error.fail("overflow", pos)
-        Val.Num(pos, r)
+        Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
         if (r.isInfinite) Error.fail("overflow", pos)
-        Val.Num(pos, r)
+        Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("division by zero", pos)
         val result = l / r
         if (result.isInfinite) Error.fail("overflow", pos)
-        Val.Num(pos, result)
+        Val.cachedNum(pos, result)
       // Polymorphic ops: need visitExpr for type dispatch
       case Expr.BinaryOp.OP_% =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l % r)
           case (Val.Str(_, l), r)             => Val.Str(pos, Format.format(l, r, pos))
           case _                              => failBinOp(l, e.op, r, pos)
         }
@@ -709,7 +710,7 @@ class Evaluator(
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l + r)
           case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
           case (Val.Str(_, l), r)             => Val.Str(pos, l + Materializer.stringify(r))
           case (l, Val.Str(_, r))             => Val.Str(pos, Materializer.stringify(l) + r)
@@ -726,13 +727,13 @@ class Evaluator(
         if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
           Error.fail("numeric value outside safe integer range for bitwise operation", pos)
         else
-          Val.Num(pos, (ll << rr).toDouble)
+          Val.cachedNum(pos, (ll << rr).toDouble)
 
       case Expr.BinaryOp.OP_>> =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
         if (rr < 0) Error.fail("shift by negative exponent", pos)
-        Val.Num(pos, (ll >> rr).toDouble)
+        Val.cachedNum(pos, (ll >> rr).toDouble)
 
       // Comparison ops: polymorphic (Num/Str/Arr)
       case Expr.BinaryOp.OP_< =>
@@ -804,21 +805,21 @@ class Evaluator(
 
       // Bitwise ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_& =>
-        Val.Num(
+        Val.cachedNum(
           pos,
           (visitExprAsDouble(e.lhs).toSafeLong(pos) &
           visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
         )
 
       case Expr.BinaryOp.OP_^ =>
-        Val.Num(
+        Val.cachedNum(
           pos,
           (visitExprAsDouble(e.lhs).toSafeLong(pos) ^
           visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
         )
 
       case Expr.BinaryOp.OP_| =>
-        Val.Num(
+        Val.cachedNum(
           pos,
           (visitExprAsDouble(e.lhs).toSafeLong(pos) |
           visitExprAsDouble(e.rhs).toSafeLong(pos)).toDouble
