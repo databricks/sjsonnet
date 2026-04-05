@@ -139,12 +139,59 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d                              =>
         val i = d.toLong
-        if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
+        if (d == i) writeLongDirect(i)
         else super.visitFloat64(d, index)
         flushBuffer()
     }
     flushCharBuilder()
     out
+  }
+
+  /**
+   * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
+   * digit-pair table for fast two-digits-at-a-time conversion.
+   */
+  private def writeLongDirect(v: Long): Unit = {
+    flushBuffer()
+    if (v == 0L) {
+      elemBuilder.ensureLength(1)
+      elemBuilder.appendUnsafe('0')
+      return
+    }
+    if (v == Long.MinValue) {
+      // -Long.MinValue overflows; handle specially
+      visitFloat64StringParts("-9223372036854775808", -1, -1, -1)
+      return
+    }
+    val negative = v < 0
+    var abs = if (negative) -v else v
+    // Count digits
+    var numDigits = 0
+    var tmp = abs
+    while (tmp > 0) { numDigits += 1; tmp /= 10 }
+    val totalLen = numDigits + (if (negative) 1 else 0)
+    elemBuilder.ensureLength(totalLen)
+    val cbArr = elemBuilder.arr
+    val startPos = elemBuilder.getLength
+    var writePos = startPos + totalLen - 1
+    // Write digits from right to left, two at a time
+    while (abs >= 100) {
+      val q = abs / 100
+      val r = (abs - q * 100L).toInt
+      abs = q
+      cbArr(writePos) = BaseCharRenderer.DIGIT_ONES(r)
+      cbArr(writePos - 1) = BaseCharRenderer.DIGIT_TENS(r)
+      writePos -= 2
+    }
+    if (abs >= 10) {
+      val r = abs.toInt
+      cbArr(writePos) = BaseCharRenderer.DIGIT_ONES(r)
+      cbArr(writePos - 1) = BaseCharRenderer.DIGIT_TENS(r)
+    } else {
+      cbArr(writePos) = ('0' + abs.toInt).toChar
+    }
+    if (negative) cbArr(startPos) = '-'
+    elemBuilder.length = startPos + totalLen
   }
 
   def visitString(s: CharSequence, index: Int): T = {
@@ -224,5 +271,25 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       elemBuilder.appendUnsafeC(s.charAt(i))
       i += 1
     }
+  }
+}
+
+object BaseCharRenderer {
+
+  /**
+   * Digit-pair lookup tables for fast two-digit-at-a-time integer rendering. DIGIT_TENS(i) gives
+   * the tens digit for value i (0..99). DIGIT_ONES(i) gives the ones digit for value i (0..99).
+   */
+  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
+    a
+  }
+  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
+    a
   }
 }
