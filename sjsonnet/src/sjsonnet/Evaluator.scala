@@ -1049,7 +1049,12 @@ class Evaluator(
       newScope
     }
 
-    val builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
+    // Lazily allocate builder only when we have 2+ fields, avoiding LinkedHashMap for single-field objects
+    var builder: java.util.LinkedHashMap[String, Val.Obj.Member] = null
+    // Track single-field optimization candidates
+    var singleKey: String = null
+    var singleMember: Val.Obj.Member = null
+    var fieldCount = 0
     fields.foreach {
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -1062,10 +1067,23 @@ class Evaluator(
               finally decrementStackDepth()
             }
           }
-          val previousValue = builder.put(k, v)
-          if (previousValue != null) {
-            Error.fail(s"Duplicate key $k in evaluated object.", offset)
+          if (fieldCount == 0) {
+            singleKey = k
+            singleMember = v
+          } else {
+            if (fieldCount == 1) {
+              // Moving from single-field to multi-field: allocate builder and add the first field
+              builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
+              builder.put(singleKey, singleMember)
+              singleKey = null
+              singleMember = null
+            }
+            val previousValue = builder.put(k, v)
+            if (previousValue != null) {
+              Error.fail(s"Duplicate key $k in evaluated object.", offset)
+            }
           }
+          fieldCount += 1
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
@@ -1078,10 +1096,22 @@ class Evaluator(
               finally decrementStackDepth()
             }
           }
-          val previousValue = builder.put(k, v)
-          if (previousValue != null) {
-            Error.fail(s"Duplicate key $k in evaluated object.", offset)
+          if (fieldCount == 0) {
+            singleKey = k
+            singleMember = v
+          } else {
+            if (fieldCount == 1) {
+              builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](fields.length)
+              builder.put(singleKey, singleMember)
+              singleKey = null
+              singleMember = null
+            }
+            val previousValue = builder.put(k, v)
+            if (previousValue != null) {
+              Error.fail(s"Duplicate key $k in evaluated object.", offset)
+            }
           }
+          fieldCount += 1
         }
       case _ =>
         Error.fail("This case should never be hit", objPos)
@@ -1091,14 +1121,29 @@ class Evaluator(
     } else {
       new java.util.HashMap[Any, Val]()
     }
-    cachedObj = new Val.Obj(
-      objPos,
-      builder,
-      false,
-      if (asserts != null) triggerAsserts else null,
-      sup,
-      valueCache
-    )
+    cachedObj = if (fieldCount == 1 && singleKey != null) {
+      // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
+      new Val.Obj(
+        objPos,
+        null,
+        false,
+        if (asserts != null) triggerAsserts else null,
+        sup,
+        valueCache,
+        singleFieldKey = singleKey,
+        singleFieldMember = singleMember
+      )
+    } else {
+      new Val.Obj(
+        objPos,
+        if (builder != null) builder
+        else Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](0),
+        false,
+        if (asserts != null) triggerAsserts else null,
+        sup,
+        valueCache
+      )
+    }
     cachedObj
   }
 

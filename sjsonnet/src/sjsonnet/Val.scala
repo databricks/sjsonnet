@@ -361,7 +361,9 @@ object Val {
       `super`: Obj,
       valueCache: util.HashMap[Any, Val] = new util.HashMap[Any, Val](),
       private var allKeys: util.LinkedHashMap[String, java.lang.Boolean] = null,
-      private val excludedKeys: java.util.Set[String] = null)
+      private val excludedKeys: java.util.Set[String] = null,
+      private val singleFieldKey: String = null,
+      private val singleFieldMember: Obj.Member = null)
       extends Literal
       with Expr.ObjBody {
     private var asserting: Boolean = false
@@ -369,16 +371,23 @@ object Val {
     def getSuper: Obj = `super`
 
     private def getValue0: util.LinkedHashMap[String, Obj.Member] = {
-      // value0 is always defined for non-static objects, so if we're computing it here
-      // then that implies that the object is static and therefore valueCache should be
-      // pre-populated and all members should be visible and constant.
       if (value0 == null) {
-        val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
-        allKeys.forEach { (k, _) =>
-          value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
+        if (singleFieldKey != null) {
+          // Single-field object: lazily construct LinkedHashMap from inline storage
+          val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](1)
+          m.put(singleFieldKey, singleFieldMember)
+          this.value0 = m
+        } else {
+          // value0 is always defined for non-static objects, so if we're computing it here
+          // then that implies that the object is static and therefore valueCache should be
+          // pre-populated and all members should be visible and constant.
+          val value0 = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.size())
+          allKeys.forEach { (k, _) =>
+            value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
+          }
+          // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
+          this.value0 = value0
         }
-        // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
-        this.value0 = value0
       }
       value0
     }
@@ -576,26 +585,32 @@ object Val {
     }
 
     @inline def hasKeys: Boolean = {
-      val m = if (static || `super` != null) getAllKeys else value0
-      !m.isEmpty
+      if (singleFieldKey != null) true
+      else {
+        val m = if (static || `super` != null) getAllKeys else getValue0
+        !m.isEmpty
+      }
     }
 
     @inline def containsKey(k: String): Boolean = {
-      val m = if (static || `super` != null) getAllKeys else value0
-      m.containsKey(k)
+      if (singleFieldKey != null && `super` == null) singleFieldKey.equals(k)
+      else {
+        val m = if (static || `super` != null) getAllKeys else getValue0
+        m.containsKey(k)
+      }
     }
 
     @inline def containsVisibleKey(k: String): Boolean = {
       if (static || `super` != null) {
         getAllKeys.get(k) == java.lang.Boolean.FALSE
       } else {
-        val m = value0.get(k)
+        val m = getValue0.get(k)
         m != null && (m.visibility != Visibility.Hidden)
       }
     }
 
     lazy val allKeyNames: Array[String] = {
-      val m = if (static || `super` != null) getAllKeys else value0
+      val m = if (static || `super` != null) getAllKeys else getValue0
       m.keySet().toArray(new Array[String](m.size()))
     }
 
@@ -605,10 +620,11 @@ object Val {
       } else {
         val buf = new mutable.ArrayBuilder.ofRef[String]
         if (`super` == null) {
+          val v0 = getValue0
           // This size hint is based on an optimistic assumption that most fields are visible,
           // avoiding re-sizing or trimming the buffer in the common case:
-          buf.sizeHint(value0.size())
-          value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
+          buf.sizeHint(v0.size())
+          v0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
         } else {
           getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
         }
@@ -682,10 +698,11 @@ object Val {
         v
       } else {
         val s = this.`super`
-        getValue0.get(k) match {
-          case null =>
-            if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
-          case m =>
+        val sfk = singleFieldKey
+        if (sfk != null) {
+          // Single-field fast path: avoid LinkedHashMap lookup
+          if (sfk.equals(k)) {
+            val m = singleFieldMember
             if (!evaluator.settings.brokenAssertionLogic || !m.deprecatedSkipAsserts) {
               self.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
             }
@@ -698,6 +715,27 @@ object Val {
             } else vv
             if (addTo != null && m.cached) addTo.put(addKey, v)
             v
+          } else {
+            if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+          }
+        } else {
+          getValue0.get(k) match {
+            case null =>
+              if (s == null) null else s.valueRaw(k, self, pos, addTo, addKey)
+            case m =>
+              if (!evaluator.settings.brokenAssertionLogic || !m.deprecatedSkipAsserts) {
+                self.triggerAllAsserts(evaluator.settings.brokenAssertionLogic)
+              }
+              val vv = m.invoke(self, s, pos.fileScope, evaluator)
+              val v = if (s != null && m.add) {
+                s.valueRaw(k, self, pos, null, null) match {
+                  case null     => vv
+                  case supValue => mergeMember(supValue, vv, pos)
+                }
+              } else vv
+              if (addTo != null && m.cached) addTo.put(addKey, v)
+              v
+          }
         }
       }
     }
