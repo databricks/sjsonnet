@@ -341,15 +341,106 @@ class Parser(
   }
 
   def tripleBarStringBody[$: P](indent: String, sep: String): P[Seq[String]] = P(
-    // First line: indentation already consumed, just capture content up to the line separator.
+    // First line: use fastparse combinator for proper error messages on malformed input
     (CharsWhile(!sep.contains(_), 0) ~~ sep).!.flatMapX { firstLine =>
-      // Subsequent lines: empty line (just separator) | indented line with whitespace check.
-      (sep.! | tripleBarStringIndentedLine(indent, sep))
-        .opaque("|||-block line must either be an empty line or start with at least one whitespace")
-        .repX
-        .map(firstLine +: _)
+      // Subsequent lines: use bulk scanner to avoid per-line string allocation.
+      // For a 600KB text block with ~8000 lines, this avoids ~8000 String objects,
+      // the Seq[String] overhead, and the final mkString concatenation.
+      tripleBarStringBodyBulk(indent, sep, firstLine)
     }
   )
+
+  /**
+   * Bulk text block scanner for lines after the first. Instead of per-line fastparse combinators
+   * (repX of sep.! | tripleBarStringIndentedLine), this scans all remaining lines in a single pass
+   * using one StringBuilder with direct character access — no intermediate String allocations per
+   * line.
+   */
+  private def tripleBarStringBodyBulk[$: P](
+      indent: String,
+      sep: String,
+      firstLine: String): P[Seq[String]] = {
+    val ctx = P.current
+    val input = ctx.input
+    val pos0 = ctx.index
+    val indentLen = indent.length
+    val sepLen = sep.length
+
+    // For IndexedParserInput (always the case in sjsonnet), access the underlying
+    // String directly for zero-copy bulk appends via StringBuilder.append(CharSequence, start, end)
+    input match {
+      case indexed: IndexedParserInput =>
+        val data = indexed.data
+        val dataLen = data.length
+        // Pre-size: firstLine + estimate remaining content
+        val sb = new java.lang.StringBuilder(firstLine.length + Math.min(dataLen - pos0, 1 << 20))
+        sb.append(firstLine)
+        var pos = pos0
+
+        var continue = true
+        while (continue) {
+          // Case 1: Empty line (just separator)
+          if (
+            pos + sepLen <= dataLen && data.charAt(pos) == sep.charAt(0) &&
+            (sepLen == 1 || data.charAt(pos + 1) == sep.charAt(1))
+          ) {
+            appendSep(sb, sep)
+            pos += sepLen
+          }
+          // Case 2: Line starts with expected indent
+          else if (pos + indentLen <= dataLen && data.regionMatches(pos, indent, 0, indentLen)) {
+            val afterIndent = pos + indentLen
+            // Find line end (next separator char)
+            var lineEnd = afterIndent
+            while (lineEnd < dataLen && sep.indexOf(data.charAt(lineEnd)) < 0) lineEnd += 1
+            // Verify full separator at lineEnd
+            if (
+              lineEnd + sepLen <= dataLen && data.charAt(lineEnd) == sep.charAt(0) &&
+              (sepLen == 1 || data.charAt(lineEnd + 1) == sep.charAt(1))
+            ) {
+              // Zero-copy bulk append: extra whitespace + content + separator (skipping indent)
+              sb.append(data, afterIndent, lineEnd + sepLen)
+              pos = lineEnd + sepLen
+            } else {
+              continue = false
+            }
+          }
+          // Case 3: Not empty and not properly indented — stop
+          else {
+            // Preserve error quality for indentation mismatches
+            var wsEnd = pos
+            while (wsEnd < dataLen && isSpaceOrTab(data.charAt(wsEnd))) wsEnd += 1
+            if (wsEnd > pos) {
+              val isTerminator = wsEnd + 2 < dataLen &&
+                data.charAt(wsEnd) == '|' && data.charAt(wsEnd + 1) == '|' &&
+                data.charAt(wsEnd + 2) == '|'
+              if (!isTerminator) {
+                val whitespace = data.substring(pos, wsEnd)
+                val expectedDescription = describeWhitespace(indent)
+                val actualDescription = describeWhitespace(whitespace)
+                return failParse(
+                  "text block indentation mismatch: expected at least " +
+                  expectedDescription + ", found " + actualDescription,
+                  wsEnd
+                ).asInstanceOf[P[Seq[String]]]
+              }
+            }
+            continue = false
+          }
+        }
+
+        ctx.freshSuccess(Seq(sb.toString), pos).asInstanceOf[P[Seq[String]]]
+
+      case _ =>
+        // Fallback for non-indexed input: use original fastparse combinators
+        (sep.! | tripleBarStringIndentedLine(indent, sep))
+          .opaque(
+            "|||-block line must either be an empty line or start with at least one whitespace"
+          )
+          .repX
+          .map(firstLine +: _)
+    }
+  }
 
   private def tripleBarStringIndentedLine[$: P](indent: String, sep: String): P[String] = P(
     // Parse whitespace once, then check if it matches the expected indentation.
@@ -383,6 +474,9 @@ class Parser(
       }
     }
   )
+
+  /** Append the line separator to StringBuilder. */
+  private def appendSep(sb: java.lang.StringBuilder, sep: String): Unit = sb.append(sep)
 
   def arr[$: P](pos: Position): P[Expr] = arr(pos, 0)
 
@@ -616,8 +710,22 @@ class Parser(
   }
 
   def constructString(pos: Position, lines: Seq[String]): Val.Str = {
-    val s = lines.mkString
-    val unique = internedStrings.getOrElseUpdate(s, s)
+    val s =
+      if (lines.length == 1) lines.head
+      else {
+        // Pre-size StringBuilder for multi-line text blocks to avoid repeated resizing
+        var totalLen = 0
+        val it = lines.iterator
+        while (it.hasNext) totalLen += it.next().length
+        val sb = new java.lang.StringBuilder(totalLen)
+        val it2 = lines.iterator
+        while (it2.hasNext) sb.append(it2.next())
+        sb.toString
+      }
+    // Skip interning for large strings — the hash computation and map lookup
+    // cost more than the potential memory savings for strings that are unlikely
+    // to repeat (e.g., 600KB text block literals)
+    val unique = if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
     Val.Str(pos, unique)
   }
 
