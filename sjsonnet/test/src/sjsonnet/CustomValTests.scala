@@ -8,6 +8,7 @@ object CustomValTests extends TestSuite {
       extends Val.Literal
       with Materializer.Materializable {
     override def prettyName: String = "Important string"
+    private[sjsonnet] def valTag: Byte = -1
     def materialize[T](visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = {
       visitor.visitString(str + "!".repeat(importance), -1)
     }
