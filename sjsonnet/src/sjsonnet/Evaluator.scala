@@ -1387,7 +1387,9 @@ class Evaluator(
         val yi = y.value(i)
         // Reference equality short-circuit for shared array elements
         if (!(xi eq yi)) {
-          // Inline numeric fast path to avoid polymorphic compare() dispatch
+          // Inline numeric fast path to avoid polymorphic compare() dispatch per element.
+          // In numeric array comparisons (e.g. 1M elements), this avoids recursive
+          // method calls with polymorphic dispatch across 5 type branches.
           val cmp = xi match {
             case xn: Val.Num =>
               yi match {
