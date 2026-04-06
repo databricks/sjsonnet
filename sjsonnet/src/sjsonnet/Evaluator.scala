@@ -341,8 +341,17 @@ class Evaluator(
     }
   }
 
-  def visitArr(e: Arr)(implicit scope: ValScope): Val =
-    Val.Arr(e.pos, e.value.map(visitAsLazy))
+  def visitArr(e: Arr)(implicit scope: ValScope): Val = {
+    val src = e.value
+    val len = src.length
+    val res = new Array[Eval](len)
+    var i = 0
+    while (i < len) {
+      res(i) = visitAsLazy(src(i))
+      i += 1
+    }
+    Val.Arr(e.pos, res)
+  }
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
@@ -755,14 +764,18 @@ class Evaluator(
   }
 
   def visitImportBin(e: ImportBin): Val.Arr = {
-    Val.Arr(
-      e.pos,
-      importer
-        .resolveAndReadOrFail(e.value, e.pos, binaryData = true)
-        ._2
-        .readRawBytes()
-        .map(x => Val.Num(e.pos, (x & 0xff).doubleValue))
-    )
+    val bytes = importer
+      .resolveAndReadOrFail(e.value, e.pos, binaryData = true)
+      ._2
+      .readRawBytes()
+    val len = bytes.length
+    val res = new Array[Eval](len)
+    var i = 0
+    while (i < len) {
+      res(i) = Val.Num(e.pos, (bytes(i) & 0xff).doubleValue)
+      i += 1
+    }
+    Val.Arr(e.pos, res)
   }
 
   def visitImport(e: Import): Val = {
@@ -1208,13 +1221,28 @@ class Evaluator(
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
           val fieldKey = k
-          val v = new Val.Obj.Member(plus, sep) {
-            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos, fieldKey)
-              try visitExpr(rhs)(makeNewScope(self, sup))
-              finally decrementStackDepth()
-            }
+          // ConstMember fast path: for simple field bodies (Val literals or
+          // parent-scope ValidId that already resolved to a Val), pre-compute
+          // the value and skip the Member closure + scope extension in invoke.
+          val constVal: Val = rhs match {
+            case v: Val                                     => v
+            case vid: ValidId if vid.nameIdx < scope.length =>
+              scope.bindings(vid.nameIdx) match {
+                case v: Val => v
+                case _      => null
+              }
+            case _ => null
           }
+          val v: Val.Obj.Member =
+            if (constVal ne null) new Val.Obj.ConstMember(plus, sep, constVal)
+            else
+              new Val.Obj.Member(plus, sep) {
+                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                  checkStackDepth(rhs.pos, fieldKey)
+                  try visitExpr(rhs)(makeNewScope(self, sup))
+                  finally decrementStackDepth()
+                }
+              }
           if (fieldCount == 0) {
             singleKey = k
             singleMember = v
@@ -1301,7 +1329,9 @@ class Evaluator(
     val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
     val compScopes = visitComp(e.first :: e.rest, Array(compScope))
     if (debugStats != null) debugStats.objectCompIterations += compScopes.length
-    for (s <- compScopes) {
+    var ci = 0
+    while (ci < compScopes.length) {
+      val s = compScopes(ci)
       visitExpr(e.key)(s) match {
         case Val.Str(_, k) =>
           val previousValue = builder.put(
@@ -1323,6 +1353,7 @@ class Evaluator(
         case Val.Null(_) => // do nothing
         case x           => fieldNameTypeError(x, e.pos)
       }
+      ci += 1
     }
     val valueCache = if (sup == null) {
       Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
@@ -1359,18 +1390,23 @@ class Evaluator(
       }
       visitComp(rest, newScopes.result())
     case (spec @ IfSpec(offset, expr)) :: rest =>
-      visitComp(
-        rest,
-        scopes.filter(visitExpr(expr)(_) match {
-          case Val.True(_)  => true
-          case Val.False(_) => false
+      val filtered = collection.mutable.ArrayBuilder.make[ValScope]
+      filtered.sizeHint(scopes.length)
+      var i = 0
+      while (i < scopes.length) {
+        val s = scopes(i)
+        visitExpr(expr)(s) match {
+          case Val.True(_)  => filtered += s
+          case Val.False(_) => // skip
           case other        =>
             Error.fail(
               "Condition must be boolean, got " + other.prettyName,
               spec
             )
-        })
-      )
+        }
+        i += 1
+      }
+      visitComp(rest, filtered.result())
     case Nil => scopes
   }
 
@@ -1380,27 +1416,34 @@ class Evaluator(
     case (x: Val.Str, y: Val.Str)   => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Bool, y: Val.Bool) => x.asBoolean.compareTo(y.asBoolean)
     case (x: Val.Arr, y: Val.Arr)   =>
-      val len = math.min(x.length, y.length)
+      val xArr = x.asLazyArray
+      val yArr = y.asLazyArray
+      val len = math.min(xArr.length, yArr.length)
+      // Phase 1: skip shared Eval references (e.g. from array concat)
       var i = 0
+      while (i < len && (xArr(i) eq yArr(i))) { i += 1 }
+      // Phase 2: compare from first mismatch onwards
       while (i < len) {
-        val xi = x.value(i)
-        val yi = y.value(i)
-        // Reference equality short-circuit for shared array elements
-        if (!(xi eq yi)) {
-          // Inline numeric fast path to avoid polymorphic compare() dispatch
-          val cmp = xi match {
-            case xn: Val.Num =>
-              yi match {
-                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-                case _           => compare(xi, yi)
-              }
-            case _ => compare(xi, yi)
+        val xe = xArr(i)
+        val ye = yArr(i)
+        if (!(xe eq ye)) {
+          val xi = xe.value
+          val yi = ye.value
+          if (!(xi eq yi)) {
+            val cmp = xi match {
+              case xn: Val.Num =>
+                yi match {
+                  case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                  case _           => compare(xi, yi)
+                }
+              case _ => compare(xi, yi)
+            }
+            if (cmp != 0) return cmp
           }
-          if (cmp != 0) return cmp
         }
         i += 1
       }
-      Integer.compare(x.length, y.length)
+      Integer.compare(xArr.length, yArr.length)
     case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
   }
 
@@ -1423,9 +1466,20 @@ class Evaluator(
         case y: Val.Arr =>
           val xlen = x.length
           if (xlen != y.length) return false
+          val xArr = x.asLazyArray
+          val yArr = y.asLazyArray
           var i = 0
+          // Phase 1: skip shared Eval references
+          while (i < xlen && (xArr(i) eq yArr(i))) { i += 1 }
+          // Phase 2: compare remaining elements
           while (i < xlen) {
-            if (!equal(x.value(i), y.value(i))) return false
+            val xe = xArr(i)
+            val ye = yArr(i)
+            if (!(xe eq ye)) {
+              val xv = xe.value
+              val yv = ye.value
+              if (!(xv eq yv) && !equal(xv, yv)) return false
+            }
             i += 1
           }
           true

@@ -799,8 +799,24 @@ class Parser(
       else Fail.opaque("no duplicate field: " + overlap)
     }.flatMapX {
       case (exprs, None) =>
-        val b =
-          exprs.iterator.filter(_.isInstanceOf[Expr.Bind]).asInstanceOf[Iterator[Expr.Bind]].toArray
+        // Single-pass classification: classify members into binds, fields, and asserts
+        // in one loop instead of three separate iterator.filter passes.
+        val bindsBuilder = new scala.collection.mutable.ArrayBuilder.ofRef[Expr.Bind]
+        val fieldsBuilder = new scala.collection.mutable.ArrayBuilder.ofRef[Expr.Member.Field]
+        val assertsBuilder = new scala.collection.mutable.ArrayBuilder.ofRef[Expr.Member.AssertStmt]
+        var i = 0
+        while (i < exprs.length) {
+          exprs(i) match {
+            case bind: Expr.Bind                => bindsBuilder += bind
+            case field: Expr.Member.Field       => fieldsBuilder += field
+            case assert: Expr.Member.AssertStmt => assertsBuilder += assert
+            case _                              =>
+          }
+          i += 1
+        }
+        val b = bindsBuilder.result()
+        val fields = fieldsBuilder.result()
+
         val seen = collection.mutable.Set.empty[String]
         var overlap: String = null
         b.foreach {
@@ -813,16 +829,8 @@ class Parser(
           Fail.opaque("no duplicate local: " + overlap)
         } else {
           val binds = if (b.isEmpty) null else b
-
-          val fields = exprs.iterator
-            .filter(_.isInstanceOf[Expr.Member.Field])
-            .asInstanceOf[Iterator[Expr.Member.Field]]
-            .toArray
           val asserts = {
-            val a = exprs.iterator
-              .filter(_.isInstanceOf[Expr.Member.AssertStmt])
-              .asInstanceOf[Iterator[Expr.Member.AssertStmt]]
-              .toArray
+            val a = assertsBuilder.result()
             if (a.isEmpty) null else a
           }
           if (binds == null && asserts == null && fields.forall(_.isStatic))
@@ -830,10 +838,15 @@ class Parser(
           else Pass(Expr.ObjBody.MemberList(pos, binds, fields, asserts))
         }
       case (exprs, Some(comps)) =>
-        val preLocals = exprs
-          .takeWhile(_.isInstanceOf[Expr.Bind])
-          .map(_.asInstanceOf[Expr.Bind])
-        if (preLocals.nonEmpty && exprs.length == preLocals.length) {
+        // Index-based single-pass: find preLocals (leading Bind exprs)
+        var preEnd = 0
+        while (preEnd < exprs.length && exprs(preEnd).isInstanceOf[Expr.Bind]) preEnd += 1
+        val preLocals = {
+          val arr = new Array[Expr.Bind](preEnd)
+          var j = 0; while (j < preEnd) { arr(j) = exprs(j).asInstanceOf[Expr.Bind]; j += 1 }
+          arr
+        }
+        if (preLocals.length > 0 && exprs.length == preLocals.length) {
           Fail.opaque("object comprehension must have a field")
         } else
           exprs(preLocals.length) match {
@@ -850,10 +863,15 @@ class Parser(
               } else {
                 Expr.Function(offset, args, rhsBody)
               }
-              val postLocals = exprs
-                .drop(preLocals.length + 1)
-                .takeWhile(_.isInstanceOf[Expr.Bind])
-                .map(_.asInstanceOf[Expr.Bind])
+              val postLocals = {
+                val start = preEnd + 1
+                var end = start
+                while (end < exprs.length && exprs(end).isInstanceOf[Expr.Bind]) end += 1
+                val arr = new Array[Expr.Bind](end - start)
+                var j = 0;
+                while (j < arr.length) { arr(j) = exprs(start + j).asInstanceOf[Expr.Bind]; j += 1 }
+                arr
+              }
 
               /*
                * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
@@ -871,11 +889,11 @@ class Parser(
                   Pass(
                     Expr.ObjBody.ObjComp(
                       pos,
-                      preLocals.toArray,
+                      preLocals,
                       lhs,
                       rhs,
                       plus,
-                      postLocals.toArray,
+                      postLocals,
                       comps._1,
                       comps._2.toList
                     )

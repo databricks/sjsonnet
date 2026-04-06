@@ -108,7 +108,13 @@ object SetModule extends AbstractFunctionModule {
           val sortedIndices = if (keyType == classOf[Val.Str]) {
             indices.sortBy(i => keys(i).cast[Val.Str].asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
-            indices.sortBy(i => keys(i).cast[Val.Num].asDouble)
+            // Extract doubles into primitive array for unboxed comparison
+            val dkeys = new Array[Double](keys.length)
+            var di = 0
+            while (di < dkeys.length) {
+              dkeys(di) = keys(di).asInstanceOf[Val.Num].asDouble; di += 1
+            }
+            indices.sortWith((a, b) => java.lang.Double.compare(dkeys(a), dkeys(b)) < 0)
           } else if (keyType == classOf[Val.Arr]) {
             indices.sortBy(i => keys(i).cast[Val.Arr])(ev.compare(_, _))
           } else {
@@ -128,7 +134,16 @@ object SetModule extends AbstractFunctionModule {
           if (keyType == classOf[Val.Str]) {
             strict.map(_.cast[Val.Str]).sortBy(_.asString)(Util.CodepointStringOrdering)
           } else if (keyType == classOf[Val.Num]) {
-            strict.map(_.cast[Val.Num]).sortBy(_.asDouble)
+            // Primitive double sort: extract doubles, sort with DualPivotQuicksort,
+            // reconstruct Val.Num array. Avoids Comparator virtual dispatch + boxing.
+            val n = strict.length
+            val doubles = new Array[Double](n)
+            var di = 0
+            while (di < n) { doubles(di) = strict(di).asInstanceOf[Val.Num].asDouble; di += 1 }
+            java.util.Arrays.sort(doubles)
+            di = 0
+            while (di < n) { strict(di) = Val.Num(pos, doubles(di)); di += 1 }
+            strict
           } else if (keyType == classOf[Val.Arr]) {
             strict.map(_.cast[Val.Arr]).sortBy(identity)(ev.compare(_, _))
           } else if (keyType == classOf[Val.Obj]) {

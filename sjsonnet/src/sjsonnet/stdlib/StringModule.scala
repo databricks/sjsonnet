@@ -104,6 +104,26 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StripUtils {
+
+    /**
+     * Try to represent the code points as a pair of Long bitmasks (ASCII range 0..127). Returns
+     * null if any code point is >= 128.
+     */
+    private def tryAsciiBitSet(str: String): Array[Long] = {
+      val bits = new Array[Long](2) // bits(0) covers 0..63, bits(1) covers 64..127
+      var i = 0
+      while (i < str.length) {
+        val cp = str.codePointAt(i)
+        if (cp >= 128) return null
+        bits(cp >> 6) |= 1L << (cp & 63)
+        i += Character.charCount(cp)
+      }
+      bits
+    }
+
+    @inline private def bitSetContains(bits: Array[Long], cp: Int): Boolean =
+      cp < 128 && (bits(cp >> 6) & (1L << (cp & 63))) != 0
+
     def codePointsSet(str: String): collection.Set[Int] = {
       val chars = Set.newBuilder[Int]
       chars.sizeHint(str.codePointCount(0, str.length))
@@ -114,6 +134,43 @@ object StringModule extends AbstractFunctionModule {
         i += Character.charCount(codePoint)
       }
       chars.result()
+    }
+
+    /** Strip characters from a string, using ASCII bitset fast path when possible. */
+    def strip(str: String, charsStr: String, left: Boolean, right: Boolean): String = {
+      val bits = tryAsciiBitSet(charsStr)
+      if (bits != null) asciiStrip(str, bits, left, right)
+      else unspecializedStrip(str, codePointsSet(charsStr), left, right)
+    }
+
+    /** Fast path for ASCII-only strip characters using bitset lookup. */
+    private def asciiStrip(
+        str: String,
+        bits: Array[Long],
+        left: Boolean,
+        right: Boolean): String = {
+      if (str.isEmpty) return str
+      var start = 0
+      var end = str.length
+
+      if (left) {
+        while (
+          start < end && {
+            val c = str.charAt(start)
+            c < 128 && bitSetContains(bits, c)
+          }
+        ) start += 1
+      }
+
+      if (right) {
+        while (
+          end > start && {
+            val c = str.charAt(end - 1)
+            c < 128 && bitSetContains(bits, c)
+          }
+        ) end -= 1
+      }
+      str.substring(start, end)
     }
 
     def unspecializedStrip(
@@ -141,45 +198,30 @@ object StringModule extends AbstractFunctionModule {
 
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = true,
-          right = true
-        )
+        StripUtils.strip(str.value.asString, charsStr, left = true, right = true)
       )
     }
   }
 
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = true,
-          right = false
-        )
+        StripUtils.strip(str.value.asString, charsStr, left = true, right = false)
       )
     }
   }
 
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = false,
-          right = true
-        )
+        StripUtils.strip(str.value.asString, charsStr, left = false, right = true)
       )
     }
   }
