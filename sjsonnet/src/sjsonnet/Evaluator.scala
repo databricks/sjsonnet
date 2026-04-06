@@ -358,9 +358,25 @@ class Evaluator(
         if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
+        // While-loop to eagerly evaluate arguments for tailstrict calls
+        val args = e.args
+        val evaluated = new Array[Val](args.length)
+        var i = 0
+        while (i < args.length) {
+          evaluated(i) = visitExpr(args(i))
+          i += 1
+        }
+        TailCall.resolve(lhs.cast[Val.Func].apply(evaluated, e.namedNames, e.pos))
       } else {
-        lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
+        // While-loop to wrap arguments as lazy thunks
+        val args = e.args
+        val lazied = new Array[Eval](args.length)
+        var i = 0
+        while (i < args.length) {
+          lazied(i) = visitAsLazy(args(i))
+          i += 1
+        }
+        lhs.cast[Val.Func].apply(lazied, e.namedNames, e.pos)
       }
     } finally decrementStackDepth()
   }

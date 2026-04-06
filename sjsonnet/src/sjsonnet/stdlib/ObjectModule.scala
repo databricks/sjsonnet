@@ -333,14 +333,32 @@ object ObjectModule extends AbstractFunctionModule {
       }
       def rec(x: Eval): Val = x.value match {
         case o: Val.Obj =>
-          val bindings: Array[(String, Val.Obj.Member)] = for {
-            k <- o.visibleKeyNames
-            v = rec(o.value(k, pos.fileScope.noOffsetPos)(ev))
-            if filter(v)
-          } yield (k, new Val.Obj.ConstMember(false, Visibility.Normal, v))
-          Val.Obj.mk(pos, bindings)
+          val keys = o.visibleKeyNames
+          val noOffPos = pos.fileScope.noOffsetPos
+          // Single-pass: apply rec and filter together, avoiding intermediate allocation
+          val buf = new scala.collection.mutable.ArrayBuilder.ofRef[(String, Val.Obj.Member)]
+          buf.sizeHint(keys.length)
+          var i = 0
+          while (i < keys.length) {
+            val k = keys(i)
+            val v = rec(o.value(k, noOffPos)(ev))
+            if (filter(v)) {
+              buf += ((k, new Val.Obj.ConstMember(false, Visibility.Normal, v)))
+            }
+            i += 1
+          }
+          Val.Obj.mk(pos, buf.result())
         case a: Val.Arr =>
-          Val.Arr(pos, a.asLazyArray.map(rec).filter(filter))
+          val la = a.asLazyArray
+          val buf = new scala.collection.mutable.ArrayBuilder.ofRef[Eval]
+          buf.sizeHint(la.length)
+          var i = 0
+          while (i < la.length) {
+            val v = rec(la(i))
+            if (filter(v)) buf += v
+            i += 1
+          }
+          Val.Arr(pos, buf.result())
         case x => x
       }
       rec(s)

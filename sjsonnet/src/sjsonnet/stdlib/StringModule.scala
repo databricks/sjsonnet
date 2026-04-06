@@ -440,18 +440,20 @@ object StringModule extends AbstractFunctionModule {
       out.toString
     },
     builtin("escapeStringXML", "str") { (_, _, str: String) =>
-      val out = new java.io.StringWriter()
-      for (c <- str) {
-        c match {
-          case '<'  => out.write("&lt;")
-          case '>'  => out.write("&gt;")
-          case '&'  => out.write("&amp;")
-          case '"'  => out.write("&quot;")
-          case '\'' => out.write("&apos;")
-          case _    => out.write(c)
+      val sb = new java.lang.StringBuilder(str.length)
+      var i = 0
+      while (i < str.length) {
+        str.charAt(i) match {
+          case '<'  => sb.append("&lt;")
+          case '>'  => sb.append("&gt;")
+          case '&'  => sb.append("&amp;")
+          case '"'  => sb.append("&quot;")
+          case '\'' => sb.append("&apos;")
+          case c    => sb.append(c)
         }
+        i += 1
       }
-      out.toString
+      sb.toString
     },
     builtin("escapeStringBash", "str_") { (pos, ev, str: String) =>
       "'" + str.replace("'", """'"'"'""") + "'"

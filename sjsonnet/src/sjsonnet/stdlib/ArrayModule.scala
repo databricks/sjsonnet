@@ -74,20 +74,40 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.forall(v => v.asBoolean))
+      val a = arr.value.asArr
+      var i = 0
+      while (i < a.length) {
+        if (!a.value(i).asBoolean) return Val.False(pos)
+        i += 1
+      }
+      Val.True(pos)
     }
   }
 
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.iterator.exists(v => v.asBoolean))
+      val a = arr.value.asArr
+      var i = 0
+      while (i < a.length) {
+        if (a.value(i).asBoolean) return Val.True(pos)
+        i += 1
+      }
+      Val.False(pos)
     }
   }
 
   private object Count extends Val.Builtin2("count", "arr", "x") {
     def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
+      val a = arr.value.asArr.asLazyArray
+      // Guard: don't force x.value for empty arrays (preserves lazy semantics)
+      if (a.isEmpty) return Val.Num(pos, 0)
+      val xVal = x.value
       var count = 0
-      arr.value.asArr.foreach(v => if (ev.equal(v.value, x.value)) count += 1)
+      var i = 0
+      while (i < a.length) {
+        if (ev.equal(a(i).value, xVal)) count += 1
+        i += 1
+      }
       Val.Num(pos, count)
     }
   }
@@ -265,7 +285,19 @@ object ArrayModule extends AbstractFunctionModule {
             }
             str.str.contains(secondArg)
           case a: Val.Arr =>
-            a.asLazyArray.indexWhere(v => ev.equal(v.value, x.value)) >= 0
+            val la = a.asLazyArray
+            // Guard: don't force x.value for empty arrays (preserves lazy semantics)
+            if (la.isEmpty) false
+            else {
+              val xVal = x.value
+              var i = 0
+              var found = false
+              while (i < la.length && !found) {
+                if (ev.equal(la(i).value, xVal)) found = true
+                i += 1
+              }
+              found
+            }
           case arr =>
             Error.fail(
               "std.member first argument must be an array or a string, got " + arr.prettyName
@@ -452,14 +484,14 @@ object ArrayModule extends AbstractFunctionModule {
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
           val lazyArray = a.asLazyArray
-          val out = new mutable.ArrayBuilder.ofRef[Eval]
-          out.sizeHint(lazyArray.length * count)
+          val elemLen = lazyArray.length
+          val result = new Array[Eval](elemLen * count)
           var i = 0
           while (i < count) {
-            out ++= lazyArray
+            System.arraycopy(lazyArray, 0, result, i * elemLen, elemLen)
             i += 1
           }
-          Val.Arr(pos, out.result())
+          Val.Arr(pos, result)
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
@@ -480,42 +512,70 @@ object ArrayModule extends AbstractFunctionModule {
       )
     },
     builtin("contains", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem)) != -1
+      val la = arr.asLazyArray
+      var i = 0
+      var found = false
+      while (i < la.length && !found) {
+        if (ev.equal(la(i).value, elem)) found = true
+        i += 1
+      }
+      found
     },
     builtin("remove", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      val idx = arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem))
+      val lazyArray = arr.asLazyArray
+      // While-loop linear search for first matching element
+      var idx = -1
+      var i = 0
+      while (i < lazyArray.length && idx == -1) {
+        if (ev.equal(lazyArray(i).value, elem)) idx = i
+        i += 1
+      }
       if (idx == -1) {
         arr
       } else {
-        Val.Arr(
-          arr.pos,
-          arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
-        )
+        // Use arraycopy to build result without the matched element
+        val result = new Array[Eval](lazyArray.length - 1)
+        System.arraycopy(lazyArray, 0, result, 0, idx)
+        System.arraycopy(lazyArray, idx + 1, result, idx, lazyArray.length - idx - 1)
+        Val.Arr(arr.pos, result)
       }
     },
     builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Int) =>
       if (!(0 <= idx && idx < arr.length)) {
         Error.fail("index out of bounds: 0 <= " + idx + " < " + arr.length)
       }
-      Val.Arr(
-        arr.pos,
-        arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
-      )
+      val lazyArray = arr.asLazyArray
+      val result = new Array[Eval](lazyArray.length - 1)
+      System.arraycopy(lazyArray, 0, result, 0, idx)
+      System.arraycopy(lazyArray, idx + 1, result, idx, lazyArray.length - idx - 1)
+      Val.Arr(arr.pos, result)
     },
     builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
+      val la = arr.asLazyArray
+      var sum = 0.0
+      var i = 0
+      while (i < la.length) {
+        la(i).value match {
+          case n: Val.Num => sum += n.asDouble
+          case _          => Error.fail("Argument must be an array of numbers")
+        }
+        i += 1
       }
-      arr.asLazyArray.map(_.value.asDouble).sum
+      sum
     },
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
+      val la = arr.asLazyArray
+      if (la.isEmpty) Error.fail("Cannot calculate average of an empty array")
+      var sum = 0.0
+      var i = 0
+      while (i < la.length) {
+        la(i).value match {
+          case n: Val.Num => sum += n.asDouble
+          case _          => Error.fail("Argument must be an array of numbers")
+        }
+        i += 1
       }
-      if (arr.length == 0) {
-        Error.fail("Cannot calculate average of an empty array")
-      }
-      arr.asLazyArray.map(_.value.asDouble).sum / arr.length
+      sum / la.length
     }
   )
 }

@@ -23,7 +23,13 @@ object DecimalFormat {
     val sign = if (n < 0) "-" else ""
     val absN = math.abs(n)
     val nWidth = if (absN == 0) 1 else Math.log10(absN.toDouble).toInt + 1
-    sign + "0" * (targetWidth - nWidth) + absN
+    val padding = targetWidth - nWidth
+    val sb = new java.lang.StringBuilder(sign.length + padding + nWidth + 1)
+    sb.append(sign)
+    var i = 0
+    while (i < padding) { sb.append('0'); i += 1 }
+    sb.append(absN)
+    sb.toString
   }
 
   private def rightPad(n0: Long, minWidth: Int, maxWidth: Int): String = {
@@ -32,7 +38,13 @@ object DecimalFormat {
       val n = (n0 / Math.pow(10, trailingZeroes(n0))).toInt
       assert(n == math.abs(n))
       val nWidth = if (n == 0) 1 else Math.log10(n).toInt + 1
-      ("" + n + "0" * (minWidth - nWidth)).take(maxWidth)
+      val sb = new java.lang.StringBuilder(maxWidth + 1)
+      sb.append(n)
+      val padCount = minWidth - nWidth
+      var i = 0
+      while (i < padCount) { sb.append('0'); i += 1 }
+      // Truncate to maxWidth if needed
+      if (sb.length > maxWidth) sb.substring(0, maxWidth) else sb.toString
     }
   }
 

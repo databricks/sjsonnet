@@ -169,24 +169,27 @@ object ManifestModule extends AbstractFunctionModule {
 
   private object Lines extends Val.Builtin1("lines", "arr") {
     def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = {
-      v1.value.asArr.foreach {
-        case _: Val.Str | _: Val.Null => // donothing
+      val arr = v1.value.asArr
+      // Validate all elements are strings or null
+      arr.foreach {
+        case _: Val.Str | _: Val.Null => // valid
         case x                        => Error.fail("Cannot call .lines on " + x.value.prettyName)
       }
-      Val.Str(
-        pos,
-        Materializer
-          .apply(v1.value)(ev)
-          .asInstanceOf[ujson.Arr]
-          .value
-          .filter(_ != ujson.Null)
-          .map {
-            case ujson.Str(s) => s + "\n"
-            case _            =>
-              throw new RuntimeException("Unexpected") /* we ensure it's all strings above */
-          }
-          .mkString
-      )
+      val materialized = Materializer.apply(v1.value)(ev).asInstanceOf[ujson.Arr].value
+      val sb = new java.lang.StringBuilder()
+      var i = 0
+      while (i < materialized.length) {
+        materialized(i) match {
+          case ujson.Str(s) =>
+            sb.append(s)
+            sb.append('\n')
+          case ujson.Null => // skip
+          case _          =>
+            throw new RuntimeException("Unexpected") /* we ensure it's all strings above */
+        }
+        i += 1
+      }
+      Val.Str(pos, sb.toString)
     }
   }
 
@@ -270,16 +273,23 @@ object ManifestModule extends AbstractFunctionModule {
       }
       v match {
         case arr: Val.Arr =>
-          arr.asLazyArray
-            .map { item =>
-              Materializer
-                .apply0(
-                  item.value,
-                  new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
-                )(ev)
-                .toString
-            }
-            .mkString("---\n", "\n---\n", if (cDocumentEnd) "\n...\n" else "\n")
+          val items = arr.asLazyArray
+          val sb = new java.lang.StringBuilder()
+          sb.append("---\n")
+          var i = 0
+          while (i < items.length) {
+            if (i > 0) sb.append("\n---\n")
+            val rendered = Materializer
+              .apply0(
+                items(i).value,
+                new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
+              )(ev)
+              .toString
+            sb.append(rendered)
+            i += 1
+          }
+          if (cDocumentEnd) sb.append("\n...\n") else sb.append("\n")
+          sb.toString
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
@@ -292,34 +302,47 @@ object ManifestModule extends AbstractFunctionModule {
         case ujson.Null     => "null"
         case _              => x.transform(new sjsonnet.Renderer())
       }
-      def sect(x: ujson.Obj) = {
+      val sb = new java.lang.StringBuilder()
+      // Render main section
+      materialized.obj.get("main").foreach { mainObj =>
         // TODO remove the `toSeq` once this is fixed in scala3
-        x.value.toSeq.flatMap {
-          case (k, ujson.Arr(vs)) => vs.map(x => k + " = " + render(x))
-          case (k, v)             => Seq(k + " = " + render(v))
+        mainObj.asInstanceOf[ujson.Obj].value.toSeq.foreach {
+          case (k, ujson.Arr(vs)) =>
+            vs.foreach { x =>
+              sb.append(k).append(" = ").append(render(x)).append('\n')
+            }
+          case (k, v) =>
+            sb.append(k).append(" = ").append(render(v)).append('\n')
         }
       }
-      val lines = materialized.obj
-        .get("main")
-        .fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
-        materialized.obj
-          .get("sections")
-          .fold(Iterable[String]())(x =>
-            // TODO remove the `toSeq` once this is fixed in scala3
-            x.obj.toSeq.flatMap { case (k, v) =>
-              Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])
-            }
-          )
-      lines.flatMap(Seq(_, "\n")).mkString
+      // Render named sections
+      materialized.obj.get("sections").foreach { sections =>
+        // TODO remove the `toSeq` once this is fixed in scala3
+        sections.obj.toSeq.foreach { case (k, v) =>
+          sb.append('[').append(k).append(']').append('\n')
+          v.asInstanceOf[ujson.Obj].value.toSeq.foreach {
+            case (ik, ujson.Arr(vs)) =>
+              vs.foreach { x =>
+                sb.append(ik).append(" = ").append(render(x)).append('\n')
+              }
+            case (ik, iv) =>
+              sb.append(ik).append(" = ").append(render(iv)).append('\n')
+          }
+        }
+      }
+      sb.toString
     },
     builtin("manifestPython", "v") { (pos, ev, v: Val) =>
       Materializer.apply0(v, new PythonRenderer())(ev).toString
     },
     builtin("manifestPythonVars", "conf") { (pos, ev, v: Val.Obj) =>
       // TODO remove the `toSeq` once this is fixed in scala3
-      Materializer(v)(ev).obj.toSeq.map { case (k, v) =>
-        k + " = " + v.transform(new PythonRenderer()).toString + "\n"
-      }.mkString
+      val entries = Materializer(v)(ev).obj.toSeq
+      val sb = new java.lang.StringBuilder()
+      entries.foreach { case (k, v) =>
+        sb.append(k).append(" = ").append(v.transform(new PythonRenderer()).toString).append('\n')
+      }
+      sb.toString
     },
     builtin("manifestXmlJsonml", "value") { (pos, ev, value: Val) =>
       import scalatags.Text.all.{value => _, _}
