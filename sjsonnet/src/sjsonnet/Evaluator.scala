@@ -618,11 +618,18 @@ class Evaluator(
     checkStackDepth(e.pos, e)
     try {
       val lhs = visitExpr(e.value)
+      // Auto-TCO'd calls should normally be intercepted by visitExprWithTailCallSupport,
+      // but we handle them defensively here to preserve lazy semantics if this path is ever reached.
       implicit val tailstrictMode: TailstrictMode =
-        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        if (e.isAutoTCO) TailstrictModeAutoTCO
+        else if (e.tailstrict) TailstrictModeEnabled
+        else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        TailCall.resolve(lhs.cast[Val.Func].apply(e.args.map(visitExpr(_)), e.namedNames, e.pos))
+        val args: Array[Eval] =
+          if (e.isAutoTCO) e.args.map(visitAsLazy(_))
+          else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
+        TailCall.resolve(lhs.cast[Val.Func].apply(args, e.namedNames, e.pos))
       } else {
         lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
       }
@@ -635,7 +642,9 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        if (e.isAutoTCO) TailstrictModeAutoTCO
+        else if (e.tailstrict) TailstrictModeEnabled
+        else TailstrictModeDisabled
       if (e.tailstrict) {
         TailCall.resolve(lhs.cast[Val.Func].apply0(e.pos))
       } else {
@@ -650,9 +659,12 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        if (e.isAutoTCO) TailstrictModeAutoTCO
+        else if (e.tailstrict) TailstrictModeEnabled
+        else TailstrictModeDisabled
       if (e.tailstrict) {
-        TailCall.resolve(lhs.cast[Val.Func].apply1(visitExpr(e.a1), e.pos))
+        val arg: Eval = if (e.isAutoTCO) visitAsLazy(e.a1) else visitExpr(e.a1)
+        TailCall.resolve(lhs.cast[Val.Func].apply1(arg, e.pos))
       } else {
         val l1 = visitAsLazy(e.a1)
         lhs.cast[Val.Func].apply1(l1, e.pos)
@@ -666,10 +678,18 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        if (e.isAutoTCO) TailstrictModeAutoTCO
+        else if (e.tailstrict) TailstrictModeEnabled
+        else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
+        if (e.isAutoTCO) {
+          TailCall.resolve(
+            lhs.cast[Val.Func].apply2(visitAsLazy(e.a1), visitAsLazy(e.a2), e.pos)
+          )
+        } else {
+          TailCall.resolve(lhs.cast[Val.Func].apply2(visitExpr(e.a1), visitExpr(e.a2), e.pos))
+        }
       } else {
         val l1 = visitAsLazy(e.a1)
         val l2 = visitAsLazy(e.a2)
@@ -684,12 +704,22 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
+        if (e.isAutoTCO) TailstrictModeAutoTCO
+        else if (e.tailstrict) TailstrictModeEnabled
+        else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        TailCall.resolve(
-          lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
-        )
+        if (e.isAutoTCO) {
+          TailCall.resolve(
+            lhs
+              .cast[Val.Func]
+              .apply3(visitAsLazy(e.a1), visitAsLazy(e.a2), visitAsLazy(e.a3), e.pos)
+          )
+        } else {
+          TailCall.resolve(
+            lhs.cast[Val.Func].apply3(visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3), e.pos)
+          )
+        }
       } else {
         val l1 = visitAsLazy(e.a1)
         val l2 = visitAsLazy(e.a2)
@@ -1223,32 +1253,40 @@ class Evaluator(
         case e: Apply =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]], e.namedNames, e)
+            val isAuto = e.isAutoTCO
+            val args: Array[Eval] =
+              if (isAuto) e.args.map(visitAsLazy(_))
+              else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
+            new TailCall(func, args, e.namedNames, e, autoTCO = isAuto)
           } catch Error.withStackFrame(e)
         case e: Apply0 =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Evaluator.emptyLazyArray, null, e)
+            new TailCall(func, Evaluator.emptyLazyArray, null, e, autoTCO = e.isAutoTCO)
           } catch Error.withStackFrame(e)
         case e: Apply1 =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Array[Eval](visitExpr(e.a1)), null, e)
+            val isAuto = e.isAutoTCO
+            val arg: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
+            new TailCall(func, Array[Eval](arg), null, e, autoTCO = isAuto)
           } catch Error.withStackFrame(e)
         case e: Apply2 =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Array[Eval](visitExpr(e.a1), visitExpr(e.a2)), null, e)
+            val isAuto = e.isAutoTCO
+            val a1: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
+            val a2: Eval = if (isAuto) visitAsLazy(e.a2) else visitExpr(e.a2)
+            new TailCall(func, Array[Eval](a1, a2), null, e, autoTCO = isAuto)
           } catch Error.withStackFrame(e)
         case e: Apply3 =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(
-              func,
-              Array[Eval](visitExpr(e.a1), visitExpr(e.a2), visitExpr(e.a3)),
-              null,
-              e
-            )
+            val isAuto = e.isAutoTCO
+            val a1: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
+            val a2: Eval = if (isAuto) visitAsLazy(e.a2) else visitExpr(e.a2)
+            val a3: Eval = if (isAuto) visitAsLazy(e.a3) else visitExpr(e.a3)
+            new TailCall(func, Array[Eval](a1, a2, a3), null, e, autoTCO = isAuto)
           } catch Error.withStackFrame(e)
         case _ => visitExpr(e)
       }

@@ -52,6 +52,14 @@ trait Expr {
  */
 trait TailstrictableExpr extends Expr {
   def tailstrict: Boolean
+
+  /**
+   * True when this call was auto-TCO'd by the StaticOptimizer (as opposed to an explicit
+   * `tailstrict` annotation by the user). Auto-TCO'd calls use lazy argument evaluation to preserve
+   * Jsonnet's standard lazy semantics, whereas explicit `tailstrict` forces eager argument
+   * evaluation per the Jsonnet spec.
+   */
+  def isAutoTCO: Boolean = false
 }
 
 object Expr {
@@ -231,25 +239,45 @@ object Expr {
       value: Expr,
       args: Array[Expr],
       namedNames: Array[String],
-      tailstrict: Boolean)
+      tailstrict: Boolean,
+      autoTCO: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply
     override def exprErrorString: String = Expr.callTargetName(value)
+    override def isAutoTCO: Boolean = autoTCO
   }
-  final case class Apply0(var pos: Position, value: Expr, tailstrict: Boolean)
+  final case class Apply0(
+      var pos: Position,
+      value: Expr,
+      tailstrict: Boolean,
+      autoTCO: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply0
     override def exprErrorString: String = Expr.callTargetName(value)
+    override def isAutoTCO: Boolean = autoTCO
   }
-  final case class Apply1(var pos: Position, value: Expr, a1: Expr, tailstrict: Boolean)
+  final case class Apply1(
+      var pos: Position,
+      value: Expr,
+      a1: Expr,
+      tailstrict: Boolean,
+      autoTCO: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply1
     override def exprErrorString: String = Expr.callTargetName(value)
+    override def isAutoTCO: Boolean = autoTCO
   }
-  final case class Apply2(var pos: Position, value: Expr, a1: Expr, a2: Expr, tailstrict: Boolean)
+  final case class Apply2(
+      var pos: Position,
+      value: Expr,
+      a1: Expr,
+      a2: Expr,
+      tailstrict: Boolean,
+      autoTCO: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply2
     override def exprErrorString: String = Expr.callTargetName(value)
+    override def isAutoTCO: Boolean = autoTCO
   }
   final case class Apply3(
       var pos: Position,
@@ -257,10 +285,12 @@ object Expr {
       a1: Expr,
       a2: Expr,
       a3: Expr,
-      tailstrict: Boolean)
+      tailstrict: Boolean,
+      autoTCO: Boolean = false)
       extends TailstrictableExpr {
     final override private[sjsonnet] def tag = ExprTags.Apply3
     override def exprErrorString: String = Expr.callTargetName(value)
+    override def isAutoTCO: Boolean = autoTCO
   }
   final case class ApplyBuiltin(
       var pos: Position,
