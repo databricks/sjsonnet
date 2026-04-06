@@ -390,6 +390,8 @@ object Expr {
       override def exprErrorString: String = "object comprehension"
       override def toString: String =
         s"ObjComp($pos, ${arrStr(preLocals)}, $key, $value, ${arrStr(postLocals)}, $first, $rest)"
+      // Cache concatenation of preLocals and postLocals to avoid repeated array allocation
+      lazy val allLocals: Array[Bind] = preLocals ++ postLocals
     }
   }
 }
