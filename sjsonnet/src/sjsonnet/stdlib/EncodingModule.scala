@@ -50,7 +50,15 @@ object EncodingModule extends AbstractFunctionModule {
     },
     builtin("base64DecodeBytes", "str") { (pos, _, str: String) =>
       try {
-        Val.Arr(pos, Base64.getDecoder.decode(str).map(i => Val.Num(pos, i)))
+        val decoded = Base64.getDecoder.decode(str)
+        val result = new Array[Eval](decoded.length)
+        var i = 0
+        while (i < decoded.length) {
+          // Mask with 0xff to convert signed byte to unsigned int (0-255)
+          result(i) = Val.Num(pos, decoded(i) & 0xff)
+          i += 1
+        }
+        Val.Arr(pos, result)
       } catch {
         case e: IllegalArgumentException =>
           Error.fail("Invalid base64 string: " + e.getMessage)

@@ -487,35 +487,49 @@ object ArrayModule extends AbstractFunctionModule {
       if (idx == -1) {
         arr
       } else {
-        Val.Arr(
-          arr.pos,
-          arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
-        )
+        val src = arr.asLazyArray
+        val result = new Array[Eval](src.length - 1)
+        System.arraycopy(src, 0, result, 0, idx)
+        System.arraycopy(src, idx + 1, result, idx, src.length - idx - 1)
+        Val.Arr(arr.pos, result)
       }
     },
     builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Int) =>
       if (!(0 <= idx && idx < arr.length)) {
         Error.fail("index out of bounds: 0 <= " + idx + " < " + arr.length)
       }
-      Val.Arr(
-        arr.pos,
-        arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
-      )
+      val src = arr.asLazyArray
+      val result = new Array[Eval](src.length - 1)
+      System.arraycopy(src, 0, result, 0, idx)
+      System.arraycopy(src, idx + 1, result, idx, src.length - idx - 1)
+      Val.Arr(arr.pos, result)
     },
     builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
+      val a = arr.asLazyArray
+      var sum = 0.0
+      var i = 0
+      while (i < a.length) {
+        val v = a(i).value
+        if (!v.isInstanceOf[Val.Num]) Error.fail("Argument must be an array of numbers")
+        sum += v.asInstanceOf[Val.Num].asDouble
+        i += 1
       }
-      arr.asLazyArray.map(_.value.asDouble).sum
+      sum
     },
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
-      }
       if (arr.length == 0) {
         Error.fail("Cannot calculate average of an empty array")
       }
-      arr.asLazyArray.map(_.value.asDouble).sum / arr.length
+      val a = arr.asLazyArray
+      var sum = 0.0
+      var i = 0
+      while (i < a.length) {
+        val v = a(i).value
+        if (!v.isInstanceOf[Val.Num]) Error.fail("Argument must be an array of numbers")
+        sum += v.asInstanceOf[Val.Num].asDouble
+        i += 1
+      }
+      sum / arr.length
     }
   )
 }

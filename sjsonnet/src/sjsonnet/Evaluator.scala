@@ -1103,7 +1103,7 @@ class Evaluator(
   }
 
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
-    val binds = e.preLocals ++ e.postLocals
+    val binds = e.allLocals
     val compScope: ValScope = scope // .clearSuper
     val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
     val compScopes = visitComp(e.first :: e.rest, Array(compScope))

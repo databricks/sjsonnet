@@ -610,7 +610,11 @@ object Val {
           buf.sizeHint(value0.size())
           value0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
         } else {
-          getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
+          val iter = getAllKeys.entrySet().iterator()
+          while (iter.hasNext()) {
+            val e = iter.next()
+            if (e.getValue() == java.lang.Boolean.FALSE) buf += e.getKey()
+          }
         }
         buf.result()
       }
