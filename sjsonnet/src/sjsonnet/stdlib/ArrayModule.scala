@@ -212,17 +212,33 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
-      val out = new mutable.ArrayBuilder.ofRef[Eval]
       val arr = arrs.value.asArr
-      out.sizeHint(arr.length * 4) // Rough size hint
-      for (x <- arr) {
-        x.value match {
-          case Val.Null(_) => // do nothing
-          case v: Val.Arr  => out ++= v.asLazyArray
+      // Two-pass: count total elements first to pre-size the result array exactly
+      var totalSize = 0
+      var i = 0
+      while (i < arr.length) {
+        arr.value(i) match {
+          case _: Val.Null => // do nothing
+          case v: Val.Arr  => totalSize += v.length
           case x           => Error.fail("Cannot call flattenArrays on " + x)
         }
+        i += 1
       }
-      Val.Arr(pos, out.result())
+      val result = new Array[Eval](totalSize)
+      var offset = 0
+      i = 0
+      while (i < arr.length) {
+        arr.value(i) match {
+          case _: Val.Null => // do nothing
+          case v: Val.Arr  =>
+            val la = v.asLazyArray
+            System.arraycopy(la, 0, result, offset, la.length)
+            offset += la.length
+          case _ => // already validated in first pass
+        }
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
@@ -232,7 +248,8 @@ object ArrayModule extends AbstractFunctionModule {
       val out = new mutable.ArrayBuilder.ofRef[Eval]
       out.sizeHint(lazyArray.length)
       val q = new java.util.ArrayDeque[Eval](lazyArray.length)
-      lazyArray.foreach(q.add)
+      var k = 0
+      while (k < lazyArray.length) { q.add(lazyArray(k)); k += 1 }
       while (!q.isEmpty) {
         q.removeFirst().value match {
           case v: Val.Arr =>
@@ -248,7 +265,15 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, arrs.value.asArr.asLazyArray.reverse)
+      val src = arrs.value.asArr.asLazyArray
+      val len = src.length
+      val res = new Array[Eval](len)
+      var i = 0
+      while (i < len) {
+        res(len - 1 - i) = src(i)
+        i += 1
+      }
+      Val.Arr(pos, res)
     }
   }
 
@@ -289,20 +314,25 @@ object ArrayModule extends AbstractFunctionModule {
       arr.value match {
         case arr: Val.Arr =>
           var current = init.value
-          for (item <- arr.asLazyArray) {
+          val lazyArr = arr.asLazyArray
+          val noOff = pos.noOffset
+          var i = 0
+          while (i < lazyArr.length) {
             val c = current
-            current = func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
+            current = func.apply2(c, lazyArr(i), noOff)(ev, TailstrictModeDisabled)
+            i += 1
           }
           current
 
         case s: Val.Str =>
           var current = init.value
           val str = s.str
+          val noOff = pos.noOffset
           var i = 0
           while (i < str.length) {
             val c = current
             val codePoint = str.codePointAt(i)
-            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), pos.noOffset)(
+            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), noOff)(
               ev,
               TailstrictModeDisabled
             )

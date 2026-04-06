@@ -189,7 +189,9 @@ object StringModule extends AbstractFunctionModule {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
       sep.value match {
         case Val.Str(_, s) =>
-          val b = new java.lang.StringBuilder()
+          // Pre-size StringBuilder: estimate average element length * count + separators
+          val estimatedSize = arr.length * (s.length + 8)
+          val b = new java.lang.StringBuilder(math.max(16, estimatedSize))
           var i = 0
           var added = false
           while (i < arr.length) {
@@ -205,21 +207,52 @@ object StringModule extends AbstractFunctionModule {
           }
           Val.Str(pos, b.toString)
         case sep: Val.Arr =>
-          val out = new mutable.ArrayBuilder.ofRef[Eval]
-          // Set a reasonable size hint based on estimated result size
-          out.sizeHint(arr.length * 2)
-          var added = false
-          for (x <- arr) {
-            x match {
-              case Val.Null(_) => // do nothing
-              case v: Val.Arr  =>
-                if (added) out ++= sep.asLazyArray
-                added = true
-                out ++= v.asLazyArray
-              case x => Error.fail("Cannot join " + x.prettyName)
+          if (sep.length == 0) {
+            // Fast path for empty separator (flattening): two-pass pre-sized
+            var totalSize = 0
+            var i = 0
+            while (i < arr.length) {
+              arr.value(i) match {
+                case _: Val.Null => // do nothing
+                case v: Val.Arr  => totalSize += v.length
+                case x           => Error.fail("Cannot join " + x.prettyName)
+              }
+              i += 1
             }
+            val result = new Array[Eval](totalSize)
+            var offset = 0
+            i = 0
+            while (i < arr.length) {
+              arr.value(i) match {
+                case _: Val.Null => // do nothing
+                case v: Val.Arr  =>
+                  val la = v.asLazyArray
+                  System.arraycopy(la, 0, result, offset, la.length)
+                  offset += la.length
+                case _ => // already validated in first pass
+              }
+              i += 1
+            }
+            Val.Arr(pos, result)
+          } else {
+            // Normal path with non-empty separator
+            val out = new mutable.ArrayBuilder.ofRef[Eval]
+            out.sizeHint(arr.length * (sep.length + 2))
+            var added = false
+            var i = 0
+            while (i < arr.length) {
+              arr.value(i) match {
+                case _: Val.Null => // do nothing
+                case v: Val.Arr  =>
+                  if (added) out ++= sep.asLazyArray
+                  added = true
+                  out ++= v.asLazyArray
+                case x => Error.fail("Cannot join " + x.prettyName)
+              }
+              i += 1
+            }
+            Val.Arr(pos, out.result())
           }
-          Val.Arr(pos, out.result())
         case x => Error.fail("Cannot join " + x.prettyName)
       }
     }
