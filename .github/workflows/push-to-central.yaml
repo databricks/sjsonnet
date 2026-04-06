@@ -1,24 +1,33 @@
 name: Push To Maven Central
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. 0.4.14)'
+        required: true
+        type: string
+
+permissions: {}
 
 jobs:
+  validate-tag:
+    uses: ./.github/workflows/validate-tag.yaml
+    with:
+      tag: ${{ inputs.tag }}
   publish:
-    runs-on: ubuntu-22.04
+    needs: validate-tag
+    runs-on: linux-ubuntu-latest-hardened
+    permissions:
+      contents: read
+    environment: production
     steps:
-    - uses: actions/checkout@v6
-    - name: Set up JDK 21
-      uses: actions/setup-java@v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
       with:
-        java-version: 21
-        distribution: 'zulu'
-    - name: Set up Node.js 24
-      uses: actions/setup-node@v6
+        ref: ${{ inputs.tag }}
+    - uses: ./.github/actions/setup-build
       with:
-        node-version: '24'
-
+        node: 'true'
     - run: ./mill mill.javalib.SonatypeCentralPublishModule/
       env:
         MILL_PGP_SECRET_BASE64: ${{ secrets.MILL_PGP_SECRET_BASE64 }}
