@@ -27,15 +27,20 @@ object ArrayModule extends AbstractFunctionModule {
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.min(ev)
       } else {
-        val minTuple = arr.asStrictArray
-          .map(v =>
-            keyF
-              .asInstanceOf[Val.Func]
-              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          )
-          .zipWithIndex
-          .min((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.value(minTuple._2)
+        val strict = arr.asStrictArray
+        val func = keyF.asInstanceOf[Val.Func]
+        var bestIdx = 0
+        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var i = 1
+        while (i < strict.length) {
+          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          if (ev.compare(v, bestVal) < 0) {
+            bestVal = v
+            bestIdx = i
+          }
+          i += 1
+        }
+        strict(bestIdx)
       }
     }
   }
@@ -59,15 +64,20 @@ object ArrayModule extends AbstractFunctionModule {
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.max(ev)
       } else {
-        val maxTuple = arr.asStrictArray
-          .map(v =>
-            keyF
-              .asInstanceOf[Val.Func]
-              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          )
-          .zipWithIndex
-          .max((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.value(maxTuple._2)
+        val strict = arr.asStrictArray
+        val func = keyF.asInstanceOf[Val.Func]
+        var bestIdx = 0
+        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var i = 1
+        while (i < strict.length) {
+          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          if (ev.compare(v, bestVal) > 0) {
+            bestVal = v
+            bestIdx = i
+          }
+          i += 1
+        }
+        strict(bestIdx)
       }
     }
   }

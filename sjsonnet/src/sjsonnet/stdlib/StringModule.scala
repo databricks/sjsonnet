@@ -269,12 +269,16 @@ object StringModule extends AbstractFunctionModule {
 
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(
-        pos,
+      val splits =
         splitLimit(pos, str.value.asString.reverse, c.value.asString.reverse, maxSplits.value.asInt)
-          .map(s => Val.Str(pos, s.value.asString.reverse))
-          .reverse
-      )
+      // Build result in reverse order during iteration to avoid separate .reverse pass
+      val result = new Array[Eval](splits.length)
+      var i = 0
+      while (i < splits.length) {
+        result(splits.length - 1 - i) = Val.Str(pos, splits(i).value.asString.reverse)
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
@@ -328,17 +332,22 @@ object StringModule extends AbstractFunctionModule {
 
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      for ((v, idx) <- arr.value.asArr.iterator.zipWithIndex) {
-        if (!v.isInstanceOf[Val.Num] || !v.asDouble.isWhole || v.asInt < 0 || v.asInt > 255) {
-          throw Error.fail(
-            f"Element $idx of the provided array was not an integer in range [0,255]"
-          )
+      val a = arr.value.asArr.asLazyArray
+      val bytes = new Array[Byte](a.length)
+      var i = 0
+      while (i < a.length) {
+        val v = a(i).value
+        if (!v.isInstanceOf[Val.Num]) {
+          throw Error.fail(f"Element $i of the provided array was not an integer in range [0,255]")
         }
+        val d = v.asDouble
+        if (!d.isWhole || d < 0 || d > 255) {
+          throw Error.fail(f"Element $i of the provided array was not an integer in range [0,255]")
+        }
+        bytes(i) = d.toByte
+        i += 1
       }
-      Val.Str(
-        pos,
-        new String(arr.value.asArr.iterator.map(_.asInt.toByte).toArray, UTF_8)
-      )
+      Val.Str(pos, new String(bytes, UTF_8))
     }
   }
 
