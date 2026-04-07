@@ -1,4 +1,4 @@
-//| mill-version: 1.1.2
+//| mill-version: 1.1.5
 //| mill-jvm-version: zulu:21
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
@@ -53,7 +53,7 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
   def mvnDeps = Seq(
     mvn"com.lihaoyi::fastparse::3.1.1",
     mvn"com.lihaoyi::pprint::0.9.6",
-    mvn"com.lihaoyi::ujson::4.4.2",
+    mvn"com.lihaoyi::ujson::4.4.3",
     mvn"com.lihaoyi::scalatags::0.13.1",
     mvn"org.scala-lang.modules::scala-collection-compat::2.14.0"
   )

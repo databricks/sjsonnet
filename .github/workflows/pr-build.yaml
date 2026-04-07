@@ -4,11 +4,16 @@ on:
   pull_request:
     branches: [ master ]
 
-permissions: {}
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   build-jvm:
-    runs-on: linux-ubuntu-latest-hardened
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 20
     name: Sjsonnet jvm build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -19,13 +24,14 @@ jobs:
       - name: Check Formatting
         run: ./mill "_.jvm[_].__.checkFormat"
       - name: Run mill tests
-        timeout-minutes: 15
         run: ./mill "_.jvm[_].__.test"
       - name: Run sbt tests
-        timeout-minutes: 15
         run: sbt test
   build-graal:
-    runs-on: linux-ubuntu-latest-hardened
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 20
     name: Sjsonnet Graal Native build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -33,14 +39,16 @@ jobs:
         with:
           coursier-cache: 'true'
       - name: Run Native Image Test Suites
-        timeout-minutes: 15
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
-    runs-on: linux-ubuntu-latest-hardened
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        lang: ['js', 'wasm', 'native']
+        lang: ['js', 'wasm']
     name: Sjsonnet ${{ matrix.lang }} build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -52,5 +60,4 @@ jobs:
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Run mill tests for ${{ matrix.lang }}
-        timeout-minutes: 15
         run: ./mill _.${{ matrix.lang }}[_].__.test

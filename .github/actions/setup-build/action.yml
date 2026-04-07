@@ -35,3 +35,9 @@ runs:
     - name: Cache Coursier cache
       if: inputs.coursier-cache == 'true'
       uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
+    - name: Get JFrog OIDC token
+      shell: bash
+      run: .github/scripts/get-jfrog-token.sh
+    - name: Fix Mill Bootstrap Script
+      shell: bash
+      run: .github/scripts/fix-build-config.sh
