@@ -459,6 +459,11 @@ object Val {
       with Expr.ObjBody {
     private[sjsonnet] def valTag: Byte = TAG_OBJ
     private var asserting: Boolean = false
+    // Pre-computed flag: true if this object or any super has assert statements.
+    // Computed O(1) at construction from the super chain (super is already constructed).
+    // Allows skipping the triggerAllAsserts super-chain walk for assert-free objects.
+    private val hasAnyAsserts: Boolean =
+      triggerAsserts != null || (`super` != null && `super`.hasAnyAsserts)
 
     def getSuper: Obj = `super`
 
@@ -485,9 +490,8 @@ object Val {
     }
 
     def triggerAllAsserts(brokenAssertionLogic: Boolean): Unit = {
-      // We need to avoid asserting the same object more than once to prevent
-      // infinite recursion
-      if (!asserting) {
+      // Short-circuit: no asserts in this object or any super
+      if (hasAnyAsserts && !asserting) {
         asserting = true
         triggerAllAsserts(this, `super`, brokenAssertionLogic)
       }
