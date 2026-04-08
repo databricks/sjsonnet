@@ -314,9 +314,31 @@ object Val {
     def value(i: Int): Val = arr(i).value
 
     def asLazyArray: Array[Eval] = arr.asInstanceOf[Array[Eval]]
-    def asStrictArray: Array[Val] = arr.map(_.value)
+    def asStrictArray: Array[Val] = {
+      val len = arr.length
+      val result = new Array[Val](len)
+      var i = 0
+      while (i < len) {
+        result(i) = arr(i).value
+        i += 1
+      }
+      result
+    }
 
-    def concat(newPos: Position, rhs: Arr): Arr = Arr(newPos, arr ++ rhs.arr)
+    /**
+     * Concatenate two arrays using System.arraycopy to avoid ClassTag resolution and ArrayBuilder
+     * overhead from Scala's `++` operator.
+     */
+    def concat(newPos: Position, rhs: Arr): Arr = {
+      val lArr = arr
+      val rArr = rhs.arr
+      val lLen = lArr.length
+      val rLen = rArr.length
+      val result = new Array[Eval](lLen + rLen)
+      System.arraycopy(lArr, 0, result, 0, lLen)
+      System.arraycopy(rArr, 0, result, lLen, rLen)
+      Arr(newPos, result)
+    }
 
     def iterator: Iterator[Val] = arr.iterator.map(_.value)
     def foreach[U](f: Val => U): Unit = {
@@ -745,7 +767,7 @@ object Val {
         case (lNum: Val.Num, rNum: Val.Num) =>
           Val.Num(pos, lNum.asDouble + rNum.asDouble)
         case (lArr: Val.Arr, rArr: Val.Arr) =>
-          Val.Arr(pos, lArr.asLazyArray ++ rArr.asLazyArray)
+          lArr.concat(pos, rArr)
         case (lObj: Val.Obj, rObj: Val.Obj) =>
           rObj.addSuper(pos, lObj)
         case (_: Val.Null, _) =>
