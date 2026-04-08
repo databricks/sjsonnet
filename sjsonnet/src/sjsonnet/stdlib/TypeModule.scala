@@ -47,10 +47,16 @@ object TypeModule extends AbstractFunctionModule {
 
   private object AssertEqual extends Val.Builtin2("assertEqual", "a", "b") {
     def evalRhs(v1: Eval, v2: Eval, ev: EvalScope, pos: Position): Val = {
-      val x1 = Materializer(v1.value)(ev)
-      val x2 = Materializer(v2.value)(ev)
-      if (x1 == x2) Val.staticTrue
-      else Error.fail("assertEqual failed: " + x1 + " != " + x2)
+      val a = v1.value
+      val b = v2.value
+      // Use structural equality first (avoids double materialization on success path)
+      if (ev.equal(a, b)) Val.True(pos)
+      else {
+        // Only materialize on failure for the error message
+        val x1 = Materializer(a)(ev)
+        val x2 = Materializer(b)(ev)
+        Error.fail("assertEqual failed: " + x1 + " != " + x2)
+      }
     }
   }
 
