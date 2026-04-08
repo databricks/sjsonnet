@@ -1191,11 +1191,24 @@ class Evaluator(
       val len = math.min(x.length, y.length)
       var i = 0
       while (i < len) {
-        val cmp = compare(x.value(i), y.value(i))
-        if (cmp != 0) return cmp
+        val xi = x.value(i)
+        val yi = y.value(i)
+        // Reference equality short-circuit for shared array elements
+        if (!(xi eq yi)) {
+          // Inline numeric fast path to avoid polymorphic compare() dispatch
+          val cmp = xi match {
+            case xn: Val.Num =>
+              yi match {
+                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                case _           => compare(xi, yi)
+              }
+            case _ => compare(xi, yi)
+          }
+          if (cmp != 0) return cmp
+        }
         i += 1
       }
-      Ordering[Int].compare(x.length, y.length)
+      Integer.compare(x.length, y.length)
     case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
   }
 
