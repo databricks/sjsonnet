@@ -213,6 +213,33 @@ object Val {
 
   def bool(pos: Position, b: Boolean): Bool = if (b) True(pos) else False(pos)
 
+  /**
+   * Pre-allocated pool of Val.Num for small non-negative integers 0–255. Used by Evaluator
+   * arithmetic fast paths to avoid per-operation allocation. Position is synthetic — acceptable for
+   * intermediate runtime results.
+   */
+  private val numCacheSize = 256
+  private val numCache: Array[Num] = {
+    val pos = Position(null, -1)
+    val arr = new Array[Num](numCacheSize)
+    var i = 0
+    while (i < numCacheSize) {
+      arr(i) = Num(pos, i.toDouble)
+      i += 1
+    }
+    arr
+  }
+
+  /**
+   * Returns a cached Val.Num for small non-negative integers (0–255), or a fresh instance
+   * otherwise. Use in evaluator arithmetic paths where the pos is not critical for error reporting.
+   */
+  def cachedNum(pos: Position, d: Double): Num = {
+    val i = d.toInt
+    if (i >= 0 && i < numCacheSize && i.toDouble == d) numCache(i)
+    else Num(pos, d)
+  }
+
   final case class True(var pos: Position) extends Bool {
     def prettyName = "boolean"
     private[sjsonnet] def valTag: Byte = TAG_TRUE

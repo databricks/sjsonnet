@@ -392,7 +392,7 @@ class StaticOptimizer(
           }
         case Expr.UnaryOp.OP_+ =>
           v match {
-            case n: Val.Num => n.pos = pos; n.asInstanceOf[Expr]
+            case n: Val.Num => Val.Num(pos, n.asDouble)
             case _          => fallback
           }
         case _ => fallback
