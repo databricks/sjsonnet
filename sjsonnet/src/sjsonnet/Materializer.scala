@@ -16,10 +16,10 @@ import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
  * guards against accidental TailCall leakage with a clear internal-error diagnostic.
  *
  * Match ordering: all dispatch points ([[apply0]], [[materializeRecursiveChild]],
- * [[materializeChild]]) use a unified match that places [[Val.Str]] first, followed by [[Val.Obj]],
- * [[Val.Num]], [[Val.Arr]], and other leaf types. This ordering mirrors the original single-method
- * design and ensures the most common leaf type (strings) is matched without first testing for
- * container types.
+ * [[materializeChild]]) use a unified dispatch that routes via `valTag` (a byte field on each
+ * [[Val]] subclass) through a JVM tableswitch for O(1) type resolution. The tag values 0-7
+ * correspond to Str, Num, True, False, Null, Arr, Obj, Func respectively. Rare types
+ * (Materializable, TailCall) fall through to a pattern match in the default branch.
  */
 abstract class Materializer {
   def storePos(pos: Position): Unit
@@ -110,9 +110,10 @@ abstract class Materializer {
       depth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
     storePos(xs.pos)
-    val av = visitor.visitArray(xs.length, -1)
+    val len = xs.length
+    val av = visitor.visitArray(len, -1)
     var i = 0
-    while (i < xs.length) {
+    while (i < len) {
       val childVal = xs.value(i)
       av.visitValue(
         materializeRecursiveChild(childVal, av.subVisitor.asInstanceOf[Visitor[T, T]], depth, ctx),
@@ -127,41 +128,59 @@ abstract class Materializer {
       childVal: Val,
       childVisitor: Visitor[T, T],
       depth: Int,
-      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = childVal match {
-    case Val.Str(pos, s) => storePos(pos); childVisitor.visitString(s, -1)
-    case obj: Val.Obj    =>
-      val nextDepth = depth + 1
-      if (nextDepth < ctx.recursiveDepthLimit)
-        materializeRecursiveObj(obj, childVisitor, nextDepth, ctx)
-      else
-        materializeStackless(childVal, childVisitor, ctx)
-    case Val.Num(pos, _) => storePos(pos); childVisitor.visitFloat64(childVal.asDouble, -1)
-    case xs: Val.Arr     =>
-      val nextDepth = depth + 1
-      if (nextDepth < ctx.recursiveDepthLimit)
-        materializeRecursiveArr(xs, childVisitor, nextDepth, ctx)
-      else
-        materializeStackless(childVal, childVisitor, ctx)
-    case Val.True(pos)                    => storePos(pos); childVisitor.visitTrue(-1)
-    case Val.False(pos)                   => storePos(pos); childVisitor.visitFalse(-1)
-    case Val.Null(pos)                    => storePos(pos); childVisitor.visitNull(-1)
-    case mat: Materializer.Materializable => storePos(childVal.pos); mat.materialize(childVisitor)
-    case s: Val.Func                      =>
-      Error.fail(
-        "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
-        childVal.pos
-      )
-    case tc: TailCall =>
-      Error.fail(
-        "Internal error: TailCall sentinel leaked into materialization. " +
-        "This indicates a bug in the TCO protocol — a TailCall was not resolved before " +
-        "reaching the Materializer.",
-        tc.pos
-      )
-    case vv: Val =>
-      Error.fail("Unknown value type " + vv.prettyName, vv.pos)
-    case null =>
-      Error.fail("Unknown value type " + childVal)
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
+    if (childVal == null) Error.fail("Unknown value type " + childVal)
+    // Use tableswitch dispatch via @switch on valTag for O(1) type routing.
+    // This replaces up to 7 sequential instanceof checks with a single
+    // byte comparison + jump table, benefiting materialization-heavy workloads.
+    val vt: Int = childVal.valTag.toInt
+    (vt: @scala.annotation.switch) match {
+      case 0 => // TAG_STR
+        val s = childVal.asInstanceOf[Val.Str]
+        storePos(s.pos); childVisitor.visitString(s.str, -1)
+      case 1 => // TAG_NUM
+        storePos(childVal.pos); childVisitor.visitFloat64(childVal.asDouble, -1)
+      case 2 => // TAG_TRUE
+        storePos(childVal.pos); childVisitor.visitTrue(-1)
+      case 3 => // TAG_FALSE
+        storePos(childVal.pos); childVisitor.visitFalse(-1)
+      case 4 => // TAG_NULL
+        storePos(childVal.pos); childVisitor.visitNull(-1)
+      case 5 => // TAG_ARR
+        val xs = childVal.asInstanceOf[Val.Arr]
+        val nextDepth = depth + 1
+        if (nextDepth < ctx.recursiveDepthLimit)
+          materializeRecursiveArr(xs, childVisitor, nextDepth, ctx)
+        else
+          materializeStackless(childVal, childVisitor, ctx)
+      case 6 => // TAG_OBJ
+        val obj = childVal.asInstanceOf[Val.Obj]
+        val nextDepth = depth + 1
+        if (nextDepth < ctx.recursiveDepthLimit)
+          materializeRecursiveObj(obj, childVisitor, nextDepth, ctx)
+        else
+          materializeStackless(childVal, childVisitor, ctx)
+      case 7 => // TAG_FUNC
+        val s = childVal.asInstanceOf[Val.Func]
+        Error.fail(
+          "Couldn't manifest function with params [" + s.params.names.mkString(",") + "]",
+          childVal.pos
+        )
+      case _ =>
+        childVal match {
+          case mat: Materializer.Materializable =>
+            storePos(childVal.pos); mat.materialize(childVisitor)
+          case tc: TailCall =>
+            Error.fail(
+              "Internal error: TailCall sentinel leaked into materialization. " +
+              "This indicates a bug in the TCO protocol — a TailCall was not resolved before " +
+              "reaching the Materializer.",
+              tc.pos
+            )
+          case vv: Val =>
+            Error.fail("Unknown value type " + vv.prettyName, vv.pos)
+        }
+    }
   }
 
   // Iterative materialization for deep nesting. Used as a fallback when recursive depth exceeds
