@@ -785,6 +785,11 @@ object Val {
 
     def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val
 
+    /**
+     * Override to expose the function's body AST for pattern detection (e.g. foldl string concat).
+     */
+    def bodyExpr: Expr = null
+
     // Convenience wrapper: evaluates the function body and resolves any TailCall sentinel.
     // Use this instead of raw `evalRhs` at call sites that bypass `apply*` and consume
     // the result directly (e.g. stdlib scope-reuse fast paths).
