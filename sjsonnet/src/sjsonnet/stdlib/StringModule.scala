@@ -75,12 +75,12 @@ object StringModule extends AbstractFunctionModule {
 
   private object StartsWith extends Val.Builtin2("startsWith", "a", "b") {
     def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, a.value.asString.startsWith(b.value.asString))
+      Val.bool(a.value.asString.startsWith(b.value.asString))
   }
 
   private object EndsWith extends Val.Builtin2("endsWith", "a", "b") {
     def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, a.value.asString.endsWith(b.value.asString))
+      Val.bool(a.value.asString.endsWith(b.value.asString))
   }
 
   private object Char_ extends Val.Builtin1("char", "n") {

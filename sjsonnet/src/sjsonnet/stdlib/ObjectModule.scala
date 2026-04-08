@@ -9,7 +9,7 @@ object ObjectModule extends AbstractFunctionModule {
 
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
     def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, o.value.asObj.containsVisibleKey(f.value.asString))
+      Val.bool(o.value.asObj.containsVisibleKey(f.value.asString))
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
         case Array(o, s: Val.Str) => (new SpecF(s.str), Array(o))
@@ -17,13 +17,13 @@ object ObjectModule extends AbstractFunctionModule {
       }
     private class SpecF(f: String) extends Val.Builtin1("objectHas", "o") {
       def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val =
-        Val.bool(pos, o.value.asObj.containsVisibleKey(f))
+        Val.bool(o.value.asObj.containsVisibleKey(f))
     }
   }
 
   private object ObjectHasAll extends Val.Builtin2("objectHasAll", "o", "f") {
     def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
-      Val.bool(pos, o.value.asObj.containsKey(f.value.asString))
+      Val.bool(o.value.asObj.containsKey(f.value.asString))
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
         case Array(o, s: Val.Str) => (new SpecF(s.str), Array(o))
@@ -31,7 +31,7 @@ object ObjectModule extends AbstractFunctionModule {
       }
     class SpecF(f: String) extends Val.Builtin1("objectHasAll", "o") {
       def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val =
-        Val.bool(pos, o.value.asObj.containsKey(f))
+        Val.bool(o.value.asObj.containsKey(f))
     }
   }
 

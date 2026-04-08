@@ -74,13 +74,13 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.forall(v => v.asBoolean))
+      Val.bool(arr.value.asArr.forall(v => v.asBoolean))
     }
   }
 
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.iterator.exists(v => v.asBoolean))
+      Val.bool(arr.value.asArr.iterator.exists(v => v.asBoolean))
     }
   }
 
@@ -283,26 +283,77 @@ object ArrayModule extends AbstractFunctionModule {
       )
   }
 
+  /**
+   * Detect pattern: function(acc, elem) acc + elem with string init → use StringBuilder O(n).
+   * Returns null if the pattern doesn't match, letting the caller fall through to the general path.
+   */
+  private def tryStringBuilderFoldl(
+      func: Val.Func,
+      arr: Val.Arr,
+      initStr: String,
+      ev: EvalScope,
+      pos: Position
+  ): Val = {
+    val body = func.bodyExpr
+    if (body == null) return null
+    body match {
+      case e: Expr.BinaryOp if e.op == Expr.BinaryOp.OP_+ =>
+        (e.lhs, e.rhs) match {
+          case (l: Expr.ValidId, r: Expr.ValidId) =>
+            val base = func.defSiteValScope.bindings.length
+            if (l.nameIdx == base && r.nameIdx == base + 1) {
+              val sb = new java.lang.StringBuilder(initStr)
+              val lazyArr = arr.asLazyArray
+              var i = 0
+              while (i < lazyArr.length) {
+                lazyArr(i).value match {
+                  case s: Val.Str => sb.append(s.str)
+                  case v          => sb.append(Materializer.stringify(v)(ev))
+                }
+                i += 1
+              }
+              return Val.Str(pos, sb.toString)
+            }
+            null
+          case _ => null
+        }
+      case _ => null
+    }
+  }
+
   private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
     def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
       arr.value match {
         case arr: Val.Arr =>
-          var current = init.value
-          for (item <- arr.asLazyArray) {
+          val initVal = init.value
+          // Fast path: string concatenation via StringBuilder O(n) instead of O(n²)
+          initVal match {
+            case s: Val.Str =>
+              val result = tryStringBuilderFoldl(func, arr, s.str, ev, pos)
+              if (result != null) return result
+            case _ =>
+          }
+          var current = initVal
+          val lazyArr = arr.asLazyArray
+          val noOff = pos.noOffset
+          var i = 0
+          while (i < lazyArr.length) {
             val c = current
-            current = func.apply2(c, item, pos.noOffset)(ev, TailstrictModeDisabled)
+            current = func.apply2(c, lazyArr(i), noOff)(ev, TailstrictModeDisabled)
+            i += 1
           }
           current
 
         case s: Val.Str =>
           var current = init.value
           val str = s.str
+          val noOff = pos.noOffset
           var i = 0
           while (i < str.length) {
             val c = current
             val codePoint = str.codePointAt(i)
-            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), pos.noOffset)(
+            current = func.apply2(c, Val.Str(pos, Character.toString(codePoint)), noOff)(
               ev,
               TailstrictModeDisabled
             )

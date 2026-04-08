@@ -243,8 +243,8 @@ class Evaluator(
       case Expr.UnaryOp.OP_~ => Val.Num(pos, (~visitExprAsDouble(e.value).toSafeLong(pos)).toDouble)
       case Expr.UnaryOp.OP_! =>
         visitExpr(e.value) match {
-          case Val.True(_)  => Val.False(pos)
-          case Val.False(_) => Val.True(pos)
+          case Val.True(_)  => Val.staticFalse
+          case Val.False(_) => Val.staticTrue
           case v            =>
             Error.fail(s"Unknown unary operation: ! ${v.prettyName}", pos)
         }
@@ -647,7 +647,7 @@ class Evaluator(
             Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
         }
       case _: Val.False =>
-        Val.False(e.pos)
+        Val.staticFalse
       case unknown =>
         Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
     }
@@ -655,7 +655,7 @@ class Evaluator(
 
   def visitOr(e: Or)(implicit scope: ValScope): Val.Bool = {
     visitExpr(e.lhs) match {
-      case _: Val.True  => Val.True(e.pos)
+      case _: Val.True  => Val.staticTrue
       case _: Val.False =>
         visitExpr(e.rhs) match {
           case b: Val.Bool => b
@@ -669,10 +669,10 @@ class Evaluator(
 
   def visitInSuper(e: InSuper)(implicit scope: ValScope): Val.Bool = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
-    if (sup == null) Val.False(e.pos)
+    if (sup == null) Val.staticFalse
     else {
       val key = visitExpr(e.value).cast[Val.Str]
-      Val.bool(e.pos, sup.containsKey(key.str))
+      Val.bool(sup.containsKey(key.str))
     }
   }
 
@@ -740,9 +740,9 @@ class Evaluator(
         val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(pos, Util.compareStringsByCodepoint(l, r) < 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l < r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) < 0)
+            Val.bool(Util.compareStringsByCodepoint(l, r) < 0)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l < r)
+          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) < 0)
           case _                              => failBinOp(l, e.op, r, pos)
         }
 
@@ -751,9 +751,9 @@ class Evaluator(
         val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(pos, Util.compareStringsByCodepoint(l, r) > 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l > r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) > 0)
+            Val.bool(Util.compareStringsByCodepoint(l, r) > 0)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l > r)
+          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) > 0)
           case _                              => failBinOp(l, e.op, r, pos)
         }
 
@@ -762,9 +762,9 @@ class Evaluator(
         val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(pos, Util.compareStringsByCodepoint(l, r) <= 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l <= r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) <= 0)
+            Val.bool(Util.compareStringsByCodepoint(l, r) <= 0)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l <= r)
+          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) <= 0)
           case _                              => failBinOp(l, e.op, r, pos)
         }
 
@@ -773,9 +773,9 @@ class Evaluator(
         val r = visitExpr(e.rhs)
         (l, r) match {
           case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(pos, Util.compareStringsByCodepoint(l, r) >= 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(pos, l >= r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(pos, compare(x, y) >= 0)
+            Val.bool(Util.compareStringsByCodepoint(l, r) >= 0)
+          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l >= r)
+          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) >= 0)
           case _                              => failBinOp(l, e.op, r, pos)
         }
 
@@ -783,7 +783,7 @@ class Evaluator(
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         (l, r) match {
-          case (Val.Str(_, l), o: Val.Obj) => Val.bool(pos, o.containsKey(l))
+          case (Val.Str(_, l), o: Val.Obj) => Val.bool(o.containsKey(l))
           case _                           => failBinOp(l, e.op, r, pos)
         }
 
@@ -793,14 +793,14 @@ class Evaluator(
         val r = visitExpr(e.rhs)
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
           Error.fail("cannot test equality of functions", pos)
-        Val.bool(pos, equal(l, r))
+        Val.bool(equal(l, r))
 
       case Expr.BinaryOp.OP_!= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
           Error.fail("cannot test equality of functions", pos)
-        Val.bool(pos, !equal(l, r))
+        Val.bool(!equal(l, r))
 
       // Bitwise ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_& =>
@@ -857,6 +857,7 @@ class Evaluator(
       scope: ValScope): Val.Func =
     new Val.Func(outerPos, scope, params) {
       override def functionName: String = name
+      override val bodyExpr: Expr = rhs
       def evalRhs(vs: ValScope, es: EvalScope, fs: FileScope, pos: Position): Val =
         visitExprWithTailCallSupport(rhs)(vs)
       override def evalDefault(expr: Expr, vs: ValScope, es: EvalScope): Val = {
