@@ -373,7 +373,8 @@ object SjsonnetMainBase {
       logger = warnLogger,
       std = std,
       variableResolver = _ => None,
-      debugStats = debugStats
+      debugStats = debugStats,
+      formatCache = FormatCache.SharedDefault
     ) {
       override def createEvaluator(
           resolver: CachedResolver,

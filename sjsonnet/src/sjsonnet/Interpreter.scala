@@ -45,7 +45,8 @@ class Interpreter(
     logger: Evaluator.Logger,
     std: Val.Obj,
     variableResolver: String => Option[Expr],
-    val debugStats: DebugStats
+    val debugStats: DebugStats,
+    formatCache: FormatCache
 ) { self =>
 
   def this(
@@ -70,7 +71,8 @@ class Interpreter(
       logger,
       std,
       variableResolver,
-      null
+      null,
+      FormatCache.SharedDefault
     )
 
   private val noOffsetPos = new Position(new FileScope(wd), -1)
@@ -135,9 +137,9 @@ class Interpreter(
       extVars: String => Option[Expr],
       wd: Path,
       settings: Settings): Evaluator = if (settings.useNewEvaluator)
-    new NewEvaluator(resolver, extVars, wd, settings, logger, debugStats)
+    new NewEvaluator(resolver, extVars, wd, settings, logger, debugStats, formatCache)
   else
-    new Evaluator(resolver, extVars, wd, settings, logger, debugStats)
+    new Evaluator(resolver, extVars, wd, settings, logger, debugStats, formatCache)
 
   /**
    * Evaluate a variable to an `Expr`.
