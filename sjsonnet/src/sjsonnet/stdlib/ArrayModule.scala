@@ -74,13 +74,13 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.forall(v => v.asBoolean))
+      Val.bool(arr.value.asArr.forall(v => v.asBoolean))
     }
   }
 
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(pos, arr.value.asArr.iterator.exists(v => v.asBoolean))
+      Val.bool(arr.value.asArr.iterator.exists(v => v.asBoolean))
     }
   }
 
