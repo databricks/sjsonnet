@@ -276,11 +276,25 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Range extends Val.Builtin2("range", "from", "to") {
-    def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Arr(
-        pos,
-        (from.value.asInt to to.value.asInt).map(i => Val.Num(pos, i)).toArray
-      )
+    def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
+      val fromInt = from.value.asInt
+      val toInt = to.value.asInt
+      // Use Long arithmetic to detect overflow before allocating
+      val sizeLong = toInt.toLong - fromInt.toLong + 1L
+      val size =
+        if (sizeLong <= 0) 0
+        else if (sizeLong > Int.MaxValue)
+          Error.fail("std.range result too large: " + sizeLong + " elements")
+        else sizeLong.toInt
+      // Direct array allocation avoids Scala Range.map.toArray intermediates
+      val arr = new Array[Eval](size)
+      var i = 0
+      while (i < size) {
+        arr(i) = Val.Num(pos, fromInt + i)
+        i += 1
+      }
+      Val.Arr(pos, arr)
+    }
   }
 
   /**

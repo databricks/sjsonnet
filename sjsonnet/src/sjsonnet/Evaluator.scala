@@ -219,7 +219,7 @@ class Evaluator(
       case Val.True(_)  => visitExpr(e.`then`)
       case Val.False(_) =>
         e.`else` match {
-          case null => Val.Null(e.pos)
+          case null => Val.staticNull
           case v    => visitExpr(v)
         }
       case v => Error.fail("Need boolean, found " + v.prettyName, e.pos)
@@ -882,7 +882,7 @@ class Evaluator(
         case Val.True(_)  => visitExprWithTailCallSupport(e.`then`)
         case Val.False(_) =>
           e.`else` match {
-            case null => Val.Null(e.pos)
+            case null => Val.staticNull
             case v    => visitExprWithTailCallSupport(v)
           }
         case v => Error.fail("Need boolean, found " + v.prettyName, e.pos)
