@@ -6,10 +6,6 @@ inputs:
     description: 'Whether to install Node.js'
     required: false
     default: 'false'
-  coursier-cache:
-    description: 'Whether to set up Coursier cache'
-    required: false
-    default: 'false'
   sbt:
     description: 'Whether to install sbt'
     required: false
@@ -34,7 +30,6 @@ runs:
       with:
         java-version: 21
         distribution: 'zulu'
-        cache: ${{ inputs.sbt == 'true' && 'sbt' || '' }}
     - name: Set up sbt
       if: inputs.sbt == 'true'
       uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # 1.1.22
@@ -43,9 +38,6 @@ runs:
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
       with:
         node-version: '24'
-    - name: Cache Coursier cache
-      if: inputs.coursier-cache == 'true'
-      uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 8.1.0
     - name: Get JFrog OIDC token
       shell: bash
       run: .github/scripts/get-jfrog-token.sh
