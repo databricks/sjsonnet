@@ -1,8 +1,11 @@
 name: Pull Request Validation
 
 on:
-  pull_request:
-    branches: [ master ]
+  pull_request_target:
+    branches: [master]
+    types: [assigned, opened, synchronize, reopened]
+    paths-ignore:
+      - .github/**
 
 permissions:
   contents: read
@@ -17,6 +20,8 @@ jobs:
     name: Sjsonnet jvm build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+        with:
+            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
@@ -35,6 +40,8 @@ jobs:
     name: Sjsonnet Graal Native build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+        with:
+            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           coursier-cache: 'true'
@@ -52,6 +59,8 @@ jobs:
     name: Sjsonnet ${{ matrix.lang }} build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+        with:
+            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
