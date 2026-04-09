@@ -270,6 +270,15 @@ object Val {
     }
 
     def prettyName = "number"
+
+    /**
+     * Access the raw double value without NaN check. Safe for internal comparison and equality
+     * operations where IEEE 754 NaN semantics are acceptable. NaN values cannot arise from valid
+     * Jsonnet expressions (the constructor only guards against infinity, and no standard Jsonnet
+     * operator produces NaN). This is consistent with the comparison operators (OP_<, OP_>, etc.)
+     * which already extracted the raw double via case class pattern matching.
+     */
+    def rawDouble: Double = num
     override def asInt: Int = num.toInt
 
     def asPositiveInt: Int = {
@@ -509,6 +518,23 @@ object Val {
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
+      // Fast path: no super chain — avoid ArrayBuilder + Array allocation.
+      // Invariant: excludedKeys != null implies getSuper != null (removeKeys always sets super),
+      // so when getSuper == null, excludedKeys is always null and the re-introduction logic
+      // in the slow path is not needed.
+      if (getSuper == null) {
+        assert(excludedKeys == null, "excludedKeys should be null when getSuper is null")
+        return new Val.Obj(
+          this.pos,
+          this.getValue0,
+          false,
+          this.triggerAsserts,
+          lhs,
+          new util.HashMap[Any, Val](),
+          null,
+          null
+        )
+      }
       // Single traversal: collect chain in this-first order
       val builder = new mutable.ArrayBuilder.ofRef[Val.Obj]
       var current = this
