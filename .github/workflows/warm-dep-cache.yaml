@@ -17,7 +17,9 @@ name: Warm Dependency Cache
 on:
   push:
     branches: [master]
-    paths: ['build.mill']
+    paths:
+      - build.mill
+      - .github/workflows/warm-dep-cache.yaml
   schedule:
     - cron: '0 6 * * 0,3'
   workflow_dispatch:
@@ -45,29 +47,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Run the same build commands as the PR CI workflows to ensure
-          # every plugin and transitive dependency is resolved and cached.
-
-          echo "=== 1/7: Mill bootstrap ==="
-          ./mill version
-
-          echo "=== 2/7: JVM compile + test deps ==="
-          ./mill 'sjsonnet.jvm[_].compile' || true
-          ./mill 'sjsonnet.jvm[_].test.compile' || true
-
-          echo "=== 3/7: JS deps ==="
-          ./mill 'sjsonnet.js[_].compile' || true
-
-          echo "=== 4/7: WASM deps ==="
-          ./mill 'sjsonnet.wasm[_].compile' || true
-
-          echo "=== 5/7: Native deps ==="
-          ./mill 'sjsonnet.native[_].compile' || true
-
-          echo "=== 6/7: Bench deps ==="
-          ./mill bench.compile || true
-
-          echo "=== 7/7: sbt deps ==="
+          ./mill "__.resolvedMvnDeps"
           sbt update || true
 
           echo "Dependency resolution complete"
@@ -92,4 +72,5 @@ jobs:
             ~/.cache/mill
             ~/.sbt
             ~/.ivy2/cache
+            ~/.ivy2/local
           key: ${{ steps.cache-key.outputs.key }}
