@@ -41,13 +41,13 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
-          coursier-cache: 'false' # We save the cache ourselves below
 
       - name: Resolve all dependencies
         run: |
           set -euo pipefail
 
           ./mill "__.resolvedMvnDeps"
+          ./mill "sjsonnet.jvm[3.3.7].compile"
           sbt update || true
 
           echo "Dependency resolution complete"

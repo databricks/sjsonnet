@@ -20,7 +20,6 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
-          coursier-cache: 'true'
       - name: Check Formatting
         run: ./mill "_.jvm[_].__.checkFormat"
       - name: Run mill tests
@@ -34,8 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
       - uses: ./.github/actions/setup-build
-        with:
-          coursier-cache: 'true'
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
@@ -52,7 +49,6 @@ jobs:
         with:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
           sbt: 'true'
-          coursier-cache: 'true'
       - name: Check Formatting
         run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Run mill tests for ${{ matrix.lang }}
