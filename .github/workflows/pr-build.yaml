@@ -10,10 +10,9 @@ permissions:
   id-token: write # Needed for JFrog OIDC on internal PRs; unavailable for fork PRs
 
 jobs:
-  # Fork PRs use GitHub-hosted runners (no org runner group access).
-  # Internal PRs use protected runners with JFrog fallback.
+  # Forks cannot use org runner groups; use GitHub-hosted runners instead.
   build-jvm:
-    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     name: Sjsonnet jvm build
     steps:
@@ -29,7 +28,7 @@ jobs:
       - name: Run sbt tests
         run: sbt test
   build-graal:
-    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     name: Sjsonnet Graal Native build
     steps:
@@ -40,7 +39,7 @@ jobs:
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
-    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
