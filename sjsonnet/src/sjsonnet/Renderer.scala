@@ -4,6 +4,15 @@ import java.io.{StringWriter, Writer}
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
+object Renderer {
+
+  /**
+   * Maximum nesting depth for pre-computed indent arrays. Depths beyond this fall back to
+   * per-character rendering. 16 covers the vast majority of real-world Jsonnet output.
+   */
+  final val MaxCachedDepth = 16
+}
+
 /**
  * Custom JSON renderer to try and match the behavior of google/jsonnet's render:
  *
@@ -12,6 +21,7 @@ import upickle.core.{ArrVisitor, ObjVisitor}
  */
 class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
+  import Renderer.MaxCachedDepth
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
     val s = RenderUtils.renderDouble(d)
@@ -20,6 +30,23 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     flushCharBuilder()
     out
   }
+
+  // Pre-computed indent arrays: indentCache(d) = '\n' + indent*d spaces
+  private val indentCache: Array[Array[Char]] =
+    if (indent <= 0) null
+    else {
+      val arr = new Array[Array[Char]](MaxCachedDepth)
+      var d = 0
+      while (d < MaxCachedDepth) {
+        val spaces = indent * d
+        val buf = Array.fill(spaces + 1)(' ')
+        buf(0) = '\n'
+        arr(d) = buf
+        d += 1
+      }
+      arr
+    }
+
   override def flushBuffer(): Unit = {
     if (commaBuffered) {
       elemBuilder.append(',')
@@ -27,12 +54,17 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     }
     if (indent == -1) ()
     else if (commaBuffered || newlineBuffered) {
-      var i = indent * depth
-      elemBuilder.ensureLength(i + 1)
-      elemBuilder.append('\n')
-      while (i > 0) {
-        elemBuilder.append(' ')
-        i -= 1
+      if (indentCache != null && depth < MaxCachedDepth) {
+        val cached = indentCache(depth)
+        elemBuilder.appendAll(cached, cached.length)
+      } else {
+        var i = indent * depth
+        elemBuilder.ensureLength(i + 1)
+        elemBuilder.append('\n')
+        while (i > 0) {
+          elemBuilder.append(' ')
+          i -= 1
+        }
       }
     }
     newlineBuffered = false
