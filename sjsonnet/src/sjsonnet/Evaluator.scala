@@ -714,28 +714,45 @@ class Evaluator(
     )
   }
 
+  // Nested match avoids Tuple2 allocation from (visitExpr(...), visitExpr(...)) match
   def visitLookup(e: Lookup)(implicit scope: ValScope): Val = {
     val pos = e.pos
-    (visitExpr(e.value), visitExpr(e.index)) match {
-      case (v: Val.Arr, i: Val.Num) =>
-        val int = i.asPositiveInt
-        if (v.length == 0) Error.fail("array bounds error: array is empty", pos)
-        if (int >= v.length)
-          Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
-        v.value(int)
-      case (v: Val.Str, i: Val.Num) =>
-        val int = i.asPositiveInt
-        val str = v.str
-        if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
-        val unicodeLength = str.codePointCount(0, str.length)
-        if (int >= unicodeLength)
-          Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
-        val startUtf16 = if (int == 0) 0 else str.offsetByCodePoints(0, int)
-        val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
-        Val.Str(pos, str.substring(startUtf16, endUtf16))
-      case (v: Val.Obj, i: Val.Str) =>
-        v.value(i.str, pos)
-      case (lhs, rhs) =>
+    val lhs = visitExpr(e.value)
+    val rhs = visitExpr(e.index)
+    lhs match {
+      case v: Val.Arr =>
+        rhs match {
+          case i: Val.Num =>
+            val int = i.asPositiveInt
+            if (v.length == 0) Error.fail("array bounds error: array is empty", pos)
+            if (int >= v.length)
+              Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
+            v.value(int)
+          case _ =>
+            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+        }
+      case v: Val.Str =>
+        rhs match {
+          case i: Val.Num =>
+            val int = i.asPositiveInt
+            val str = v.str
+            if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
+            val unicodeLength = str.codePointCount(0, str.length)
+            if (int >= unicodeLength)
+              Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
+            val startUtf16 = if (int == 0) 0 else str.offsetByCodePoints(0, int)
+            val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
+            Val.Str(pos, str.substring(startUtf16, endUtf16))
+          case _ =>
+            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+        }
+      case v: Val.Obj =>
+        rhs match {
+          case i: Val.Str => v.value(i.str, pos)
+          case _          =>
+            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+        }
+      case _ =>
         Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
     }
   }
@@ -842,14 +859,18 @@ class Evaluator(
         val result = l / r
         if (result.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, result)
-      // Polymorphic ops: need visitExpr for type dispatch
+      // Polymorphic ops: nested match avoids Tuple2 allocation; Num checked first (most common)
       case Expr.BinaryOp.OP_% =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l % r)
-          case (Val.Str(_, l), r)             => Val.Str(pos, Format.format(l, r, pos))
-          case _                              => failBinOp(l, e.op, r, pos)
+        l match {
+          case Val.Num(_, ld) =>
+            r match {
+              case Val.Num(_, rd) => Val.cachedNum(pos, ld % rd)
+              case _              => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str => Val.Str(pos, Format.format(ls.str, r, pos))
+          case _           => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_+ =>
@@ -929,9 +950,13 @@ class Evaluator(
       case Expr.BinaryOp.OP_in =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Str(_, l), o: Val.Obj) => Val.bool(o.containsKey(l))
-          case _                           => failBinOp(l, e.op, r, pos)
+        l match {
+          case ls: Val.Str =>
+            r match {
+              case o: Val.Obj => Val.bool(o.containsKey(ls.str))
+              case _          => failBinOp(l, e.op, r, pos)
+            }
+          case _ => failBinOp(l, e.op, r, pos)
         }
 
       // Equality ops
