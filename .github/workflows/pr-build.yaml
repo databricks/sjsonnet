@@ -1,7 +1,7 @@
 name: Pull Request Validation
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [master]
     types: [assigned, opened, synchronize, reopened]
     paths-ignore:
@@ -9,18 +9,17 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+  id-token: write # Needed for JFrog OIDC on internal PRs; unavailable for fork PRs
 
 jobs:
-  # Forks cannot use org runner groups; use GitHub-hosted runners instead.
+  # Fork PRs use GitHub-hosted runners (no org runner group access).
+  # Internal PRs use protected runners with JFrog fallback.
   build-jvm:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     name: Sjsonnet jvm build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
-        with:
-            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
@@ -32,20 +31,18 @@ jobs:
       - name: Run sbt tests
         run: sbt test
   build-graal:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     name: Sjsonnet Graal Native build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
-        with:
-            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           coursier-cache: 'true'
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) && 'ubuntu-latest' || github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -54,8 +51,6 @@ jobs:
     name: Sjsonnet ${{ matrix.lang }} build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
-        with:
-            ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-build
         with:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}

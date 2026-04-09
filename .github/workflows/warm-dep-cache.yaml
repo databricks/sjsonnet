@@ -1,0 +1,95 @@
+name: Warm Dependency Cache
+
+# Pre-downloads all Coursier/sbt dependencies via JFrog Artifactory and
+# saves them to the GitHub Actions cache. Fork PRs (which cannot
+# authenticate to JFrog) restore this cache to build without credentials.
+#
+# Unlike Maven's pom.xml, Mill's build.mill is executable Scala code, so
+# PR-specific cache warming (checking out a fork's build.mill) is
+# intentionally not supported — it would run untrusted code on protected
+# runners with JFrog credentials.
+#
+# Triggers:
+#   - push to master when build.mill changes (keeps cache fresh after dep updates)
+#   - daily schedule (prevents 7-day cache eviction)
+#   - manual dispatch
+
+on:
+  push:
+    branches: [master]
+    paths: ['build.mill']
+  schedule:
+    - cron: '0 6 * * *' # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  warm-cache:
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+
+      - uses: ./.github/actions/setup-build
+        with:
+          sbt: 'true'
+          coursier-cache: 'false' # We save the cache ourselves below
+
+      - name: Resolve all dependencies
+        run: |
+          set -euo pipefail
+
+          # Run the same build commands as the PR CI workflows to ensure
+          # every plugin and transitive dependency is resolved and cached.
+
+          echo "=== 1/7: Mill bootstrap ==="
+          ./mill version
+
+          echo "=== 2/7: JVM compile + test deps ==="
+          ./mill 'sjsonnet.jvm[_].compile' || true
+          ./mill 'sjsonnet.jvm[_].test.compile' || true
+
+          echo "=== 3/7: JS deps ==="
+          ./mill 'sjsonnet.js[_].compile' || true
+
+          echo "=== 4/7: WASM deps ==="
+          ./mill 'sjsonnet.wasm[_].compile' || true
+
+          echo "=== 5/7: Native deps ==="
+          ./mill 'sjsonnet.native[_].compile' || true
+
+          echo "=== 6/7: Bench deps ==="
+          ./mill bench.compile || true
+
+          echo "=== 7/7: sbt deps ==="
+          sbt update || true
+
+          echo "Dependency resolution complete"
+
+      - name: Generate cache key with timestamp
+        id: cache-key
+        shell: bash
+        run: |
+          # Include timestamp so each warmer run creates a new cache entry
+          # (GitHub Actions caches are immutable — can't overwrite existing keys).
+          # The restore step uses prefix 'dep-cache-' to match the latest entry.
+          # Old entries auto-expire after 7 days of no access.
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          BUILD_HASH=${{ hashFiles('build.mill') }}
+          echo "key=dep-cache-${TIMESTAMP}-${BUILD_HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Save dependency cache
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/coursier/v1
+            ~/.cache/mill
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ steps.cache-key.outputs.key }}
