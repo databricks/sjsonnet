@@ -1016,7 +1016,8 @@ object Val {
     def evalRhs(scope: ValScope, ev: EvalScope, fs: FileScope, pos: Position): Val
 
     /**
-     * Override to expose the function's body AST for pattern detection (e.g. foldl string concat).
+     * Override to expose the function's body AST for pattern detection (e.g. foldl string concat,
+     * constant-body makeArray optimization). Returns null by default.
      */
     def bodyExpr: Expr = null
 
