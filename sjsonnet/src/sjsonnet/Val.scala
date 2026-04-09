@@ -220,7 +220,7 @@ object Val {
    */
   private val numCacheSize = 256
   private val numCache: Array[Num] = {
-    val pos = Position(null, -1)
+    val pos = new Position(null, -1)
     val arr = new Array[Num](numCacheSize)
     var i = 0
     while (i < numCacheSize) {
@@ -257,7 +257,7 @@ object Val {
    * Singleton null for runtime results where position is not meaningful. Safe in single-threaded
    * evaluation. See staticTrue/staticFalse for rationale.
    */
-  val staticNull: Val.Null = Val.Null(Position(null, -1))
+  val staticNull: Val.Null = Val.Null(new Position(null, -1))
 
   final case class Str(var pos: Position, str: String) extends Literal {
     def prettyName = "string"
