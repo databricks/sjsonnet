@@ -303,6 +303,12 @@ object Val {
       num
     }
     private[sjsonnet] def valTag: Byte = TAG_NUM
+
+    /**
+     * Direct access to the underlying double without NaN check. Used by inline arithmetic fast
+     * paths where the value is known to be valid.
+     */
+    @inline def rawDouble: Double = num
   }
 
   final case class Arr(var pos: Position, private val arr: Array[? <: Eval]) extends Literal {

@@ -7,6 +7,7 @@ import ujson.Value
 import sjsonnet.Evaluator.SafeDoubleOps
 
 import scala.annotation.{switch, tailrec}
+import scala.util.control.NonFatal
 
 /**
  * Recursively walks the [[Expr]] trees to convert them into into [[Val]] objects that can be
@@ -153,9 +154,94 @@ class Evaluator(
         new LazyExpr(e, scope, this)
       }
     case e =>
-      if (debugStats != null) debugStats.lazyCreated += 1
-      new LazyExpr(e, scope, this)
+      // Try eager evaluation for simple arithmetic (BinaryOp/UnaryOp with
+      // resolved operands). Delegates instanceof checks and try-catch to
+      // separate methods to keep this frame small for deep recursion.
+      val eager = tryEagerEval(e)
+      if (eager != null) eager
+      else {
+        if (debugStats != null) debugStats.lazyCreated += 1
+        new LazyExpr(e, scope, this)
+      }
   }
+
+  /**
+   * Attempt eager evaluation for BinaryOp/UnaryOp with immediately-resolvable operands. Returns
+   * null if the expression is not eligible or evaluation fails. Kept in a separate method to avoid
+   * enlarging visitAsLazy's bytecode frame.
+   */
+  private def tryEagerEval(e: Expr)(implicit scope: ValScope): Val = e match {
+    case bo: BinaryOp =>
+      // Inline fast path for ValidId/Val.Num arithmetic — avoids the full
+      // visitExpr → visitBinaryOp → visitBinaryOpAsDouble → visitExprAsDouble dispatch chain
+      // and the try/catch in tryEvalCatch. Covers the fibonacci hot path (n-1, n-2).
+      val lDouble = resolveAsDouble(bo.lhs)
+      if (!lDouble.isNaN) {
+        val rDouble = resolveAsDouble(bo.rhs)
+        if (!rDouble.isNaN) {
+          val inlined = tryInlineArith(bo.op, lDouble, rDouble, bo.pos)
+          if (inlined != null) return inlined
+        }
+      }
+      if (isImmediatelyResolvable(bo.lhs) && isImmediatelyResolvable(bo.rhs))
+        tryEvalCatch(bo)
+      else null
+    case uo: UnaryOp =>
+      if (isImmediatelyResolvable(uo.value)) tryEvalCatch(uo)
+      else null
+    case _ => null
+  }
+
+  /**
+   * Resolve an expression to a double without full visitExpr dispatch. Returns NaN as sentinel when
+   * the expression can't be directly resolved to a number. Only uses already-resolved Val.Num
+   * bindings — never forces lazy thunks.
+   */
+  @inline private def resolveAsDouble(e: Expr)(implicit scope: ValScope): Double = e match {
+    case n: Val.Num => n.rawDouble
+    case v: ValidId =>
+      val idx = v.nameIdx
+      if (idx < scope.length) {
+        // Only match already-resolved Val.Num — don't force lazy thunks
+        scope.bindings(idx) match {
+          case n: Val.Num => n.rawDouble
+          case _          => Double.NaN
+        }
+      } else Double.NaN
+    case _ => Double.NaN
+  }
+
+  /**
+   * Perform inline arithmetic, returning null on overflow or unsupported op. Returning null falls
+   * through to tryEvalCatch or LazyExpr which preserves error semantics.
+   */
+  @inline private def tryInlineArith(op: Int, ld: Double, rd: Double, pos: Position): Val =
+    (op: @switch) match {
+      case Expr.BinaryOp.OP_+ =>
+        val r = ld + rd; if (r.isInfinite) null else Val.Num(pos, r)
+      case Expr.BinaryOp.OP_- =>
+        val r = ld - rd; if (r.isInfinite) null else Val.Num(pos, r)
+      case Expr.BinaryOp.OP_* =>
+        val r = ld * rd; if (r.isInfinite) null else Val.Num(pos, r)
+      case _ => null // unsupported op — fall through to tryEvalCatch or LazyExpr
+    }
+
+  /**
+   * Evaluate an expression, returning null on any exception (preserving lazy error semantics for
+   * unused arguments).
+   */
+  private def tryEvalCatch(e: Expr)(implicit scope: ValScope): Val =
+    try visitExpr(e)
+    catch { case NonFatal(_) => null }
+
+  @inline private def isImmediatelyResolvable(e: Expr)(implicit scope: ValScope): Boolean =
+    e match {
+      case _: Val     => true
+      case v: ValidId =>
+        // Only consider resolvable if binding is already a Val (not a lazy thunk)
+        v.nameIdx < scope.length && scope.bindings(v.nameIdx).isInstanceOf[Val]
+      case _ => false
+    }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
@@ -1130,6 +1216,68 @@ class Evaluator(
     arrF
   }
 
+  /**
+   * Checks whether a field-body expression only references bindings in the enclosing scope (indices
+   * < scopeLen) and is cheap enough to evaluate eagerly. If true, the field body doesn't depend on
+   * the new object's self/super, so it can be evaluated at object creation time and stored as a
+   * ConstMember, avoiding a deferred Member closure + scope copy.
+   */
+  private def canEagerEval(e: Expr, scopeLen: Int): Boolean =
+    (e.tag: @switch) match {
+      case ExprTags.ValidId =>
+        e.asInstanceOf[ValidId].nameIdx < scopeLen
+      case ExprTags.BinaryOp =>
+        val b = e.asInstanceOf[BinaryOp]
+        canEagerEval(b.lhs, scopeLen) && canEagerEval(b.rhs, scopeLen)
+      case ExprTags.UnaryOp =>
+        canEagerEval(e.asInstanceOf[UnaryOp].value, scopeLen)
+      // Select intentionally excluded: visitSelect can trigger object assertions
+      // prematurely, violating Jsonnet's lazy field evaluation semantics.
+      case ExprTags.And =>
+        val a = e.asInstanceOf[And]
+        canEagerEval(a.lhs, scopeLen) && canEagerEval(a.rhs, scopeLen)
+      case ExprTags.Or =>
+        val o = e.asInstanceOf[Or]
+        canEagerEval(o.lhs, scopeLen) && canEagerEval(o.rhs, scopeLen)
+      case ExprTags.IfElse =>
+        val ie = e.asInstanceOf[IfElse]
+        canEagerEval(ie.cond, scopeLen) &&
+        canEagerEval(ie.`then`, scopeLen) &&
+        (ie.`else` == null || canEagerEval(ie.`else`, scopeLen))
+      case _ =>
+        e.isInstanceOf[Val.Literal]
+    }
+
+  /**
+   * Runtime check: verifies that all ValidId references in the expression tree are already resolved
+   * to Val instances (not lazy thunks). This prevents eager evaluation from forcing lazy bindings
+   * and changing observable behavior (e.g., std.trace side effects).
+   */
+  private def allRefsResolved(e: Expr)(implicit scope: ValScope): Boolean =
+    (e.tag: @switch) match {
+      case ExprTags.ValidId =>
+        val idx = e.asInstanceOf[ValidId].nameIdx
+        idx < scope.length && scope.bindings(idx).isInstanceOf[Val]
+      case ExprTags.BinaryOp =>
+        val b = e.asInstanceOf[BinaryOp]
+        allRefsResolved(b.lhs) && allRefsResolved(b.rhs)
+      case ExprTags.UnaryOp =>
+        allRefsResolved(e.asInstanceOf[UnaryOp].value)
+      case ExprTags.And =>
+        val a = e.asInstanceOf[And]
+        allRefsResolved(a.lhs) && allRefsResolved(a.rhs)
+      case ExprTags.Or =>
+        val o = e.asInstanceOf[Or]
+        allRefsResolved(o.lhs) && allRefsResolved(o.rhs)
+      case ExprTags.IfElse =>
+        val ie = e.asInstanceOf[IfElse]
+        allRefsResolved(ie.cond) &&
+        allRefsResolved(ie.`then`) &&
+        (ie.`else` == null || allRefsResolved(ie.`else`))
+      case _ =>
+        e.isInstanceOf[Val.Literal]
+    }
+
   def visitMemberList(objPos: Position, e: ObjBody.MemberList, sup: Val.Obj)(implicit
       scope: ValScope): Val.Obj = {
     val asserts = e.asserts
@@ -1208,13 +1356,36 @@ class Evaluator(
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
           val fieldKey = k
-          val v = new Val.Obj.Member(plus, sep) {
-            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos, fieldKey)
-              try visitExpr(rhs)(makeNewScope(self, sup))
-              finally decrementStackDepth()
-            }
+          // ConstMember fast path: for simple field bodies (Val literals or
+          // parent-scope ValidId that already resolved to a Val), pre-compute
+          // the value and skip the Member closure + scope extension in invoke.
+          val constVal: Val = rhs match {
+            case v: Val                                     => v
+            case vid: ValidId if vid.nameIdx < scope.length =>
+              scope.bindings(vid.nameIdx) match {
+                case v: Val => v
+                case _      => null
+              }
+            case _ if e.binds == null && canEagerEval(rhs, scope.length) && allRefsResolved(rhs) =>
+              // Field body doesn't reference new object's self/super and has
+              // no local binds, and all referenced parent-scope bindings are
+              // already resolved Val instances (not lazy thunks). Safe to
+              // evaluate eagerly, avoiding deferred Member closure allocation
+              // + scope copy at access time.
+              try visitExpr(rhs)
+              catch { case NonFatal(_) => null }
+            case _ => null
           }
+          val v: Val.Obj.Member =
+            if (constVal ne null) new Val.Obj.ConstMember(plus, sep, constVal)
+            else
+              new Val.Obj.Member(plus, sep) {
+                def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+                  checkStackDepth(rhs.pos, fieldKey)
+                  try visitExpr(rhs)(makeNewScope(self, sup))
+                  finally decrementStackDepth()
+                }
+              }
           if (fieldCount == 0) {
             singleKey = k
             singleMember = v
