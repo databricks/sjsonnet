@@ -6,13 +6,6 @@ if [ "${GITHUB_REPOSITORY:-}" != "databricks/sjsonnet" ]; then
   exit 0
 fi
 
-# Fork PRs using the pull_request trigger don't have OIDC access.
-# They rely on the pre-warmed dependency cache instead of JFrog.
-if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
-  echo "Skipping JFrog token: OIDC not available (likely a fork PR)"
-  exit 0
-fi
-
 # Exchange a GitHub Actions OIDC token for a JFrog access token and
 # write JFROG_ACCESS_TOKEN to $GITHUB_ENV so subsequent steps can use it.
 

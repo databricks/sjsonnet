@@ -6,14 +6,6 @@ if [ "${GITHUB_REPOSITORY:-}" != "databricks/sjsonnet" ]; then
   exit 0
 fi
 
-# If JFrog token is not available (e.g. fork PRs without OIDC), skip
-# JFrog configuration. The build will use the pre-warmed dependency
-# cache and fall back to Maven Central for any missing artifacts.
-if [ -z "${JFROG_ACCESS_TOKEN:-}" ]; then
-  echo "Skipping Mill/sbt JFrog config: JFROG_ACCESS_TOKEN not set (likely a fork PR)"
-  exit 0
-fi
-
 JFROG_HOSTNAME="databricks.jfrog.io"
 JFROG_REALM="Artifactory Realm"
 JFROG_USERNAME="gha-service-account"
