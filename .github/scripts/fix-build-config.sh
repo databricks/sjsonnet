@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "${GITHUB_REPOSITORY:-}" != "databricks/sjsonnet" ]; then
+  echo "Skipping Mill/sbt JFrog config: GITHUB_REPOSITORY is ${GITHUB_REPOSITORY:-unset}, expected databricks/sjsonnet"
+  exit 0
+fi
+
 JFROG_HOSTNAME="databricks.jfrog.io"
 JFROG_REALM="Artifactory Realm"
 JFROG_USERNAME="gha-service-account"

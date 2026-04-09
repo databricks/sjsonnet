@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "${GITHUB_REPOSITORY:-}" != "databricks/sjsonnet" ]; then
+  echo "Skipping JFrog token: GITHUB_REPOSITORY is ${GITHUB_REPOSITORY:-unset}, expected databricks/sjsonnet"
+  exit 0
+fi
+
 # Exchange a GitHub Actions OIDC token for a JFrog access token and
 # write JFROG_ACCESS_TOKEN to $GITHUB_ENV so subsequent steps can use it.
 
