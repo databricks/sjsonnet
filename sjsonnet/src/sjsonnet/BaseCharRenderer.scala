@@ -155,13 +155,50 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
 
   private def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
-    upickle.core.RenderUtils.escapeChar(
-      null,
-      elemBuilder,
-      s,
-      escapeUnicode = escapeUnicode,
-      wrapQuotes = true
-    )
+    s match {
+      case str: String if !escapeUnicode =>
+        val len = str.length
+        // Quick pre-scan: determine if any character needs escaping (control chars,
+        // double-quote, backslash). This is NOT a replacement of escapeChar — it's a
+        // gate that lets us SKIP escapeChar's per-character processing entirely when
+        // the string is clean (the common case in Jsonnet output). When no escaping is
+        // needed, String.getChars bulk-copies the entire string in one JVM intrinsic
+        // call, which is significantly faster than character-by-character append.
+        var needsEscape = false
+        var i = 0
+        while (i < len && !needsEscape) {
+          val c = str.charAt(i)
+          if (c < 32 || c == '"' || c == '\\') needsEscape = true
+          i += 1
+        }
+        if (!needsEscape) {
+          // Fast path: bulk copy entire string with surrounding quotes
+          elemBuilder.ensureLength(len + 2)
+          elemBuilder.appendUnsafe('"')
+          val cbArr = elemBuilder.arr
+          val pos = elemBuilder.getLength
+          str.getChars(0, len, cbArr, pos)
+          elemBuilder.length = pos + len
+          elemBuilder.appendUnsafe('"')
+        } else {
+          // Slow path: delegate to upickle's per-character escapeChar
+          upickle.core.RenderUtils.escapeChar(
+            null,
+            elemBuilder,
+            s,
+            escapeUnicode = escapeUnicode,
+            wrapQuotes = true
+          )
+        }
+      case _ =>
+        upickle.core.RenderUtils.escapeChar(
+          null,
+          elemBuilder,
+          s,
+          escapeUnicode = escapeUnicode,
+          wrapQuotes = true
+        )
+    }
     flushCharBuilder()
     out
   }
