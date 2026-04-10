@@ -45,6 +45,7 @@ jobs:
 
           ./mill "__.checkFormat"
           ./mill "__.compile"
+          ./mill "__.test"
           sbt update || true
 
           echo "Dependency resolution complete"
