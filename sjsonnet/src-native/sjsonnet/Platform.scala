@@ -9,6 +9,12 @@ import scala.collection.mutable
 import org.virtuslab.yaml.*
 
 object Platform {
+
+  /**
+   * Native's LLVM LTO already devirtualizes the Visitor pattern, making DirectJsonRenderer slower.
+   */
+  final val useDirectRenderer = false
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)

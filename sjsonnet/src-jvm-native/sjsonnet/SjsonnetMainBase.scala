@@ -264,11 +264,22 @@ object SjsonnetMainBase {
       path: os.Path,
       wd: os.Path,
       getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
-      val renderer = rendererForConfig(writer, config, getCurrentPosition)
-      val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-      if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
-      res
+    // Fast path: direct JSON rendering to StringBuilder when outputting to stdout.
+    // Bypasses the Visitor pattern, eliminating per-object/array allocations and
+    // virtual dispatch overhead (~10% materialization speedup on JVM for realistic workloads).
+    // Disabled on Native where LLVM LTO already devirtualizes the Visitor pattern.
+    // Not used for YAML, string mode, or file output (which benefits from streaming).
+    if (
+      Platform.useDirectRenderer && !config.yamlOut.value && !config.expectString.value && config.outputFile.isEmpty
+    ) {
+      interp.interpretStringify(jsonnetCode, OsPath(path), config.indent)
+    } else {
+      writeToFile(config, wd) { writer =>
+        val renderer = rendererForConfig(writer, config, getCurrentPosition)
+        val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+        if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
+        res
+      }
     }
   }
 

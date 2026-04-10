@@ -16,6 +16,10 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 object Platform {
+
+  /** JVM benefits from DirectJsonRenderer which bypasses Visitor virtual dispatch. */
+  final val useDirectRenderer = true
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)

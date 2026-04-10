@@ -184,6 +184,36 @@ class Interpreter(
       r <- materialize(v, visitor)
     } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
 
+  /**
+   * Evaluate and materialize Jsonnet source directly to a JSON string, bypassing the Visitor
+   * pattern. This is faster than [[interpret0]] with a [[Renderer]] because it eliminates:
+   *   - Per-object/array anonymous Visitor allocations
+   *   - Virtual dispatch overhead on every visitor method call
+   *   - CharBuilder → Writer → StringBuffer intermediate pipeline
+   *
+   * Used by the CLI fast-path for normal JSON output to stdout.
+   */
+  def interpretStringify(txt: String, path: Path, indent: Int): Either[String, String] =
+    (for {
+      v <- evaluate(txt, path)
+      r <- materializeStringify(v, indent)
+    } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
+
+  private def materializeStringify(res: Val, indent: Int): Either[Error, String] = {
+    val t0 = if (debugStats != null) System.nanoTime() else 0L
+    val m = createMaterializer()
+    val result = handleException {
+      val renderer = new DirectJsonRenderer(
+        indent,
+        m,
+        Materializer.MaterializeContext(evaluator)
+      )(evaluator)
+      renderer.render(res)
+    }
+    if (debugStats != null) debugStats.materializeTimeNs += System.nanoTime() - t0
+    result
+  }
+
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)
     catch {
@@ -283,23 +313,26 @@ class Interpreter(
     }
   }
 
+  /** Create a Materializer instance configured with storePos callbacks if enabled. */
+  private def createMaterializer(): Materializer =
+    if (storePos == null) Materializer
+    else
+      new Materializer {
+        override def storePos(pos: Position): Unit = self.storePos(pos)
+        override def storePos(v: Val): Unit = {
+          storePos(
+            v match {
+              case v: Val.Obj if v.hasKeys    => v.pos
+              case v: Val.Arr if v.length > 0 => v.pos
+              case _                          => null
+            }
+          )
+        }
+      }
+
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
     val t0 = if (debugStats != null) System.nanoTime() else 0L
-    val m =
-      if (storePos == null) Materializer
-      else
-        new Materializer {
-          override def storePos(pos: Position): Unit = self.storePos(pos)
-          override def storePos(v: Val): Unit = {
-            storePos(
-              v match {
-                case v: Val.Obj if v.hasKeys    => v.pos
-                case v: Val.Arr if v.length > 0 => v.pos
-                case _                          => null
-              }
-            )
-          }
-        }
+    val m = createMaterializer()
     val result = handleException(m.apply0(res, visitor)(evaluator))
     if (debugStats != null) debugStats.materializeTimeNs += System.nanoTime() - t0
     result
