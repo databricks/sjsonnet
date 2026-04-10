@@ -1435,11 +1435,6 @@ class Evaluator(
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
-    val valueCache = if (sup == null) {
-      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fieldCount)
-    } else {
-      new java.util.HashMap[Any, Val]()
-    }
     cachedObj = if (fieldCount == 1 && singleKey != null) {
       // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
       new Val.Obj(
@@ -1448,7 +1443,6 @@ class Evaluator(
         false,
         if (asserts != null) triggerAsserts else null,
         sup,
-        valueCache,
         singleFieldKey = singleKey,
         singleFieldMember = singleMember
       )
@@ -1466,7 +1460,6 @@ class Evaluator(
         false,
         if (asserts != null) triggerAsserts else null,
         sup,
-        valueCache,
         inlineFieldKeys = finalKeys,
         inlineFieldMembers = finalMembers
       )
@@ -1477,8 +1470,7 @@ class Evaluator(
         else Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](0),
         false,
         if (asserts != null) triggerAsserts else null,
-        sup,
-        valueCache
+        sup
       )
     }
     cachedObj
@@ -1513,12 +1505,7 @@ class Evaluator(
         case x           => fieldNameTypeError(x, e.pos)
       }
     }
-    val valueCache = if (sup == null) {
-      Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
-    } else {
-      new java.util.HashMap[Any, Val]()
-    }
-    new Val.Obj(e.pos, builder, false, null, sup, valueCache)
+    new Val.Obj(e.pos, builder, false, null, sup)
   }
 
   @tailrec

@@ -117,8 +117,7 @@ object ObjectModule extends AbstractFunctionModule {
         m.put(k, v)
         i += 1
       }
-      val valueCache = Val.Obj.getEmptyValueCacheForObjWithoutSuper(allKeys.length)
-      new Val.Obj(pos, m, false, null, null, valueCache)
+      new Val.Obj(pos, m, false, null, null)
     }
   }
 
