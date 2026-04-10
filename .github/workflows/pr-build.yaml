@@ -10,8 +10,21 @@ permissions:
   id-token: write # Needed for JFrog OIDC on internal PRs; unavailable for fork PRs
 
 jobs:
+  format:
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 10
+    name: Check formatting
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+      - uses: ./.github/actions/setup-build
+      - name: Check project is formatted
+        run: ./mill "__.checkFormat"
+
   # Forks cannot use org runner groups; use GitHub-hosted runners instead.
   build-jvm:
+    needs: format
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
@@ -22,13 +35,12 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
-      - name: Check Formatting
-        run: ./mill "_.jvm[_].__.checkFormat"
       - name: Run mill tests
         run: ./mill "_.jvm[_].__.test"
       - name: Run sbt tests
         run: sbt test
   build-graal:
+    needs: format
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
@@ -40,6 +52,7 @@ jobs:
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
+    needs: format
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
@@ -55,7 +68,5 @@ jobs:
         with:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
           sbt: 'true'
-      - name: Check Formatting
-        run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill _.${{ matrix.lang }}[_].__.test

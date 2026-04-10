@@ -1,0 +1,23 @@
+name: Scalafmt
+
+on:
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Code is formatted
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-build
+      - name: Check project is formatted
+        run: ./mill "__.checkFormat"
