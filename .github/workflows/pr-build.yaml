@@ -12,7 +12,9 @@ permissions:
 jobs:
   # Forks cannot use org runner groups; use GitHub-hosted runners instead.
   build-jvm:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
     timeout-minutes: 20
     name: Sjsonnet jvm build
     steps:
@@ -27,7 +29,9 @@ jobs:
       - name: Run sbt tests
         run: sbt test
   build-graal:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
     timeout-minutes: 20
     name: Sjsonnet Graal Native build
     steps:
@@ -36,7 +40,9 @@ jobs:
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
   build-other:
-    runs-on: ${{ github.repository == 'databricks/sjsonnet' && fromJSON('{"group":"databricks-protected-runner-group","labels":"linux-ubuntu-latest"}') || 'ubuntu-latest' }}
+    runs-on:
+      group: databricks-protected-runner-group
+      labels: linux-ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
