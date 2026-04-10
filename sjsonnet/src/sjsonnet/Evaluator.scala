@@ -879,11 +879,13 @@ class Evaluator(
         (l, r) match {
           case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l + r)
           case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
-          case (Val.Str(_, l), r)             => Val.Str(pos, l + Materializer.stringify(r))
-          case (l, Val.Str(_, r))             => Val.Str(pos, Materializer.stringify(l) + r)
-          case (l: Val.Obj, r: Val.Obj)       => r.addSuper(pos, l)
-          case (l: Val.Arr, r: Val.Arr)       => l.concat(pos, r)
-          case _                              => failBinOp(l, e.op, r, pos)
+          case (n: Val.Num, Val.Str(_, r)) => Val.Str(pos, RenderUtils.renderDouble(n.asDouble) + r)
+          case (Val.Str(_, l), n: Val.Num) => Val.Str(pos, l + RenderUtils.renderDouble(n.asDouble))
+          case (Val.Str(_, l), r)          => Val.Str(pos, l + Materializer.stringify(r))
+          case (l, Val.Str(_, r))          => Val.Str(pos, Materializer.stringify(l) + r)
+          case (l: Val.Obj, r: Val.Obj)    => r.addSuper(pos, l)
+          case (l: Val.Arr, r: Val.Arr)    => l.concat(pos, r)
+          case _                           => failBinOp(l, e.op, r, pos)
         }
 
       // Shift ops: pure numeric with safe-integer range check
