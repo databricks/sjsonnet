@@ -44,7 +44,12 @@ jobs:
           set -euo pipefail
 
           ./mill "__.checkFormat"
-          ./mill "__.compile"
+          ./mill "__.prepareOffline"
+          ./mill "__.scalaCompilerClasspath"
+          ./mill "__.scalaJSWorkerClasspath"
+          ./mill "__.scalaJSLinkerClasspath"
+          ./mill "__.scalaNativeWorkerClasspath"
+          ./mill "__.bridgeFullClassPath"
           sbt update || true
 
           echo "Dependency resolution complete"

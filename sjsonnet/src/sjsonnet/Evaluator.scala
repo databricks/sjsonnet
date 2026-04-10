@@ -7,6 +7,7 @@ import ujson.Value
 import sjsonnet.Evaluator.SafeDoubleOps
 
 import scala.annotation.{switch, tailrec}
+import scala.util.control.NonFatal
 
 /**
  * Recursively walks the [[Expr]] trees to convert them into into [[Val]] objects that can be
@@ -153,9 +154,125 @@ class Evaluator(
         new LazyExpr(e, scope, this)
       }
     case e =>
-      if (debugStats != null) debugStats.lazyCreated += 1
-      new LazyExpr(e, scope, this)
+      // Try eager evaluation for simple BinaryOp/UnaryOp with resolvable operands.
+      // This avoids wrapping them in a LazyExpr thunk that would be immediately forced.
+      // Delegates to separate methods to keep visitAsLazy's bytecode frame small.
+      val eager = tryEagerEval(e)
+      if (eager != null) eager
+      else {
+        if (debugStats != null) debugStats.lazyCreated += 1
+        new LazyExpr(e, scope, this)
+      }
   }
+
+  /**
+   * Attempt eager evaluation for BinaryOp/UnaryOp with immediately-resolvable operands (Val
+   * literals or already-bound scope entries). Returns null if the expression is not eligible or
+   * evaluation fails. Kept in a separate method to avoid enlarging visitAsLazy's bytecode frame.
+   */
+  private def tryEagerEval(e: Expr)(implicit scope: ValScope): Val = e match {
+    case bo: BinaryOp =>
+      // Inline fast path for numeric arithmetic — avoids the full dispatch chain
+      // (visitExpr → visitBinaryOp → visitBinaryOpAsDouble → visitExprAsDouble)
+      // and the try/catch in tryEvalCatch. Covers fibonacci hot path (n-1, n-2).
+      val lDouble = resolveAsDouble(bo.lhs)
+      if (!lDouble.isNaN) {
+        val rDouble = resolveAsDouble(bo.rhs)
+        if (!rDouble.isNaN)
+          return tryInlineArith(bo.op, lDouble, rDouble, bo.pos)
+      }
+      if (isImmediatelyResolvable(bo.lhs) && isImmediatelyResolvable(bo.rhs))
+        tryEvalCatch(bo)
+      else null
+    case uo: UnaryOp =>
+      if (isImmediatelyResolvable(uo.value)) tryEvalCatch(uo)
+      else null
+    case _ => null
+  }
+
+  /**
+   * Resolve an expression to a double without full visitExpr dispatch. Returns NaN as sentinel when
+   * the expression can't be directly resolved.
+   */
+  @inline private def resolveAsDouble(e: Expr)(implicit scope: ValScope): Double = e match {
+    case n: Val.Num => n.rawDouble
+    case v: ValidId =>
+      val idx = v.nameIdx
+      if (idx < scope.length) {
+        val binding = scope.bindings(idx)
+        if (binding != null) binding.value match {
+          case n: Val.Num => n.rawDouble
+          case _          => Double.NaN
+        }
+        else Double.NaN
+      } else Double.NaN
+    case _ => Double.NaN
+  }
+
+  /**
+   * Perform inline numeric binary op, returning null on error or unsupported op. Covers arithmetic,
+   * comparison, and bitwise operators. Returns null (fallback to LazyExpr) for: overflow, division
+   * by zero, out-of-range bitwise operands, OP_in (string+object), OP_&&/OP_|| (short-circuit).
+   */
+  @inline private def tryInlineArith(op: Int, ld: Double, rd: Double, pos: Position): Val =
+    (op: @switch) match {
+      case Expr.BinaryOp.OP_* =>
+        val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_/ =>
+        if (rd == 0) null
+        else { val r = ld / rd; if (r.isInfinite) null else Val.cachedNum(pos, r) }
+      case Expr.BinaryOp.OP_% =>
+        Val.cachedNum(pos, ld % rd)
+      case Expr.BinaryOp.OP_+ =>
+        val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_- =>
+        val r = ld - rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_<< =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null // not safe integers
+        else if (rl < 0) null
+        else if (rl >= 1 && math.abs(ll) >= (1L << (63 - rl))) null
+        else Val.cachedNum(pos, (ll << rl).toDouble)
+      case Expr.BinaryOp.OP_>> =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else if (rl < 0) null
+        else Val.cachedNum(pos, (ll >> rl).toDouble)
+      case Expr.BinaryOp.OP_< => Val.bool(ld < rd)
+      case Expr.BinaryOp.OP_> => Val.bool(ld > rd)
+      case Expr.BinaryOp.OP_<= => Val.bool(ld <= rd)
+      case Expr.BinaryOp.OP_>= => Val.bool(ld >= rd)
+      case Expr.BinaryOp.OP_== => Val.bool(ld == rd)
+      case Expr.BinaryOp.OP_!= => Val.bool(ld != rd)
+      case Expr.BinaryOp.OP_& =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll & rl).toDouble)
+      case Expr.BinaryOp.OP_^ =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll ^ rl).toDouble)
+      case Expr.BinaryOp.OP_| =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll | rl).toDouble)
+      case _ => null // OP_in (string+object), OP_&&/OP_|| (short-circuit)
+    }
+
+  /**
+   * Evaluate an expression, returning null on any exception (preserving lazy error semantics for
+   * unused arguments).
+   */
+  private def tryEvalCatch(e: Expr)(implicit scope: ValScope): Val =
+    try visitExpr(e)
+    catch { case NonFatal(_) => null }
+
+  @inline private def isImmediatelyResolvable(e: Expr)(implicit scope: ValScope): Boolean =
+    e match {
+      case _: Val     => true
+      case v: ValidId => v.nameIdx < scope.length && scope.bindings(v.nameIdx) != null
+      case _          => false
+    }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
@@ -879,11 +996,13 @@ class Evaluator(
         (l, r) match {
           case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l + r)
           case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
-          case (Val.Str(_, l), r)             => Val.Str(pos, l + Materializer.stringify(r))
-          case (l, Val.Str(_, r))             => Val.Str(pos, Materializer.stringify(l) + r)
-          case (l: Val.Obj, r: Val.Obj)       => r.addSuper(pos, l)
-          case (l: Val.Arr, r: Val.Arr)       => l.concat(pos, r)
-          case _                              => failBinOp(l, e.op, r, pos)
+          case (n: Val.Num, Val.Str(_, r)) => Val.Str(pos, RenderUtils.renderDouble(n.asDouble) + r)
+          case (Val.Str(_, l), n: Val.Num) => Val.Str(pos, l + RenderUtils.renderDouble(n.asDouble))
+          case (Val.Str(_, l), r)          => Val.Str(pos, l + Materializer.stringify(r))
+          case (l, Val.Str(_, r))          => Val.Str(pos, Materializer.stringify(l) + r)
+          case (l: Val.Obj, r: Val.Obj)    => r.addSuper(pos, l)
+          case (l: Val.Arr, r: Val.Arr)    => l.concat(pos, r)
+          case _                           => failBinOp(l, e.op, r, pos)
         }
 
       // Shift ops: pure numeric with safe-integer range check
@@ -1316,11 +1435,6 @@ class Evaluator(
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
-    val valueCache = if (sup == null) {
-      Val.Obj.getEmptyValueCacheForObjWithoutSuper(fieldCount)
-    } else {
-      new java.util.HashMap[Any, Val]()
-    }
     cachedObj = if (fieldCount == 1 && singleKey != null) {
       // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
       new Val.Obj(
@@ -1329,7 +1443,6 @@ class Evaluator(
         false,
         if (asserts != null) triggerAsserts else null,
         sup,
-        valueCache,
         singleFieldKey = singleKey,
         singleFieldMember = singleMember
       )
@@ -1347,7 +1460,6 @@ class Evaluator(
         false,
         if (asserts != null) triggerAsserts else null,
         sup,
-        valueCache,
         inlineFieldKeys = finalKeys,
         inlineFieldMembers = finalMembers
       )
@@ -1358,8 +1470,7 @@ class Evaluator(
         else Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](0),
         false,
         if (asserts != null) triggerAsserts else null,
-        sup,
-        valueCache
+        sup
       )
     }
     cachedObj
@@ -1394,12 +1505,7 @@ class Evaluator(
         case x           => fieldNameTypeError(x, e.pos)
       }
     }
-    val valueCache = if (sup == null) {
-      Val.Obj.getEmptyValueCacheForObjWithoutSuper(builder.size())
-    } else {
-      new java.util.HashMap[Any, Val]()
-    }
-    new Val.Obj(e.pos, builder, false, null, sup, valueCache)
+    new Val.Obj(e.pos, builder, false, null, sup)
   }
 
   @tailrec
@@ -1444,55 +1550,41 @@ class Evaluator(
     case Nil => scopes
   }
 
-  // Nested match avoids Tuple2 allocation from (x, y) match { case (X, Y) => ... }
-  def compare(x: Val, y: Val): Int = x match {
-    case xn: Val.Num =>
-      y match {
-        case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xs: Val.Str =>
-      y match {
-        case ys: Val.Str => Util.compareStringsByCodepoint(xs.str, ys.str)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xb: Val.Bool =>
-      y match {
-        case yb: Val.Bool => java.lang.Boolean.compare(xb.asBoolean, yb.asBoolean)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case _: Val.Null =>
-      y match {
-        case _: Val.Null => 0
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xa: Val.Arr =>
-      y match {
-        case ya: Val.Arr =>
-          val len = math.min(xa.length, ya.length)
-          var i = 0
-          while (i < len) {
-            val xi = xa.value(i)
-            val yi = ya.value(i)
-            // Reference equality short-circuit for shared array elements
-            if (!(xi eq yi)) {
-              // Inline numeric fast path to avoid polymorphic compare() dispatch
-              val cmp = xi match {
-                case xn: Val.Num =>
-                  yi match {
-                    case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-                    case _           => compare(xi, yi)
-                  }
-                case _ => compare(xi, yi)
+  private def compareTypeMismatch(x: Val, y: Val): Nothing =
+    Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+
+  // Tuple match keeps the method compact for JIT inlining. Scala 2.13+ pattern matcher lowers
+  // this to direct instanceof/checkcast without Tuple2 allocation. The inner array loop uses nested
+  // match for the per-element numeric fast path. Error path is extracted to keep the happy path small.
+  def compare(x: Val, y: Val): Int = (x, y) match {
+    case (x: Val.Num, y: Val.Num) => java.lang.Double.compare(x.asDouble, y.asDouble)
+    case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
+    case (x: Val.Arr, y: Val.Arr) =>
+      val len = math.min(x.length, y.length)
+      var i = 0
+      while (i < len) {
+        val xi = x.value(i)
+        val yi = y.value(i)
+        // Post-force reference equality for shared elements (e.g., from array concatenation).
+        // Must force first to preserve error semantics on lazy elements.
+        if (!(xi eq yi)) {
+          // Inline numeric fast path avoids recursive compare() dispatch per element
+          val cmp = xi match {
+            case xn: Val.Num =>
+              yi match {
+                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                case _           => compare(xi, yi)
               }
-              if (cmp != 0) return cmp
-            }
-            i += 1
+            case _ => compare(xi, yi)
           }
-          Integer.compare(xa.length, ya.length)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+          if (cmp != 0) return cmp
+        }
+        i += 1
       }
-    case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+      Integer.compare(x.length, y.length)
+    case (x: Val.Bool, y: Val.Bool) => java.lang.Boolean.compare(x.asBoolean, y.asBoolean)
+    case (_: Val.Null, _: Val.Null) => 0
+    case _                          => compareTypeMismatch(x, y)
   }
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
