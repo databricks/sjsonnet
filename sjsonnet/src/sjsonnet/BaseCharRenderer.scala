@@ -5,6 +5,17 @@ package sjsonnet
 
 import ujson._
 import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
+
+object BaseCharRenderer {
+
+  /**
+   * Maximum nesting depth for pre-computed indent arrays. Depths beyond this fall back to
+   * per-character rendering. 32 covers the vast majority of real-world Jsonnet output; even deeply
+   * nested configurations rarely exceed 20 levels.
+   */
+  final val MaxCachedDepth = 32
+}
+
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     out: T,
     indent: Int = -1,
@@ -23,6 +34,30 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
   protected var depth: Int = 0
 
   protected var commaBuffered = false
+
+  /**
+   * Pre-computed indent arrays: indentCache(d) = newline + indent*d spaces. Used by
+   * [[renderIndent]] to replace the per-character space loop with a single bulk `System.arraycopy`,
+   * which is a significant win on Scala Native (no JIT to unroll the loop) and measurable even on
+   * JVM for materialization-heavy workloads.
+   */
+  protected val indentCache: Array[Array[Char]] =
+    if (indent <= 0) null
+    else {
+      val maxDepth = BaseCharRenderer.MaxCachedDepth
+      val arr = new Array[Array[Char]](maxDepth)
+      var d = 0
+      while (d < maxDepth) {
+        val spaces = indent * d
+        val totalLen = newline.length + spaces
+        val buf = new Array[Char](totalLen)
+        System.arraycopy(newline, 0, buf, 0, newline.length)
+        java.util.Arrays.fill(buf, newline.length, totalLen, ' ')
+        arr(d) = buf
+        d += 1
+      }
+      arr
+    }
 
   def flushBuffer(): Unit = {
     if (commaBuffered) {
@@ -205,9 +240,12 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
 
   final def renderIndent(): Unit = {
     if (indent == -1) ()
-    else {
+    else if (indentCache != null && depth < BaseCharRenderer.MaxCachedDepth) {
+      val cached = indentCache(depth)
+      elemBuilder.appendAll(cached, cached.length)
+    } else {
       var i = indent * depth
-      elemBuilder.ensureLength(i + 1)
+      elemBuilder.ensureLength(i + newline.length)
       elemBuilder.appendAll(newline, newline.length)
       while (i > 0) {
         elemBuilder.appendUnsafe(' ')
@@ -218,11 +256,10 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
 
   protected def appendString(s: String): Unit = {
     val len = s.length
-    var i = 0
     elemBuilder.ensureLength(len)
-    while (i < len) {
-      elemBuilder.appendUnsafeC(s.charAt(i))
-      i += 1
-    }
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    s.getChars(0, len, cbArr, pos)
+    elemBuilder.length = pos + len
   }
 }

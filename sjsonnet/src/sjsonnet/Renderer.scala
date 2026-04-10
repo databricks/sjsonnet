@@ -14,9 +14,19 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
-    val s = RenderUtils.renderDouble(d)
     flushBuffer()
-    appendString(s)
+    val i = d.toLong
+    if (d == i) {
+      // Fast path: render integers directly to char buffer, avoiding String allocation.
+      // Most numbers in Jsonnet output are integers (array indices, counters, etc.).
+      RenderUtils.appendLong(elemBuilder, i)
+    } else if (d % 1 == 0) {
+      appendString(
+        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+      )
+    } else {
+      appendString(d.toString)
+    }
     flushCharBuilder()
     out
   }
@@ -27,12 +37,17 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     }
     if (indent == -1) ()
     else if (commaBuffered || newlineBuffered) {
-      var i = indent * depth
-      elemBuilder.ensureLength(i + 1)
-      elemBuilder.append('\n')
-      while (i > 0) {
-        elemBuilder.append(' ')
-        i -= 1
+      if (indentCache != null && depth < BaseCharRenderer.MaxCachedDepth) {
+        val cached = indentCache(depth)
+        elemBuilder.appendAll(cached, cached.length)
+      } else {
+        var i = indent * depth
+        elemBuilder.ensureLength(i + 1)
+        elemBuilder.append('\n')
+        while (i > 0) {
+          elemBuilder.append(' ')
+          i -= 1
+        }
       }
     }
     newlineBuffered = false
@@ -261,5 +276,55 @@ object RenderUtils {
     else if (d % 1 == 0) {
       BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
     } else d.toString
+  }
+
+  /** Maximum number of digits in a Long value (Long.MinValue = -9223372036854775808, 20 chars). */
+  private final val MaxLongChars = 20
+
+  /**
+   * Render a long value directly into a [[upickle.core.CharBuilder]], avoiding the intermediate
+   * `String` allocation that `Long.toString` would create. For small absolute values (the common
+   * case in Jsonnet output — array lengths, indices, counters), this saves one allocation per
+   * number. The algorithm writes digits in reverse then reverses in-place.
+   */
+  def appendLong(cb: upickle.core.CharBuilder, value: Long): Unit = {
+    if (value == 0) {
+      cb.append('0')
+      return
+    }
+
+    cb.ensureLength(MaxLongChars)
+    val arr = cb.arr
+    var pos = cb.getLength
+
+    val negative = value < 0
+    // Use negative accumulator to handle Long.MinValue correctly
+    var n = if (negative) value else -value
+    val startPos = pos
+
+    while (n != 0) {
+      val digit = -(n % 10).toInt
+      arr(pos) = ('0' + digit).toChar
+      pos += 1
+      n /= 10
+    }
+
+    if (negative) {
+      arr(pos) = '-'
+      pos += 1
+    }
+
+    // Reverse the digits in-place
+    var lo = startPos
+    var hi = pos - 1
+    while (lo < hi) {
+      val tmp = arr(lo)
+      arr(lo) = arr(hi)
+      arr(hi) = tmp
+      lo += 1
+      hi -= 1
+    }
+
+    cb.length = pos
   }
 }
