@@ -7,6 +7,7 @@ import ujson.Value
 import sjsonnet.Evaluator.SafeDoubleOps
 
 import scala.annotation.{switch, tailrec}
+import scala.util.control.NonFatal
 
 /**
  * Recursively walks the [[Expr]] trees to convert them into into [[Val]] objects that can be
@@ -153,9 +154,125 @@ class Evaluator(
         new LazyExpr(e, scope, this)
       }
     case e =>
-      if (debugStats != null) debugStats.lazyCreated += 1
-      new LazyExpr(e, scope, this)
+      // Try eager evaluation for simple BinaryOp/UnaryOp with resolvable operands.
+      // This avoids wrapping them in a LazyExpr thunk that would be immediately forced.
+      // Delegates to separate methods to keep visitAsLazy's bytecode frame small.
+      val eager = tryEagerEval(e)
+      if (eager != null) eager
+      else {
+        if (debugStats != null) debugStats.lazyCreated += 1
+        new LazyExpr(e, scope, this)
+      }
   }
+
+  /**
+   * Attempt eager evaluation for BinaryOp/UnaryOp with immediately-resolvable operands (Val
+   * literals or already-bound scope entries). Returns null if the expression is not eligible or
+   * evaluation fails. Kept in a separate method to avoid enlarging visitAsLazy's bytecode frame.
+   */
+  private def tryEagerEval(e: Expr)(implicit scope: ValScope): Val = e match {
+    case bo: BinaryOp =>
+      // Inline fast path for numeric arithmetic — avoids the full dispatch chain
+      // (visitExpr → visitBinaryOp → visitBinaryOpAsDouble → visitExprAsDouble)
+      // and the try/catch in tryEvalCatch. Covers fibonacci hot path (n-1, n-2).
+      val lDouble = resolveAsDouble(bo.lhs)
+      if (!lDouble.isNaN) {
+        val rDouble = resolveAsDouble(bo.rhs)
+        if (!rDouble.isNaN)
+          return tryInlineArith(bo.op, lDouble, rDouble, bo.pos)
+      }
+      if (isImmediatelyResolvable(bo.lhs) && isImmediatelyResolvable(bo.rhs))
+        tryEvalCatch(bo)
+      else null
+    case uo: UnaryOp =>
+      if (isImmediatelyResolvable(uo.value)) tryEvalCatch(uo)
+      else null
+    case _ => null
+  }
+
+  /**
+   * Resolve an expression to a double without full visitExpr dispatch. Returns NaN as sentinel when
+   * the expression can't be directly resolved.
+   */
+  @inline private def resolveAsDouble(e: Expr)(implicit scope: ValScope): Double = e match {
+    case n: Val.Num => n.rawDouble
+    case v: ValidId =>
+      val idx = v.nameIdx
+      if (idx < scope.length) {
+        val binding = scope.bindings(idx)
+        if (binding != null) binding.value match {
+          case n: Val.Num => n.rawDouble
+          case _          => Double.NaN
+        }
+        else Double.NaN
+      } else Double.NaN
+    case _ => Double.NaN
+  }
+
+  /**
+   * Perform inline numeric binary op, returning null on error or unsupported op. Covers arithmetic,
+   * comparison, and bitwise operators. Returns null (fallback to LazyExpr) for: overflow, division
+   * by zero, out-of-range bitwise operands, OP_in (string+object), OP_&&/OP_|| (short-circuit).
+   */
+  @inline private def tryInlineArith(op: Int, ld: Double, rd: Double, pos: Position): Val =
+    (op: @switch) match {
+      case Expr.BinaryOp.OP_* =>
+        val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_/ =>
+        if (rd == 0) null
+        else { val r = ld / rd; if (r.isInfinite) null else Val.cachedNum(pos, r) }
+      case Expr.BinaryOp.OP_% =>
+        Val.cachedNum(pos, ld % rd)
+      case Expr.BinaryOp.OP_+ =>
+        val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_- =>
+        val r = ld - rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_<< =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null // not safe integers
+        else if (rl < 0) null
+        else if (rl >= 1 && math.abs(ll) >= (1L << (63 - rl))) null
+        else Val.cachedNum(pos, (ll << rl).toDouble)
+      case Expr.BinaryOp.OP_>> =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else if (rl < 0) null
+        else Val.cachedNum(pos, (ll >> rl).toDouble)
+      case Expr.BinaryOp.OP_< => Val.bool(ld < rd)
+      case Expr.BinaryOp.OP_> => Val.bool(ld > rd)
+      case Expr.BinaryOp.OP_<= => Val.bool(ld <= rd)
+      case Expr.BinaryOp.OP_>= => Val.bool(ld >= rd)
+      case Expr.BinaryOp.OP_== => Val.bool(ld == rd)
+      case Expr.BinaryOp.OP_!= => Val.bool(ld != rd)
+      case Expr.BinaryOp.OP_& =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll & rl).toDouble)
+      case Expr.BinaryOp.OP_^ =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll ^ rl).toDouble)
+      case Expr.BinaryOp.OP_| =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll | rl).toDouble)
+      case _ => null // OP_in (string+object), OP_&&/OP_|| (short-circuit)
+    }
+
+  /**
+   * Evaluate an expression, returning null on any exception (preserving lazy error semantics for
+   * unused arguments).
+   */
+  private def tryEvalCatch(e: Expr)(implicit scope: ValScope): Val =
+    try visitExpr(e)
+    catch { case NonFatal(_) => null }
+
+  @inline private def isImmediatelyResolvable(e: Expr)(implicit scope: ValScope): Boolean =
+    e match {
+      case _: Val     => true
+      case v: ValidId => v.nameIdx < scope.length && scope.bindings(v.nameIdx) != null
+      case _          => false
+    }
 
   def visitValidId(e: ValidId)(implicit scope: ValScope): Val = {
     val ref = scope.bindings(e.nameIdx)
