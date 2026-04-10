@@ -19,13 +19,13 @@ object StdObjectRemoveKeyTests extends TestSuite {
 
     test("re-adding removed key via object inheritance") {
       eval("""std.objectRemoveKey({foo: "bar"}, "foo") + {foo: "bar2"}""") ==>
-        ujson.Obj("foo" -> "bar2")
+      ujson.Obj("foo" -> "bar2")
 
       eval("""std.objectRemoveKey({a: 1, b: 2}, "a") + {a: 3}""") ==>
-        ujson.Obj("b" -> 2, "a" -> 3)
+      ujson.Obj("b" -> 2, "a" -> 3)
 
       eval("""std.objectRemoveKey({a: 1, b: 2, c: 3}, "b") + {b: 99, d: 4}""") ==>
-        ujson.Obj("a" -> 1, "c" -> 3, "b" -> 99, "d" -> 4)
+      ujson.Obj("a" -> 1, "c" -> 3, "b" -> 99, "d" -> 4)
     }
 
     test("double removal then re-add") {
@@ -46,18 +46,18 @@ object StdObjectRemoveKeyTests extends TestSuite {
 
     test("external inheritance preserved after removal") {
       eval("{a: 1} + std.objectRemoveKey({b: super.a}, 'a')") ==>
-        ujson.Obj("a" -> 1, "b" -> 1)
+      ujson.Obj("a" -> 1, "b" -> 1)
     }
 
     test("LHS key preserved when RHS removes it") {
       eval("""{a: 1} + std.objectRemoveKey({a: 2}, "a")""") ==>
-        ujson.Obj("a" -> 1)
+      ujson.Obj("a" -> 1)
 
       eval("""{a: 1} + std.objectRemoveKey({a: 2, b: 3}, "a")""") ==>
-        ujson.Obj("a" -> 1, "b" -> 3)
+      ujson.Obj("a" -> 1, "b" -> 3)
 
       eval("""{a: 10} + std.objectRemoveKey({a: 1} + {b: super.a}, "a")""") ==>
-        ujson.Obj("a" -> 10, "b" -> 1)
+      ujson.Obj("a" -> 10, "b" -> 1)
     }
 
     test("containsKey and objectFields reflect re-added key") {
