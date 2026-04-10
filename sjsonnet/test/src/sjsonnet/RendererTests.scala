@@ -68,7 +68,7 @@ object RendererTests extends TestSuite {
     test("indentZero") {
       // indent=0 should produce newlines but no spaces
       ujson.transform(ujson.Arr(1, 2), new Renderer(indent = 0)).toString ==>
-        """[
+      """[
           |1,
           |2
           |]""".stripMargin
