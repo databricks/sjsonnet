@@ -27,7 +27,18 @@ abstract class Materializer {
 
   def apply(v: Val)(implicit evaluator: EvalScope): ujson.Value = apply0(v, ujson.Value)
   def stringify(v: Val)(implicit evaluator: EvalScope): String = {
-    apply0(v, new sjsonnet.Renderer()).toString
+    // Fast path for leaf types: avoid Renderer + StringWriter + CharBuilder allocation
+    v match {
+      case Val.True(_)   => "true"
+      case Val.False(_)  => "false"
+      case Val.Null(_)   => "null"
+      case Val.Num(_, _) =>
+        val d = v.asDouble
+        val l = d.toLong
+        if (l.toDouble == d) java.lang.Long.toString(l)
+        else RenderUtils.renderDouble(d)
+      case _ => apply0(v, new sjsonnet.Renderer()).toString
+    }
   }
 
   /**

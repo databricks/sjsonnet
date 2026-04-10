@@ -154,16 +154,19 @@ class Parser(
       }
     ) {
       Fail.opaque("numbers cannot start with a 0 digit")
-    } else if (!isValidNumberWithSeparators(numStr)) {
-      Fail.opaque("invalid underscore placement in number")
     } else {
-      // Remove underscores for parsing
-      val cleanStr = numStr.replace("_", "")
-      val v = cleanStr.toDouble
-      if (v.isInfinite) {
-        Fail.opaque("finite number required")
+      // Fast path: skip underscore validation and String.replace when no underscores present
+      val hasUnderscores = numStr.indexOf('_') >= 0
+      if (hasUnderscores && !isValidNumberWithSeparators(numStr)) {
+        Fail.opaque("invalid underscore placement in number")
       } else {
-        Pass(Val.Num(s._1, v))
+        val cleanStr = if (hasUnderscores) numStr.replace("_", "") else numStr
+        val v = cleanStr.toDouble
+        if (v.isInfinite) {
+          Fail.opaque("finite number required")
+        } else {
+          Pass(Val.Num(s._1, v))
+        }
       }
     }
   })
