@@ -830,8 +830,8 @@ object Val {
         }
         val cacheKey: Any = if (self eq this) k else (k, self)
         // Check inline cache first (avoids HashMap lookup for ≤2 cached fields)
-        if (ck1 != null && ck1.equals(cacheKey)) return cv1
-        if (ck2 != null && ck2.equals(cacheKey)) return cv2
+        if (ck1 != null && ck1 == cacheKey) return cv1
+        if (ck2 != null && ck2 == cacheKey) return cv2
         // Check overflow HashMap
         val cachedValue = if (valueCache != null) valueCache.get(cacheKey) else null
         if (cachedValue != null) {
