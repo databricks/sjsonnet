@@ -216,13 +216,15 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     }
   }
 
+  /**
+   * Bulk-copy String chars into CharBuilder's backing array. Safe because ensureLength(len)
+   * guarantees capacity for currentLength + len.
+   */
   protected def appendString(s: String): Unit = {
     val len = s.length
-    var i = 0
     elemBuilder.ensureLength(len)
-    while (i < len) {
-      elemBuilder.appendUnsafeC(s.charAt(i))
-      i += 1
-    }
+    val pos = elemBuilder.getLength
+    s.getChars(0, len, elemBuilder.arr, pos)
+    elemBuilder.length = pos + len
   }
 }
