@@ -22,7 +22,6 @@ on:
       - .github/workflows/warm-dep-cache.yaml
   schedule:
     - cron: '0 6 * * 0,3'
-  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -46,8 +45,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          ./mill "__.resolvedMvnDeps"
-          ./mill "sjsonnet.jvm[3.3.7].compile"
+          ./mill "__.checkFormat"
+          ./mill "__.compile"
           sbt update || true
 
           echo "Dependency resolution complete"
