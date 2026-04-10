@@ -23,8 +23,8 @@ object RegressionBenchmark {
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @Fork(1)
-@Warmup(iterations = 1, time = 2)
-@Measurement(iterations = 1)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 3)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
 class RegressionBenchmark {
