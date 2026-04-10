@@ -373,6 +373,13 @@ object Expr {
         asserts: Array[Member.AssertStmt])
         extends ObjBody {
       final override private[sjsonnet] def tag = ExprTags.`ObjBody.MemberList`
+
+      /**
+       * Cached sorted field order for inline objects. Computed once, shared across all Val.Obj
+       * instances created from this MemberList.
+       */
+      @volatile var _cachedSortedOrder: Array[Int] = null
+
       override def toString: String =
         s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
     }

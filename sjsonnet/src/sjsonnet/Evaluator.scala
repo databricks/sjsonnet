@@ -1454,7 +1454,7 @@ class Evaluator(
       val finalMembers =
         if (fieldCount == inlineMembers.length) inlineMembers
         else java.util.Arrays.copyOf(inlineMembers, fieldCount)
-      new Val.Obj(
+      val obj = new Val.Obj(
         objPos,
         null,
         false,
@@ -1463,6 +1463,14 @@ class Evaluator(
         inlineFieldKeys = finalKeys,
         inlineFieldMembers = finalMembers
       )
+      // Cache sorted field order on MemberList (shared across all objects from same expression)
+      var sortedOrder = e._cachedSortedOrder
+      if (sortedOrder == null && sup == null) {
+        sortedOrder = Materializer.computeSortedInlineOrder(finalKeys, finalMembers)
+        e._cachedSortedOrder = sortedOrder
+      }
+      if (sortedOrder != null) obj._sortedInlineOrder = sortedOrder
+      obj
     } else {
       new Val.Obj(
         objPos,
