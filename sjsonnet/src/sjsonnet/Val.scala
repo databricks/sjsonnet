@@ -320,7 +320,14 @@ object Val {
 
     override def asArr: Arr = this
     def length: Int = arr.length
-    def value(i: Int): Val = arr(i).value
+    def value(i: Int): Val = {
+      val e = arr(i)
+      // Inline instanceof check avoids virtual dispatch on Scala Native for strict values.
+      // Val.value is `final def value: Val = this`, but at the Eval call site the compiler
+      // emits a vtable call. The instanceof check (~1-2ns) is cheaper than vtable dispatch
+      // (~5ns on Scala Native) and has no effect on JVM where JIT devirtualizes anyway.
+      if (e.isInstanceOf[Val]) e.asInstanceOf[Val] else e.value
+    }
 
     def asLazyArray: Array[Eval] = arr.asInstanceOf[Array[Eval]]
     def asStrictArray: Array[Val] = {

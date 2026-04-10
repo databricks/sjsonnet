@@ -1560,28 +1560,42 @@ class Evaluator(
     case (x: Val.Num, y: Val.Num) => java.lang.Double.compare(x.asDouble, y.asDouble)
     case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Arr, y: Val.Arr) =>
-      val len = math.min(x.length, y.length)
+      val xArr = x.asLazyArray
+      val yArr = y.asLazyArray
+      val len = math.min(xArr.length, yArr.length)
       var i = 0
       while (i < len) {
-        val xi = x.value(i)
-        val yi = y.value(i)
-        // Post-force reference equality for shared elements (e.g., from array concatenation).
-        // Must force first to preserve error semantics on lazy elements.
-        if (!(xi eq yi)) {
-          // Inline numeric fast path avoids recursive compare() dispatch per element
-          val cmp = xi match {
-            case xn: Val.Num =>
-              yi match {
-                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-                case _           => compare(xi, yi)
-              }
-            case _ => compare(xi, yi)
+        val ex = xArr(i)
+        val ey = yArr(i)
+        // Pre-force reference equality: when both arrays share the same Eval reference
+        // (e.g., from array concatenation via System.arraycopy), skip forcing entirely
+        // for strict values (Val). For shared lazy thunks, force once to preserve error
+        // semantics — if the thunk throws, the error must still be observed.
+        if (!(ex eq ey)) {
+          // Inline instanceof check avoids virtual dispatch for strict values.
+          // On Scala Native (no JIT), Eval.value is a vtable call (~5ns); instanceof
+          // is a direct type tag check (~1-2ns).
+          val xi = if (ex.isInstanceOf[Val]) ex.asInstanceOf[Val] else ex.value
+          val yi = if (ey.isInstanceOf[Val]) ey.asInstanceOf[Val] else ey.value
+          if (!(xi eq yi)) {
+            // Inline numeric fast path avoids recursive compare() dispatch per element
+            val cmp = xi match {
+              case xn: Val.Num =>
+                yi match {
+                  case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                  case _           => compare(xi, yi)
+                }
+              case _ => compare(xi, yi)
+            }
+            if (cmp != 0) return cmp
           }
-          if (cmp != 0) return cmp
+        } else if (!ex.isInstanceOf[Val]) {
+          // Same lazy thunk — force once to preserve error semantics
+          ex.value
         }
         i += 1
       }
-      Integer.compare(x.length, y.length)
+      Integer.compare(xArr.length, yArr.length)
     case (x: Val.Bool, y: Val.Bool) => java.lang.Boolean.compare(x.asBoolean, y.asBoolean)
     case (_: Val.Null, _: Val.Null) => 0
     case _                          => compareTypeMismatch(x, y)
@@ -1606,9 +1620,24 @@ class Evaluator(
         case y: Val.Arr =>
           val xlen = x.length
           if (xlen != y.length) return false
+          val xArr = x.asLazyArray
+          val yArr = y.asLazyArray
           var i = 0
           while (i < xlen) {
-            if (!equal(x.value(i), y.value(i))) return false
+            val ex = xArr(i)
+            val ey = yArr(i)
+            // Pre-force reference equality: when both arrays share the same Eval
+            // reference (e.g., from array concatenation), skip forcing entirely for
+            // strict values (Val). For shared lazy thunks, force once to preserve
+            // error semantics. Mirrors the compare() optimization above.
+            if (!(ex eq ey)) {
+              val xi = if (ex.isInstanceOf[Val]) ex.asInstanceOf[Val] else ex.value
+              val yi = if (ey.isInstanceOf[Val]) ey.asInstanceOf[Val] else ey.value
+              if (!equal(xi, yi)) return false
+            } else if (!ex.isInstanceOf[Val]) {
+              // Same lazy thunk — force once to preserve error semantics
+              ex.value
+            }
             i += 1
           }
           true
