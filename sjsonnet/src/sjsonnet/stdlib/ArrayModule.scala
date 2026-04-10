@@ -561,11 +561,19 @@ object ArrayModule extends AbstractFunctionModule {
         pos, {
           val sz = size.cast[Val.Num].asPositiveInt
           val a = new Array[Eval](sz)
-          val noOff = pos.noOffset
-          var i = 0
-          while (i < sz) {
-            a(i) = new LazyApply1(func, Val.Num(pos, i), noOff, ev)
-            i += 1
+          val body = func.bodyExpr
+          if (func.params.names.length == 1 && body != null && body.isInstanceOf[Val.Literal]) {
+            // Function body is a constant (e.g. `function(_) 'x'`).
+            // Skip lazy thunk + Val.Num(index) allocation per element.
+            val constVal = body.asInstanceOf[Val]
+            java.util.Arrays.fill(a.asInstanceOf[Array[AnyRef]], constVal)
+          } else {
+            val noOff = pos.noOffset
+            var i = 0
+            while (i < sz) {
+              a(i) = new LazyApply1(func, Val.Num(pos, i), noOff, ev)
+              i += 1
+            }
           }
           a
         }
