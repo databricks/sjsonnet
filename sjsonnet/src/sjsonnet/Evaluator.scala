@@ -1446,55 +1446,41 @@ class Evaluator(
     case Nil => scopes
   }
 
-  // Nested match avoids Tuple2 allocation from (x, y) match { case (X, Y) => ... }
-  def compare(x: Val, y: Val): Int = x match {
-    case xn: Val.Num =>
-      y match {
-        case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xs: Val.Str =>
-      y match {
-        case ys: Val.Str => Util.compareStringsByCodepoint(xs.str, ys.str)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xb: Val.Bool =>
-      y match {
-        case yb: Val.Bool => java.lang.Boolean.compare(xb.asBoolean, yb.asBoolean)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case _: Val.Null =>
-      y match {
-        case _: Val.Null => 0
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
-      }
-    case xa: Val.Arr =>
-      y match {
-        case ya: Val.Arr =>
-          val len = math.min(xa.length, ya.length)
-          var i = 0
-          while (i < len) {
-            val xi = xa.value(i)
-            val yi = ya.value(i)
-            // Reference equality short-circuit for shared array elements
-            if (!(xi eq yi)) {
-              // Inline numeric fast path to avoid polymorphic compare() dispatch
-              val cmp = xi match {
-                case xn: Val.Num =>
-                  yi match {
-                    case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
-                    case _           => compare(xi, yi)
-                  }
-                case _ => compare(xi, yi)
+  private def compareTypeMismatch(x: Val, y: Val): Nothing =
+    Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+
+  // Tuple match keeps the method compact for JIT inlining. Scala 2.13+ pattern matcher lowers
+  // this to direct instanceof/checkcast without Tuple2 allocation. The inner array loop uses nested
+  // match for the per-element numeric fast path. Error path is extracted to keep the happy path small.
+  def compare(x: Val, y: Val): Int = (x, y) match {
+    case (x: Val.Num, y: Val.Num) => java.lang.Double.compare(x.asDouble, y.asDouble)
+    case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
+    case (x: Val.Arr, y: Val.Arr) =>
+      val len = math.min(x.length, y.length)
+      var i = 0
+      while (i < len) {
+        val xi = x.value(i)
+        val yi = y.value(i)
+        // Post-force reference equality for shared elements (e.g., from array concatenation).
+        // Must force first to preserve error semantics on lazy elements.
+        if (!(xi eq yi)) {
+          // Inline numeric fast path avoids recursive compare() dispatch per element
+          val cmp = xi match {
+            case xn: Val.Num =>
+              yi match {
+                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                case _           => compare(xi, yi)
               }
-              if (cmp != 0) return cmp
-            }
-            i += 1
+            case _ => compare(xi, yi)
           }
-          Integer.compare(xa.length, ya.length)
-        case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+          if (cmp != 0) return cmp
+        }
+        i += 1
       }
-    case _ => Error.fail("Cannot compare " + x.prettyName + " with " + y.prettyName, x.pos)
+      Integer.compare(x.length, y.length)
+    case (x: Val.Bool, y: Val.Bool) => java.lang.Boolean.compare(x.asBoolean, y.asBoolean)
+    case (_: Val.Null, _: Val.Null) => 0
+    case _                          => compareTypeMismatch(x, y)
   }
 
   def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
