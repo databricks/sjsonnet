@@ -7,6 +7,7 @@ import ujson.Value
 import sjsonnet.Evaluator.SafeDoubleOps
 
 import scala.annotation.{switch, tailrec}
+import scala.util.control.NonFatal
 
 /**
  * Recursively walks the [[Expr]] trees to convert them into into [[Val]] objects that can be
@@ -208,16 +209,54 @@ class Evaluator(
     case _ => Double.NaN
   }
 
-  /** Perform inline arithmetic, returning null on overflow or unsupported op. */
+  /**
+   * Perform inline numeric binary op, returning null on error or unsupported op. Covers arithmetic,
+   * comparison, and bitwise operators. Returns null (fallback to LazyExpr) for: overflow, division
+   * by zero, out-of-range bitwise operands, OP_in (string+object), OP_&&/OP_|| (short-circuit).
+   */
   @inline private def tryInlineArith(op: Int, ld: Double, rd: Double, pos: Position): Val =
     (op: @switch) match {
+      case Expr.BinaryOp.OP_* =>
+        val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+      case Expr.BinaryOp.OP_/ =>
+        if (rd == 0) null
+        else { val r = ld / rd; if (r.isInfinite) null else Val.cachedNum(pos, r) }
+      case Expr.BinaryOp.OP_% =>
+        Val.cachedNum(pos, ld % rd)
       case Expr.BinaryOp.OP_+ =>
         val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = ld - rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
-      case Expr.BinaryOp.OP_* =>
-        val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
-      case _ => null
+      case Expr.BinaryOp.OP_<< =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null // not safe integers
+        else if (rl < 0) null
+        else if (rl >= 1 && math.abs(ll) >= (1L << (63 - rl))) null
+        else Val.cachedNum(pos, (ll << rl).toDouble)
+      case Expr.BinaryOp.OP_>> =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else if (rl < 0) null
+        else Val.cachedNum(pos, (ll >> rl).toDouble)
+      case Expr.BinaryOp.OP_< => Val.bool(ld < rd)
+      case Expr.BinaryOp.OP_> => Val.bool(ld > rd)
+      case Expr.BinaryOp.OP_<= => Val.bool(ld <= rd)
+      case Expr.BinaryOp.OP_>= => Val.bool(ld >= rd)
+      case Expr.BinaryOp.OP_== => Val.bool(ld == rd)
+      case Expr.BinaryOp.OP_!= => Val.bool(ld != rd)
+      case Expr.BinaryOp.OP_& =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll & rl).toDouble)
+      case Expr.BinaryOp.OP_^ =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll ^ rl).toDouble)
+      case Expr.BinaryOp.OP_| =>
+        val ll = ld.toLong; val rl = rd.toLong
+        if (ll.toDouble != ld || rl.toDouble != rd) null
+        else Val.cachedNum(pos, (ll | rl).toDouble)
+      case _ => null // OP_in (string+object), OP_&&/OP_|| (short-circuit)
     }
 
   /**
@@ -226,7 +265,7 @@ class Evaluator(
    */
   private def tryEvalCatch(e: Expr)(implicit scope: ValScope): Val =
     try visitExpr(e)
-    catch { case _: Exception => null }
+    catch { case NonFatal(_) => null }
 
   @inline private def isImmediatelyResolvable(e: Expr)(implicit scope: ValScope): Boolean =
     e match {
