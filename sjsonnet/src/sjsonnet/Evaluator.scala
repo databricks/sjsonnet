@@ -238,13 +238,13 @@ class Evaluator(
         if (ll.toDouble != ld || rl.toDouble != rd) null
         else if (rl < 0) null
         else Val.cachedNum(pos, (ll >> rl).toDouble)
-      case Expr.BinaryOp.OP_< => Val.bool(ld < rd)
-      case Expr.BinaryOp.OP_> => Val.bool(ld > rd)
+      case Expr.BinaryOp.OP_<  => Val.bool(ld < rd)
+      case Expr.BinaryOp.OP_>  => Val.bool(ld > rd)
       case Expr.BinaryOp.OP_<= => Val.bool(ld <= rd)
       case Expr.BinaryOp.OP_>= => Val.bool(ld >= rd)
       case Expr.BinaryOp.OP_== => Val.bool(ld == rd)
       case Expr.BinaryOp.OP_!= => Val.bool(ld != rd)
-      case Expr.BinaryOp.OP_& =>
+      case Expr.BinaryOp.OP_&  =>
         val ll = ld.toLong; val rl = rd.toLong
         if (ll.toDouble != ld || rl.toDouble != rd) null
         else Val.cachedNum(pos, (ll & rl).toDouble)
