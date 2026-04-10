@@ -50,6 +50,10 @@ jobs:
           ./mill "__.scalaJSLinkerClasspath"
           ./mill "__.scalaNativeWorkerClasspath"
           ./mill "__.bridgeFullClassPath"
+          ./mill "__.scalaJSTestDeps"
+          ./mill "__.resolvedMvnDeps"
+          ./mill "__.resolvedRunMvnDeps"
+          ./mill "sjsonnet.graal.javaHome"
           sbt update || true
 
           echo "Dependency resolution complete"
