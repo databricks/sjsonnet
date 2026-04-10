@@ -36,11 +36,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
-
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
-
       - name: Resolve all dependencies
         run: |
           set -euo pipefail
@@ -71,5 +69,4 @@ jobs:
             ~/.cache/mill
             ~/.sbt
             ~/.ivy2/cache
-            ~/.ivy2/local
           key: ${{ steps.cache-key.outputs.key }}
