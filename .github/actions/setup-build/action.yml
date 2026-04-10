@@ -22,7 +22,6 @@ runs:
           ~/.cache/mill
           ~/.sbt
           ~/.ivy2/cache
-          ~/.ivy2/local
         key: dep-cache-${{ hashFiles('build.mill') }}
         restore-keys: dep-cache-
     - name: Set up JDK 21
