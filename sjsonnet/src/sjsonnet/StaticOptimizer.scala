@@ -279,11 +279,11 @@ class StaticOptimizer(
     if (a.namedNames != null) a
     else
       a.args.length match {
-        case 0 => Apply0(a.pos, a.value, a.tailstrict, a.autoTCO)
-        case 1 => Apply1(a.pos, a.value, a.args(0), a.tailstrict, a.autoTCO)
-        case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1), a.tailstrict, a.autoTCO)
+        case 0 => Apply0(a.pos, a.value, a.tailstrict, a.strict)
+        case 1 => Apply1(a.pos, a.value, a.args(0), a.tailstrict, a.strict)
+        case 2 => Apply2(a.pos, a.value, a.args(0), a.args(1), a.tailstrict, a.strict)
         case 3 =>
-          Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2), a.tailstrict, a.autoTCO)
+          Apply3(a.pos, a.value, a.args(0), a.args(1), a.args(2), a.tailstrict, a.strict)
         case _ => a
       }
   }
@@ -595,9 +595,10 @@ class StaticOptimizer(
    * because the TailCall trampoline would loop forever — the function never produces a base-case
    * result.
    *
-   * The analysis mirrors `markTailCalls` traversal: it propagates through IfElse, LocalExpr, and
-   * AssertExpr (the same positions where tail calls are detected), returning `true` as soon as any
-   * leaf expression is found that is NOT a self-recursive call.
+   * The analysis mirrors `markTailCalls` traversal: it propagates through IfElse, LocalExpr,
+   * AssertExpr, And/Or (rhs only), and Expr.Error (value) — the same positions where tail calls are
+   * detected, returning `true` as soon as any leaf expression is found that is NOT a self-recursive
+   * call.
    */
   private def hasNonRecursiveExit(
       body: Expr,
@@ -645,6 +646,20 @@ class StaticOptimizer(
         hasNonRecursiveExit(e.returned, selfName, selfIdx, paramCount)
       case e: AssertExpr =>
         hasNonRecursiveExit(e.returned, selfName, selfIdx, paramCount)
+      case e: And =>
+        // rhs of && is in tail position (when lhs is true, rhs result is returned directly).
+        // lhs is NOT in tail position, but provides a control-flow exit path (returns false
+        // when lhs is false). We must still check rhs for non-recursive exits to prevent
+        // auto-TCO on functions with no base case (e.g. `f() = true && f()`).
+        hasNonRecursiveExit(e.rhs, selfName, selfIdx, paramCount)
+      case e: Or =>
+        // rhs of || is in tail position (when lhs is false, rhs result is returned directly).
+        // lhs is NOT in tail position, but provides a control-flow exit path (returns true
+        // when lhs is true). We must still check rhs for non-recursive exits.
+        hasNonRecursiveExit(e.rhs, selfName, selfIdx, paramCount)
+      case _: Expr.Error =>
+        // error value is the last thing evaluated before throwing → non-recursive exit
+        true
       case e if isSelfTailCall(e) =>
         false // this path IS a self-recursive tail call → not a non-recursive exit
       case _ =>
@@ -661,6 +676,9 @@ class StaticOptimizer(
    *   - Both branches of `if-else`
    *   - The `returned` expression of `local ... ; returned`
    *   - The `returned` expression of `assert ... ; returned`
+   *   - The `rhs` of `lhs && rhs` (when lhs is true, rhs is the result)
+   *   - The `rhs` of `lhs || rhs` (when lhs is false, rhs is the result)
+   *   - The `value` of `error value` (last thing evaluated before throwing)
    *
    * This matches the evaluator's `visitExprWithTailCallSupport` propagation rules exactly.
    *
@@ -701,21 +719,39 @@ class StaticOptimizer(
         if (ret eq e.returned) body
         else AssertExpr(e.pos, e.asserted, ret)
 
-      // Self-recursive tail calls: mark as tailstrict + autoTCO to enable the TailCall trampoline
+      case e: And =>
+        // rhs of && is in tail position: when lhs evaluates to true, rhs is returned directly
+        val rhs2 = markTailCalls(e.rhs, selfName, selfIdx, paramCount)
+        if (rhs2 eq e.rhs) body
+        else And(e.pos, e.lhs, rhs2)
+
+      case e: Or =>
+        // rhs of || is in tail position: when lhs evaluates to false, rhs is returned directly
+        val rhs2 = markTailCalls(e.rhs, selfName, selfIdx, paramCount)
+        if (rhs2 eq e.rhs) body
+        else Or(e.pos, e.lhs, rhs2)
+
+      case e: Expr.Error =>
+        // error value is in tail position (last thing evaluated before throwing)
+        val v = markTailCalls(e.value, selfName, selfIdx, paramCount)
+        if (v eq e.value) body
+        else Expr.Error(e.pos, v)
+
+      // Self-recursive tail calls: mark as tailstrict + strict=false to enable the TailCall trampoline
       // while preserving lazy argument semantics (auto-TCO uses TailstrictModeAutoTCO, not
       // TailstrictModeEnabled, so arguments are not eagerly forced).
       // Only match when call arity == param count (no named args, no default args involved).
       case a: Apply0 if !a.tailstrict && isSelfCall(a.value, 0) =>
-        Apply0(a.pos, a.value, tailstrict = true, autoTCO = true)
+        Apply0(a.pos, a.value, tailstrict = true, strict = false)
       case a: Apply1 if !a.tailstrict && isSelfCall(a.value, 1) =>
-        Apply1(a.pos, a.value, a.a1, tailstrict = true, autoTCO = true)
+        Apply1(a.pos, a.value, a.a1, tailstrict = true, strict = false)
       case a: Apply2 if !a.tailstrict && isSelfCall(a.value, 2) =>
-        Apply2(a.pos, a.value, a.a1, a.a2, tailstrict = true, autoTCO = true)
+        Apply2(a.pos, a.value, a.a1, a.a2, tailstrict = true, strict = false)
       case a: Apply3 if !a.tailstrict && isSelfCall(a.value, 3) =>
-        Apply3(a.pos, a.value, a.a1, a.a2, a.a3, tailstrict = true, autoTCO = true)
+        Apply3(a.pos, a.value, a.a1, a.a2, a.a3, tailstrict = true, strict = false)
       case a: Apply
           if !a.tailstrict && a.namedNames == null && isSelfCall(a.value, a.args.length) =>
-        Apply(a.pos, a.value, a.args, null, tailstrict = true, autoTCO = true)
+        Apply(a.pos, a.value, a.args, null, tailstrict = true, strict = false)
 
       case _ => body
     }

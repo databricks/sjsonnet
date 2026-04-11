@@ -14,37 +14,37 @@ abstract class ExprTransform {
         if (x2 eq x) expr
         else Select(pos, x2, name)
 
-      case Apply(pos, x, y, namedNames, tailstrict, autoTCO) =>
+      case Apply(pos, x, y, namedNames, tailstrict, strict) =>
         val x2 = transform(x)
         val y2 = transformArr(y)
         if ((x2 eq x) && (y2 eq y)) expr
-        else Apply(pos, x2, y2, namedNames, tailstrict, autoTCO)
+        else Apply(pos, x2, y2, namedNames, tailstrict, strict)
 
-      case Apply0(pos, x, tailstrict, autoTCO) =>
+      case Apply0(pos, x, tailstrict, strict) =>
         val x2 = transform(x)
         if (x2 eq x) expr
-        else Apply0(pos, x2, tailstrict, autoTCO)
+        else Apply0(pos, x2, tailstrict, strict)
 
-      case Apply1(pos, x, y, tailstrict, autoTCO) =>
+      case Apply1(pos, x, y, tailstrict, strict) =>
         val x2 = transform(x)
         val y2 = transform(y)
         if ((x2 eq x) && (y2 eq y)) expr
-        else Apply1(pos, x2, y2, tailstrict, autoTCO)
+        else Apply1(pos, x2, y2, tailstrict, strict)
 
-      case Apply2(pos, x, y, z, tailstrict, autoTCO) =>
+      case Apply2(pos, x, y, z, tailstrict, strict) =>
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
         if ((x2 eq x) && (y2 eq y) && (z2 eq z)) expr
-        else Apply2(pos, x2, y2, z2, tailstrict, autoTCO)
+        else Apply2(pos, x2, y2, z2, tailstrict, strict)
 
-      case Apply3(pos, x, y, z, a, tailstrict, autoTCO) =>
+      case Apply3(pos, x, y, z, a, tailstrict, strict) =>
         val x2 = transform(x)
         val y2 = transform(y)
         val z2 = transform(z)
         val a2 = transform(a)
         if ((x2 eq x) && (y2 eq y) && (z2 eq z) && (a2 eq a)) expr
-        else Apply3(pos, x2, y2, z2, a2, tailstrict, autoTCO)
+        else Apply3(pos, x2, y2, z2, a2, tailstrict, strict)
 
       case ApplyBuiltin(pos, func, x, tailstrict) =>
         val x2 = transformArr(x)

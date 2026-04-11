@@ -1437,17 +1437,17 @@ case object TailstrictModeAutoTCO extends TailstrictMode
  * pass `TailstrictModeEnabled` / `TailstrictModeAutoTCO` (so the caller resolves it) or guard the
  * result with [[TailCall.resolve]].
  *
- * @param autoTCO
- *   when true, [[TailCall.resolve]] uses [[TailstrictModeAutoTCO]] so that arguments remain lazy
- *   (preserving Jsonnet semantics). When false, [[TailstrictModeEnabled]] is used (explicit
- *   `tailstrict` — eager argument forcing per the Jsonnet spec).
+ * @param strict
+ *   when true, [[TailCall.resolve]] uses [[TailstrictModeEnabled]] (explicit `tailstrict` — eager
+ *   argument forcing per the Jsonnet spec). When false, [[TailstrictModeAutoTCO]] is used so that
+ *   arguments remain lazy (preserving Jsonnet semantics).
  */
 final class TailCall(
     val func: Val.Func,
     val args: Array[Eval],
     val namedNames: Array[String],
     val callSiteExpr: Expr,
-    val autoTCO: Boolean = false)
+    val strict: Boolean = false)
     extends Val {
   private[sjsonnet] def valTag: Byte = -1
   def pos: Position = callSiteExpr.pos
@@ -1462,10 +1462,10 @@ object TailCall {
    * is returned immediately. Otherwise, each TailCall's target function is re-invoked until a
    * non-TailCall result is produced.
    *
-   * The mode used for re-invocation depends on [[TailCall.autoTCO]]:
-   *   - `autoTCO = false` (explicit `tailstrict`): uses [[TailstrictModeEnabled]], which forces
-   *     eager argument evaluation inside `func.apply`.
-   *   - `autoTCO = true` (auto-TCO): uses [[TailstrictModeAutoTCO]], which preserves lazy argument
+   * The mode used for re-invocation depends on [[TailCall.strict]]:
+   *   - `strict = true` (explicit `tailstrict`): uses [[TailstrictModeEnabled]], which forces eager
+   *     argument evaluation inside `func.apply`.
+   *   - `strict = false` (auto-TCO): uses [[TailstrictModeAutoTCO]], which preserves lazy argument
    *     evaluation — arguments are only evaluated when the function body accesses them.
    *
    * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
@@ -1475,7 +1475,7 @@ object TailCall {
   def resolve(current: Val)(implicit ev: EvalScope): Val = current match {
     case tc: TailCall =>
       val mode: TailstrictMode =
-        if (tc.autoTCO) TailstrictModeAutoTCO else TailstrictModeEnabled
+        if (tc.strict) TailstrictModeEnabled else TailstrictModeAutoTCO
       val next =
         try {
           tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)(ev, mode)

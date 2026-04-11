@@ -621,13 +621,13 @@ class Evaluator(
       // Auto-TCO'd calls should normally be intercepted by visitExprWithTailCallSupport,
       // but we handle them defensively here to preserve lazy semantics if this path is ever reached.
       implicit val tailstrictMode: TailstrictMode =
-        if (e.isAutoTCO) TailstrictModeAutoTCO
+        if (!e.strict && e.tailstrict) TailstrictModeAutoTCO
         else if (e.tailstrict) TailstrictModeEnabled
         else TailstrictModeDisabled
 
       if (e.tailstrict) {
         val args: Array[Eval] =
-          if (e.isAutoTCO) e.args.map(visitAsLazy(_))
+          if (!e.strict) e.args.map(visitAsLazy(_))
           else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
         TailCall.resolve(lhs.cast[Val.Func].apply(args, e.namedNames, e.pos))
       } else {
@@ -642,7 +642,7 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.isAutoTCO) TailstrictModeAutoTCO
+        if (!e.strict && e.tailstrict) TailstrictModeAutoTCO
         else if (e.tailstrict) TailstrictModeEnabled
         else TailstrictModeDisabled
       if (e.tailstrict) {
@@ -659,11 +659,11 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.isAutoTCO) TailstrictModeAutoTCO
+        if (!e.strict && e.tailstrict) TailstrictModeAutoTCO
         else if (e.tailstrict) TailstrictModeEnabled
         else TailstrictModeDisabled
       if (e.tailstrict) {
-        val arg: Eval = if (e.isAutoTCO) visitAsLazy(e.a1) else visitExpr(e.a1)
+        val arg: Eval = if (!e.strict) visitAsLazy(e.a1) else visitExpr(e.a1)
         TailCall.resolve(lhs.cast[Val.Func].apply1(arg, e.pos))
       } else {
         val l1 = visitAsLazy(e.a1)
@@ -678,12 +678,12 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.isAutoTCO) TailstrictModeAutoTCO
+        if (!e.strict && e.tailstrict) TailstrictModeAutoTCO
         else if (e.tailstrict) TailstrictModeEnabled
         else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        if (e.isAutoTCO) {
+        if (!e.strict) {
           TailCall.resolve(
             lhs.cast[Val.Func].apply2(visitAsLazy(e.a1), visitAsLazy(e.a2), e.pos)
           )
@@ -704,12 +704,12 @@ class Evaluator(
     try {
       val lhs = visitExpr(e.value)
       implicit val tailstrictMode: TailstrictMode =
-        if (e.isAutoTCO) TailstrictModeAutoTCO
+        if (!e.strict && e.tailstrict) TailstrictModeAutoTCO
         else if (e.tailstrict) TailstrictModeEnabled
         else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        if (e.isAutoTCO) {
+        if (!e.strict) {
           TailCall.resolve(
             lhs
               .cast[Val.Func]
@@ -1188,13 +1188,36 @@ class Evaluator(
       }
     }
 
+  // And/Or rhs tail-position helpers — extracted to preserve @tailrec on visitExprWithTailCallSupport.
+  // TailCall sentinels pass through without a boolean type check: this is a deliberate semantic
+  // relaxation matching google/jsonnet behavior (where `&&` is simply `if a then b else false`).
+  // Direct non-boolean rhs values (e.g. `true && "hello"`) are still caught.
+  private def visitAndRhsTailPos(rhs: Expr, andPos: Position)(implicit scope: ValScope): Val = {
+    visitExprWithTailCallSupport(rhs) match {
+      case b: Val.Bool  => b
+      case tc: TailCall => tc
+      case unknown      =>
+        Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", andPos)
+    }
+  }
+
+  private def visitOrRhsTailPos(rhs: Expr, orPos: Position)(implicit scope: ValScope): Val = {
+    visitExprWithTailCallSupport(rhs) match {
+      case b: Val.Bool  => b
+      case tc: TailCall => tc
+      case unknown      =>
+        Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", orPos)
+    }
+  }
+
   /**
    * Evaluate an expression with tail-call support. When a `tailstrict` call is encountered at a
    * potential tail position, returns a [[TailCall]] sentinel instead of recursing, enabling
    * `TailCall.resolve` in `visitApply*` to iterate rather than grow the JVM stack.
    *
    * Potential tail positions are propagated through: IfElse (both branches), LocalExpr (returned),
-   * and AssertExpr (returned). All other expression types delegate to normal `visitExpr`.
+   * AssertExpr (returned), And (rhs), Or (rhs), and Expr.Error (value). All other expression types
+   * delegate to normal `visitExpr`.
    */
   @tailrec
   private def visitExprWithTailCallSupport(e: Expr)(implicit scope: ValScope): Val = e match {
@@ -1238,6 +1261,26 @@ class Evaluator(
         }
       }
       visitExprWithTailCallSupport(e.returned)
+    case e: And =>
+      // rhs of && is in tail position: when lhs is true, rhs is returned directly.
+      // Type check via helper to preserve @tailrec on this method.
+      visitExpr(e.lhs) match {
+        case _: Val.True  => visitAndRhsTailPos(e.rhs, e.pos)
+        case _: Val.False => Val.staticFalse
+        case unknown      =>
+          Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+      }
+    case e: Or =>
+      // rhs of || is in tail position: when lhs is false, rhs is returned directly.
+      // Type check via helper to preserve @tailrec on this method.
+      visitExpr(e.lhs) match {
+        case _: Val.True  => Val.staticTrue
+        case _: Val.False => visitOrRhsTailPos(e.rhs, e.pos)
+        case unknown      =>
+          Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+      }
+    case e: Expr.Error =>
+      Error.fail(materializeError(visitExpr(e.value)), e.pos)
     // Tail-position tailstrict calls: match TailstrictableExpr to unify the tailstrict guard,
     // then dispatch by concrete type.
     //
@@ -1252,41 +1295,41 @@ class Evaluator(
       e match {
         case e: Apply =>
           try {
+            val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
-            val isAuto = e.isAutoTCO
             val args: Array[Eval] =
-              if (isAuto) e.args.map(visitAsLazy(_))
+              if (!isStrict) e.args.map(visitAsLazy(_))
               else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
-            new TailCall(func, args, e.namedNames, e, autoTCO = isAuto)
+            new TailCall(func, args, e.namedNames, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply0 =>
           try {
             val func = visitExpr(e.value).cast[Val.Func]
-            new TailCall(func, Evaluator.emptyLazyArray, null, e, autoTCO = e.isAutoTCO)
+            new TailCall(func, Evaluator.emptyLazyArray, null, e, strict = e.isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply1 =>
           try {
+            val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
-            val isAuto = e.isAutoTCO
-            val arg: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
-            new TailCall(func, Array[Eval](arg), null, e, autoTCO = isAuto)
+            val arg: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
+            new TailCall(func, Array[Eval](arg), null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply2 =>
           try {
+            val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
-            val isAuto = e.isAutoTCO
-            val a1: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
-            val a2: Eval = if (isAuto) visitAsLazy(e.a2) else visitExpr(e.a2)
-            new TailCall(func, Array[Eval](a1, a2), null, e, autoTCO = isAuto)
+            val a1: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
+            val a2: Eval = if (!isStrict) visitAsLazy(e.a2) else visitExpr(e.a2)
+            new TailCall(func, Array[Eval](a1, a2), null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply3 =>
           try {
+            val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
-            val isAuto = e.isAutoTCO
-            val a1: Eval = if (isAuto) visitAsLazy(e.a1) else visitExpr(e.a1)
-            val a2: Eval = if (isAuto) visitAsLazy(e.a2) else visitExpr(e.a2)
-            val a3: Eval = if (isAuto) visitAsLazy(e.a3) else visitExpr(e.a3)
-            new TailCall(func, Array[Eval](a1, a2, a3), null, e, autoTCO = isAuto)
+            val a1: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
+            val a2: Eval = if (!isStrict) visitAsLazy(e.a2) else visitExpr(e.a2)
+            val a3: Eval = if (!isStrict) visitAsLazy(e.a3) else visitExpr(e.a3)
+            new TailCall(func, Array[Eval](a1, a2, a3), null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case _ => visitExpr(e)
       }
