@@ -534,6 +534,9 @@ object Val {
 
   object Obj {
 
+    /** Package-private ref to DebugStats, set by Evaluator when --debug-stats is active. */
+    private[sjsonnet] var currentDebugStats: DebugStats = _
+
     /**
      * @param add
      *   whether this field was defined the "+:", "+::" or "+:::" separators, corresponding to the
@@ -639,7 +642,11 @@ object Val {
       if (ck1 == null) { ck1 = key; cv1 = v }
       else if (ck2 == null) { ck2 = key; cv2 = v }
       else {
-        if (valueCache == null) valueCache = new util.HashMap[Any, Val]()
+        if (valueCache == null) {
+          val ds = Obj.currentDebugStats
+          if (ds != null) ds.valueCacheOverflows += 1
+          valueCache = new util.HashMap[Any, Val]()
+        }
         valueCache.put(key, v)
       }
     }
@@ -741,6 +748,8 @@ object Val {
     }
 
     def addSuper(pos: Position, lhs: Val.Obj): Val.Obj = {
+      val ds = Obj.currentDebugStats
+      if (ds != null) ds.addSuperCalls += 1
       // Fast path: no super chain — avoid ArrayBuilder + Array allocation.
       // Invariant: excludedKeys != null implies getSuper != null (removeKeys always sets super),
       // so when getSuper == null, excludedKeys is always null and the re-introduction logic
@@ -758,6 +767,7 @@ object Val {
           null
         )
       }
+      if (ds != null) ds.addSuperChainWalks += 1
       // Single traversal: collect chain in this-first order
       val builder = new mutable.ArrayBuilder.ofRef[Val.Obj]
       var current = this
@@ -766,6 +776,8 @@ object Val {
         current = current.getSuper
       }
       val chain = builder.result()
+      if (ds != null && chain.length > ds.maxSuperChainDepth)
+        ds.maxSuperChainDepth = chain.length
 
       // Pre-collect all keys defined in this chain once (only needed if any obj has excludedKeys)
       lazy val keysInThisChain: java.util.Set[String] = {
@@ -1023,24 +1035,31 @@ object Val {
     }
 
     def value(k: String, pos: Position, self: Obj = this)(implicit evaluator: EvalScope): Val = {
+      val ds = evaluator.debugStats
+      if (ds != null) ds.fieldLookups += 1
       if (static) {
         valueCache.get(k) match {
           case null => Error.fail("Field does not exist: " + k, pos)
-          case x    => x
+          case x    =>
+            if (ds != null) ds.fieldCacheHits += 1
+            x
         }
       } else {
-        // Check if the key is excluded (used by objectRemoveKey)
-        // When self != this, we need to check if the key exists in self's visible keys
         if ((self eq this) && excludedKeys != null && excludedKeys.contains(k)) {
           Error.fail("Field does not exist: " + k, pos)
         }
         val cacheKey: Any = if (self eq this) k else (k, self)
-        // Check inline cache first (avoids HashMap lookup for ≤2 cached fields)
-        if (ck1 != null && ck1 == cacheKey) return cv1
-        if (ck2 != null && ck2 == cacheKey) return cv2
-        // Check overflow HashMap
+        if (ck1 != null && ck1 == cacheKey) {
+          if (ds != null) ds.fieldCacheHits += 1
+          return cv1
+        }
+        if (ck2 != null && ck2 == cacheKey) {
+          if (ds != null) ds.fieldCacheHits += 1
+          return cv2
+        }
         val cachedValue = if (valueCache != null) valueCache.get(cacheKey) else null
         if (cachedValue != null) {
+          if (ds != null) ds.fieldCacheHits += 1
           cachedValue
         } else {
           valueRaw(k, self, pos, this, cacheKey) match {
@@ -1711,6 +1730,7 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   val emptyMaterializeFileScopePos = new Position(emptyMaterializeFileScope, -1)
 
   def settings: Settings
+  def debugStats: DebugStats
   def trace(msg: String): Unit
   def warn(e: Error): Unit
 

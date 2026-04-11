@@ -23,6 +23,15 @@ final class DebugStats {
   var arrayCompIterations: Long = 0
   var objectCompIterations: Long = 0
 
+  // -- Objects --
+  var objectsCreated: Long = 0
+  var addSuperCalls: Long = 0
+  var addSuperChainWalks: Long = 0
+  var maxSuperChainDepth: Int = 0
+  var valueCacheOverflows: Long = 0
+  var fieldLookups: Long = 0
+  var fieldCacheHits: Long = 0
+
   // -- Parse / import --
   var filesParsed: Long = 0
   var importCalls: Long = 0
@@ -45,6 +54,13 @@ final class DebugStats {
     sb.append(formatLine("max_stack_depth", maxStackDepth))
     sb.append(formatLine("array_comp_iterations", arrayCompIterations))
     sb.append(formatLine("object_comp_iterations", objectCompIterations))
+    sb.append(formatLine("objects_created", objectsCreated))
+    sb.append(formatLine("add_super_calls", addSuperCalls))
+    sb.append(formatLine("add_super_chain_walks", addSuperChainWalks))
+    sb.append(formatLine("max_super_chain_depth", maxSuperChainDepth))
+    sb.append(formatLine("value_cache_overflows", valueCacheOverflows))
+    sb.append(formatLine("field_lookups", fieldLookups))
+    sb.append(formatLine("field_cache_hits", fieldCacheHits))
     sb.append(formatLine("files_parsed", filesParsed))
     sb.append(formatLine("import_calls", importCalls))
     sb.append(formatLine("import_cache_hits", importCacheHits))
