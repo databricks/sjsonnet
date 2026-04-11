@@ -354,16 +354,38 @@ object ArrayModule extends AbstractFunctionModule {
               if (result != null) return result
             case _ =>
           }
-          var current = initVal
           val lazyArr = arr.asLazyArray
           val noOff = pos.noOffset
-          var i = 0
-          while (i < lazyArr.length) {
-            val c = current
-            current = func.apply2(c, lazyArr(i), noOff)(ev, TailstrictModeDisabled)
-            i += 1
+          if (!func.isInstanceOf[Val.Builtin] && func.params.names.length == 2) {
+            // Scope reuse: extend scope once, mutate bindings per iteration.
+            // Safe because evalRhsResolved forces the result immediately — the mutable
+            // scope slots cannot leak into a lazy value that outlives the iteration.
+            val funDefFileScope: FileScope = func.pos match {
+              case null => noOff.fileScope
+              case pp   => pp.fileScope
+            }
+            val newScope: ValScope = func.defSiteValScope.extendBy(2)
+            val accIdx = newScope.length - 2
+            val elemIdx = newScope.length - 1
+            var current: Val = initVal
+            var i = 0
+            while (i < lazyArr.length) {
+              newScope.bindings(accIdx) = current
+              newScope.bindings(elemIdx) = lazyArr(i)
+              current = func.evalRhsResolved(newScope, ev, funDefFileScope, noOff)
+              i += 1
+            }
+            current
+          } else {
+            var current: Val = initVal
+            var i = 0
+            while (i < lazyArr.length) {
+              val c = current
+              current = func.apply2(c, lazyArr(i), noOff)(ev, TailstrictModeDisabled)
+              i += 1
+            }
+            current
           }
-          current
 
         case s: Val.Str =>
           var current = init.value
@@ -392,15 +414,37 @@ object ArrayModule extends AbstractFunctionModule {
       val func = _func.value.asFunc
       arr.value match {
         case arr: Val.Arr =>
-          var current = init.value
           val lazyArr = arr.asLazyArray
-          var i = lazyArr.length - 1
-          while (i >= 0) {
-            val c = current
-            current = func.apply2(lazyArr(i), c, pos.noOffset)(ev, TailstrictModeDisabled)
-            i -= 1
+          val noOff = pos.noOffset
+          if (!func.isInstanceOf[Val.Builtin] && func.params.names.length == 2) {
+            // Scope reuse: same pattern as Foldl but reversed iteration.
+            // foldr callback is func(elem, acc) — elem is first param.
+            val funDefFileScope: FileScope = func.pos match {
+              case null => noOff.fileScope
+              case pp   => pp.fileScope
+            }
+            val newScope: ValScope = func.defSiteValScope.extendBy(2)
+            val elemIdx = newScope.length - 2
+            val accIdx = newScope.length - 1
+            var current: Val = init.value
+            var i = lazyArr.length - 1
+            while (i >= 0) {
+              newScope.bindings(elemIdx) = lazyArr(i)
+              newScope.bindings(accIdx) = current
+              current = func.evalRhsResolved(newScope, ev, funDefFileScope, noOff)
+              i -= 1
+            }
+            current
+          } else {
+            var current = init.value
+            var i = lazyArr.length - 1
+            while (i >= 0) {
+              val c = current
+              current = func.apply2(lazyArr(i), c, noOff)(ev, TailstrictModeDisabled)
+              i -= 1
+            }
+            current
           }
-          current
         case s: Val.Str =>
           var current = init.value
           val str = s.str
