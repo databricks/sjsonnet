@@ -14,10 +14,20 @@ import upickle.core.{ArrVisitor, ObjVisitor}
  *   - Doubles via [[RenderUtils.renderDouble]] (matches google/jsonnet output)
  *   - Empty arrays render as `[ ]`, empty objects as `{ }`
  *   - Comma-space separator when indent=-1 (minified mode)
+ *
+ * Uses reusable visitor instances to avoid per-object/array allocation.
  */
 class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), indent: Int = -1)
     extends BaseByteRenderer(out, indent) {
   var newlineBuffered = false
+
+  // Track empty state per nesting level. Bit i = 1 means level i has seen a value.
+  // Supports up to 64 levels of nesting (realistic JSON rarely exceeds ~20).
+  private var emptyBits: Long = 0L
+
+  @inline private def markNonEmpty(): Unit = emptyBits |= (1L << depth)
+  @inline private def isEmpty: Boolean = (emptyBits & (1L << depth)) == 0L
+  @inline private def resetEmpty(): Unit = emptyBits &= ~(1L << depth)
 
   override def visitFloat64(d: Double, index: Int): OutputStream = {
     flushBuffer()
@@ -63,29 +73,24 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     commaBuffered = false
   }
 
-  override def visitArray(
-      length: Int,
-      index: Int): upickle.core.ArrVisitor[OutputStream, OutputStream] {
+  // Reusable ArrVisitor — avoids per-array allocation
+  private val reusableArrVisitor: ArrVisitor[OutputStream, OutputStream] {
     def subVisitor: sjsonnet.ByteRenderer
   } = new ArrVisitor[OutputStream, OutputStream] {
-    var empty = true
-    flushBuffer()
-    elemBuilder.append('[')
-    newlineBuffered = true
-
-    depth += 1
     def subVisitor: sjsonnet.ByteRenderer = ByteRenderer.this
     def visitValue(v: OutputStream, index: Int): Unit = {
-      empty = false
+      markNonEmpty()
       flushBuffer()
       commaBuffered = true
     }
     def visitEnd(index: Int): OutputStream = {
       commaBuffered = false
       newlineBuffered = false
+      val wasEmpty = isEmpty
+      resetEmpty()
       depth -= 1
 
-      if (empty) elemBuilder.append(' ')
+      if (wasEmpty) elemBuilder.append(' ')
       else renderIndent()
       elemBuilder.append(']')
       flushByteBuilder()
@@ -93,20 +98,14 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     }
   }
 
-  override def visitObject(
-      length: Int,
-      index: Int): upickle.core.ObjVisitor[OutputStream, OutputStream] {
+  // Reusable ObjVisitor — avoids per-object allocation
+  private val reusableObjVisitor: ObjVisitor[OutputStream, OutputStream] {
     def subVisitor: sjsonnet.ByteRenderer; def visitKey(index: Int): sjsonnet.ByteRenderer
   } = new ObjVisitor[OutputStream, OutputStream] {
-    var empty = true
-    flushBuffer()
-    elemBuilder.append('{')
-    newlineBuffered = true
-    depth += 1
     def subVisitor: sjsonnet.ByteRenderer = ByteRenderer.this
     def visitKey(index: Int): sjsonnet.ByteRenderer = ByteRenderer.this
     def visitKeyValue(v: Any): Unit = {
-      empty = false
+      markNonEmpty()
       elemBuilder.append(':')
       elemBuilder.append(' ')
     }
@@ -116,13 +115,41 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     def visitEnd(index: Int): OutputStream = {
       commaBuffered = false
       newlineBuffered = false
+      val wasEmpty = isEmpty
+      resetEmpty()
       depth -= 1
 
-      if (empty) elemBuilder.append(' ')
+      if (wasEmpty) elemBuilder.append(' ')
       else renderIndent()
       elemBuilder.append('}')
       flushByteBuilder()
       out
     }
+  }
+
+  override def visitArray(
+      length: Int,
+      index: Int): upickle.core.ArrVisitor[OutputStream, OutputStream] {
+    def subVisitor: sjsonnet.ByteRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('[')
+    newlineBuffered = true
+    depth += 1
+    resetEmpty()
+    reusableArrVisitor
+  }
+
+  override def visitObject(
+      length: Int,
+      index: Int): upickle.core.ObjVisitor[OutputStream, OutputStream] {
+    def subVisitor: sjsonnet.ByteRenderer; def visitKey(index: Int): sjsonnet.ByteRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('{')
+    newlineBuffered = true
+    depth += 1
+    resetEmpty()
+    reusableObjVisitor
   }
 }
