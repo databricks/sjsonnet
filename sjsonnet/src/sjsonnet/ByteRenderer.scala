@@ -42,12 +42,21 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     }
     if (indent == -1) ()
     else if (commaBuffered || newlineBuffered) {
-      var i = indent * depth
-      elemBuilder.ensureLength(i + 1)
+      val nSpaces = indent * depth
+      elemBuilder.ensureLength(nSpaces + 1)
       elemBuilder.append('\n')
-      while (i > 0) {
-        elemBuilder.append(' ')
-        i -= 1
+      if (nSpaces > 0) {
+        val spaces = BaseByteRenderer.SPACES
+        val arr = elemBuilder.arr
+        var pos = elemBuilder.length
+        var remaining = nSpaces
+        while (remaining > 0) {
+          val chunk = math.min(remaining, spaces.length)
+          System.arraycopy(spaces, 0, arr, pos, chunk)
+          pos += chunk
+          remaining -= chunk
+        }
+        elemBuilder.length = pos
       }
     }
     newlineBuffered = false

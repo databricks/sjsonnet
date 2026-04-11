@@ -305,12 +305,21 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   final def renderIndent(): Unit = {
     if (indent == -1) ()
     else {
-      var i = indent * depth
-      elemBuilder.ensureLength(i + 1)
+      val nSpaces = indent * depth
+      elemBuilder.ensureLength(nSpaces + newline.length)
       elemBuilder.appendAll(newline, newline.length)
-      while (i > 0) {
-        elemBuilder.appendUnsafeC(' ')
-        i -= 1
+      if (nSpaces > 0) {
+        val spaces = BaseByteRenderer.SPACES
+        val arr = elemBuilder.arr
+        var pos = elemBuilder.length
+        var remaining = nSpaces
+        while (remaining > 0) {
+          val chunk = math.min(remaining, spaces.length)
+          System.arraycopy(spaces, 0, arr, pos, chunk)
+          pos += chunk
+          remaining -= chunk
+        }
+        elemBuilder.length = pos
       }
     }
   }
@@ -330,6 +339,13 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 }
 
 object BaseByteRenderer {
+
+  /** Pre-allocated spaces buffer for bulk indentation. */
+  private[sjsonnet] val SPACES: Array[Byte] = {
+    val a = new Array[Byte](64)
+    java.util.Arrays.fill(a, ' '.toByte)
+    a
+  }
 
   /** Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue).
    * Not thread-safe, but renderers are single-threaded. */
