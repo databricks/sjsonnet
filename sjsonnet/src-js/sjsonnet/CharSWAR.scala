@@ -27,7 +27,7 @@ object CharSWAR {
   def hasEscapeChar(arr: Array[Byte], from: Int, to: Int): Boolean = {
     var i = from
     while (i < to) {
-      val b = arr(i) & 0xFF
+      val b = arr(i) & 0xff
       if (b < 32 || b == '"' || b == '\\') return true
       i += 1
     }

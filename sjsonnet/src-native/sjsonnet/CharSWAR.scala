@@ -5,26 +5,26 @@ import scala.scalanative.runtime.{ByteArray, Intrinsics}
 /**
  * SWAR (SIMD Within A Register) escape-char scanner for Scala Native.
  *
- * Uses Scala Native's `Intrinsics.loadLong` + `ByteArray.atRawUnsafe` for
- * zero-overhead 8-byte bulk reads directly from Array[Byte] memory, matching
- * the JVM VarHandle SWAR performance.
+ * Uses Scala Native's `Intrinsics.loadLong` + `ByteArray.atRawUnsafe` for zero-overhead 8-byte bulk
+ * reads directly from Array[Byte] memory, matching the JVM VarHandle SWAR performance.
  *
- * For String scanning, uses `getBytes(UTF-8)` + byte[] SWAR. On Scala Native
- * compact strings are UTF-16, so converting to bytes first is necessary.
+ * For String scanning, uses `getBytes(UTF-8)` + byte[] SWAR. On Scala Native compact strings are
+ * UTF-16, so converting to bytes first is necessary.
  *
- * Based on Hacker's Delight Ch. 6 zero-detection formula.
+ * Inspired by netty's SWARUtil (io.netty.util.SWARUtil) and Hacker's Delight Ch. 6 zero-detection
+ * formula.
  */
 object CharSWAR {
 
   // --- 8-bit SWAR constants ---
-  private final val HOLE  = 0x7f7f7f7f7f7f7f7fL
+  private final val HOLE = 0x7f7f7f7f7f7f7f7fL
   private final val QUOTE = 0x2222222222222222L
   private final val BSLAS = 0x5c5c5c5c5c5c5c5cL
-  private final val CTRL  = 0xe0e0e0e0e0e0e0e0L
+  private final val CTRL = 0xe0e0e0e0e0e0e0e0L
 
   /**
-   * SWAR: returns true if any byte lane in `word` contains
-   * '"' (0x22), '\\' (0x5C), or a control char (< 0x20).
+   * SWAR: returns true if any byte lane in `word` contains '"' (0x22), '\\' (0x5C), or a control
+   * char (< 0x20).
    */
   @inline private def swarHasMatch(word: Long): Boolean = {
     // 1. Detect '"' via XOR + zero-detection
@@ -63,9 +63,9 @@ object CharSWAR {
   }
 
   /**
-   * SWAR scan for byte[] using Intrinsics.loadLong for zero-overhead bulk reads.
-   * Processes 8 bytes per iteration — same throughput as the JVM VarHandle path.
-   * UTF-8 multi-byte sequences never produce bytes matching '"', '\', or < 0x20.
+   * SWAR scan for byte[] using Intrinsics.loadLong for zero-overhead bulk reads. Processes 8 bytes
+   * per iteration — same throughput as the JVM VarHandle path. UTF-8 multi-byte sequences never
+   * produce bytes matching '"', '\', or < 0x20.
    */
   def hasEscapeChar(arr: Array[Byte], from: Int, to: Int): Boolean = {
     val len = to - from
@@ -82,7 +82,7 @@ object CharSWAR {
     }
     // Tail: remaining 0-7 bytes
     while (i < to) {
-      val b = arr(i) & 0xFF
+      val b = arr(i) & 0xff
       if (b < 32 || b == '"' || b == '\\') return true
       i += 1
     }
@@ -99,13 +99,10 @@ object CharSWAR {
     false
   }
 
-  @inline private def hasEscapeCharScalarBytes(
-      arr: Array[Byte],
-      from: Int,
-      to: Int): Boolean = {
+  @inline private def hasEscapeCharScalarBytes(arr: Array[Byte], from: Int, to: Int): Boolean = {
     var i = from
     while (i < to) {
-      val b = arr(i) & 0xFF
+      val b = arr(i) & 0xff
       if (b < 32 || b == '"' || b == '\\') return true
       i += 1
     }

@@ -285,22 +285,33 @@ class Interpreter(
 
   def materialize[T](res: Val, visitor: upickle.core.Visitor[T, T]): Either[Error, T] = {
     val t0 = if (debugStats != null) System.nanoTime() else 0L
-    val m =
-      if (storePos == null) Materializer
-      else
-        new Materializer {
-          override def storePos(pos: Position): Unit = self.storePos(pos)
-          override def storePos(v: Val): Unit = {
-            storePos(
-              v match {
-                case v: Val.Obj if v.hasKeys    => v.pos
-                case v: Val.Arr if v.length > 0 => v.pos
-                case _                          => null
-              }
-            )
-          }
+    val result: Either[Error, T] = visitor match {
+      // Fused path: when using ByteRenderer, bypass the Visitor interface entirely and
+      // write bytes directly. Eliminates ~5M virtual dispatch calls for realistic workloads.
+      // ByteRenderer is only used for JSON output (never YAML), so storePos is irrelevant.
+      case br: ByteRenderer =>
+        handleException {
+          br.materializeDirect(res)(evaluator)
+          br.outputStream.asInstanceOf[T]
         }
-    val result = handleException(m.apply0(res, visitor)(evaluator))
+      case _ =>
+        val m =
+          if (storePos == null) Materializer
+          else
+            new Materializer {
+              override def storePos(pos: Position): Unit = self.storePos(pos)
+              override def storePos(v: Val): Unit = {
+                storePos(
+                  v match {
+                    case v: Val.Obj if v.hasKeys    => v.pos
+                    case v: Val.Arr if v.length > 0 => v.pos
+                    case _                          => null
+                  }
+                )
+              }
+            }
+        handleException(m.apply0(res, visitor)(evaluator))
+    }
     if (debugStats != null) debugStats.materializeTimeNs += System.nanoTime() - t0
     result
   }

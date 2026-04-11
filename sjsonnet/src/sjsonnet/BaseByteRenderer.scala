@@ -150,7 +150,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       case Double.PositiveInfinity        => visitNonNullString("Infinity", -1)
       case Double.NegativeInfinity        => visitNonNullString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
-      case d =>
+      case d                              =>
         val i = d.toLong
         if (d == i) writeLongDirect(i)
         else super.visitFloat64(d, index)
@@ -161,8 +161,8 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * Write a long integer directly into elemBuilder without intermediate String allocation.
-   * Uses digit-pair lookup table for fast two-digits-at-a-time conversion.
+   * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
+   * digit-pair lookup table for fast two-digits-at-a-time conversion.
    */
   protected def writeLongDirect(v: Long): Unit = {
     flushBuffer()
@@ -182,7 +182,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     val buf = BaseByteRenderer.scratchBuf
     var pos = 20
     while (abs >= 100) {
-      val q = (abs / 100).toInt
+      val q = abs / 100
       val r = (abs - q * 100L).toInt
       abs = q
       pos -= 2
@@ -233,10 +233,20 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * Zero-allocation fast path for short ASCII strings (the vast majority of JSON keys/values).
-   * Uses getChars to bulk-copy into a reusable char buffer, then scans the buffer
-   * directly (avoiding per-char String.charAt virtual dispatch).
-   * If any char needs escaping or is non-ASCII, falls back to escapeByte.
+   * Render a quoted string into elemBuilder without calling flushBuffer/flushByteBuilder. Used by
+   * the fused materializer path in ByteRenderer where the caller manages flush state.
+   */
+  private[sjsonnet] def renderQuotedString(str: String): Unit = {
+    val len = str.length
+    if (len < 128) visitShortString(str, len)
+    else visitLongString(str)
+  }
+
+  /**
+   * Zero-allocation fast path for short ASCII strings (the vast majority of JSON keys/values). Uses
+   * getChars to bulk-copy into a reusable char buffer, then scans the buffer directly (avoiding
+   * per-char String.charAt virtual dispatch). If any char needs escaping or is non-ASCII, falls
+   * back to escapeByte.
    */
   private def visitShortString(str: String, len: Int): Unit = {
     // Reuse unicodeCharBuilder's array as temp char buffer (no allocation after warmup)
@@ -276,9 +286,8 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * SWAR-accelerated path for long strings.
-   * Converts to UTF-8 bytes once, scans with SWAR, and bulk-copies if clean.
-   * The getBytes allocation is amortized by avoiding per-char processing.
+   * SWAR-accelerated path for long strings. Converts to UTF-8 bytes once, scans with SWAR, and
+   * bulk-copies if clean. The getBytes allocation is amortized by avoiding per-char processing.
    */
   private def visitLongString(str: String): Unit = {
     val bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8)
@@ -347,13 +356,17 @@ object BaseByteRenderer {
     a
   }
 
-  /** Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue).
-   * Not thread-safe, but renderers are single-threaded. */
+  /**
+   * Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue). Not thread-safe,
+   * but renderers are single-threaded.
+   */
   private[sjsonnet] val scratchBuf: Array[Byte] = new Array[Byte](20)
 
-  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering.
-   * DIGIT_TENS(i) gives the tens digit byte for value i (0..99).
-   * DIGIT_ONES(i) gives the ones digit byte for value i (0..99). */
+  /**
+   * Digit-pair lookup tables for two-digits-at-a-time integer rendering. DIGIT_TENS(i) gives the
+   * tens digit byte for value i (0..99). DIGIT_ONES(i) gives the ones digit byte for value i
+   * (0..99).
+   */
   private[sjsonnet] val DIGIT_TENS: Array[Byte] = {
     val a = new Array[Byte](100)
     var i = 0

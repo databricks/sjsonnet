@@ -14,6 +14,26 @@ object BaseCharRenderer {
    * nested configurations rarely exceed 20 levels.
    */
   final val MaxCachedDepth = 32
+
+  /**
+   * Reusable scratch buffer for writeLongDirect (max 20 chars for Long.MinValue). Not thread-safe,
+   * but renderers are single-threaded.
+   */
+  private[sjsonnet] val scratchBuf: Array[Char] = new Array[Char](20)
+
+  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
+  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
+    a
+  }
+  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
+    a
+  }
 }
 
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
@@ -183,8 +203,8 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
   }
 
   /**
-   * Write a long integer directly into elemBuilder without intermediate String allocation.
-   * Uses digit-pair lookup table for fast two-digits-at-a-time conversion.
+   * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
+   * digit-pair lookup table for fast two-digits-at-a-time conversion.
    */
   protected def writeLongDirect(v: Long): Unit = {
     flushBuffer()
@@ -288,26 +308,5 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     val pos = elemBuilder.getLength
     s.getChars(0, len, cbArr, pos)
     elemBuilder.length = pos + len
-  }
-}
-
-object BaseCharRenderer {
-
-  /** Reusable scratch buffer for writeLongDirect (max 20 chars for Long.MinValue).
-   * Not thread-safe, but renderers are single-threaded. */
-  private[sjsonnet] val scratchBuf: Array[Char] = new Array[Char](20)
-
-  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
-  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
-    val a = new Array[Char](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
-    a
-  }
-  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
-    val a = new Array[Char](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
-    a
   }
 }

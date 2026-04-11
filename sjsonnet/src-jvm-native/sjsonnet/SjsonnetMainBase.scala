@@ -18,7 +18,9 @@ import scala.util.Try
 
 object SjsonnetMainBase {
 
-  /** Sentinel value returned when output was already written directly to stdout via byte pipeline. */
+  /**
+   * Sentinel value returned when output was already written directly to stdout via byte pipeline.
+   */
   private val ByteRenderedSentinel = "\u0000"
 
   class SimpleImporter(
@@ -275,7 +277,7 @@ object SjsonnetMainBase {
       path: os.Path,
       wd: os.Path,
       getCurrentPosition: () => Position,
-      stdoutStream: OutputStream = null) = {
+      stdoutStream: OutputStream) = {
     config.outputFile match {
       case Some(f) if !config.yamlOut.value && !config.expectString.value =>
         // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
