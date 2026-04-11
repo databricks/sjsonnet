@@ -174,12 +174,59 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d                              =>
         val i = d.toLong
-        if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
+        if (d == i) writeLongDirect(i)
         else super.visitFloat64(d, index)
         flushBuffer()
     }
     flushCharBuilder()
     out
+  }
+
+  /**
+   * Write a long integer directly into elemBuilder without intermediate String allocation.
+   * Uses digit-pair lookup table for fast two-digits-at-a-time conversion.
+   */
+  protected def writeLongDirect(v: Long): Unit = {
+    flushBuffer()
+    if (v == 0L) {
+      elemBuilder.ensureLength(1)
+      elemBuilder.appendUnsafe('0')
+      return
+    }
+    if (v == Long.MinValue) {
+      visitFloat64StringParts("-9223372036854775808", -1, -1, -1)
+      return
+    }
+    val negative = v < 0
+    var abs = if (negative) -v else v
+    // Write digits backward into a small local buffer, then bulk-copy.
+    // Max Long digits = 19, plus sign = 20.
+    val buf = BaseCharRenderer.scratchBuf
+    var pos = 20
+    while (abs >= 100) {
+      val q = (abs / 100).toInt
+      val r = (abs - q * 100L).toInt
+      abs = q
+      pos -= 2
+      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
+      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
+    }
+    if (abs >= 10) {
+      val r = abs.toInt
+      pos -= 2
+      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
+      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
+    } else {
+      pos -= 1
+      buf(pos) = ('0' + abs.toInt).toChar
+    }
+    if (negative) { pos -= 1; buf(pos) = '-' }
+    val totalLen = 20 - pos
+    elemBuilder.ensureLength(totalLen)
+    val cbArr = elemBuilder.arr
+    val startPos = elemBuilder.getLength
+    System.arraycopy(buf, pos, cbArr, startPos, totalLen)
+    elemBuilder.length = startPos + totalLen
   }
 
   def visitString(s: CharSequence, index: Int): T = {
@@ -241,5 +288,26 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     val pos = elemBuilder.getLength
     s.getChars(0, len, cbArr, pos)
     elemBuilder.length = pos + len
+  }
+}
+
+object BaseCharRenderer {
+
+  /** Reusable scratch buffer for writeLongDirect (max 20 chars for Long.MinValue).
+   * Not thread-safe, but renderers are single-threaded. */
+  private[sjsonnet] val scratchBuf: Array[Char] = new Array[Char](20)
+
+  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
+  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
+    a
+  }
+  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
+    a
   }
 }

@@ -20,9 +20,17 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   var newlineBuffered = false
 
   override def visitFloat64(d: Double, index: Int): OutputStream = {
-    val s = RenderUtils.renderDouble(d)
     flushBuffer()
-    appendString(s)
+    val i = d.toLong
+    if (d == i) {
+      writeLongDirect(i)
+    } else if (d % 1 == 0) {
+      appendString(
+        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+      )
+    } else {
+      appendString(d.toString)
+    }
     flushByteBuilder()
     out
   }
