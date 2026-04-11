@@ -1612,25 +1612,12 @@ class Evaluator(
       scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
-    var cachedSimpleScope: Option[ValScope] = None
-    var cachedObj: Val.Obj = null
-
-    def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
-      if ((sup eq null) && (self eq cachedObj)) {
-        cachedSimpleScope match {
-          case Some(s) => s
-          case None    =>
-            val newScope = createNewScope(self, sup)
-            cachedSimpleScope = Some(newScope)
-            newScope
-        }
-      } else createNewScope(self, sup)
-    }
+    val factory = new ObjectScopeFactory(scope, e.binds, this)
 
     // Trigger an object's own assertions. This defines a closure which is
     // invoked from within Val.Obj; it should not be called directly.
     def triggerAsserts(self: Val.Obj, sup: Val.Obj): Unit = {
-      val newScope: ValScope = makeNewScope(self, sup)
+      val newScope: ValScope = factory.makeScope(self, sup)
       var i = 0
       while (i < asserts.length) {
         val a = asserts(i)
@@ -1646,33 +1633,6 @@ class Evaluator(
         }
         i += 1
       }
-    }
-
-    def createNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
-      val scopeLen = scope.length
-      val binds = e.binds
-      val by = if (binds == null) 2 else 2 + binds.length
-      val newScope = scope.extendBy(by)
-      newScope.bindings(scopeLen) = self
-      newScope.bindings(scopeLen + 1) = sup
-      if (binds != null) {
-        val arrF = newScope.bindings
-        var i = 0
-        var j = scopeLen + 2
-        while (i < binds.length) {
-          val b = binds(i)
-          arrF(j) = b.args match {
-            case null =>
-              visitAsLazy(b.rhs)(newScope)
-            case argSpec =>
-              if (debugStats != null) debugStats.lazyCreated += 1
-              new LazyFunc(() => visitMethod(b.rhs, argSpec, b.pos)(newScope))
-          }
-          i += 1
-          j += 1
-        }
-      }
-      newScope
     }
 
     // Lazily allocate builder only when we have more than 8 fields,
@@ -1743,28 +1703,12 @@ class Evaluator(
       case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
-          val fieldKey = k
-          val v = new Val.Obj.Member(plus, sep) {
-            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos, fieldKey)
-              try visitExpr(rhs)(makeNewScope(self, sup))
-              finally decrementStackDepth()
-            }
-          }
-          trackField(k, v, offset)
+          trackField(k, new ExprFieldMember(plus, sep, rhs, k, factory), offset)
         }
       case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
         val k = visitFieldName(fieldName, offset)
         if (k != null) {
-          val fieldKey = k
-          val v = new Val.Obj.Member(false, sep) {
-            def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-              checkStackDepth(rhs.pos, fieldKey)
-              try visitMethod(rhs, argSpec, offset)(makeNewScope(self, sup))
-              finally decrementStackDepth()
-            }
-          }
-          trackField(k, v, offset)
+          trackField(k, new MethodFieldMember(sep, rhs, argSpec, offset, k, factory), offset)
         }
       case _ =>
         Error.fail("This case should never be hit", objPos)
@@ -1774,7 +1718,7 @@ class Evaluator(
     // HashMap allocation overhead for objects with >2 fields.
     val noSelfRef = sup == null && Materializer.computeNoSelfRef(e)
     if (debugStats != null) debugStats.objectsCreated += 1
-    cachedObj = if (fieldCount == 1 && singleKey != null) {
+    factory.cachedObj = if (fieldCount == 1 && singleKey != null) {
       // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
       val obj = new Val.Obj(
         objPos,
@@ -1823,7 +1767,7 @@ class Evaluator(
         sup
       )
     }
-    cachedObj
+    factory.cachedObj
   }
 
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
@@ -2099,4 +2043,95 @@ object Evaluator {
   type Logger = (Boolean, String) => Unit
   val emptyStringArray = new Array[String](0)
   val emptyLazyArray = new Array[Eval](0)
+}
+
+/**
+ * Shared scope factory for object field evaluation. Encapsulates the scope-caching logic that was
+ * previously embedded in `visitMemberList`'s `makeNewScope` closure. All [[ExprFieldMember]] and
+ * [[MethodFieldMember]] instances from the same object literal share one factory, preserving the
+ * per-object scope cache.
+ */
+private[sjsonnet] final class ObjectScopeFactory(
+    private val enclosingScope: ValScope,
+    private val binds: Array[Expr.Bind],
+    private[sjsonnet] val evaluator: Evaluator) {
+  private var cachedScope: ValScope = ValScope.empty
+  private var cachedScopeSet: Boolean = false
+  private[sjsonnet] var cachedObj: Val.Obj = _
+
+  def makeScope(self: Val.Obj, sup: Val.Obj): ValScope = {
+    if ((sup eq null) && (self eq cachedObj)) {
+      if (cachedScopeSet) cachedScope
+      else {
+        val s = createScope(self, sup)
+        cachedScope = s
+        cachedScopeSet = true
+        s
+      }
+    } else createScope(self, sup)
+  }
+
+  private def createScope(self: Val.Obj, sup: Val.Obj): ValScope = {
+    val scopeLen = enclosingScope.length
+    val by = if (binds == null) 2 else 2 + binds.length
+    val newScope = enclosingScope.extendBy(by)
+    newScope.bindings(scopeLen) = self
+    newScope.bindings(scopeLen + 1) = sup
+    if (binds != null) {
+      val arrF = newScope.bindings
+      var i = 0
+      var j = scopeLen + 2
+      while (i < binds.length) {
+        val b = binds(i)
+        arrF(j) = b.args match {
+          case null =>
+            evaluator.visitAsLazy(b.rhs)(newScope)
+          case argSpec =>
+            if (evaluator.debugStats != null) evaluator.debugStats.lazyCreated += 1
+            new LazyFunc(() => evaluator.visitMethod(b.rhs, argSpec, b.pos)(newScope))
+        }
+        i += 1
+        j += 1
+      }
+    }
+    newScope
+  }
+}
+
+/**
+ * Concrete [[Val.Obj.Member]] for expression-body fields (no argSpec). Replaces the anonymous inner
+ * class in `visitMemberList`, giving the JIT a single monomorphic type at `invoke` call sites for
+ * better inlining.
+ */
+private[sjsonnet] final class ExprFieldMember(
+    add0: Boolean,
+    vis0: Visibility,
+    private val rhs: Expr,
+    private val fieldKey: String,
+    private val factory: ObjectScopeFactory)
+    extends Val.Obj.Member(add0, vis0) {
+  def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+    factory.evaluator.checkStackDepth(rhs.pos, fieldKey)
+    try factory.evaluator.visitExpr(rhs)(factory.makeScope(self, sup))
+    finally factory.evaluator.decrementStackDepth()
+  }
+}
+
+/**
+ * Concrete [[Val.Obj.Member]] for method-body fields (has argSpec). Same monomorphic-dispatch
+ * benefit as [[ExprFieldMember]].
+ */
+private[sjsonnet] final class MethodFieldMember(
+    vis0: Visibility,
+    private val rhs: Expr,
+    private val argSpec: Expr.Params,
+    private val methodPos: Position,
+    private val fieldKey: String,
+    private val factory: ObjectScopeFactory)
+    extends Val.Obj.Member(false, vis0) {
+  def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+    factory.evaluator.checkStackDepth(rhs.pos, fieldKey)
+    try factory.evaluator.visitMethod(rhs, argSpec, methodPos)(factory.makeScope(self, sup))
+    finally factory.evaluator.decrementStackDepth()
+  }
 }
