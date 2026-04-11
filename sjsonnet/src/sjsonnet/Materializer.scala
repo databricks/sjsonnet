@@ -140,7 +140,7 @@ abstract class Materializer {
         val m = rawMembers(i)
         if (m.visibility != Visibility.Hidden) {
           val childVal = m.invoke(obj, null, fs, evaluator)
-          obj.cacheFieldValue(rawKeys(i), childVal)
+          if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(i), childVal)
           storePos(childVal)
           ov.visitKeyValue(ov.visitKey(-1).visitString(rawKeys(i), -1))
           val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
@@ -155,7 +155,7 @@ abstract class Materializer {
       if (sfm.visibility != Visibility.Hidden) {
         val ov = visitor.visitObject(1, jsonableKeys = true, -1)
         val childVal = sfm.invoke(obj, null, fs, evaluator)
-        obj.cacheFieldValue(obj.singleKey, childVal)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(obj.singleKey, childVal)
         storePos(childVal)
         ov.visitKeyValue(ov.visitKey(-1).visitString(obj.singleKey, -1))
         val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
@@ -199,7 +199,7 @@ abstract class Materializer {
       while (i < visCount) {
         val idx = order(i)
         val childVal = rawMembers(idx).invoke(obj, null, fs, evaluator)
-        obj.cacheFieldValue(rawKeys(idx), childVal)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(idx), childVal)
         storePos(childVal)
         ov.visitKeyValue(ov.visitKey(-1).visitString(rawKeys(idx), -1))
         val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
@@ -213,7 +213,7 @@ abstract class Materializer {
       if (sfm.visibility != Visibility.Hidden) {
         val ov = visitor.visitObject(1, jsonableKeys = true, -1)
         val childVal = sfm.invoke(obj, null, fs, evaluator)
-        obj.cacheFieldValue(obj.singleKey, childVal)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(obj.singleKey, childVal)
         storePos(childVal)
         ov.visitKeyValue(ov.visitKey(-1).visitString(obj.singleKey, -1))
         val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
@@ -578,6 +578,230 @@ object Materializer extends Materializer {
       i += 1
     }
     order
+  }
+
+  /**
+   * Checks whether a [[Expr.ObjBody.MemberList]]'s expressions reference `self`, `super`, or `$` at
+   * the current object scope level. When `true` (no self-ref), field caching can be safely skipped
+   * during materialization since no field evaluation will trigger `obj.value()` on the current
+   * object.
+   *
+   * Uses two-mode scanning:
+   *   - At current scope (`inNestedObj=false`): `Self`, `Super`, `$`, `SelectSuper`, `InSuper`,
+   *     `LookupSuper` → has self-ref
+   *   - Inside nested object bodies (`inNestedObj=true`): only `$` → has self-ref (because `$`
+   *     always references the root object, which might be the current object; `self/super` inside
+   *     nested objects refer to the inner object, not the outer)
+   *
+   * The result is cached on [[Expr.ObjBody.MemberList._noSelfRef]] (volatile, benign-race safe)
+   * since the same MemberList AST node is shared across all objects created from the same
+   * expression.
+   */
+  private[sjsonnet] def computeNoSelfRef(e: Expr.ObjBody.MemberList): Boolean = {
+    val cached = e._noSelfRef
+    if (cached != null) return cached.booleanValue()
+    val result = !hasSelfRefInMemberList(e, inNestedObj = false)
+    e._noSelfRef = java.lang.Boolean.valueOf(result)
+    result
+  }
+
+  /** Scan all expressions in a MemberList for self/super/$ references. */
+  private def hasSelfRefInMemberList(
+      ml: Expr.ObjBody.MemberList,
+      inNestedObj: Boolean
+  ): Boolean = {
+    // Check fields (rhs, dynamic field names, method-style args)
+    if (ml.fields != null) {
+      var i = 0
+      while (i < ml.fields.length) {
+        val f = ml.fields(i)
+        f.fieldName match {
+          case Expr.FieldName.Dyn(expr) =>
+            if (hasSelfRefExpr(expr, inNestedObj)) return true
+          case _ =>
+        }
+        if (f.args != null && hasSelfRefParams(f.args, inNestedObj)) return true
+        if (hasSelfRefExpr(f.rhs, inNestedObj)) return true
+        i += 1
+      }
+    }
+    // Check binds (object locals): rhs and function default args
+    if (ml.binds != null) {
+      var i = 0
+      while (i < ml.binds.length) {
+        val b = ml.binds(i)
+        if (hasSelfRefExpr(b.rhs, inNestedObj)) return true
+        if (b.args != null && hasSelfRefParams(b.args, inNestedObj)) return true
+        i += 1
+      }
+    }
+    // Check asserts: value and optional message
+    if (ml.asserts != null) {
+      var i = 0
+      while (i < ml.asserts.length) {
+        val a = ml.asserts(i)
+        if (hasSelfRefExpr(a.value, inNestedObj)) return true
+        if (a.msg != null && hasSelfRefExpr(a.msg, inNestedObj)) return true
+        i += 1
+      }
+    }
+    false
+  }
+
+  /** Scan function parameter default expressions for self/super/$ references. */
+  private def hasSelfRefParams(p: Expr.Params, inNestedObj: Boolean): Boolean = {
+    if (p.defaultExprs != null) {
+      var i = 0
+      while (i < p.defaultExprs.length) {
+        val de = p.defaultExprs(i)
+        if (de != null && hasSelfRefExpr(de, inNestedObj)) return true
+        i += 1
+      }
+    }
+    false
+  }
+
+  /**
+   * Recursive self-reference check for a single expression.
+   *
+   * @param inNestedObj
+   *   when true, Self/Super nodes are ignored (they refer to the inner object); only `$` is
+   *   detected (it always refers to the root object)
+   */
+  private def hasSelfRefExpr(e: Expr, inNestedObj: Boolean): Boolean = {
+    if (e == null) return false
+    e match {
+      // $ always propagates — it references the root object, which might be the current object
+      case _: Expr.$ => true
+      // self/super only matter at current scope level; inner objects rebind them
+      case _: Expr.Self        => !inNestedObj
+      case _: Expr.Super       => !inNestedObj
+      case _: Expr.SelectSuper => !inNestedObj
+      case e: Expr.InSuper     =>
+        if (!inNestedObj) true else hasSelfRefExpr(e.value, true)
+      case e: Expr.LookupSuper =>
+        if (!inNestedObj) true else hasSelfRefExpr(e.index, true)
+
+      // Leaf nodes: no self-reference
+      case _: Val.Literal    => false
+      case _: Expr.ValidId   => false
+      case _: Expr.Id        => false
+      case _: Expr.Import    => false
+      case _: Expr.ImportStr => false
+      case _: Expr.ImportBin => false
+
+      // Composite nodes: recurse into children
+      case Expr.UnaryOp(_, _, v)     => hasSelfRefExpr(v, inNestedObj)
+      case Expr.BinaryOp(_, l, _, r) =>
+        hasSelfRefExpr(l, inNestedObj) || hasSelfRefExpr(r, inNestedObj)
+      case Expr.And(_, l, r)    => hasSelfRefExpr(l, inNestedObj) || hasSelfRefExpr(r, inNestedObj)
+      case Expr.Or(_, l, r)     => hasSelfRefExpr(l, inNestedObj) || hasSelfRefExpr(r, inNestedObj)
+      case Expr.Select(_, v, _) => hasSelfRefExpr(v, inNestedObj)
+      case Expr.Lookup(_, v, idx) =>
+        hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(idx, inNestedObj)
+      case Expr.IfElse(_, c, t, el) =>
+        hasSelfRefExpr(c, inNestedObj) || hasSelfRefExpr(t, inNestedObj) || hasSelfRefExpr(
+          el,
+          inNestedObj
+        )
+      case Expr.Error(_, v) => hasSelfRefExpr(v, inNestedObj)
+
+      // Apply variants
+      case Expr.Apply(_, v, args, _, _) =>
+        hasSelfRefExpr(v, inNestedObj) || args.exists(a => hasSelfRefExpr(a, inNestedObj))
+      case Expr.Apply0(_, v, _)     => hasSelfRefExpr(v, inNestedObj)
+      case Expr.Apply1(_, v, a1, _) =>
+        hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj)
+      case Expr.Apply2(_, v, a1, a2, _) =>
+        hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj) || hasSelfRefExpr(
+          a2,
+          inNestedObj
+        )
+      case Expr.Apply3(_, v, a1, a2, a3, _) =>
+        hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj) ||
+        hasSelfRefExpr(a2, inNestedObj) || hasSelfRefExpr(a3, inNestedObj)
+
+      // ApplyBuiltin variants
+      case _: Expr.ApplyBuiltin0               => false
+      case Expr.ApplyBuiltin1(_, _, a1, _)     => hasSelfRefExpr(a1, inNestedObj)
+      case Expr.ApplyBuiltin2(_, _, a1, a2, _) =>
+        hasSelfRefExpr(a1, inNestedObj) || hasSelfRefExpr(a2, inNestedObj)
+      case Expr.ApplyBuiltin3(_, _, a1, a2, a3, _) =>
+        hasSelfRefExpr(a1, inNestedObj) || hasSelfRefExpr(a2, inNestedObj) || hasSelfRefExpr(
+          a3,
+          inNestedObj
+        )
+      case Expr.ApplyBuiltin4(_, _, a1, a2, a3, a4, _) =>
+        hasSelfRefExpr(a1, inNestedObj) || hasSelfRefExpr(a2, inNestedObj) ||
+        hasSelfRefExpr(a3, inNestedObj) || hasSelfRefExpr(a4, inNestedObj)
+      case Expr.ApplyBuiltin(_, _, argExprs, _) =>
+        argExprs.exists(a => hasSelfRefExpr(a, inNestedObj))
+
+      // Assert expression (inline assert ... ; expr)
+      case Expr.AssertExpr(_, asserted, returned) =>
+        hasSelfRefExpr(asserted.value, inNestedObj) ||
+        (asserted.msg != null && hasSelfRefExpr(asserted.msg, inNestedObj)) ||
+        hasSelfRefExpr(returned, inNestedObj)
+
+      // Local expression (local x = ...; expr)
+      case Expr.LocalExpr(_, bindings, returned) =>
+        bindings.exists(b =>
+          hasSelfRefExpr(b.rhs, inNestedObj) ||
+          (b.args != null && hasSelfRefParams(b.args, inNestedObj))
+        ) || hasSelfRefExpr(returned, inNestedObj)
+
+      // Array literal
+      case Expr.Arr(_, values) => values.exists(v => hasSelfRefExpr(v, inNestedObj))
+
+      // Slice
+      case Expr.Slice(_, v, start, end, stride) =>
+        hasSelfRefExpr(v, inNestedObj) ||
+        start.exists(s => hasSelfRefExpr(s, inNestedObj)) ||
+        end.exists(e => hasSelfRefExpr(e, inNestedObj)) ||
+        stride.exists(s => hasSelfRefExpr(s, inNestedObj))
+
+      // Function: scan body and parameter defaults (closures can capture self)
+      case Expr.Function(_, params, body) =>
+        hasSelfRefExpr(body, inNestedObj) ||
+        (params != null && hasSelfRefParams(params, inNestedObj))
+
+      // Array comprehension
+      case Expr.Comp(_, v, first, rest) =>
+        hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(first.cond, inNestedObj) ||
+        rest.exists {
+          case Expr.ForSpec(_, _, cond) => hasSelfRefExpr(cond, inNestedObj)
+          case Expr.IfSpec(_, cond)     => hasSelfRefExpr(cond, inNestedObj)
+        }
+
+      // Object extension: base is in current scope, ext creates new self scope
+      case Expr.ObjExtend(_, base, ext) =>
+        hasSelfRefExpr(base, inNestedObj) || hasSelfRefExpr(ext, true)
+
+      // Nested object bodies: switch to inNestedObj=true (self/super refer to inner object)
+      case ml: Expr.ObjBody.MemberList => hasSelfRefInMemberList(ml, inNestedObj = true)
+      case oc: Expr.ObjBody.ObjComp    =>
+        hasSelfRefExpr(oc.key, true) || hasSelfRefExpr(oc.value, true) ||
+        (oc.preLocals != null && oc.preLocals.exists(b =>
+          hasSelfRefExpr(b.rhs, true) || (b.args != null && hasSelfRefParams(b.args, true))
+        )) ||
+        (oc.postLocals != null && oc.postLocals.exists(b =>
+          hasSelfRefExpr(b.rhs, true) || (b.args != null && hasSelfRefParams(b.args, true))
+        )) ||
+        hasSelfRefExpr(oc.first.cond, true) ||
+        oc.rest.exists {
+          case Expr.ForSpec(_, _, cond) => hasSelfRefExpr(cond, true)
+          case Expr.IfSpec(_, cond)     => hasSelfRefExpr(cond, true)
+        }
+
+      // Val.Func (appears in AST after StaticOptimizer inlines constant functions).
+      // Val.Builtin* extends Val.Func — builtins have bodyExpr=null, so this returns false for them.
+      case f: Val.Func =>
+        (f.bodyExpr != null && hasSelfRefExpr(f.bodyExpr, inNestedObj)) ||
+        (f.params != null && hasSelfRefParams(f.params, inNestedObj))
+
+      // Conservative default: assume self-reference for unknown node types
+      case _ => true
+    }
   }
 
   /**

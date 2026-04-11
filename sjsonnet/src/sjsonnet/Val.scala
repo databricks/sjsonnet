@@ -508,6 +508,13 @@ object Val {
     @volatile private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
 
     /**
+     * When true, field caching can be skipped during materialization because no field body
+     * references `self` or `super`. This eliminates HashMap allocation overhead for objects with >2
+     * fields (where the 2-slot inline cache overflows).
+     */
+    private[sjsonnet] var _skipFieldCache: Boolean = false
+
+    /**
      * Store a computed field value in the object's inline cache, preserving memoization semantics
      * when bypassing `value()` during direct iteration. This ensures that subsequent accesses via
      * `self.field` within sibling field computations see the cached value, preventing double

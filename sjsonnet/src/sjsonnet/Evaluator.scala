@@ -1435,9 +1435,13 @@ class Evaluator(
       case _ =>
         Error.fail("This case should never be hit", objPos)
     }
+    // Compute no-self-ref flag once per MemberList (shared across all objects from same expression).
+    // When true, the Materializer can skip cacheFieldValue() during inline iteration, eliminating
+    // HashMap allocation overhead for objects with >2 fields.
+    val noSelfRef = sup == null && Materializer.computeNoSelfRef(e)
     cachedObj = if (fieldCount == 1 && singleKey != null) {
       // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
-      new Val.Obj(
+      val obj = new Val.Obj(
         objPos,
         null,
         false,
@@ -1446,6 +1450,8 @@ class Evaluator(
         singleFieldKey = singleKey,
         singleFieldMember = singleMember
       )
+      if (noSelfRef) obj._skipFieldCache = true
+      obj
     } else if (inlineKeys != null && fieldCount >= 2) {
       // Multi-field inline object: use flat arrays instead of LinkedHashMap
       val finalKeys =
@@ -1470,6 +1476,7 @@ class Evaluator(
         e._cachedSortedOrder = sortedOrder
       }
       if (sortedOrder != null) obj._sortedInlineOrder = sortedOrder
+      if (noSelfRef) obj._skipFieldCache = true
       obj
     } else {
       new Val.Obj(
