@@ -1908,7 +1908,10 @@ class Evaluator(
     case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Arr, y: Val.Arr) =>
       val len = math.min(x.length, y.length)
-      var i = 0
+      // Skip shared prefix for ConcatView arrays (e.g., big_array + [x] < big_array + [y]).
+      // When both arrays are O(1) concat views sharing the same left array, we can jump
+      // past the entire shared prefix — turning O(n) comparison into O(suffix_len).
+      var i = x.sharedConcatPrefixLength(y)
       while (i < len) {
         val xi = x.value(i)
         val yi = y.value(i)
@@ -1953,7 +1956,8 @@ class Evaluator(
         case y: Val.Arr =>
           val xlen = x.length
           if (xlen != y.length) return false
-          var i = 0
+          // Skip shared prefix for ConcatView arrays — see compare() for details
+          var i = x.sharedConcatPrefixLength(y)
           while (i < xlen) {
             if (!equal(x.value(i), y.value(i))) return false
             i += 1
