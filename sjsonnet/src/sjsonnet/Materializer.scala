@@ -246,7 +246,7 @@ abstract class Materializer {
     av.visitEnd(-1)
   }
 
-  @inline private def materializeRecursiveChild[T](
+  private def materializeRecursiveChild[T](
       childVal: Val,
       childVisitor: Visitor[T, T],
       depth: Int,
