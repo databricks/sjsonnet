@@ -5,6 +5,7 @@ import upickle.core.SimpleVisitor
 import java.io.{
   BufferedOutputStream,
   InputStream,
+  OutputStream,
   OutputStreamWriter,
   PrintStream,
   StringWriter,
@@ -16,6 +17,50 @@ import scala.annotation.unused
 import scala.util.Try
 
 object SjsonnetMainBase {
+
+  /**
+   * Unsynchronized byte array output stream, inspired by Apache Pekko's approach.
+   *
+   * Unlike `java.io.ByteArrayOutputStream`, this class:
+   *   - Does NOT synchronize on write operations (no mutex overhead on Scala Native)
+   *   - Exposes `writeTo(OutputStream)` for zero-copy transfer to stdout
+   *   - Uses 1.5x growth factor instead of 2x for reduced memory waste
+   *
+   * The `writeTo` method writes directly from the internal buffer without creating an intermediate
+   * String or byte array copy, unlike StringWriter's `.toString()`.
+   */
+  private final class CompactByteArrayOutputStream(initialCapacity: Int) extends OutputStream {
+    private var buf: Array[Byte] = new Array[Byte](initialCapacity)
+    private var count: Int = 0
+
+    private def ensureCapacity(minCapacity: Int): Unit = {
+      if (minCapacity > buf.length) {
+        // Grow by at least 1.5x to amortize copies (Pekko-style growth factor)
+        val newCapacity = math.max(buf.length + (buf.length >> 1), minCapacity)
+        buf = java.util.Arrays.copyOf(buf, newCapacity)
+      }
+    }
+
+    override def write(b: Int): Unit = {
+      ensureCapacity(count + 1)
+      buf(count) = b.toByte
+      count += 1
+    }
+
+    override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+      if (len > 0) {
+        ensureCapacity(count + len)
+        System.arraycopy(b, off, buf, count, len)
+        count += len
+      }
+    }
+
+    /** Write internal buffer directly to the target stream — no intermediate copy. */
+    def writeTo(out: OutputStream): Unit = out.write(buf, 0, count)
+
+    def size(): Int = count
+  }
+
   class SimpleImporter(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
       allowedInputs: Option[Set[os.Path]] = None,
@@ -170,7 +215,8 @@ object SjsonnetMainBase {
         warn,
         std,
         debugStats = debugStats,
-        profileOpt = config.profile
+        profileOpt = config.profile,
+        stdout = if (config.outputFile.isEmpty) stdout else null
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -236,9 +282,23 @@ object SjsonnetMainBase {
       )
     )
 
-  private def writeToFile(config: Config, wd: os.Path)(
+  private def writeToFile(config: Config, wd: os.Path, stdout: PrintStream)(
       materialize: Writer => Either[String, ?]): Either[String, String] = {
     config.outputFile match {
+      case None if stdout != null =>
+        // Direct-write mode: bypass StringWriter → toString → println overhead.
+        // Uses CompactByteArrayOutputStream (unsynchronized, 1.5x growth) so that
+        // on rendering error, nothing reaches stdout (the buffer is simply discarded).
+        val baos = new CompactByteArrayOutputStream(65536)
+        val wr = new OutputStreamWriter(baos, StandardCharsets.UTF_8)
+        val result = materialize(wr)
+        result.map { _ =>
+          if (!config.noTrailingNewline.value) wr.write('\n')
+          wr.flush()
+          baos.writeTo(stdout)
+          stdout.flush()
+          ""
+        }
       case None =>
         val sw = new StringWriter
         materialize(sw).map(_ => sw.toString)
@@ -263,8 +323,9 @@ object SjsonnetMainBase {
       jsonnetCode: String,
       path: os.Path,
       wd: os.Path,
-      getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
+      getCurrentPosition: () => Position,
+      stdout: PrintStream) = {
+    writeToFile(config, wd, stdout) { writer =>
       val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
       if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
@@ -320,7 +381,8 @@ object SjsonnetMainBase {
       std: Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
-      profileOpt: Option[String] = None): Either[String, String] = {
+      profileOpt: Option[String] = None,
+      stdout: PrintStream = null): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -431,7 +493,7 @@ object SjsonnetMainBase {
 
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
           case arr: ujson.Arr =>
-            writeToFile(config, wd) { writer =>
+            writeToFile(config, wd, stdout) { writer =>
               arr.value.toSeq match {
                 case Nil         => // donothing
                 case Seq(single) =>
@@ -455,9 +517,9 @@ object SjsonnetMainBase {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdout)
         }
-      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdout)
     }
 
     if (profilerInstance != null)
