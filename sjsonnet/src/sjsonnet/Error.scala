@@ -68,9 +68,14 @@ object Error {
       val collapseIntoMessage: Boolean = false)(implicit ev: EvalErrorScope) {
     val ste: StackTraceElement = {
       val cl = if (exprErrorString == null) "" else s"[$exprErrorString]"
-      val (frameFile, frameLine) = ev.prettyIndex(pos) match {
-        case None              => (pos.currentFile.relativeToString(ev.wd) + " offset", pos.offset)
-        case Some((line, col)) => (pos.currentFile.relativeToString(ev.wd) + ":" + line, col)
+      val file = pos.currentFile
+      val (frameFile, frameLine) = if (file == null) {
+        ("<cached>", pos.offset)
+      } else {
+        ev.prettyIndex(pos) match {
+          case None              => (file.relativeToString(ev.wd) + " offset", pos.offset)
+          case Some((line, col)) => (file.relativeToString(ev.wd) + ":" + line, col)
+        }
       }
       new StackTraceElement(cl, "", frameFile, frameLine)
     }
@@ -229,7 +234,9 @@ trait EvalErrorScope {
   def wd: Path
 
   def prettyIndex(pos: Position): Option[(Int, Int)] = {
-    importer.read(pos.currentFile, binaryData = false).map { s =>
+    val file = pos.currentFile
+    if (file == null) return None
+    importer.read(file, binaryData = false).map { s =>
       val splitted =
         s.getParserInput().prettyIndex(pos.offset).split(':')
       if (splitted.length != 2) {
