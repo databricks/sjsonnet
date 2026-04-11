@@ -1414,30 +1414,40 @@ object Val {
  * Using a sealed trait (rather than a plain Boolean) gives the JVM JIT better type-profile
  * information at `if` guards, and makes the two modes self-documenting at call sites.
  *
- *   - [[TailstrictModeEnabled]]: caller will handle TailCall via [[TailCall.resolve]]; sentinels
- *     may be returned without resolution.
+ *   - [[TailstrictModeEnabled]]: explicit `tailstrict` — caller will handle TailCall via
+ *     [[TailCall.resolve]]; sentinels may be returned without resolution. Arguments are eagerly
+ *     evaluated per the Jsonnet spec.
  *   - [[TailstrictModeDisabled]]: normal call; any TailCall must be resolved before returning.
+ *   - [[TailstrictModeAutoTCO]]: auto-TCO — like Enabled (TailCall sentinels may be returned), but
+ *     arguments are NOT forced, preserving Jsonnet's standard lazy evaluation semantics.
  */
 sealed trait TailstrictMode
 case object TailstrictModeEnabled extends TailstrictMode
 case object TailstrictModeDisabled extends TailstrictMode
+case object TailstrictModeAutoTCO extends TailstrictMode
 
 /**
- * Sentinel value for tail call optimization of `tailstrict` calls. When a function body's tail
- * position is a `tailstrict` call, the evaluator returns a [[TailCall]] instead of recursing into
- * the callee. [[TailCall.resolve]] then re-invokes the target function iteratively, eliminating
- * native stack growth.
+ * Sentinel value for tail call optimization of `tailstrict` and auto-TCO calls. When a function
+ * body's tail position is a `tailstrict` or auto-TCO call, the evaluator returns a [[TailCall]]
+ * instead of recursing into the callee. [[TailCall.resolve]] then re-invokes the target function
+ * iteratively, eliminating native stack growth.
  *
  * This is an internal protocol value and must never escape to user-visible code paths (e.g.
  * materialization, object field access). Every call site that may produce a TailCall must either
- * pass `TailstrictModeEnabled` (so the caller resolves it) or guard the result with
- * [[TailCall.resolve]].
+ * pass `TailstrictModeEnabled` / `TailstrictModeAutoTCO` (so the caller resolves it) or guard the
+ * result with [[TailCall.resolve]].
+ *
+ * @param strict
+ *   when true, [[TailCall.resolve]] uses [[TailstrictModeEnabled]] (explicit `tailstrict` — eager
+ *   argument forcing per the Jsonnet spec). When false, [[TailstrictModeAutoTCO]] is used so that
+ *   arguments remain lazy (preserving Jsonnet semantics).
  */
 final class TailCall(
     val func: Val.Func,
     val args: Array[Eval],
     val namedNames: Array[String],
-    val callSiteExpr: Expr)
+    val callSiteExpr: Expr,
+    val strict: Boolean = false)
     extends Val {
   private[sjsonnet] def valTag: Byte = -1
   def pos: Position = callSiteExpr.pos
@@ -1449,8 +1459,14 @@ object TailCall {
 
   /**
    * Iteratively resolve a [[TailCall]] chain (trampoline loop). If `current` is not a TailCall, it
-   * is returned immediately. Otherwise, each TailCall's target function is re-invoked with
-   * `TailstrictModeEnabled` until a non-TailCall result is produced.
+   * is returned immediately. Otherwise, each TailCall's target function is re-invoked until a
+   * non-TailCall result is produced.
+   *
+   * The mode used for re-invocation depends on [[TailCall.strict]]:
+   *   - `strict = true` (explicit `tailstrict`): uses [[TailstrictModeEnabled]], which forces eager
+   *     argument evaluation inside `func.apply`.
+   *   - `strict = false` (auto-TCO): uses [[TailstrictModeAutoTCO]], which preserves lazy argument
+   *     evaluation — arguments are only evaluated when the function body accesses them.
    *
    * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
    * not alter user-visible stack traces.
@@ -1458,10 +1474,11 @@ object TailCall {
   @tailrec
   def resolve(current: Val)(implicit ev: EvalScope): Val = current match {
     case tc: TailCall =>
-      implicit val tailstrictMode: TailstrictMode = TailstrictModeEnabled
+      val mode: TailstrictMode =
+        if (tc.strict) TailstrictModeEnabled else TailstrictModeAutoTCO
       val next =
         try {
-          tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)
+          tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)(ev, mode)
         } catch {
           case e: Error =>
             throw e.addFrame(tc.callSiteExpr.pos, tc.callSiteExpr)

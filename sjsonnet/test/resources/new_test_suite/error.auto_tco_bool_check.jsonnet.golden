@@ -1,0 +1,2 @@
+sjsonnet.Error: binary operator && does not operate on strings.
+    at [f].(error.auto_tco_bool_check.jsonnet:4:18)
