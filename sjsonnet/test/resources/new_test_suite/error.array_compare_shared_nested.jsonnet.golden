@@ -1,0 +1,2 @@
+sjsonnet.Error: boom
+    at [<root>].(error.array_compare_shared_nested.jsonnet:4:7)

@@ -1,0 +1,2 @@
+sjsonnet.Error: boom
+    at [<root>].(error.array_equal_shared_error.jsonnet:3:7)

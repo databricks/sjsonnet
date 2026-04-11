@@ -1907,17 +1907,25 @@ class Evaluator(
     case (x: Val.Num, y: Val.Num) => java.lang.Double.compare(x.asDouble, y.asDouble)
     case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Arr, y: Val.Arr) =>
-      val len = math.min(x.length, y.length)
-      // Skip shared prefix for ConcatView arrays (e.g., big_array + [x] < big_array + [y]).
-      // When both arrays are O(1) concat views sharing the same left array, we can jump
-      // past the entire shared prefix — turning O(n) comparison into O(suffix_len).
+      // Use eval(i) to access raw Eval without materializing ConcatViews.
+      // Combined with sharedConcatPrefixLength(), this turns O(n) comparison
+      // into O(right_len) for patterns like `big_array + [x] < big_array + [y]`.
+      val xLen = x.length
+      val yLen = y.length
+      val len = math.min(xLen, yLen)
+      // Fast path: skip shared ConcatView prefix entirely
       var i = x.sharedConcatPrefixLength(y)
       while (i < len) {
-        val xi = x.value(i)
-        val yi = y.value(i)
-        // Post-force reference equality for shared elements (e.g., from array concatenation).
-        // Must force first to preserve error semantics on lazy elements.
-        if (!(xi eq yi)) {
+        val xe = x.eval(i)
+        val ye = y.eval(i)
+        // For shared Eval refs that are already-evaluated primitives (Str, Num, Bool,
+        // Null), compare(x, x) is trivially 0 — safe to skip. Non-primitive shared
+        // refs (Arr, Obj, Func) must still recurse or error, so they fall through.
+        if ((xe eq ye) && xe.isInstanceOf[Val] && xe.asInstanceOf[Val].valTag <= Val.TAG_NULL) {
+          // Shared primitive Val: self-comparison is always 0
+        } else {
+          val xi = xe.value
+          val yi = ye.value
           // Inline numeric fast path avoids recursive compare() dispatch per element
           val cmp = xi match {
             case xn: Val.Num =>
@@ -1931,7 +1939,7 @@ class Evaluator(
         }
         i += 1
       }
-      Integer.compare(x.length, y.length)
+      Integer.compare(xLen, yLen)
     case (x: Val.Bool, y: Val.Bool) => java.lang.Boolean.compare(x.asBoolean, y.asBoolean)
     case (_: Val.Null, _: Val.Null) => 0
     case _                          => compareTypeMismatch(x, y)
@@ -1956,10 +1964,18 @@ class Evaluator(
         case y: Val.Arr =>
           val xlen = x.length
           if (xlen != y.length) return false
-          // Skip shared prefix for ConcatView arrays — see compare() for details
+          // Skip shared ConcatView prefix — elements are reference-identical
           var i = x.sharedConcatPrefixLength(y)
           while (i < xlen) {
-            if (!equal(x.value(i), y.value(i))) return false
+            val xe = x.eval(i)
+            val ye = y.eval(i)
+            // Skip forcing when Eval references match (shared backing elements)
+            if (!(xe eq ye)) {
+              if (!equal(xe.value, ye.value)) return false
+            } else if (!xe.isInstanceOf[Val]) {
+              // Invariant: Eval = Val | Lazy. Val is pure; Lazy may error on force.
+              xe.value // Force shared Lazy thunks for error semantics
+            }
             i += 1
           }
           true
