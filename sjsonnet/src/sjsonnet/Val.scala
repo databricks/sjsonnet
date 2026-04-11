@@ -318,18 +318,54 @@ object Val {
     def prettyName = "array"
     private[sjsonnet] def valTag: Byte = TAG_ARR
 
+    /**
+     * Flag indicating this array is a lazy reversed view of the backing array. When true, element
+     * access is remapped: `value(i)` returns `arr(length - 1 - i)` instead of `arr(i)`. This avoids
+     * allocating and copying a new array for `std.reverse`.
+     *
+     * Inspired by jrsonnet's ReverseArray approach which uses zero-copy index remapping.
+     */
+    private[sjsonnet] var _reversed: Boolean = false
+
     override def asArr: Arr = this
     def length: Int = arr.length
-    def value(i: Int): Val = arr(i).value
 
-    def asLazyArray: Array[Eval] = arr.asInstanceOf[Array[Eval]]
+    def value(i: Int): Val =
+      if (_reversed) arr(arr.length - 1 - i).value
+      else arr(i).value
+
+    /**
+     * Returns the backing array in logical order. If reversed, creates a new copy with elements in
+     * reversed order (materialization on demand).
+     */
+    def asLazyArray: Array[Eval] =
+      if (_reversed) {
+        val len = arr.length
+        val result = new Array[Eval](len)
+        var i = 0
+        while (i < len) {
+          result(i) = arr(len - 1 - i).asInstanceOf[Eval]
+          i += 1
+        }
+        result
+      } else {
+        arr.asInstanceOf[Array[Eval]]
+      }
+
     def asStrictArray: Array[Val] = {
       val len = arr.length
       val result = new Array[Val](len)
       var i = 0
-      while (i < len) {
-        result(i) = arr(i).value
-        i += 1
+      if (_reversed) {
+        while (i < len) {
+          result(i) = arr(len - 1 - i).value
+          i += 1
+        }
+      } else {
+        while (i < len) {
+          result(i) = arr(i).value
+          i += 1
+        }
       }
       result
     }
@@ -339,8 +375,9 @@ object Val {
      * overhead from Scala's `++` operator.
      */
     def concat(newPos: Position, rhs: Arr): Arr = {
-      val lArr = arr
-      val rArr = rhs.arr
+      // Materialize reversed arrays before concat to ensure correct element order
+      val lArr = asLazyArray
+      val rArr = rhs.asLazyArray
       val lLen = lArr.length
       val rLen = rArr.length
       val result = new Array[Eval](lLen + rLen)
@@ -349,21 +386,59 @@ object Val {
       Arr(newPos, result)
     }
 
-    def iterator: Iterator[Val] = arr.iterator.map(_.value)
+    def iterator: Iterator[Val] = new Iterator[Val] {
+      private var i = 0
+      private val len = arr.length
+      def hasNext: Boolean = i < len
+      def next(): Val = {
+        if (i >= len) throw new NoSuchElementException("next on empty iterator")
+        val idx = if (_reversed) len - 1 - i else i
+        i += 1
+        arr(idx).value
+      }
+    }
+
     def foreach[U](f: Val => U): Unit = {
       var i = 0
-      while (i < arr.length) {
-        f(arr(i).value)
-        i += 1
+      val len = arr.length
+      if (_reversed) {
+        while (i < len) {
+          f(arr(len - 1 - i).value)
+          i += 1
+        }
+      } else {
+        while (i < len) {
+          f(arr(i).value)
+          i += 1
+        }
       }
     }
     def forall(f: Val => Boolean): Boolean = {
       var i = 0
-      while (i < arr.length) {
-        if (!f(arr(i).value)) return false
-        i += 1
+      val len = arr.length
+      if (_reversed) {
+        while (i < len) {
+          if (!f(arr(len - 1 - i).value)) return false
+          i += 1
+        }
+      } else {
+        while (i < len) {
+          if (!f(arr(i).value)) return false
+          i += 1
+        }
       }
       true
+    }
+
+    /**
+     * Create a reversed view of this array without copying. The returned Arr shares the same
+     * backing array but flips the reversed flag, so element access is O(1) with zero allocation.
+     * Double-reversal cancels out.
+     */
+    def reversed(newPos: Position): Arr = {
+      val result = Arr(newPos, arr)
+      result._reversed = !this._reversed
+      result
     }
   }
 
