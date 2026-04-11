@@ -314,7 +314,7 @@ object Val {
     private[sjsonnet] def valTag: Byte = TAG_NUM
   }
 
-  final case class Arr(var pos: Position, private val arr: Array[? <: Eval]) extends Literal {
+  final class Arr(var pos: Position, private var arr: Array[? <: Eval]) extends Literal {
     def prettyName = "array"
     private[sjsonnet] def valTag: Byte = TAG_ARR
 
@@ -327,18 +327,75 @@ object Val {
      */
     private[sjsonnet] var _reversed: Boolean = false
 
-    override def asArr: Arr = this
-    def length: Int = arr.length
+    // Lazy concat state. When _concatLeft is non-null, this array is a virtual view
+    // over the concatenation of _concatLeft and _concatRight. Inspired by jrsonnet's
+    // ExtendedArray which uses O(1) concat for large arrays to avoid copying.
+    // The 'arr' field is lazily materialized when bulk access (asLazyArray, etc.) is needed.
+    private var _concatLeft: Arr = _
+    private var _concatRight: Arr = _
+    private var _length: Int = -1
 
-    def value(i: Int): Val =
-      if (_reversed) arr(arr.length - 1 - i).value
-      else arr(i).value
+    @inline private def isConcatView: Boolean = _concatLeft ne null
+
+    override def asArr: Arr = this
+
+    def length: Int = {
+      val l = _length
+      if (l >= 0) l
+      else {
+        val computed =
+          if (isConcatView) _concatLeft.length + _concatRight.length
+          else arr.length
+        _length = computed
+        computed
+      }
+    }
+
+    def value(i: Int): Val = {
+      if (isConcatView) {
+        val leftLen = _concatLeft.length
+        if (i < leftLen) _concatLeft.value(i) else _concatRight.value(i - leftLen)
+      } else if (_reversed) {
+        arr(arr.length - 1 - i).value
+      } else {
+        arr(i).value
+      }
+    }
 
     /**
-     * Returns the backing array in logical order. If reversed, creates a new copy with elements in
-     * reversed order (materialization on demand).
+     * Return the raw Eval at index i without forcing it. For ConcatViews, follows the tree without
+     * materializing the backing array — this preserves reference equality for shared prefix
+     * elements, enabling O(1) identity checks in compare/equal.
      */
-    def asLazyArray: Array[Eval] =
+    def eval(i: Int): Eval = {
+      if (isConcatView) {
+        val leftLen = _concatLeft.length
+        if (i < leftLen) _concatLeft.eval(i) else _concatRight.eval(i - leftLen)
+      } else if (_reversed) {
+        arr(arr.length - 1 - i)
+      } else {
+        arr(i)
+      }
+    }
+
+    /**
+     * If both this and other are ConcatViews sharing the same left array, return the shared prefix
+     * length. Otherwise return 0. Used by compare/equal to skip identical prefix elements entirely,
+     * turning O(n) comparison into O(right_len) for patterns like
+     * `big_array + [x] < big_array + [y]`.
+     */
+    def sharedConcatPrefixLength(other: Arr): Int = {
+      if (isConcatView && other.isConcatView && (_concatLeft eq other._concatLeft))
+        _concatLeft.length
+      else 0
+    }
+
+    /**
+     * Returns the backing array in logical order. For concat views, materializes into a flat array.
+     * For reversed arrays, creates a new copy with elements in reversed order.
+     */
+    def asLazyArray: Array[Eval] = {
+      if (isConcatView) materialize()
       if (_reversed) {
         val len = arr.length
         val result = new Array[Eval](len)
@@ -351,81 +408,94 @@ object Val {
       } else {
         arr.asInstanceOf[Array[Eval]]
       }
+    }
 
     def asStrictArray: Array[Val] = {
-      val len = arr.length
+      val len = length
       val result = new Array[Val](len)
       var i = 0
-      if (_reversed) {
-        while (i < len) {
-          result(i) = arr(len - 1 - i).value
-          i += 1
-        }
-      } else {
-        while (i < len) {
-          result(i) = arr(i).value
-          i += 1
-        }
+      while (i < len) {
+        result(i) = value(i)
+        i += 1
       }
       result
     }
 
     /**
-     * Concatenate two arrays using System.arraycopy to avoid ClassTag resolution and ArrayBuilder
-     * overhead from Scala's `++` operator.
+     * Materialize a lazy concat view into a flat array. After this call, `arr` holds the full
+     * contents and the concat references are released for GC.
      */
-    def concat(newPos: Position, rhs: Arr): Arr = {
-      // Materialize reversed arrays before concat to ensure correct element order
-      val lArr = asLazyArray
-      val rArr = rhs.asLazyArray
+    private def materialize(): Unit = {
+      val left = _concatLeft
+      val right = _concatRight
+      val lArr = left.asLazyArray
+      val rArr = right.asLazyArray
       val lLen = lArr.length
       val rLen = rArr.length
       val result = new Array[Eval](lLen + rLen)
       System.arraycopy(lArr, 0, result, 0, lLen)
       System.arraycopy(rArr, 0, result, lLen, rLen)
-      Arr(newPos, result)
+      arr = result
+      _concatLeft = null
+      _concatRight = null
     }
 
-    def iterator: Iterator[Val] = new Iterator[Val] {
-      private var i = 0
-      private val len = arr.length
-      def hasNext: Boolean = i < len
-      def next(): Val = {
-        if (i >= len) throw new NoSuchElementException("next on empty iterator")
-        val idx = if (_reversed) len - 1 - i else i
-        i += 1
-        arr(idx).value
+    /**
+     * Concatenate two arrays. For large left-side arrays where neither operand is already a concat
+     * view, creates a lazy ConcatView that defers the copy until bulk access is needed. This is
+     * particularly beneficial for patterns like `big_array + [x] < big_array + [y]` where
+     * element-wise comparison via value(i) never needs the flattened backing array.
+     *
+     * Inspired by jrsonnet's ExtendedArray (arr/spec.rs) which uses O(1) concat for arrays above a
+     * size threshold.
+     */
+    def concat(newPos: Position, rhs: Arr): Arr = {
+      val leftLen = this.length
+      // Use lazy concat when the left side is large enough that avoiding the
+      // arraycopy is worthwhile. Limit to depth-1 (neither side is a concat view)
+      // to prevent O(depth) access chains and ensure value(i) stays O(1).
+      if (leftLen >= Arr.LAZY_CONCAT_THRESHOLD && !this.isConcatView && !rhs.isConcatView) {
+        val result = Arr(newPos, Arr.EMPTY_EVAL_ARRAY)
+        result._concatLeft = this
+        result._concatRight = rhs
+        result._length = leftLen + rhs.length
+        result
+      } else {
+        // Eager path: allocate + arraycopy (also used when either side is a concat view
+        // to flatten and prevent deep nesting)
+        val lArr = this.asLazyArray
+        val rArr = rhs.asLazyArray
+        val rLen = rArr.length
+        val result = new Array[Eval](leftLen + rLen)
+        System.arraycopy(lArr, 0, result, 0, leftLen)
+        System.arraycopy(rArr, 0, result, leftLen, rLen)
+        Arr(newPos, result)
       }
     }
 
+    def iterator: Iterator[Val] = {
+      val self = this
+      new Iterator[Val] {
+        private val len = self.length
+        private var i = 0
+        def hasNext: Boolean = i < len
+        def next(): Val = { val v = self.value(i); i += 1; v }
+      }
+    }
     def foreach[U](f: Val => U): Unit = {
+      val len = length
       var i = 0
-      val len = arr.length
-      if (_reversed) {
-        while (i < len) {
-          f(arr(len - 1 - i).value)
-          i += 1
-        }
-      } else {
-        while (i < len) {
-          f(arr(i).value)
-          i += 1
-        }
+      while (i < len) {
+        f(value(i))
+        i += 1
       }
     }
     def forall(f: Val => Boolean): Boolean = {
+      val len = length
       var i = 0
-      val len = arr.length
-      if (_reversed) {
-        while (i < len) {
-          if (!f(arr(len - 1 - i).value)) return false
-          i += 1
-        }
-      } else {
-        while (i < len) {
-          if (!f(arr(i).value)) return false
-          i += 1
-        }
+      while (i < len) {
+        if (!f(value(i))) return false
+        i += 1
       }
       true
     }
@@ -436,10 +506,23 @@ object Val {
      * Double-reversal cancels out.
      */
     def reversed(newPos: Position): Arr = {
+      if (isConcatView) materialize() // flatten before reverse
       val result = Arr(newPos, arr)
       result._reversed = !this._reversed
       result
     }
+  }
+
+  object Arr {
+    def apply(pos: Position, arr: Array[? <: Eval]): Arr = new Arr(pos, arr)
+
+    /**
+     * Threshold for lazy concat. Arrays with left.length >= this value use a virtual ConcatView
+     * instead of eager arraycopy. Below this size, arraycopy is cheap enough that the indirection
+     * overhead of virtual dispatch outweighs the copy savings.
+     */
+    val LAZY_CONCAT_THRESHOLD = 256
+    private[sjsonnet] val EMPTY_EVAL_ARRAY: Array[Eval] = Array.empty[Eval]
   }
 
   object Obj {
