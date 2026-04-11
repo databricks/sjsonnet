@@ -184,6 +184,60 @@ class Interpreter(
       r <- materialize(v, visitor)
     } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
 
+  /**
+   * Fused evaluate + materialize path that bypasses the Visitor pattern entirely, writing JSON
+   * directly to a Writer. Significantly faster on Scala Native for materialization-heavy workloads
+   * where Visitor virtual dispatch dominates.
+   *
+   * Only suitable for standard JSON output (not YAML, not string-expect mode).
+   */
+  def interpretDirect(
+      txt: String,
+      path: Path,
+      out: java.io.Writer,
+      indent: Int = 3): Either[String, Unit] =
+    (for {
+      v <- evaluate(txt, path)
+      r <- materializeDirect(v, out, indent)
+    } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
+
+  private def materializeDirect(res: Val, out: java.io.Writer, indent: Int): Either[Error, Unit] = {
+    val t0 = if (debugStats != null) System.nanoTime() else 0L
+    val result =
+      try {
+        val writer = new DirectJsonWriter(
+          out,
+          indent = indent,
+          sort = !settings.preserveOrder,
+          brokenAssertionLogic = settings.brokenAssertionLogic
+        )(evaluator)
+        writer.write(res)
+        Right(())
+      } catch {
+        case e: Error              => Left(e)
+        case _: StackOverflowError =>
+          Left(
+            new Error(
+              "Stackoverflow while materializing, possibly due to recursive value",
+              Nil,
+              None
+            )
+          )
+        case _: OutOfMemoryError =>
+          Left(
+            new Error(
+              "Out of memory while materializing, possibly due to recursive value",
+              Nil,
+              None
+            )
+          )
+        case NonFatal(e) =>
+          Left(new Error("Internal error: " + e.toString, Nil, Some(e)))
+      }
+    if (debugStats != null) debugStats.materializeTimeNs += System.nanoTime() - t0
+    result
+  }
+
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)
     catch {
