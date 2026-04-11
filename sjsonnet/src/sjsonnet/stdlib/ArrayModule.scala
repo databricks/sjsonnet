@@ -252,7 +252,9 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, arrs.value.asArr.asLazyArray.reverse)
+      // Zero-copy reverse: create a reversed view sharing the same backing array.
+      // This avoids allocating and copying a new array, reducing GC pressure.
+      arrs.value.asArr.reversed(pos)
     }
   }
 
