@@ -99,26 +99,57 @@ object ObjectModule extends AbstractFunctionModule {
       val func = _func.value.asFunc
       val obj = _obj.value.asObj
       val allKeys = obj.allKeyNames
-      val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](allKeys.length)
-      var i = 0
-      while (i < allKeys.length) {
-        val k = allKeys(i)
-        val v = new Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
-          def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
-            func.apply2(
-              Val.Str(pos, k),
-              new LazyFunc(() => obj.value(k, pos.noOffset)(ev)),
-              pos.noOffset
-            )(
-              ev,
-              TailstrictModeDisabled
-            )
+      val n = allKeys.length
+      if (n == 1) {
+        new Val.Obj(
+          pos,
+          null,
+          false,
+          null,
+          null,
+          singleFieldKey = allKeys(0),
+          singleFieldMember = new MapWithKeyMember(func, obj, allKeys(0), pos)
+        )
+      } else if (n <= 8) {
+        val members = new Array[Val.Obj.Member](n)
+        var i = 0
+        while (i < n) {
+          members(i) = new MapWithKeyMember(func, obj, allKeys(i), pos)
+          i += 1
         }
-        m.put(k, v)
-        i += 1
+        new Val.Obj(
+          pos,
+          null,
+          false,
+          null,
+          null,
+          inlineFieldKeys = allKeys,
+          inlineFieldMembers = members
+        )
+      } else {
+        val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](n)
+        var i = 0
+        while (i < n) {
+          m.put(allKeys(i), new MapWithKeyMember(func, obj, allKeys(i), pos))
+          i += 1
+        }
+        new Val.Obj(pos, m, false, null, null)
       }
-      new Val.Obj(pos, m, false, null, null)
     }
+  }
+
+  private final class MapWithKeyMember(
+      private val func: Val.Func,
+      private val sourceObj: Val.Obj,
+      private val key: String,
+      private val pos: Position)
+      extends Val.Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
+    def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
+      func.apply2(
+        Val.Str(pos, key),
+        new LazyFunc(() => sourceObj.value(key, pos.noOffset)(ev)),
+        pos.noOffset
+      )(ev, TailstrictModeDisabled)
   }
 
   def getVisibleKeys(ev: EvalScope, v1: Val.Obj): Array[String] =
