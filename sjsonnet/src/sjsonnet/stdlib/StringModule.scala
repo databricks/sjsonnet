@@ -23,15 +23,15 @@ object StringModule extends AbstractFunctionModule {
 
   private object Length extends Val.Builtin1("length", "x") {
     def evalRhs(x: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Num(
+      Val.cachedNum(
         pos,
-        x.value match {
+        (x.value match {
           case Val.Str(_, s) => s.codePointCount(0, s.length)
           case a: Val.Arr    => a.length
           case o: Val.Obj    => o.visibleKeyNames.length
           case o: Val.Func   => o.params.names.length
           case x             => Error.fail("Cannot get length of " + x.prettyName)
-        }
+        }).toDouble
       )
   }
 
@@ -42,7 +42,7 @@ object StringModule extends AbstractFunctionModule {
       if (codePointCount != 1) {
         Error.fail("expected a single character string, got " + s)
       } else {
-        Val.Num(pos, s.codePointAt(0).toDouble)
+        Val.cachedNum(pos, s.codePointAt(0).toDouble)
       }
     }
   }
@@ -286,7 +286,7 @@ object StringModule extends AbstractFunctionModule {
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       try {
-        Val.Num(pos, str.value.asString.toLong.toDouble)
+        Val.cachedNum(pos, str.value.asString.toLong.toDouble)
       } catch {
         case _: NumberFormatException =>
           Error.fail("Cannot parse '" + str.value.asString + "' as an integer in base 10")
@@ -295,12 +295,12 @@ object StringModule extends AbstractFunctionModule {
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.value.asString, 8).toDouble)
+      Val.cachedNum(pos, java.lang.Long.parseLong(str.value.asString, 8).toDouble)
   }
 
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Num(pos, java.lang.Long.parseLong(str.value.asString, 16).toDouble)
+      Val.cachedNum(pos, java.lang.Long.parseLong(str.value.asString, 16).toDouble)
   }
 
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
@@ -319,7 +319,7 @@ object StringModule extends AbstractFunctionModule {
       val arr = new Array[Eval](bytes.length)
       var i = 0
       while (i < bytes.length) {
-        arr(i) = Val.Num(pos, bytes(i) & 0xff)
+        arr(i) = Val.cachedNum(pos, (bytes(i) & 0xff).toDouble)
         i += 1
       }
       Val.Arr(pos, arr)
@@ -406,7 +406,7 @@ object StringModule extends AbstractFunctionModule {
 
           while (0 <= matchIndex && matchIndex < str.length) {
             val codePointIndex = prevCodePointIndex + str.codePointCount(prevCharIndex, matchIndex)
-            indices.+=(Val.Num(pos, codePointIndex))
+            indices.+=(Val.cachedNum(pos, codePointIndex.toDouble))
 
             prevCharIndex = matchIndex
             prevCodePointIndex = codePointIndex

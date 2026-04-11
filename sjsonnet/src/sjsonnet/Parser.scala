@@ -1045,9 +1045,10 @@ class Parser(
 }
 
 final class Position(val fileScope: FileScope, val offset: Int) {
-  def currentFile: Path = fileScope.currentFile
+  // Null-safe: synthetic positions (e.g. from Val.cachedNum pool) have null fileScope
+  def currentFile: Path = if (fileScope != null) fileScope.currentFile else null
 
-  def noOffset: Position = fileScope.noOffsetPos
+  def noOffset: Position = if (fileScope != null) fileScope.noOffsetPos else this
 
   override def equals(o: Any): Boolean = o match {
     case o: Position => currentFile == o.currentFile && offset == o.offset

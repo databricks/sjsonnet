@@ -88,7 +88,7 @@ object ArrayModule extends AbstractFunctionModule {
     def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
       var count = 0
       arr.value.asArr.foreach(v => if (ev.equal(v.value, x.value)) count += 1)
-      Val.Num(pos, count)
+      Val.cachedNum(pos, count.toDouble)
     }
   }
 
@@ -189,7 +189,7 @@ object ArrayModule extends AbstractFunctionModule {
       var i = 0
       while (i < a.length) {
         val x = arr(i)
-        val idx = Val.Num(pos, i)
+        val idx = Val.cachedNum(pos, i)
         a(i) = new LazyApply2(func, idx, x, noOff, ev)
         i += 1
       }
@@ -206,7 +206,7 @@ object ArrayModule extends AbstractFunctionModule {
       while (i < arr.length) {
         if (ev.equal(arr.value(i), value.value)) {
           val finalI = i
-          b.+=(Val.Num(pos, finalI))
+          b.+=(Val.cachedNum(pos, finalI))
         }
         i += 1
       }
@@ -296,7 +296,7 @@ object ArrayModule extends AbstractFunctionModule {
       val arr = new Array[Eval](size)
       var i = 0
       while (i < size) {
-        arr(i) = Val.Num(pos, fromInt + i)
+        arr(i) = Val.cachedNum(pos, fromInt + i)
         i += 1
       }
       Val.Arr(pos, arr)
@@ -573,7 +573,7 @@ object ArrayModule extends AbstractFunctionModule {
             val noOff = pos.noOffset
             var i = 0
             while (i < sz) {
-              a(i) = new LazyApply1(func, Val.Num(pos, i), noOff, ev)
+              a(i) = new LazyApply1(func, Val.cachedNum(pos, i), noOff, ev)
               i += 1
             }
           }

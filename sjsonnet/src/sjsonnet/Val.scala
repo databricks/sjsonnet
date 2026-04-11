@@ -236,7 +236,14 @@ object Val {
    */
   def cachedNum(pos: Position, d: Double): Num = {
     val i = d.toInt
-    if (i >= 0 && i < numCacheSize && i.toDouble == d) numCache(i)
+    // Use raw bits comparison to correctly distinguish -0.0 from +0.0
+    // (IEEE-754: -0.0 == 0.0 is true, but they have different bit patterns
+    // and different observable behavior e.g. via std.math.atan2)
+    if (
+      i >= 0 && i < numCacheSize &&
+      java.lang.Double.doubleToRawLongBits(i.toDouble) == java.lang.Double.doubleToRawLongBits(d)
+    )
+      numCache(i)
     else Num(pos, d)
   }
 
