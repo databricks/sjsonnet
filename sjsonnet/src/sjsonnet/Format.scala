@@ -124,9 +124,163 @@ object Format {
   private def parseFormatCached(s: String, cache: FormatCache): RuntimeFormat = {
     // CompiledFormat is sealed with RuntimeFormat as the only subtype, so this match is exhaustive.
     // Using pattern match instead of asInstanceOf for explicit safety.
-    cache.getOrElseUpdate(s, lowerParsedFormat(fastparse.parse(s, format(_)).get.value)) match {
+    cache.getOrElseUpdate(s, scanFormat(s)) match {
       case rf: RuntimeFormat => rf
     }
+  }
+
+  /**
+   * Hand-written format string scanner. Replaces the fastparse-based parser with direct
+   * `String.indexOf('%')` scanning, which is a JVM intrinsic / native SIMD-optimized operation. For
+   * large format strings (e.g. 605KB large_string_template with 256 interpolations), this avoids
+   * the overhead of running parser combinators over hundreds of KB of literal text.
+   */
+  private def scanFormat(s: String): RuntimeFormat = {
+    val len = s.length
+    val specsBuilder = new java.util.ArrayList[FormatSpec]()
+    val literalsBuilder = new java.util.ArrayList[String]()
+    var staticChars = 0
+    var hasAnyStar = false
+
+    // Find the first '%' to extract the leading literal
+    var pos = s.indexOf('%')
+    val leading =
+      if (pos < 0) s // No format specs at all
+      else s.substring(0, pos)
+    staticChars += leading.length
+
+    while (pos >= 0 && pos < len) {
+      pos += 1 // skip the '%'
+      if (pos >= len) throw new Exception("Truncated format code at end of string")
+
+      // Parse format spec: %(label)flags width.precision [hlL] conversion
+      // 1. Optional label: (key)
+      val label: Option[String] =
+        if (s.charAt(pos) == '(') {
+          val closeIdx = s.indexOf(')', pos + 1)
+          if (closeIdx < 0) throw new Exception("Unterminated ( in format spec")
+          val key = s.substring(pos + 1, closeIdx)
+          pos = closeIdx + 1
+          Some(key)
+        } else None
+
+      // 2. Flags: #0- +
+      var alternate = false
+      var zeroPadded = false
+      var leftAdjusted = false
+      var blankBeforePositive = false
+      var signCharacter = false
+      var parsingFlags = pos < len
+      while (parsingFlags) {
+        s.charAt(pos) match {
+          case '#' => alternate = true; pos += 1
+          case '0' => zeroPadded = true; pos += 1
+          case '-' => leftAdjusted = true; pos += 1
+          case ' ' => blankBeforePositive = true; pos += 1
+          case '+' => signCharacter = true; pos += 1
+          case _   => parsingFlags = false
+        }
+        if (pos >= len) parsingFlags = false
+      }
+
+      // 3. Width: integer or *
+      var width: Option[Int] = None
+      var widthStar = false
+      if (pos < len) {
+        val c = s.charAt(pos)
+        if (c == '*') {
+          widthStar = true
+          pos += 1
+        } else if (c >= '1' && c <= '9') {
+          var w = c - '0'
+          pos += 1
+          while (pos < len && s.charAt(pos) >= '0' && s.charAt(pos) <= '9') {
+            w = w * 10 + (s.charAt(pos) - '0')
+            pos += 1
+          }
+          width = Some(w)
+        } else if (c == '0' && zeroPadded) {
+          // '0' was already consumed as a flag, but '0' followed by digits could be width
+          // The flag loop already handled leading '0', skip
+        }
+      }
+
+      // 4. Precision: .integer or .*
+      var precision: Option[Int] = None
+      var precisionStar = false
+      if (pos < len && s.charAt(pos) == '.') {
+        pos += 1
+        if (pos < len) {
+          val c = s.charAt(pos)
+          if (c == '*') {
+            precisionStar = true
+            pos += 1
+          } else if (c >= '0' && c <= '9') {
+            var p = c - '0'
+            pos += 1
+            while (pos < len && s.charAt(pos) >= '0' && s.charAt(pos) <= '9') {
+              p = p * 10 + (s.charAt(pos) - '0')
+              pos += 1
+            }
+            precision = Some(p)
+          } else {
+            // "." with no digits = precision 0
+            precision = Some(0)
+          }
+        }
+      }
+
+      // 5. Optional length modifier: h, l, L (ignored per Python spec)
+      if (pos < len) {
+        val c = s.charAt(pos)
+        if (c == 'h' || c == 'l' || c == 'L') pos += 1
+      }
+
+      // 6. Conversion character
+      if (pos >= len) throw new Exception("Truncated format code at end of string")
+      val conversion = s.charAt(pos)
+      pos += 1
+      if ("diouxXeEfFgGcrsa%".indexOf(conversion) < 0)
+        throw new Exception(s"Unrecognized conversion type: $conversion")
+
+      specsBuilder.add(
+        FormatSpec(
+          label,
+          alternate,
+          zeroPadded,
+          leftAdjusted,
+          blankBeforePositive,
+          signCharacter,
+          width,
+          widthStar,
+          precision,
+          precisionStar,
+          conversion
+        )
+      )
+      hasAnyStar ||= widthStar || precisionStar
+
+      // Find next '%' to extract the literal between this spec and the next
+      val nextPct = s.indexOf('%', pos)
+      val literal =
+        if (nextPct < 0) s.substring(pos) // Rest of string is literal
+        else s.substring(pos, nextPct)
+      literalsBuilder.add(literal)
+      staticChars += literal.length
+
+      pos = nextPct
+    }
+
+    val size = specsBuilder.size()
+    val specs = new Array[FormatSpec](size)
+    val literals = new Array[String](size)
+    var idx = 0
+    while (idx < size) {
+      specs(idx) = specsBuilder.get(idx)
+      literals(idx) = literalsBuilder.get(idx)
+      idx += 1
+    }
+    new RuntimeFormat(leading, specs, literals, hasAnyStar, staticChars)
   }
 
   /** Convert a parsed format (leading + Seq of tuples) into a RuntimeFormat with arrays. */
@@ -492,8 +646,9 @@ object Format {
    */
   class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
     // Pre-parse the format string at construction time (during static optimization).
+    // Uses the hand-written scanner instead of fastparse for faster parsing of large format strings.
     // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.
-    private val parsed = lowerParsedFormat(fastparse.parse(fmt, format(_)).get.value)
+    private val parsed = scanFormat(fmt)
     def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, format(parsed, values0.value, pos)(ev))
   }
