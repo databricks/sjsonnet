@@ -687,6 +687,13 @@ object Val {
     private[sjsonnet] var _skipFieldCache: Boolean = false
 
     /**
+     * Reference to the source MemberList expression, set for objects with super == null. Enables
+     * lazy sharing of allKeyNames/visibleKeyNames: the first access computes and caches on the
+     * MemberList; subsequent objects from the same expression find the cached result.
+     */
+    private[sjsonnet] var _sourceMemberList: Expr.ObjBody.MemberList = null
+
+    /**
      * Store a computed field value in the object's inline cache, preserving memoization semantics
      * when bypassing `value()` during direct iteration. This ensures that subsequent accesses via
      * `self.field` within sibling field computations see the cached value, preventing double
@@ -987,62 +994,73 @@ object Val {
     }
 
     lazy val allKeyNames: Array[String] = {
-      if (inlineFieldKeys != null && `super` == null) inlineFieldKeys.clone()
+      val ml = _sourceMemberList
+      val cached = if (ml != null) ml._cachedAllKeyNames else null
+      if (cached != null) cached
       else {
-        val m = if (static || `super` != null) getAllKeys else getValue0
-        m.keySet().toArray(new Array[String](m.size()))
+        val result =
+          if (inlineFieldKeys != null && `super` == null) inlineFieldKeys.clone()
+          else {
+            val m = if (static || `super` != null) getAllKeys else getValue0
+            m.keySet().toArray(new Array[String](m.size()))
+          }
+        if (ml != null) ml._cachedAllKeyNames = result
+        result
       }
     }
 
     lazy val visibleKeyNames: Array[String] = {
-      if (static) {
-        allKeyNames
-      } else if (inlineFieldKeys != null && `super` == null) {
-        // Inline multi-field fast path: check if all visible (common case)
-        val keys = inlineFieldKeys
-        val members = inlineFieldMembers
-        val n = keys.length
-        var allVisible = true
-        var i = 0
-        while (allVisible && i < n) {
-          if (members(i).visibility == Visibility.Hidden) allVisible = false
-          i += 1
-        }
-        if (allVisible) keys.clone()
-        else {
+      val ml = _sourceMemberList
+      val cached = if (ml != null) ml._cachedVisibleKeyNames else null
+      if (cached != null) cached
+      else {
+        val result = if (static) {
+          allKeyNames
+        } else if (inlineFieldKeys != null && `super` == null) {
+          // Inline multi-field fast path: check if all visible (common case)
+          val keys = inlineFieldKeys
+          val members = inlineFieldMembers
+          val n = keys.length
+          var allVisible = true
+          var i = 0
+          while (allVisible && i < n) {
+            if (members(i).visibility == Visibility.Hidden) allVisible = false
+            i += 1
+          }
+          if (allVisible) keys.clone()
+          else {
+            val buf = new mutable.ArrayBuilder.ofRef[String]
+            buf.sizeHint(n)
+            var j = 0
+            while (j < n) {
+              if (members(j).visibility != Visibility.Hidden) buf += keys(j)
+              j += 1
+            }
+            buf.result()
+          }
+        } else {
           val buf = new mutable.ArrayBuilder.ofRef[String]
-          buf.sizeHint(n)
-          var j = 0
-          while (j < n) {
-            if (members(j).visibility != Visibility.Hidden) buf += keys(j)
-            j += 1
+          if (`super` == null) {
+            val v0 = getValue0
+            // This size hint is based on an optimistic assumption that most fields are visible,
+            // avoiding re-sizing or trimming the buffer in the common case:
+            buf.sizeHint(v0.size())
+            v0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
+          } else {
+            getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
           }
           buf.result()
         }
-      } else {
-        val buf = new mutable.ArrayBuilder.ofRef[String]
-        if (`super` == null) {
-          val v0 = getValue0
-          // This size hint is based on an optimistic assumption that most fields are visible,
-          // avoiding re-sizing or trimming the buffer in the common case:
-          buf.sizeHint(v0.size())
-          v0.forEach((k, m) => if (m.visibility != Visibility.Hidden) buf += k)
-        } else {
-          getAllKeys.forEach((k, b) => if (b == java.lang.Boolean.FALSE) buf += k)
-        }
-        buf.result()
+        if (ml != null) ml._cachedVisibleKeyNames = result
+        result
       }
     }
 
     def value(k: String, pos: Position, self: Obj = this)(implicit evaluator: EvalScope): Val = {
-      val ds = evaluator.debugStats
-      if (ds != null) ds.fieldLookups += 1
       if (static) {
         valueCache.get(k) match {
           case null => Error.fail("Field does not exist: " + k, pos)
-          case x    =>
-            if (ds != null) ds.fieldCacheHits += 1
-            x
+          case x    => x
         }
       } else {
         if ((self eq this) && excludedKeys != null && excludedKeys.contains(k)) {
@@ -1050,16 +1068,13 @@ object Val {
         }
         val cacheKey: Any = if (self eq this) k else (k, self)
         if (ck1 != null && ck1 == cacheKey) {
-          if (ds != null) ds.fieldCacheHits += 1
           return cv1
         }
         if (ck2 != null && ck2 == cacheKey) {
-          if (ds != null) ds.fieldCacheHits += 1
           return cv2
         }
         val cachedValue = if (valueCache != null) valueCache.get(cacheKey) else null
         if (cachedValue != null) {
-          if (ds != null) ds.fieldCacheHits += 1
           cachedValue
         } else {
           valueRaw(k, self, pos, this, cacheKey) match {

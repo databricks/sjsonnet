@@ -1767,6 +1767,7 @@ class Evaluator(
         sup
       )
     }
+    if (sup == null) factory.cachedObj._sourceMemberList = e
     factory.cachedObj
   }
 
