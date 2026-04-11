@@ -402,6 +402,20 @@ object Expr {
         asserts: Array[Member.AssertStmt])
         extends ObjBody {
       final override private[sjsonnet] def tag = ExprTags.`ObjBody.MemberList`
+
+      /**
+       * Cached sorted field order for inline objects. Computed once, shared across all Val.Obj
+       * instances created from this MemberList.
+       */
+      @volatile var _cachedSortedOrder: Array[Int] = null
+
+      /**
+       * Cached flag: true if no field body references `self` or `super` at this object scope level.
+       * When true, the Materializer can skip `cacheFieldValue()` during inline object iteration,
+       * eliminating HashMap allocations for objects with >2 fields. Null means not yet computed.
+       */
+      @volatile var _noSelfRef: java.lang.Boolean = null
+
       override def toString: String =
         s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
     }

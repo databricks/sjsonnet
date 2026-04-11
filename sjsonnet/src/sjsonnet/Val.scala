@@ -481,6 +481,47 @@ object Val {
 
     def getSuper: Obj = `super`
 
+    /**
+     * True if this object can be iterated directly via inline field arrays, bypassing the value()
+     * lookup chain (cache checks, valueRaw dispatch, key scan). Only safe when: no super chain, no
+     * excluded keys, and inline storage is present.
+     */
+    @inline private[sjsonnet] def canDirectIterate: Boolean =
+      `super` == null && excludedKeys == null && (singleFieldKey != null || inlineFieldKeys != null)
+
+    /** Raw inline field keys array (may be null for single-field objects). */
+    @inline private[sjsonnet] def inlineKeys: Array[String] = inlineFieldKeys
+
+    /** Raw inline field members array (may be null for single-field objects). */
+    @inline private[sjsonnet] def inlineMembers: Array[Obj.Member] = inlineFieldMembers
+
+    /** Single-field key (null if object has 0 or 2+ fields). */
+    @inline private[sjsonnet] def singleKey: String = singleFieldKey
+
+    /** Single-field member (null if object has 0 or 2+ fields). */
+    @inline private[sjsonnet] def singleMem: Obj.Member = singleFieldMember
+
+    /**
+     * Cached sorted field order for inline objects. Shared across all objects from the same
+     * MemberList to avoid per-object sort + allocation.
+     */
+    @volatile private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
+
+    /**
+     * When true, field caching can be skipped during materialization because no field body
+     * references `self` or `super`. This eliminates HashMap allocation overhead for objects with >2
+     * fields (where the 2-slot inline cache overflows).
+     */
+    private[sjsonnet] var _skipFieldCache: Boolean = false
+
+    /**
+     * Store a computed field value in the object's inline cache, preserving memoization semantics
+     * when bypassing `value()` during direct iteration. This ensures that subsequent accesses via
+     * `self.field` within sibling field computations see the cached value, preventing double
+     * evaluation and duplicate side effects (e.g., `std.trace`).
+     */
+    @inline private[sjsonnet] def cacheFieldValue(key: String, v: Val): Unit = putCache(key, v)
+
     private def getValue0: util.LinkedHashMap[String, Obj.Member] = {
       if (value0 == null) {
         if (singleFieldKey != null) {
