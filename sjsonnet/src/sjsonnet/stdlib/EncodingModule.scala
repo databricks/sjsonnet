@@ -3,8 +3,6 @@ package sjsonnet.stdlib
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-import java.util.Base64
-
 object EncodingModule extends AbstractFunctionModule {
   def name = "encoding"
 
@@ -18,7 +16,7 @@ object EncodingModule extends AbstractFunctionModule {
     builtin("base64", "input") { (_, _, input: Val) =>
       input match {
         case Val.Str(_, value) =>
-          Base64.getEncoder.encodeToString(value.getBytes("UTF-8"))
+          FastBase64.encodeString(value)
         case arr: Val.Arr =>
           val byteArr = new Array[Byte](arr.length)
           var i = 0
@@ -36,13 +34,13 @@ object EncodingModule extends AbstractFunctionModule {
             byteArr(i) = vInt.toByte
             i += 1
           }
-          Base64.getEncoder.encodeToString(byteArr)
+          FastBase64.encodeBytes(byteArr)
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
     },
     builtin("base64Decode", "str") { (_, _, str: String) =>
       try {
-        new String(Base64.getDecoder.decode(str))
+        FastBase64.decodeToString(str)
       } catch {
         case e: IllegalArgumentException =>
           Error.fail("Invalid base64 string: " + e.getMessage)
@@ -50,7 +48,7 @@ object EncodingModule extends AbstractFunctionModule {
     },
     builtin("base64DecodeBytes", "str") { (pos, _, str: String) =>
       try {
-        val decoded = Base64.getDecoder.decode(str)
+        val decoded = FastBase64.decodeToBytes(str)
         val result = new Array[Eval](decoded.length)
         var i = 0
         while (i < decoded.length) {
