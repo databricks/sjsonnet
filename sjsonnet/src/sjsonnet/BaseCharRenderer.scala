@@ -224,7 +224,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     val buf = BaseCharRenderer.scratchBuf
     var pos = 20
     while (abs >= 100) {
-      val q = (abs / 100).toInt
+      val q = abs / 100
       val r = (abs - q * 100L).toInt
       abs = q
       pos -= 2

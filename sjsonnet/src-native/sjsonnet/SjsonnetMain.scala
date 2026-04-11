@@ -1,6 +1,7 @@
 package sjsonnet
 
 import sjsonnet.stdlib.{NativeGzip, NativeRegex}
+import scala.scalanative.libc.stdio
 
 object SjsonnetMain {
   def main(args: Array[String]): Unit = {
@@ -12,9 +13,12 @@ object SjsonnetMain {
       System.err,
       os.pwd,
       None,
-      std = new sjsonnet.stdlib.StdLibModule(nativeFunctions =
+      None,
+      new sjsonnet.stdlib.StdLibModule(nativeFunctions =
         Map.from(NativeGzip.functions ++ NativeRegex.functions)
-      ).module
+      ).module,
+      None,
+      new NativeOutputStream(stdio.stdout)
     )
     System.exit(exitCode)
   }

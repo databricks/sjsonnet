@@ -108,7 +108,33 @@ object SjsonnetMainBase {
       allowedInputs: Option[Set[os.Path]] = None,
       importer: Option[Importer] = None,
       std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
-      jsonnetPathEnv: Option[String] = None): Int = {
+      jsonnetPathEnv: Option[String] = None): Int =
+    main0(
+      args,
+      parseCache,
+      null.asInstanceOf[InputStream], // stdin is @unused in the target overload
+      stdout,
+      stderr,
+      wd,
+      allowedInputs,
+      importer,
+      std,
+      jsonnetPathEnv,
+      rawOutputStream = null
+    )
+
+  def main0(
+      args: Array[String],
+      parseCache: ParseCache,
+      @unused stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      wd: os.Path,
+      allowedInputs: Option[Set[os.Path]],
+      importer: Option[Importer],
+      std: Val.Obj,
+      jsonnetPathEnv: Option[String],
+      rawOutputStream: OutputStream): Int = {
 
     var hasWarnings = false
     def warn(isTrace: Boolean, msg: String): Unit = {
@@ -178,7 +204,7 @@ object SjsonnetMainBase {
         std,
         debugStats = debugStats,
         profileOpt = config.profile,
-        stdoutStream = stdout
+        stdoutStream = if (rawOutputStream != null) rawOutputStream else stdout
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -196,8 +222,16 @@ object SjsonnetMainBase {
         if (str eq ByteRenderedSentinel) {
           // Output was already written directly to stdout via byte pipeline.
           // Handle trailing newline.
-          if (config.multi.isDefined || !config.noTrailingNewline.value) stdout.write('\n')
-          stdout.flush()
+          if (config.multi.isDefined || !config.noTrailingNewline.value) {
+            if (rawOutputStream != null) {
+              rawOutputStream.write('\n')
+              rawOutputStream.flush()
+            } else {
+              stdout.write('\n')
+              stdout.flush()
+            }
+          } else if (rawOutputStream != null) rawOutputStream.flush()
+          else stdout.flush()
         } else if (str.nonEmpty) {
           config.outputFile match {
             case None =>
