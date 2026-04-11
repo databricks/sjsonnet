@@ -264,11 +264,27 @@ object SjsonnetMainBase {
       path: os.Path,
       wd: os.Path,
       getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
-      val renderer = rendererForConfig(writer, config, getCurrentPosition)
-      val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-      if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
-      res
+    config.outputFile match {
+      case Some(f) if !config.yamlOut.value && !config.expectString.value =>
+        // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
+        // ByteBuilder handles buffering internally (8KB threshold), no BufferedOutputStream needed.
+        handleWriteFile(
+          os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
+        ).flatMap { out =>
+          try {
+            val renderer = new ByteRenderer(out, indent = config.indent)
+            val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+            out.flush()
+            res.map(_ => "")
+          } finally out.close()
+        }
+      case _ =>
+        writeToFile(config, wd) { writer =>
+          val renderer = rendererForConfig(writer, config, getCurrentPosition)
+          val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+          if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
+          res
+        }
     }
   }
 

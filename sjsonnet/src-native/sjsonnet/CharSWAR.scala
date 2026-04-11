@@ -22,4 +22,15 @@ object CharSWAR {
     }
     false
   }
+
+  /** Scalar scan for byte[] — used by ByteRenderer for UTF-8 encoded data. */
+  def hasEscapeChar(arr: Array[Byte], from: Int, to: Int): Boolean = {
+    var i = from
+    while (i < to) {
+      val b = arr(i) & 0xFF
+      if (b < 32 || b == '"' || b == '\\') return true
+      i += 1
+    }
+    false
+  }
 }

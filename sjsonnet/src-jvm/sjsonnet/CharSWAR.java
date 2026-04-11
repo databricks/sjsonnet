@@ -70,6 +70,16 @@ final class CharSWAR {
     }
 
     /**
+     * Check if any byte in {@code arr[from..to)} needs JSON string escaping.
+     * Used by ByteRenderer for in-place SWAR scan on byte[] buffers.
+     * UTF-8 multi-byte sequences never produce bytes matching '"', '\\', or &lt; 0x20,
+     * so this is safe for scanning UTF-8 encoded data.
+     */
+    static boolean hasEscapeChar(byte[] arr, int from, int to) {
+        return hasEscapeCharSWAR(arr, from, to);
+    }
+
+    /**
      * Check if any char in {@code arr[from..to)} needs JSON string escaping.
      */
     static boolean hasEscapeChar(char[] arr, int from, int to) {
