@@ -1610,17 +1610,18 @@ class Evaluator(
       scope: ValScope): Val.Obj = {
     val asserts = e.asserts
     val fields = e.fields
-    var cachedSimpleScope: Option[ValScope] = None
+    var cachedSimpleScope: ValScope = ValScope.empty
+    var cachedSimpleScopeSet: Boolean = false
     var cachedObj: Val.Obj = null
 
     def makeNewScope(self: Val.Obj, sup: Val.Obj): ValScope = {
       if ((sup eq null) && (self eq cachedObj)) {
-        cachedSimpleScope match {
-          case Some(s) => s
-          case None    =>
-            val newScope = createNewScope(self, sup)
-            cachedSimpleScope = Some(newScope)
-            newScope
+        if (cachedSimpleScopeSet) cachedSimpleScope
+        else {
+          val newScope = createNewScope(self, sup)
+          cachedSimpleScope = newScope
+          cachedSimpleScopeSet = true
+          newScope
         }
       } else createNewScope(self, sup)
     }
