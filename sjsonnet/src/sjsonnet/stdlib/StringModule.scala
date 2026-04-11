@@ -116,24 +116,101 @@ object StringModule extends AbstractFunctionModule {
       chars.result()
     }
 
+    /**
+     * Returns true if all characters in the string are BMP (Basic Multilingual Plane) characters —
+     * i.e. no surrogate pairs. This enables a much faster char-based strip path since charAt(i)
+     * gives the full code point.
+     */
+    @inline private def isAllBmp(str: String): Boolean = {
+      var i = 0
+      while (i < str.length) {
+        if (Character.isHighSurrogate(str.charAt(i))) return false
+        i += 1
+      }
+      true
+    }
+
+    /**
+     * Optimized strip implementation with fast paths for common cases:
+     *   1. Single-char strip set (e.g. stripChars(s, "x")) — direct char comparison
+     *   2. BMP-only strings — charAt iteration instead of codePointAt/offsetByCodePoints
+     *   3. General case — falls back to codepoint-based iteration with Set lookup
+     */
     def unspecializedStrip(
         str: String,
         charsSet: collection.Set[Int],
         left: Boolean,
         right: Boolean): String = {
       if (str.isEmpty) return str
-      var start = 0
-      // Use exclusive end position with codePointBefore() for right-to-left iteration.
-      // Unlike codePointAt(), codePointBefore() correctly reads surrogate pairs when
-      // scanning backwards (codePointAt on a low surrogate returns the wrong value).
-      var end = str.length
 
+      val strAllBmp = isAllBmp(str)
+
+      // Fast path: if the chars set has a single BMP character and the string has no surrogates,
+      // use direct charAt comparison (avoids Set lookup overhead entirely).
+      if (charsSet.size == 1) {
+        val ch = charsSet.head
+        if (ch < Character.MIN_SUPPLEMENTARY_CODE_POINT && strAllBmp) {
+          return stripSingleChar(str, ch.toChar, left, right)
+        }
+      }
+
+      // Medium path: if all chars are in BMP and string has no surrogates,
+      // use charAt-based iteration (avoids codePointAt/offsetByCodePoints overhead).
+      if (strAllBmp) {
+        var allBmp = true
+        val iter = charsSet.iterator
+        while (iter.hasNext && allBmp) {
+          if (iter.next() >= Character.MIN_SUPPLEMENTARY_CODE_POINT) allBmp = false
+        }
+        if (allBmp) {
+          return stripBmp(str, charsSet, left, right)
+        }
+      }
+
+      // General case: full codepoint-based iteration (handles surrogate pairs)
+      var start = 0
+      var end = str.length
       while (left && start < end && charsSet.contains(str.codePointAt(start))) {
         start = str.offsetByCodePoints(start, 1)
       }
-
       while (right && end > start && charsSet.contains(str.codePointBefore(end))) {
         end = str.offsetByCodePoints(end, -1)
+      }
+      str.substring(start, end)
+    }
+
+    /**
+     * Fast path for stripping a single BMP character from a BMP-only string. Avoids all
+     * Set/Map/boxed-Integer overhead.
+     */
+    private def stripSingleChar(str: String, ch: Char, left: Boolean, right: Boolean): String = {
+      var start = 0
+      var end = str.length
+      if (left) {
+        while (start < end && str.charAt(start) == ch) start += 1
+      }
+      if (right) {
+        while (end > start && str.charAt(end - 1) == ch) end -= 1
+      }
+      str.substring(start, end)
+    }
+
+    /**
+     * Medium path for stripping BMP characters from a BMP-only string. Uses charAt() instead of
+     * codePointAt(), avoiding the surrogate pair logic.
+     */
+    private def stripBmp(
+        str: String,
+        charsSet: collection.Set[Int],
+        left: Boolean,
+        right: Boolean): String = {
+      var start = 0
+      var end = str.length
+      if (left) {
+        while (start < end && charsSet.contains(str.charAt(start).toInt)) start += 1
+      }
+      if (right) {
+        while (end > start && charsSet.contains(str.charAt(end - 1).toInt)) end -= 1
       }
       str.substring(start, end)
     }
