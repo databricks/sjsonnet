@@ -14,6 +14,26 @@ object BaseCharRenderer {
    * nested configurations rarely exceed 20 levels.
    */
   final val MaxCachedDepth = 32
+
+  /**
+   * Reusable scratch buffer for writeLongDirect (max 20 chars for Long.MinValue). Not thread-safe,
+   * but renderers are single-threaded.
+   */
+  private[sjsonnet] val scratchBuf: Array[Char] = new Array[Char](20)
+
+  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
+  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
+    a
+  }
+  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
+    val a = new Array[Char](100)
+    var i = 0
+    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
+    a
+  }
 }
 
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
@@ -174,12 +194,59 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d                              =>
         val i = d.toLong
-        if (d == i) visitFloat64StringParts(i.toString, -1, -1, index)
+        if (d == i) writeLongDirect(i)
         else super.visitFloat64(d, index)
         flushBuffer()
     }
     flushCharBuilder()
     out
+  }
+
+  /**
+   * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
+   * digit-pair lookup table for fast two-digits-at-a-time conversion.
+   */
+  protected def writeLongDirect(v: Long): Unit = {
+    flushBuffer()
+    if (v == 0L) {
+      elemBuilder.ensureLength(1)
+      elemBuilder.appendUnsafe('0')
+      return
+    }
+    if (v == Long.MinValue) {
+      visitFloat64StringParts("-9223372036854775808", -1, -1, -1)
+      return
+    }
+    val negative = v < 0
+    var abs = if (negative) -v else v
+    // Write digits backward into a small local buffer, then bulk-copy.
+    // Max Long digits = 19, plus sign = 20.
+    val buf = BaseCharRenderer.scratchBuf
+    var pos = 20
+    while (abs >= 100) {
+      val q = abs / 100
+      val r = (abs - q * 100L).toInt
+      abs = q
+      pos -= 2
+      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
+      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
+    }
+    if (abs >= 10) {
+      val r = abs.toInt
+      pos -= 2
+      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
+      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
+    } else {
+      pos -= 1
+      buf(pos) = ('0' + abs.toInt).toChar
+    }
+    if (negative) { pos -= 1; buf(pos) = '-' }
+    val totalLen = 20 - pos
+    elemBuilder.ensureLength(totalLen)
+    val cbArr = elemBuilder.arr
+    val startPos = elemBuilder.getLength
+    System.arraycopy(buf, pos, cbArr, startPos, totalLen)
+    elemBuilder.length = startPos + totalLen
   }
 
   def visitString(s: CharSequence, index: Int): T = {
@@ -193,21 +260,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     s match {
       case str: String if !escapeUnicode =>
         val len = str.length
-        // Quick pre-scan: determine if any character needs escaping (control chars,
-        // double-quote, backslash). This is NOT a replacement of escapeChar — it's a
-        // gate that lets us SKIP escapeChar's per-character processing entirely when
-        // the string is clean (the common case in Jsonnet output). When no escaping is
-        // needed, String.getChars bulk-copies the entire string in one JVM intrinsic
-        // call, which is significantly faster than character-by-character append.
-        var needsEscape = false
-        var i = 0
-        while (i < len && !needsEscape) {
-          val c = str.charAt(i)
-          if (c < 32 || c == '"' || c == '\\') needsEscape = true
-          i += 1
-        }
-        if (!needsEscape) {
-          // Fast path: bulk copy entire string with surrounding quotes
+        if (!CharSWAR.hasEscapeChar(str)) {
           elemBuilder.ensureLength(len + 2)
           elemBuilder.appendUnsafe('"')
           val cbArr = elemBuilder.arr
@@ -216,14 +269,8 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
           elemBuilder.length = pos + len
           elemBuilder.appendUnsafe('"')
         } else {
-          // Slow path: delegate to upickle's per-character escapeChar
-          upickle.core.RenderUtils.escapeChar(
-            null,
-            elemBuilder,
-            s,
-            escapeUnicode = escapeUnicode,
-            wrapQuotes = true
-          )
+          upickle.core.RenderUtils
+            .escapeChar(null, elemBuilder, s, escapeUnicode = escapeUnicode, wrapQuotes = true)
         }
       case _ =>
         upickle.core.RenderUtils.escapeChar(

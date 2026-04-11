@@ -5,6 +5,7 @@ import upickle.core.SimpleVisitor
 import java.io.{
   BufferedOutputStream,
   InputStream,
+  OutputStream,
   OutputStreamWriter,
   PrintStream,
   StringWriter,
@@ -16,6 +17,12 @@ import scala.annotation.unused
 import scala.util.Try
 
 object SjsonnetMainBase {
+
+  /**
+   * Sentinel value returned when output was already written directly to stdout via byte pipeline.
+   */
+  private val ByteRenderedSentinel = "\u0000"
+
   class SimpleImporter(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
       allowedInputs: Option[Set[os.Path]] = None,
@@ -101,7 +108,33 @@ object SjsonnetMainBase {
       allowedInputs: Option[Set[os.Path]] = None,
       importer: Option[Importer] = None,
       std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
-      jsonnetPathEnv: Option[String] = None): Int = {
+      jsonnetPathEnv: Option[String] = None): Int =
+    main0(
+      args,
+      parseCache,
+      null.asInstanceOf[InputStream], // stdin is @unused in the target overload
+      stdout,
+      stderr,
+      wd,
+      allowedInputs,
+      importer,
+      std,
+      jsonnetPathEnv,
+      rawOutputStream = null
+    )
+
+  def main0(
+      args: Array[String],
+      parseCache: ParseCache,
+      @unused stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      wd: os.Path,
+      allowedInputs: Option[Set[os.Path]],
+      importer: Option[Importer],
+      std: Val.Obj,
+      jsonnetPathEnv: Option[String],
+      rawOutputStream: OutputStream): Int = {
 
     var hasWarnings = false
     def warn(isTrace: Boolean, msg: String): Unit = {
@@ -170,7 +203,8 @@ object SjsonnetMainBase {
         warn,
         std,
         debugStats = debugStats,
-        profileOpt = config.profile
+        profileOpt = config.profile,
+        stdoutStream = if (rawOutputStream != null) rawOutputStream else stdout
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -185,7 +219,20 @@ object SjsonnetMainBase {
         if (err.nonEmpty) stderr.println(err)
         1
       case Right((config, str)) =>
-        if (str.nonEmpty) {
+        if (str eq ByteRenderedSentinel) {
+          // Output was already written directly to stdout via byte pipeline.
+          // Handle trailing newline.
+          if (config.multi.isDefined || !config.noTrailingNewline.value) {
+            if (rawOutputStream != null) {
+              rawOutputStream.write('\n')
+              rawOutputStream.flush()
+            } else {
+              stdout.write('\n')
+              stdout.flush()
+            }
+          } else if (rawOutputStream != null) rawOutputStream.flush()
+          else stdout.flush()
+        } else if (str.nonEmpty) {
           config.outputFile match {
             case None =>
               // In multi mode, the file list on stdout always ends with a newline,
@@ -263,12 +310,37 @@ object SjsonnetMainBase {
       jsonnetCode: String,
       path: os.Path,
       wd: os.Path,
-      getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
-      val renderer = rendererForConfig(writer, config, getCurrentPosition)
-      val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-      if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
-      res
+      getCurrentPosition: () => Position,
+      stdoutStream: OutputStream) = {
+    config.outputFile match {
+      case Some(f) if !config.yamlOut.value && !config.expectString.value =>
+        // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
+        // ByteBuilder handles buffering internally (8KB threshold), no BufferedOutputStream needed.
+        handleWriteFile(
+          os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
+        ).flatMap { out =>
+          try {
+            val renderer = new ByteRenderer(out, indent = config.indent)
+            val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+            out.flush()
+            res.map(_ => "")
+          } finally out.close()
+        }
+      case None if stdoutStream != null && !config.yamlOut.value && !config.expectString.value =>
+        // Byte[] fast path for stdout: render directly to OutputStream,
+        // bypassing StringWriter → String → println chain.
+        val renderer = new ByteRenderer(stdoutStream, indent = config.indent)
+        val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+        stdoutStream.flush()
+        // Return sentinel to signal main0 that output was already written.
+        res.map(_ => ByteRenderedSentinel)
+      case _ =>
+        writeToFile(config, wd) { writer =>
+          val renderer = rendererForConfig(writer, config, getCurrentPosition)
+          val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+          if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
+          res
+        }
     }
   }
 
@@ -320,7 +392,8 @@ object SjsonnetMainBase {
       std: Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
-      profileOpt: Option[String] = None): Either[String, String] = {
+      profileOpt: Option[String] = None,
+      stdoutStream: OutputStream = null): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -455,9 +528,11 @@ object SjsonnetMainBase {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+          case _ =>
+            renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
         }
-      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+      case _ =>
+        renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
     }
 
     if (profilerInstance != null)
