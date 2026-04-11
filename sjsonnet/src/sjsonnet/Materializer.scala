@@ -82,35 +82,41 @@ abstract class Materializer {
       Error.fail("Out of memory while materializing, possibly due to recursive value", v.pos)
   }
 
-  @inline private def materializeRecursiveObj[T](
+  private def materializeRecursiveObj[T](
       obj: Val.Obj,
       visitor: Visitor[T, T],
       depth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
-    storePos(obj.pos)
-    obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-    if (obj.canDirectIterate) {
-      // Fast path for inline objects (1-8 fields, no super chain, no excludedKeys).
-      // Bypasses visibleKeyNames allocation, value() HashMap lookup per key,
-      // and sortedVisibleKeyNames lazy val. Instead iterates raw arrays directly.
-      if (ctx.sort) materializeSortedInlineObj(obj, visitor, depth, ctx)
-      else materializeInlineObj(obj, visitor, depth, ctx)
-    } else {
-      val keys =
-        if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
-        else obj.visibleKeyNames
-      val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
-      var i = 0
-      while (i < keys.length) {
-        val key = keys(i)
-        val childVal = obj.value(key, ctx.emptyPos)
-        storePos(childVal)
-        ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
-        val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
-        ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
-        i += 1
+    if (!ctx.enterObject(obj))
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
+    try {
+      storePos(obj.pos)
+      obj.triggerAllAsserts(ctx.brokenAssertionLogic)
+      if (obj.canDirectIterate) {
+        // Fast path for inline objects (1-8 fields, no super chain, no excludedKeys).
+        // Bypasses visibleKeyNames allocation, value() HashMap lookup per key,
+        // and sortedVisibleKeyNames lazy val. Instead iterates raw arrays directly.
+        if (ctx.sort) materializeSortedInlineObj(obj, visitor, depth, ctx)
+        else materializeInlineObj(obj, visitor, depth, ctx)
+      } else {
+        val keys =
+          if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+          else obj.visibleKeyNames
+        val ov = visitor.visitObject(keys.length, jsonableKeys = true, -1)
+        var i = 0
+        while (i < keys.length) {
+          val key = keys(i)
+          val childVal = obj.value(key, ctx.emptyPos)
+          storePos(childVal)
+          ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
+          val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+          ov.visitValue(materializeRecursiveChild(childVal, sub, depth, ctx), -1)
+          i += 1
+        }
+        ov.visitEnd(-1)
       }
-      ov.visitEnd(-1)
+    } finally {
+      ctx.exitObject(obj)
     }
   }
 
@@ -167,11 +173,6 @@ abstract class Materializer {
     }
   }
 
-  /**
-   * Sorted direct iteration for inline objects. Computes sorted field indices via insertion sort
-   * (optimal for 2-8 fields), then iterates via direct member invocation in sorted key order.
-   * Avoids: sortedVisibleKeyNames lazy val, value() linear scan, validation check.
-   */
   /**
    * Sorted direct iteration for inline objects. Uses cached sorted field order when available
    * (shared across all objects from the same MemberList), falling back to per-object computation.
@@ -245,7 +246,7 @@ abstract class Materializer {
     av.visitEnd(-1)
   }
 
-  @inline private def materializeRecursiveChild[T](
+  private def materializeRecursiveChild[T](
       childVal: Val,
       childVisitor: Visitor[T, T],
       depth: Int,
@@ -346,6 +347,7 @@ abstract class Materializer {
             val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
             materializeChild(childVal, sub, ov, stack, ctx)
           } else {
+            ctx.exitObject(frame.obj)
             val result = ov.visitEnd(-1)
             stack.removeFirst()
             if (stack.isEmpty) return result
@@ -425,6 +427,8 @@ abstract class Materializer {
       stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     checkDepth(obj.pos, stack.size, ctx.maxDepth)
+    if (!ctx.enterObject(obj))
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
     storePos(obj.pos)
     obj.triggerAllAsserts(ctx.brokenAssertionLogic)
     val keyNames =
@@ -814,7 +818,22 @@ object Materializer extends Materializer {
       val brokenAssertionLogic: Boolean,
       val emptyPos: Position,
       val recursiveDepthLimit: Int,
-      val maxDepth: Int)
+      val maxDepth: Int) {
+
+    // Tracks objects currently being materialized on the current path (entry → exit).
+    // Used to detect cycles like `{ x: self }` early, before any significant output
+    // is written. Uses identity equality so structurally equal but distinct objects
+    // can still be materialized independently.
+    val visitedObjects: java.util.IdentityHashMap[Val.Obj, java.lang.Boolean] =
+      new java.util.IdentityHashMap[Val.Obj, java.lang.Boolean]()
+
+    /** Returns true if `obj` was NOT already being materialized (safe to proceed). */
+    @inline def enterObject(obj: Val.Obj): Boolean =
+      visitedObjects.put(obj, java.lang.Boolean.TRUE) eq null
+
+    @inline def exitObject(obj: Val.Obj): Unit =
+      visitedObjects.remove(obj)
+  }
 
   private[sjsonnet] object MaterializeContext {
     def apply(ev: EvalScope): MaterializeContext = new MaterializeContext(
