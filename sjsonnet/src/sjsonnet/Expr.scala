@@ -416,6 +416,14 @@ object Expr {
        */
       @volatile var _noSelfRef: java.lang.Boolean = null
 
+      /**
+       * Cached key-name arrays shared across all Val.Obj instances from this MemberList (when super
+       * == null). Computed from the first instance and reused by subsequent ones, avoiding per-object
+       * allKeyNames/visibleKeyNames allocation.
+       */
+      var _cachedAllKeyNames: Array[String] = null
+      var _cachedVisibleKeyNames: Array[String] = null
+
       override def toString: String =
         s"MemberList($pos, ${arrStr(binds)}, ${arrStr(fields)}, ${arrStr(asserts)})"
     }
