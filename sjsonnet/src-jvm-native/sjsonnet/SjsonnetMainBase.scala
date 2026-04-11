@@ -170,7 +170,8 @@ object SjsonnetMainBase {
         warn,
         std,
         debugStats = debugStats,
-        profileOpt = config.profile
+        profileOpt = config.profile,
+        stdout = stdout
       )
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
@@ -236,12 +237,30 @@ object SjsonnetMainBase {
       )
     )
 
-  private def writeToFile(config: Config, wd: os.Path)(
+  private def writeToFile(config: Config, wd: os.Path, stdout: PrintStream)(
       materialize: Writer => Either[String, ?]): Either[String, String] = {
     config.outputFile match {
       case None =>
-        val sw = new StringWriter
-        materialize(sw).map(_ => sw.toString)
+        // Direct-to-stdout rendering: bypass StringWriter/StringBuffer allocation
+        // and the intermediate String copy. For large outputs (e.g. realistic_2 at 28.5MB),
+        // this avoids ~100MB of intermediate allocations (StringBuffer + String + encoding).
+        val buf = new BufferedOutputStream(stdout, 65536)
+        val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
+        materialize(wr) match {
+          case Right(_) =>
+            // Add trailing newline (previously done by stdout.println in main0)
+            if (!config.noTrailingNewline.value) wr.write('\n')
+            wr.flush()
+            buf.flush()
+            Right("")
+          case Left(err) =>
+            // On error, don't write trailing newline.
+            // Any partial output from the visitor is already committed to the buffer,
+            // but for evaluation errors (the common case) nothing was written.
+            wr.flush()
+            buf.flush()
+            Left(err)
+        }
       case Some(f) =>
         handleWriteFile(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
@@ -263,8 +282,9 @@ object SjsonnetMainBase {
       jsonnetCode: String,
       path: os.Path,
       wd: os.Path,
-      getCurrentPosition: () => Position) = {
-    writeToFile(config, wd) { writer =>
+      getCurrentPosition: () => Position,
+      stdout: PrintStream) = {
+    writeToFile(config, wd, stdout) { writer =>
       val renderer = rendererForConfig(writer, config, getCurrentPosition)
       val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
       if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
@@ -320,7 +340,8 @@ object SjsonnetMainBase {
       std: Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
-      profileOpt: Option[String] = None): Either[String, String] = {
+      profileOpt: Option[String] = None,
+      stdout: PrintStream = new PrintStream(System.out, false, "UTF-8")): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -431,7 +452,7 @@ object SjsonnetMainBase {
 
         interp.interpret(jsonnetCode, OsPath(path)).flatMap {
           case arr: ujson.Arr =>
-            writeToFile(config, wd) { writer =>
+            writeToFile(config, wd, stdout) { writer =>
               arr.value.toSeq match {
                 case Nil         => // donothing
                 case Seq(single) =>
@@ -455,9 +476,9 @@ object SjsonnetMainBase {
               Right("")
             }
 
-          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+          case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdout)
         }
-      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos)
+      case _ => renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdout)
     }
 
     if (profilerInstance != null)
