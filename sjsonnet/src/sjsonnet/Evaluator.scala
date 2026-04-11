@@ -29,6 +29,8 @@ class Evaluator(
   implicit def evalScope: EvalScope = this
   def importer: CachedImporter = resolver
 
+  if (debugStats != null) Val.Obj.currentDebugStats = debugStats
+
   def trace(e: String): Unit = if (logger != null) logger(true, e)
   def warn(e: Error): Unit = if (logger != null) logger(false, Error.formatError(e))
 
@@ -1771,6 +1773,7 @@ class Evaluator(
     // When true, the Materializer can skip cacheFieldValue() during inline iteration, eliminating
     // HashMap allocation overhead for objects with >2 fields.
     val noSelfRef = sup == null && Materializer.computeNoSelfRef(e)
+    if (debugStats != null) debugStats.objectsCreated += 1
     cachedObj = if (fieldCount == 1 && singleKey != null) {
       // Single-field object: store key and member inline, avoid LinkedHashMap allocation entirely
       val obj = new Val.Obj(
@@ -1852,6 +1855,7 @@ class Evaluator(
         case x           => fieldNameTypeError(x, e.pos)
       }
     }
+    if (debugStats != null) debugStats.objectsCreated += 1
     new Val.Obj(e.pos, builder, false, null, sup)
   }
 
