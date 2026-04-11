@@ -251,50 +251,56 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       obj: Val.Obj,
       matDepth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
-    obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-    val keys =
-      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
-      else obj.visibleKeyNames
+    if (!ctx.enterObject(obj))
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
+    try {
+      obj.triggerAllAsserts(ctx.brokenAssertionLogic)
+      val keys =
+        if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+        else obj.visibleKeyNames
 
-    // Inline of visitObject — open brace
-    elemBuilder.append('{')
-    newlineBuffered = true
-    depth += 1
-    resetEmpty()
+      // Inline of visitObject — open brace
+      elemBuilder.append('{')
+      newlineBuffered = true
+      depth += 1
+      resetEmpty()
 
-    var i = 0
-    while (i < keys.length) {
-      val key = keys(i)
-      val childVal = obj.value(key, ctx.emptyPos)
+      var i = 0
+      while (i < keys.length) {
+        val key = keys(i)
+        val childVal = obj.value(key, ctx.emptyPos)
 
-      markNonEmpty()
+        markNonEmpty()
 
-      // Flush comma+indent from previous pair, then render key+value
-      // without intermediate flushes
-      flushBuffer()
-      renderQuotedString(key)
+        // Flush comma+indent from previous pair, then render key+value
+        // without intermediate flushes
+        flushBuffer()
+        renderQuotedString(key)
 
-      // Key-value separator ": "
-      elemBuilder.append(':')
-      elemBuilder.append(' ')
+        // Key-value separator ": "
+        elemBuilder.append(':')
+        elemBuilder.append(' ')
 
-      // Render value directly — no flush overhead
-      materializeChild(childVal, matDepth, ctx)
+        // Render value directly — no flush overhead
+        materializeChild(childVal, matDepth, ctx)
 
-      commaBuffered = true
-      i += 1
+        commaBuffered = true
+        i += 1
+      }
+
+      // Inline of visitEnd — close brace
+      commaBuffered = false
+      newlineBuffered = false
+      val wasEmpty = isEmpty
+      resetEmpty()
+      depth -= 1
+      if (wasEmpty) elemBuilder.append(' ')
+      else renderIndent()
+      elemBuilder.append('}')
+      flushByteBuilder()
+    } finally {
+      ctx.exitObject(obj)
     }
-
-    // Inline of visitEnd — close brace
-    commaBuffered = false
-    newlineBuffered = false
-    val wasEmpty = isEmpty
-    resetEmpty()
-    depth -= 1
-    if (wasEmpty) elemBuilder.append(' ')
-    else renderIndent()
-    elemBuilder.append('}')
-    flushByteBuilder()
   }
 
   private def materializeDirectArr(
