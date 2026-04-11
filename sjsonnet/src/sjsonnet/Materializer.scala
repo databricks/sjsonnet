@@ -707,17 +707,17 @@ object Materializer extends Materializer {
       case Expr.Error(_, v) => hasSelfRefExpr(v, inNestedObj)
 
       // Apply variants
-      case Expr.Apply(_, v, args, _, _) =>
+      case Expr.Apply(_, v, args, _, _, _) =>
         hasSelfRefExpr(v, inNestedObj) || args.exists(a => hasSelfRefExpr(a, inNestedObj))
-      case Expr.Apply0(_, v, _)     => hasSelfRefExpr(v, inNestedObj)
-      case Expr.Apply1(_, v, a1, _) =>
+      case Expr.Apply0(_, v, _, _)     => hasSelfRefExpr(v, inNestedObj)
+      case Expr.Apply1(_, v, a1, _, _) =>
         hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj)
-      case Expr.Apply2(_, v, a1, a2, _) =>
+      case Expr.Apply2(_, v, a1, a2, _, _) =>
         hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj) || hasSelfRefExpr(
           a2,
           inNestedObj
         )
-      case Expr.Apply3(_, v, a1, a2, a3, _) =>
+      case Expr.Apply3(_, v, a1, a2, a3, _, _) =>
         hasSelfRefExpr(v, inNestedObj) || hasSelfRefExpr(a1, inNestedObj) ||
         hasSelfRefExpr(a2, inNestedObj) || hasSelfRefExpr(a3, inNestedObj)
 
