@@ -69,43 +69,44 @@ class Evaluator(
     val saved: (AnyRef, Int) = if (p != null) p.enter(e) else null
     try {
       e match {
-        case e: ValidId            => visitValidId(e)
-        case e: BinaryOp           => visitBinaryOp(e)
-        case e: Select             => visitSelect(e)
-        case e: Val                => e
-        case e: ApplyBuiltin0      => visitApplyBuiltin0(e)
-        case e: ApplyBuiltin1      => visitApplyBuiltin1(e)
-        case e: ApplyBuiltin2      => visitApplyBuiltin2(e)
-        case e: ApplyBuiltin3      => visitApplyBuiltin3(e)
-        case e: ApplyBuiltin4      => visitApplyBuiltin4(e)
-        case e: And                => visitAnd(e)
-        case e: Or                 => visitOr(e)
-        case e: UnaryOp            => visitUnaryOp(e)
-        case e: Apply1             => visitApply1(e)
-        case e: Lookup             => visitLookup(e)
-        case e: Function           => visitMethod(e.body, e.params, e.pos)
-        case e: LocalExpr          => visitLocalExpr(e)
-        case e: Apply              => visitApply(e)
-        case e: IfElse             => visitIfElse(e)
-        case e: Apply3             => visitApply3(e)
-        case e: ObjBody.MemberList => visitMemberList(e.pos, e, null)
-        case e: Apply2             => visitApply2(e)
-        case e: AssertExpr         => visitAssert(e)
-        case e: ApplyBuiltin       => visitApplyBuiltin(e)
-        case e: Comp               => visitComp(e)
-        case e: Arr                => visitArr(e)
-        case e: SelectSuper        => visitSelectSuper(e)
-        case e: LookupSuper        => visitLookupSuper(e)
-        case e: InSuper            => visitInSuper(e)
-        case e: ObjExtend          => visitObjExtend(e)
-        case e: ObjBody.ObjComp    => visitObjComp(e, null)
-        case e: Slice              => visitSlice(e)
-        case e: Import             => visitImport(e)
-        case e: Apply0             => visitApply0(e)
-        case e: ImportStr          => visitImportStr(e)
-        case e: ImportBin          => visitImportBin(e)
-        case e: Expr.Error         => visitError(e)
-        case e                     => visitInvalid(e)
+        case e: ValidId              => visitValidId(e)
+        case e: BinaryOp             => visitBinaryOp(e)
+        case e: Select               => visitSelect(e)
+        case e: Val                  => e
+        case e: ApplyBuiltin0        => visitApplyBuiltin0(e)
+        case e: ApplyBuiltin1        => visitApplyBuiltin1(e)
+        case e: ApplyBuiltin2        => visitApplyBuiltin2(e)
+        case e: ApplyBuiltin3        => visitApplyBuiltin3(e)
+        case e: ApplyBuiltin4        => visitApplyBuiltin4(e)
+        case e: And                  => visitAnd(e)
+        case e: Or                   => visitOr(e)
+        case e: UnaryOp              => visitUnaryOp(e)
+        case e: Apply1               => visitApply1(e)
+        case e: Lookup               => visitLookup(e)
+        case e: Function             => visitMethod(e.body, e.params, e.pos)
+        case e: LocalExpr            => visitLocalExpr(e)
+        case e: Apply                => visitApply(e)
+        case e: IfElse               => visitIfElse(e)
+        case e: Apply3               => visitApply3(e)
+        case e: ObjBody.MemberList   => visitMemberList(e.pos, e, null)
+        case e: Apply2               => visitApply2(e)
+        case e: AssertExpr           => visitAssert(e)
+        case e: ApplyBuiltin         => visitApplyBuiltin(e)
+        case e: Comp                 => visitComp(e)
+        case e: Arr                  => visitArr(e)
+        case e: SelectSuper          => visitSelectSuper(e)
+        case e: LookupSuper          => visitLookupSuper(e)
+        case e: InSuper              => visitInSuper(e)
+        case e: ObjExtend            => visitObjExtend(e)
+        case e: ObjBody.ObjComp      => visitObjComp(e, null)
+        case e: Slice                => visitSlice(e)
+        case e: Import               => visitImport(e)
+        case e: Apply0               => visitApply0(e)
+        case e: ImportStr            => visitImportStr(e)
+        case e: ImportBin            => visitImportBin(e)
+        case e: Expr.Error           => visitError(e)
+        case e: ObjBody.EagerObjBody => visitEagerObjBody(e)
+        case e                       => visitInvalid(e)
       }
     } finally if (p != null) p.exit(saved)
   } catch {
@@ -721,10 +722,11 @@ class Evaluator(
   def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {
     val original = visitExpr(e.base).cast[Val.Obj]
     e.ext match {
-      case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
-      case ext: ObjBody.ObjComp    => visitObjComp(ext, original)
-      case o: Val.Obj              => o.addSuper(e.pos, original)
-      case _                       => Error.fail("Should not have happened", e.pos)
+      case ext: ObjBody.MemberList   => visitMemberList(e.pos, ext, original)
+      case ext: ObjBody.EagerObjBody => visitEagerObjBody(ext).addSuper(e.pos, original)
+      case ext: ObjBody.ObjComp      => visitObjComp(ext, original)
+      case o: Val.Obj                => o.addSuper(e.pos, original)
+      case _                         => Error.fail("Should not have happened", e.pos)
     }
   }
 
@@ -1823,6 +1825,29 @@ class Evaluator(
     cachedObj
   }
 
+  /**
+   * Fast path for EagerObjBody: evaluates all field values eagerly in the current scope (no
+   * self/super needed), creates a static Val.Obj with pre-cached values. Eliminates lazy closure
+   * allocation and deferred invocation overhead for objects that don't reference self/super.
+   */
+  def visitEagerObjBody(e: ObjBody.EagerObjBody)(implicit scope: ValScope): Val.Obj = {
+    val n = e.fieldNames.length
+    val cache = Util.preSizedJavaHashMap[Any, Val](n)
+    val allKeys = Util.preSizedJavaLinkedHashMap[String, java.lang.Boolean](n)
+    var i = 0
+    while (i < n) {
+      val k = e.fieldNames(i)
+      val v = visitExpr(e.fieldValues(i))
+      cache.put(k, v)
+      allKeys.put(
+        k,
+        java.lang.Boolean.FALSE
+      ) // All fields are Normal visibility (enforced by optimizer)
+      i += 1
+    }
+    new Val.Obj(e.pos, null, true, null, null, cache, allKeys)
+  }
+
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope // .clearSuper
@@ -2043,6 +2068,7 @@ class NewEvaluator(
       case ExprTags.ImportStr         => visitImportStr(e.asInstanceOf[ImportStr])
       case ExprTags.ImportBin         => visitImportBin(e.asInstanceOf[ImportBin])
       case ExprTags.Error             => visitError(e.asInstanceOf[Expr.Error])
+      case ExprTags.EagerObjBody      => visitEagerObjBody(e.asInstanceOf[ObjBody.EagerObjBody])
       case _                          => visitInvalid(e)
     }
   } catch {

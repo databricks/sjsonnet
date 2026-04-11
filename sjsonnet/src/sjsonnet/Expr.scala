@@ -395,6 +395,29 @@ object Expr {
 
   trait ObjBody extends Expr
   object ObjBody {
+
+    /**
+     * Specialized object body for static-key objects whose field values do not reference `self`,
+     * `super`, or any object-local bindings, and all fields have Normal visibility. Detected by
+     * [[StaticOptimizer]] from [[ObjBody.MemberList]] when all field names are [[FieldName.Fixed]],
+     * there are no binds, asserts, `plus`, or `argSpec`, all fields are Normal visibility, field
+     * values don't reference self/super, and all field value expressions are "eager-safe" (provably
+     * total — can't error or diverge).
+     *
+     * The evaluator handles this node by evaluating all field values eagerly in the enclosing scope
+     * (no self/super binding needed) and constructing a `static=true` [[Val.Obj]] with pre-cached
+     * values, completely bypassing lazy closure allocation.
+     */
+    final case class EagerObjBody(
+        var pos: Position,
+        fieldNames: Array[String],
+        fieldValues: Array[Expr])
+        extends ObjBody {
+      final override private[sjsonnet] def tag = ExprTags.EagerObjBody
+      override def toString: String =
+        s"EagerObjBody($pos, ${arrStr(fieldNames)}, ${arrStr(fieldValues)})"
+    }
+
     final case class MemberList(
         var pos: Position,
         binds: Array[Bind],
@@ -479,6 +502,11 @@ private[sjsonnet] object ExprTags {
   final val ImportStr = 35
   final val ImportBin = 36
   final val Error = 37
+  // StaticOptimizer-specialized nodes: AST nodes created by pattern-directed optimization.
+  // These replace general-purpose nodes with specialized versions that enable fast Evaluator
+  // dispatch, bypassing overhead (closures, lazy evaluation, scope construction, etc.).
+  // See also: ValidId (scope-resolved Id), SelectSuper/InSuper (super-access specialization).
+  final val EagerObjBody = 38
   // used in Evaluator#visitInvalid
   final val Id = 0
   final val Self = 1

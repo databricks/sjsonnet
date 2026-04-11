@@ -122,6 +122,8 @@ class StaticOptimizer(
 
         if (binds == null && asserts == null && allFieldsStaticAndUniquelyNamed)
           Val.staticObject(pos, fields, internedStaticFieldSets, internedStrings)
+        else if (binds == null && asserts == null && isEagerObjCandidate(fields))
+          makeEagerObjBody(pos, fields)
         else m
       // Aggressive optimizations: constant folding, branch elimination, short-circuit elimination.
       // These reduce AST node count at parse time, benefiting long-running Jsonnet programs.
@@ -668,6 +670,29 @@ class StaticOptimizer(
   }
 
   /**
+   * Check if a MemberList's fields are eligible for EagerObjBody transformation: all field names
+   * are Fixed, no plus, no argSpec, field values don't reference self/super, unique field names,
+   * AND all field value expressions are "eager-safe" (provably total — can't error or diverge).
+   *
+   * The purity guard ensures that eager evaluation produces the same observable behavior as lazy
+   * evaluation, preserving Jsonnet's lazy field semantics.
+   */
+  private def isEagerObjCandidate(fields: Array[Expr.Member.Field]): Boolean = {
+    // scope.size is the outer scope size (self/super were added then restored by nestedObject)
+    val selfIdx = scope.size
+    val seen = mutable.Set.empty[String]
+    fields.forall { f =>
+      f.fieldName.isInstanceOf[FieldName.Fixed] &&
+      !f.plus &&
+      f.args == null &&
+      f.sep == Expr.Member.Visibility.Normal &&
+      seen.add(f.fieldName.asInstanceOf[FieldName.Fixed].value) &&
+      !exprReferencesScopeAtOrAbove(f.rhs, selfIdx) &&
+      isEagerSafeExpr(f.rhs)
+    }
+  }
+
+  /**
    * Walk an expression tree looking for self-recursive calls in tail position. A call is in tail
    * position if it is the last expression evaluated before the function returns — i.e. its result
    * becomes the function's return value without further transformation.
@@ -755,5 +780,59 @@ class StaticOptimizer(
 
       case _ => body
     }
+  }
+
+  /**
+   * Check if an expression is "eager-safe": evaluating it eagerly produces the same result as
+   * evaluating it lazily. This requires the expression to be provably total (always terminates
+   * without error). Allowed: literals, variable references, already-optimized EagerObjBody/static
+   * objects. Disallowed: function calls, error, assert, binary ops that can fail, etc.
+   */
+  private def isEagerSafeExpr(e: Expr): Boolean = e match {
+    case _: Val.Literal => true // constants — already a value
+    case _: ValidId     => true // variable reference — scope binding exists (optimizer validated)
+    case _: ObjBody.EagerObjBody => true // recursively already verified
+    case _                       => false
+  }
+
+  /** Check if an expression tree contains any ValidId with nameIdx >= threshold. */
+  private def exprReferencesScopeAtOrAbove(e: Expr, threshold: Int): Boolean = {
+    e match {
+      case ValidId(_, _, idx) => idx >= threshold
+      case _                  =>
+        var found = false
+        val checker = new ExprTransform {
+          def transform(expr: Expr): Expr = {
+            if (found) return expr
+            expr match {
+              case ValidId(_, _, idx) if idx >= threshold =>
+                found = true; expr
+              case _ => rec(expr)
+            }
+          }
+        }
+        checker.transform(e)
+        found
+    }
+  }
+
+  /** Convert eligible MemberList fields into an EagerObjBody node. */
+  private def makeEagerObjBody(
+      pos: Position,
+      fields: Array[Expr.Member.Field]): ObjBody.EagerObjBody = {
+    val n = fields.length
+    val names = new Array[String](n)
+    val values = new Array[Expr](n)
+    var i = 0
+    while (i < n) {
+      val f = fields(i)
+      names(i) = internedStrings.getOrElseUpdate(
+        f.fieldName.asInstanceOf[FieldName.Fixed].value,
+        f.fieldName.asInstanceOf[FieldName.Fixed].value
+      )
+      values(i) = f.rhs
+      i += 1
+    }
+    ObjBody.EagerObjBody(pos, names, values)
   }
 }
