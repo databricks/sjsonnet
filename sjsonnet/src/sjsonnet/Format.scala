@@ -488,14 +488,6 @@ object Format {
     output.toString()
   }
 
-  // Use Long as a fast path for integer formatting to avoid BigInt allocation.
-  // Most Jsonnet integers fit in a Long; only fall back to BigDecimal for very large values.
-  private def truncateToInteger(s: Double): BigInt = {
-    val sl = s.toLong
-    if (sl.toDouble == s) BigInt(sl)
-    else BigDecimal(s).toBigInt
-  }
-
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
     // Fast path: if the value fits in a Long (and isn't Long.MinValue where
     // negation overflows), avoid BigInt allocation entirely
@@ -537,35 +529,69 @@ object Format {
   }
 
   private def formatOctal(formatted: FormatSpec, s: Double): String = {
-    val i = truncateToInteger(s)
-    val negative = i.signum < 0
-    val lhs = if (negative) "-" else ""
-    val rhs = i.abs.toString(8)
-    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
-    widen(
-      formatted,
-      lhs,
-      if (!formatted.alternate || rhs2(0) == '0') "" else "0",
-      rhs2,
-      numeric = true,
-      signedConversion = !negative
-    )
+    // Fast path: if the value fits in a Long, avoid BigInt allocation
+    val sl = s.toLong
+    if (sl.toDouble == s && sl != Long.MinValue) {
+      val negative = sl < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = java.lang.Long.toString(if (negative) -sl else sl, 8)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(
+        formatted,
+        lhs,
+        if (!formatted.alternate || rhs2.charAt(0) == '0') "" else "0",
+        rhs2,
+        numeric = true,
+        signedConversion = !negative
+      )
+    } else {
+      val i = BigDecimal(s).toBigInt
+      val negative = i.signum < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = i.abs.toString(8)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(
+        formatted,
+        lhs,
+        if (!formatted.alternate || rhs2.charAt(0) == '0') "" else "0",
+        rhs2,
+        numeric = true,
+        signedConversion = !negative
+      )
+    }
   }
 
   private def formatHexadecimal(formatted: FormatSpec, s: Double): String = {
-    val i = truncateToInteger(s)
-    val negative = i.signum < 0
-    val lhs = if (negative) "-" else ""
-    val rhs = i.abs.toString(16)
-    val rhs2 = precisionPad(lhs, rhs, formatted.precision)
-    widen(
-      formatted,
-      lhs,
-      if (!formatted.alternate) "" else "0x",
-      rhs2,
-      numeric = true,
-      signedConversion = !negative
-    )
+    // Fast path: if the value fits in a Long, avoid BigInt allocation
+    val sl = s.toLong
+    if (sl.toDouble == s && sl != Long.MinValue) {
+      val negative = sl < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = java.lang.Long.toString(if (negative) -sl else sl, 16)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(
+        formatted,
+        lhs,
+        if (!formatted.alternate) "" else "0x",
+        rhs2,
+        numeric = true,
+        signedConversion = !negative
+      )
+    } else {
+      val i = BigDecimal(s).toBigInt
+      val negative = i.signum < 0
+      val lhs = if (negative) "-" else ""
+      val rhs = i.abs.toString(16)
+      val rhs2 = precisionPad(lhs, rhs, formatted.precision)
+      widen(
+        formatted,
+        lhs,
+        if (!formatted.alternate) "" else "0x",
+        rhs2,
+        numeric = true,
+        signedConversion = !negative
+      )
+    }
   }
 
   private def precisionPad(lhs: String, rhs: String, precision: Option[Int]): String = {
