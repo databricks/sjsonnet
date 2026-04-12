@@ -307,13 +307,18 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * SWAR-accelerated path for long strings. Converts to UTF-8 bytes once, scans with SWAR, and
-   * bulk-copies if clean. The getBytes allocation is amortized by avoiding per-char processing.
+   * Chunked SWAR-accelerated path for long strings. Instead of binary scan (clean → bulk copy,
+   * dirty → full reprocess from position 0), uses findFirstEscapeChar to locate escape positions
+   * and copies clean chunks between them with arraycopy. For a 10KB string with 5 escape chars,
+   * this copies ~10KB in bulk chunks vs re-processing the entire string char-by-char.
    */
   private def visitLongString(str: String): Unit = {
     val bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8)
-    if (!CharSWAR.hasEscapeChar(bytes, 0, bytes.length)) {
-      val bLen = bytes.length
+    val bLen = bytes.length
+
+    val firstEscape = CharSWAR.findFirstEscapeChar(bytes, 0, bLen)
+    if (firstEscape < 0) {
+      // Clean string — direct bulk copy (existing fast path)
       elemBuilder.ensureLength(bLen + 2)
       val arr = elemBuilder.arr
       val pos = elemBuilder.length
@@ -322,13 +327,77 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       arr(pos + 1 + bLen) = '"'.toByte
       elemBuilder.length = pos + bLen + 2
     } else {
-      upickle.core.RenderUtils.escapeByte(
-        unicodeCharBuilder,
-        elemBuilder,
-        str,
-        escapeUnicode = false,
-        wrapQuotes = true
-      )
+      // Dirty string — chunked rendering: copy clean segments, escape inline
+      // Worst case expansion: each byte → \uXXXX (6 bytes), plus 2 quotes
+      elemBuilder.ensureLength(bLen + bLen + 2) // 2x is sufficient for realistic strings
+      elemBuilder.appendUnsafeC('"')
+
+      var from = 0
+      var escPos = firstEscape
+      while (escPos >= 0) {
+        // Copy clean chunk before escape char
+        if (escPos > from) {
+          val chunkLen = escPos - from
+          val arr = elemBuilder.arr
+          val pos = elemBuilder.length
+          System.arraycopy(bytes, from, arr, pos, chunkLen)
+          elemBuilder.length = pos + chunkLen
+        }
+        // Escape the byte inline
+        escapeByteInline(bytes(escPos) & 0xff)
+        from = escPos + 1
+        // Find next escape char
+        escPos = if (from < bLen) CharSWAR.findFirstEscapeChar(bytes, from, bLen) else -1
+      }
+      // Copy remaining clean tail
+      if (from < bLen) {
+        val tailLen = bLen - from
+        val arr = elemBuilder.arr
+        val pos = elemBuilder.length
+        System.arraycopy(bytes, from, arr, pos, tailLen)
+        elemBuilder.length = pos + tailLen
+      }
+      elemBuilder.appendUnsafeC('"')
+    }
+  }
+
+  /**
+   * Inline JSON escape for a single byte. Handles the 7 named escapes plus \uXXXX for other control
+   * chars. Only called for bytes that actually need escaping (< 0x20, '"', '\\').
+   */
+  private def escapeByteInline(b: Int): Unit = {
+    // Ensure space for longest escape sequence (\uXXXX = 6 bytes)
+    elemBuilder.ensureLength(6)
+    (b: @scala.annotation.switch) match {
+      case '"' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('"')
+      case '\\' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('\\')
+      case '\b' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('b')
+      case '\f' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('f')
+      case '\n' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('n')
+      case '\r' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('r')
+      case '\t' =>
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('t')
+      case c =>
+        // Other control chars → \u00XX
+        elemBuilder.appendUnsafeC('\\')
+        elemBuilder.appendUnsafeC('u')
+        elemBuilder.appendUnsafeC('0')
+        elemBuilder.appendUnsafeC('0')
+        elemBuilder.appendUnsafeC(BaseByteRenderer.HEX_CHARS((c >> 4) & 0xf))
+        elemBuilder.appendUnsafeC(BaseByteRenderer.HEX_CHARS(c & 0xf))
     }
   }
 
@@ -376,6 +445,10 @@ object BaseByteRenderer {
     java.util.Arrays.fill(a, ' '.toByte)
     a
   }
+
+  /** Hex digit lookup for \uXXXX escape sequences. */
+  private[sjsonnet] val HEX_CHARS: Array[Char] =
+    Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 
   /**
    * Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue). Not thread-safe,

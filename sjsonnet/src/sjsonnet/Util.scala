@@ -133,37 +133,13 @@ object Util {
    * Compares two strings by Unicode codepoint values rather than UTF-16 code units. This ensures
    * that strings with characters above U+FFFF (which require surrogate pairs in UTF-16) are
    * compared correctly according to their Unicode codepoint values.
+   *
+   * Delegates to platform-specific CharSWAR.compareStrings which uses bulk getChars + tight array
+   * loop for JIT auto-vectorization on JVM, LLVM auto-vectorization on Native, and scalar fallback
+   * on JS.
    */
-  def compareStringsByCodepoint(s1: String, s2: String): Int = {
-    // Fast path: same reference (e.g. interned strings, or self-comparison)
-    if (s1 eq s2) return 0
-    val n1 = s1.length
-    val n2 = s2.length
-    var i1 = 0
-    var i2 = 0
-    while (i1 < n1 && i2 < n2) {
-      val c1 = s1.charAt(i1)
-      val c2 = s2.charAt(i2)
-      // Fast path: equal chars can be skipped without surrogate checks.
-      // Even for surrogate pairs, equal high surrogates at position i lead to
-      // comparing low surrogates at i+1, producing the correct codepoint ordering.
-      if (c1 == c2) {
-        i1 += 1
-        i2 += 1
-      } else if (!Character.isSurrogate(c1) && !Character.isSurrogate(c2)) {
-        // Both non-surrogates and different: direct char subtraction
-        return c1 - c2
-      } else {
-        // At least one is a surrogate, use full codepoint logic
-        val cp1 = s1.codePointAt(i1)
-        val cp2 = s2.codePointAt(i2)
-        if (cp1 != cp2) return Integer.compare(cp1, cp2)
-        i1 += Character.charCount(cp1)
-        i2 += Character.charCount(cp2)
-      }
-    }
-    if (i1 < n1) 1 else if (i2 < n2) -1 else 0
-  }
+  def compareStringsByCodepoint(s1: String, s2: String): Int =
+    CharSWAR.compareStrings(s1, s2)
 
   /**
    * A reusable Ordering[String] that compares by Unicode codepoint values. Use this in place of
