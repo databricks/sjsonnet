@@ -711,8 +711,17 @@ class Evaluator(
     }
   }
 
-  def visitArr(e: Arr)(implicit scope: ValScope): Val =
-    Val.Arr(e.pos, e.value.map(visitAsLazy))
+  def visitArr(e: Arr)(implicit scope: ValScope): Val = {
+    val len = e.value.length
+    if (len == 0) return Val.Arr(e.pos, Evaluator.emptyLazyArray)
+    val arr = new Array[Eval](len)
+    var i = 0
+    while (i < len) {
+      arr(i) = visitAsLazy(e.value(i))
+      i += 1
+    }
+    Val.Arr(e.pos, arr)
+  }
 
   def visitSelectSuper(e: SelectSuper)(implicit scope: ValScope): Val = {
     val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
@@ -858,6 +867,22 @@ class Evaluator(
     }
 
   /**
+   * Evaluate argument expressions into a pre-allocated array. Eliminates intermediate array
+   * allocation from .map().
+   */
+  private def evalArgsToArray(args: Array[Expr], strict: Boolean)(implicit
+      scope: ValScope): Array[Eval] = {
+    val len = args.length
+    val arr = new Array[Eval](len)
+    var i = 0
+    while (i < len) {
+      arr(i) = if (strict) visitExpr(args(i)) else visitAsLazy(args(i))
+      i += 1
+    }
+    arr
+  }
+
+  /**
    * Function application entry points (visitApply/visitApply0-3 for user functions,
    * visitApplyBuiltin/visitApplyBuiltin0-4 for built-in functions).
    *
@@ -879,12 +904,11 @@ class Evaluator(
         else TailstrictModeDisabled
 
       if (e.tailstrict) {
-        val args: Array[Eval] =
-          if (!e.strict) e.args.map(visitAsLazy(_))
-          else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
+        val args = evalArgsToArray(e.args, e.strict)
         TailCall.resolve(lhs.cast[Val.Func].apply(args, e.namedNames, e.pos))
       } else {
-        lhs.cast[Val.Func].apply(e.args.map(visitAsLazy(_)), e.namedNames, e.pos)
+        val args = evalArgsToArray(e.args, strict = false)
+        lhs.cast[Val.Func].apply(args, e.namedNames, e.pos)
       }
     } finally decrementStackDepth()
   }
@@ -1172,14 +1196,16 @@ class Evaluator(
   }
 
   def visitImportBin(e: ImportBin): Val.Arr = {
-    Val.Arr(
-      e.pos,
-      importer
-        .resolveAndReadOrFail(e.value, e.pos, binaryData = true)
-        ._2
-        .readRawBytes()
-        .map(x => Val.cachedNum(e.pos, (x & 0xff).doubleValue))
-    )
+    val rawBytes =
+      importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)._2.readRawBytes()
+    val len = rawBytes.length
+    val arr = new Array[Eval](len)
+    var i = 0
+    while (i < len) {
+      arr(i) = Val.cachedNum(e.pos, (rawBytes(i) & 0xff).toDouble)
+      i += 1
+    }
+    Val.Arr(e.pos, arr)
   }
 
   def visitImport(e: Import): Val = {
@@ -1550,9 +1576,7 @@ class Evaluator(
           try {
             val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
-            val args: Array[Eval] =
-              if (!isStrict) e.args.map(visitAsLazy(_))
-              else e.args.map(visitExpr(_)).asInstanceOf[Array[Eval]]
+            val args = evalArgsToArray(e.args, isStrict)
             new TailCall(func, args, e.namedNames, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply0 =>
@@ -1910,18 +1934,22 @@ class Evaluator(
       }
       visitComp(rest, newScopes.result())
     case (spec @ IfSpec(offset, expr)) :: rest =>
-      visitComp(
-        rest,
-        scopes.filter(visitExpr(expr)(_) match {
-          case Val.True(_)  => true
-          case Val.False(_) => false
+      val filtered = collection.mutable.ArrayBuilder.make[ValScope]
+      filtered.sizeHint(scopes.length)
+      var i = 0
+      while (i < scopes.length) {
+        visitExpr(expr)(scopes(i)) match {
+          case Val.True(_)  => filtered += scopes(i)
+          case Val.False(_) => // filtered out
           case other        =>
             Error.fail(
               "Condition must be boolean, got " + other.prettyName,
               spec
             )
-        })
-      )
+        }
+        i += 1
+      }
+      visitComp(rest, filtered.result())
     case Nil => scopes
   }
 
