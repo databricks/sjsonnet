@@ -60,7 +60,21 @@ object TypeModule extends AbstractFunctionModule {
     }
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "assertEqual",
+    "isString",
+    "isBoolean",
+    "isNumber",
+    "isObject",
+    "isArray",
+    "isFunction",
+    "isNull",
+    "type",
+    "equals",
+    "primitiveEquals"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(AssertEqual),
     builtin(IsString),
     builtin(IsBoolean),

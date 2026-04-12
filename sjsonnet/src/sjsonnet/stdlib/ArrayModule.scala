@@ -459,7 +459,35 @@ object ArrayModule extends AbstractFunctionModule {
     Val.Arr(pos, chars)
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "minArray",
+    "maxArray",
+    "all",
+    "any",
+    "count",
+    "filter",
+    "map",
+    "mapWithIndex",
+    "find",
+    "flattenArrays",
+    "flattenDeepArray",
+    "reverse",
+    "member",
+    "range",
+    "foldl",
+    "foldr",
+    "flatMap",
+    "filterMap",
+    "repeat",
+    "makeArray",
+    "contains",
+    "remove",
+    "removeAt",
+    "sum",
+    "avg"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(MinArray),
     builtin(MaxArray),
     builtin(All),

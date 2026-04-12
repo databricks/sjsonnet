@@ -8,12 +8,27 @@ import sjsonnet.Val
 abstract class AbstractFunctionModule extends FunctionModule {
 
   /**
-   * module's functions
+   * Module function names — cheap string array for lazy registration. No Val.Func objects created.
    */
-  val functions: Seq[(String, Val.Func)]
+  def functionNames: Array[String]
 
   /**
-   * the hodler of the module object
+   * module's functions — override as lazy val in concrete modules to defer Val.Builtin creation.
+   */
+  def functions: Seq[(String, Val.Func)]
+
+  /**
+   * Lazy function lookup map, built on first access to any function in this module.
+   */
+  private lazy val functionMap: Map[String, Val.Func] = functions.toMap
+
+  /**
+   * Get a function by name, triggering module initialization if needed.
+   */
+  def getFunction(name: String): Val.Func = functionMap(name)
+
+  /**
+   * the holder of the module object
    */
   override final lazy val module: Val.Obj = moduleFromFunctions(functions: _*)
 }

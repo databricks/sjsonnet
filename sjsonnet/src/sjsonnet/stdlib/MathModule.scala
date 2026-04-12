@@ -6,7 +6,44 @@ import sjsonnet.functions.AbstractFunctionModule
 object MathModule extends AbstractFunctionModule {
   def name = "math"
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "sqrt",
+    "max",
+    "min",
+    "mod",
+    "modulo",
+    "clamp",
+    "pow",
+    "floor",
+    "round",
+    "ceil",
+    "abs",
+    "sign",
+    "sin",
+    "cos",
+    "tan",
+    "isEven",
+    "isInteger",
+    "isOdd",
+    "isDecimal",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "hypot",
+    "deg2rad",
+    "rad2deg",
+    "log",
+    "log2",
+    "log10",
+    "exp",
+    "mantissa",
+    "exponent",
+    "xor",
+    "xnor"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
       math.sqrt(x)
     },

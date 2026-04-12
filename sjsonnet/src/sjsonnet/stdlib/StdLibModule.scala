@@ -2,10 +2,13 @@ package sjsonnet.stdlib
 
 import sjsonnet._
 import sjsonnet.Expr.Member.Visibility
-import sjsonnet.functions.FunctionModule
+import sjsonnet.functions.{AbstractFunctionModule, FunctionModule}
 
 /**
- * Main standard library module that combines all the individual stdlib modules
+ * Main standard library module that combines all the individual stdlib modules.
+ *
+ * Uses lazy initialization: only function names (cheap string arrays) are registered at startup.
+ * The actual Val.Builtin objects are created on first access, per-module granularity.
  */
 final class StdLibModule(
     private val nativeFunctions: Map[String, Val.Func] = Map.empty,
@@ -21,39 +24,66 @@ final class StdLibModule(
       nativeFunctions.getOrElse(name.value.asString, Val.Null(pos))
   }
 
-  // All functions including native and additional functions
-  val functions: Map[String, Val.Func] = allModuleFunctions ++
-    additionalStdFunctions +
-    ("native" -> nativeFunction) +
-    ("trace" -> traceFunction) +
-    ("extVar" -> extVarFunction)
+  val module: Val.Obj = {
+    // Estimate total size: module functions + additional std functions + native/trace/extVar + pi/thisFile
+    val totalSize = nameToModule.size + additionalStdFunctions.size + 3 + additionalStdMembers.size
+    val entries = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](totalSize)
 
-  val module: Val.Obj = Val.Obj.mk(
-    null,
-    functions.size + additionalStdMembers.size,
-    functions.view.map { case (k, v) =>
-      (
-        k,
-        new Val.Obj.ConstMember(false, Visibility.Hidden, v)
-      )
-    },
-    additionalStdMembers
-  )
+    // Lazy members — Val.Builtin created on first access, per-module granularity
+    val iter = nameToModule.entrySet().iterator()
+    while (iter.hasNext) {
+      val e = iter.next()
+      val n = e.getKey
+      val m = e.getValue
+      entries.put(n, new Val.Obj.LazyConstMember(false, Visibility.Hidden, () => m.getFunction(n)))
+    }
+
+    // Additional std functions (eager — typically empty or small)
+    for ((k, v) <- additionalStdFunctions)
+      entries.put(k, new Val.Obj.ConstMember(false, Visibility.Hidden, v))
+
+    // Core functions (eager — always needed, only 3)
+    entries.put("native", new Val.Obj.ConstMember(false, Visibility.Hidden, nativeFunction))
+    entries.put("trace", new Val.Obj.ConstMember(false, Visibility.Hidden, traceFunction))
+    entries.put("extVar", new Val.Obj.ConstMember(false, Visibility.Hidden, extVarFunction))
+
+    // Non-function members
+    for ((k, v) <- additionalStdMembers) entries.put(k, v)
+
+    new Val.Obj(null, entries, false, null, null)
+  }
 }
 
 object StdLibModule {
-  // Combine all functions from all modules
-  private val allModuleFunctions: Map[String, Val.Func] = (
-    ArrayModule.functions ++
-      StringModule.functions ++
-      ObjectModule.functions ++
-      MathModule.functions ++
-      TypeModule.functions ++
-      EncodingModule.functions ++
-      ManifestModule.functions ++
-      SetModule.functions ++
-      NativeRegex.functions
-  ).toMap
+  // All stdlib modules — referenced but NOT initialized (functions are lazy val)
+  private val modules: Array[AbstractFunctionModule] = Array(
+    ArrayModule,
+    StringModule,
+    ObjectModule,
+    MathModule,
+    TypeModule,
+    EncodingModule,
+    ManifestModule,
+    SetModule,
+    NativeRegex
+  )
+
+  // Build name→module index using only cheap functionNames arrays (no Val.Builtin created)
+  private val nameToModule: java.util.LinkedHashMap[String, AbstractFunctionModule] = {
+    val m = new java.util.LinkedHashMap[String, AbstractFunctionModule](256)
+    var i = 0
+    while (i < modules.length) {
+      val mod = modules(i)
+      val names = mod.functionNames
+      var j = 0
+      while (j < names.length) {
+        m.put(names(j), mod)
+        j += 1
+      }
+      i += 1
+    }
+    m
+  }
 
   // Core std library functions that belong directly in StdLibModule
   private val traceFunction = new Val.Builtin2("trace", "str", "rest") {

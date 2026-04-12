@@ -43,7 +43,15 @@ object NativeRegex extends AbstractFunctionModule {
     }
   }
 
-  val functions: Seq[(String, Val.Builtin)] = Seq(
+  val functionNames: Array[String] = Array(
+    "regexPartialMatch",
+    "regexFullMatch",
+    "regexGlobalReplace",
+    "regexReplace",
+    "regexQuoteMeta"
+  )
+
+  lazy val functions: Seq[(String, Val.Builtin)] = Seq(
     "regexPartialMatch" -> new Val.Builtin2("regexPartialMatch", "pattern", "str") {
       override def evalRhs(pattern: Eval, str: Eval, ev: EvalScope, pos: Position): Val = {
         regexPartialMatch(pos, pattern.value.asString, str.value.asString)

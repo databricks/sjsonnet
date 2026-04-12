@@ -194,7 +194,25 @@ object ObjectModule extends AbstractFunctionModule {
     Val.Arr(pos, result)
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "objectHas",
+    "objectHasAll",
+    "objectHasEx",
+    "objectFields",
+    "objectFieldsAll",
+    "objectFieldsEx",
+    "objectValues",
+    "objectValuesAll",
+    "get",
+    "mapWithKey",
+    "objectKeysValues",
+    "objectKeysValuesAll",
+    "objectRemoveKey",
+    "mergePatch",
+    "prune"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(ObjectHas),
     builtin(ObjectHasAll),
     builtin("objectHasEx", "o", "k", "inc_hidden") {

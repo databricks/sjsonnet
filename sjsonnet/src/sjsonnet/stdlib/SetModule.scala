@@ -205,7 +205,18 @@ object SetModule extends AbstractFunctionModule {
     Val.Arr(pos, chars)
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "set",
+    "slice",
+    "uniq",
+    "sort",
+    "setUnion",
+    "setInter",
+    "setDiff",
+    "setMember"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(Set_),
     builtin("slice", "indexable", "index", "end", "step") {
       (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>

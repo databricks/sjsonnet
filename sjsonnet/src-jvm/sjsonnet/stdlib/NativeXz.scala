@@ -6,7 +6,9 @@ import sjsonnet.{Error, Eval, EvalScope, Platform, Position, Val}
 object NativeXz extends AbstractFunctionModule {
   def name = "xz"
 
-  val functions: Seq[(String, Val.Builtin)] = Seq(
+  val functionNames: Array[String] = Array("xz")
+
+  lazy val functions: Seq[(String, Val.Builtin)] = Seq(
     "xz" -> new Val.Builtin2(
       "xz",
       "v",

@@ -13,7 +13,18 @@ object EncodingModule extends AbstractFunctionModule {
       Val.Str(pos, Platform.md5(s.value.asString))
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "md5",
+    "base64",
+    "base64Decode",
+    "base64DecodeBytes",
+    "sha1",
+    "sha256",
+    "sha512",
+    "sha3"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(MD5),
     builtin("base64", "input") { (_, _, input: Val) =>
       input match {

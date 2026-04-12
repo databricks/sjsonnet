@@ -444,7 +444,43 @@ object StringModule extends AbstractFunctionModule {
     Val.Arr(pos, chars)
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "toString",
+    "length",
+    "codepoint",
+    "substr",
+    "startsWith",
+    "endsWith",
+    "char",
+    "strReplace",
+    "stripChars",
+    "lstripChars",
+    "rstripChars",
+    "join",
+    "split",
+    "splitLimit",
+    "splitLimitR",
+    "stringChars",
+    "parseInt",
+    "parseOctal",
+    "parseHex",
+    "asciiUpper",
+    "asciiLower",
+    "encodeUTF8",
+    "decodeUTF8",
+    "format",
+    "findSubstr",
+    "isEmpty",
+    "trim",
+    "equalsIgnoreCase",
+    "escapeStringJson",
+    "escapeStringPython",
+    "escapeStringXML",
+    "escapeStringBash",
+    "escapeStringDollars"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(ToString),
     builtin(Length),
     builtin(Codepoint),

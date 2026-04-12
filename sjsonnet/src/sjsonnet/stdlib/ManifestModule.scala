@@ -209,7 +209,25 @@ object ManifestModule extends AbstractFunctionModule {
     }
   }
 
-  val functions: Seq[(String, Val.Func)] = Seq(
+  val functionNames: Array[String] = Array(
+    "manifestJson",
+    "manifestJsonMinified",
+    "manifestJsonEx",
+    "parseJson",
+    "parseYaml",
+    "manifestTomlEx",
+    "lines",
+    "deepJoin",
+    "manifestToml",
+    "manifestYamlDoc",
+    "manifestYamlStream",
+    "manifestIni",
+    "manifestPython",
+    "manifestPythonVars",
+    "manifestXmlJsonml"
+  )
+
+  lazy val functions: Seq[(String, Val.Func)] = Seq(
     builtin(ManifestJson),
     builtin(ManifestJsonMinified),
     builtin(ManifestJsonEx),
