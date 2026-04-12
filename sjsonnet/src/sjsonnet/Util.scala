@@ -135,6 +135,8 @@ object Util {
    * compared correctly according to their Unicode codepoint values.
    */
   def compareStringsByCodepoint(s1: String, s2: String): Int = {
+    // Fast path: same reference (e.g. interned strings, or self-comparison)
+    if (s1 eq s2) return 0
     val n1 = s1.length
     val n2 = s2.length
     var i1 = 0
