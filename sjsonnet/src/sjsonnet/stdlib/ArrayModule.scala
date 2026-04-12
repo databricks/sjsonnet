@@ -292,14 +292,11 @@ object ArrayModule extends AbstractFunctionModule {
         else if (sizeLong > Int.MaxValue)
           Error.fail("std.range result too large: " + sizeLong + " elements")
         else sizeLong.toInt
-      // Direct array allocation avoids Scala Range.map.toArray intermediates
-      val arr = new Array[Eval](size)
-      var i = 0
-      while (i < size) {
-        arr(i) = Val.cachedNum(pos, fromInt + i)
-        i += 1
-      }
-      Val.Arr(pos, arr)
+      // Lazy range: O(1) creation, elements computed on demand.
+      // Particularly beneficial for patterns like `std.range(1, 1000000) + [x]`
+      // where element-wise comparison never needs the full backing array.
+      if (size == 0) Val.Arr(pos, Val.Arr.EMPTY_EVAL_ARRAY)
+      else Val.Arr.range(pos, fromInt, size)
     }
   }
 
