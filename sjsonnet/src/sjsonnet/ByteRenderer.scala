@@ -2,6 +2,7 @@ package sjsonnet
 
 import java.io.OutputStream
 
+import sjsonnet.Expr.Member.Visibility
 import upickle.core.{ArrVisitor, ObjVisitor}
 
 /**
@@ -255,40 +256,59 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
     try {
       obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-      val keys =
-        if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
-        else obj.visibleKeyNames
 
-      // Inline of visitObject — open brace
+      if (obj.canDirectIterate) {
+        // Fast path: iterate inline field arrays directly, bypassing visibleKeyNames allocation,
+        // value() HashMap lookup, and per-object key sorting. Mirrors Materializer's
+        // materializeInlineObj / materializeSortedInlineObj but writes bytes directly.
+        if (ctx.sort) materializeDirectInlineSortedObj(obj, matDepth, ctx)
+        else materializeDirectInlineObj(obj, matDepth, ctx)
+      } else {
+        // Slow path: general objects with super chain or excluded keys
+        materializeDirectGenericObj(obj, matDepth, ctx)
+      }
+    } finally {
+      ctx.exitObject(obj)
+    }
+  }
+
+  /**
+   * Direct inline iteration for objects without super chain. Invokes members directly by array
+   * index, avoiding visibleKeyNames allocation and value() HashMap lookup per key.
+   */
+  private def materializeDirectInlineObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+
       elemBuilder.append('{')
       newlineBuffered = true
       depth += 1
       resetEmpty()
 
+      val rawN = rawKeys.length
       var i = 0
-      while (i < keys.length) {
-        val key = keys(i)
-        val childVal = obj.value(key, ctx.emptyPos)
+      while (i < rawN) {
+        val m = rawMembers(i)
+        if (m.visibility != Visibility.Hidden) {
+          val childVal = m.invoke(obj, null, fs, evaluator)
+          if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(i), childVal)
 
-        markNonEmpty()
-
-        // Flush comma+indent from previous pair, then render key+value
-        // without intermediate flushes
-        flushBuffer()
-        renderQuotedString(key)
-
-        // Key-value separator ": "
-        elemBuilder.append(':')
-        elemBuilder.append(' ')
-
-        // Render value directly — no flush overhead
-        materializeChild(childVal, matDepth, ctx)
-
-        commaBuffered = true
+          markNonEmpty()
+          flushBuffer()
+          renderQuotedString(rawKeys(i))
+          elemBuilder.append(':')
+          elemBuilder.append(' ')
+          materializeChild(childVal, matDepth, ctx)
+          commaBuffered = true
+        }
         i += 1
       }
 
-      // Inline of visitEnd — close brace
       commaBuffered = false
       newlineBuffered = false
       val wasEmpty = isEmpty
@@ -298,9 +318,134 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       else renderIndent()
       elemBuilder.append('}')
       flushByteBuilder()
-    } finally {
-      ctx.exitObject(obj)
+    } else {
+      // Single-field object
+      val sfm = obj.singleMem
+      if (sfm.visibility != Visibility.Hidden) {
+        val childVal = sfm.invoke(obj, null, fs, evaluator)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(obj.singleKey, childVal)
+
+        elemBuilder.append('{')
+        newlineBuffered = true
+        depth += 1
+        resetEmpty()
+        markNonEmpty()
+        flushBuffer()
+        renderQuotedString(obj.singleKey)
+        elemBuilder.append(':')
+        elemBuilder.append(' ')
+        materializeChild(childVal, matDepth, ctx)
+
+        commaBuffered = false
+        newlineBuffered = false
+        resetEmpty()
+        depth -= 1
+        renderIndent()
+        elemBuilder.append('}')
+        flushByteBuilder()
+      } else {
+        elemBuilder.append('{')
+        elemBuilder.append(' ')
+        elemBuilder.append('}')
+        flushByteBuilder()
+      }
     }
+  }
+
+  /**
+   * Sorted direct inline iteration using cached sort order from the MemberList expression. Avoids
+   * per-object key sorting (125K sorts in realistic2 → 0 sorts with this optimization).
+   */
+  private def materializeDirectInlineSortedObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+      // Use cached sorted order if available, otherwise compute once
+      val order = {
+        val cached = obj._sortedInlineOrder
+        if (cached != null) cached
+        else Materializer.computeSortedInlineOrder(rawKeys, rawMembers)
+      }
+      val visCount = order.length
+
+      elemBuilder.append('{')
+      newlineBuffered = true
+      depth += 1
+      resetEmpty()
+
+      var i = 0
+      while (i < visCount) {
+        val idx = order(i)
+        val childVal = rawMembers(idx).invoke(obj, null, fs, evaluator)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(idx), childVal)
+
+        markNonEmpty()
+        flushBuffer()
+        renderQuotedString(rawKeys(idx))
+        elemBuilder.append(':')
+        elemBuilder.append(' ')
+        materializeChild(childVal, matDepth, ctx)
+        commaBuffered = true
+        i += 1
+      }
+
+      commaBuffered = false
+      newlineBuffered = false
+      val wasEmpty = isEmpty
+      resetEmpty()
+      depth -= 1
+      if (wasEmpty) elemBuilder.append(' ')
+      else renderIndent()
+      elemBuilder.append('}')
+      flushByteBuilder()
+    } else {
+      // Single-field: sorting is trivial (same as unsorted)
+      materializeDirectInlineObj(obj, matDepth, ctx)
+    }
+  }
+
+  /** General object materialization for objects with super chain or excluded keys. */
+  private def materializeDirectGenericObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val keys =
+      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      else obj.visibleKeyNames
+
+    elemBuilder.append('{')
+    newlineBuffered = true
+    depth += 1
+    resetEmpty()
+
+    var i = 0
+    while (i < keys.length) {
+      val key = keys(i)
+      val childVal = obj.value(key, ctx.emptyPos)
+
+      markNonEmpty()
+      flushBuffer()
+      renderQuotedString(key)
+      elemBuilder.append(':')
+      elemBuilder.append(' ')
+      materializeChild(childVal, matDepth, ctx)
+      commaBuffered = true
+      i += 1
+    }
+
+    commaBuffered = false
+    newlineBuffered = false
+    val wasEmpty = isEmpty
+    resetEmpty()
+    depth -= 1
+    if (wasEmpty) elemBuilder.append(' ')
+    else renderIndent()
+    elemBuilder.append('}')
+    flushByteBuilder()
   }
 
   private def materializeDirectArr(
