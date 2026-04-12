@@ -321,7 +321,7 @@ object Val {
     private[sjsonnet] def valTag: Byte = TAG_NUM
   }
 
-  final class Arr(var pos: Position, private var arr: Array[? <: Eval]) extends Literal {
+  class Arr(var pos: Position, private[Val] var arr: Array[? <: Eval]) extends Literal {
     def prettyName = "array"
     private[sjsonnet] def valTag: Byte = TAG_ARR
 
@@ -340,20 +340,9 @@ object Val {
     // The 'arr' field is lazily materialized when bulk access (asLazyArray, etc.) is needed.
     private var _concatLeft: Arr = _
     private var _concatRight: Arr = _
-    private var _length: Int = -1
+    private[Val] var _length: Int = -1
 
-    // Lazy range state. When _isRange is true, this array represents
-    // a contiguous integer sequence [from, from+1, ..., from+length-1].
-    // Elements are computed on demand via Val.cachedNum, avoiding upfront allocation
-    // of the full backing array. Inspired by jrsonnet's RangeArray (arr/spec.rs)
-    // which uses O(1) creation for std.range results.
-    // Uses a separate boolean flag instead of a sentinel value to avoid collisions
-    // with valid range start values (e.g. Int.MinValue).
-    private var _isRange: Boolean = false
-    private var _rangeFrom: Int = 0
-
-    @inline private def isConcatView: Boolean = _concatLeft ne null
-    @inline private def isRange: Boolean = _isRange
+    @inline final private[Val] def isConcatView: Boolean = _concatLeft ne null
 
     override def asArr: Arr = this
 
@@ -363,7 +352,7 @@ object Val {
       else {
         val computed =
           if (isConcatView) _concatLeft.length + _concatRight.length
-          else arr.length // isRange always has _length pre-set, never reaches here
+          else arr.length // RangeArr always has _length pre-set, never reaches here
         _length = computed
         computed
       }
@@ -373,10 +362,6 @@ object Val {
       if (isConcatView) {
         val leftLen = _concatLeft.length
         if (i < leftLen) _concatLeft.value(i) else _concatRight.value(i - leftLen)
-      } else if (isRange) {
-        // For reversed ranges, _rangeFrom is the last element and we count down
-        if (_reversed) Val.cachedNum(pos, _rangeFrom - i)
-        else Val.cachedNum(pos, _rangeFrom + i)
       } else if (_reversed) {
         arr(arr.length - 1 - i).value
       } else {
@@ -393,9 +378,6 @@ object Val {
       if (isConcatView) {
         val leftLen = _concatLeft.length
         if (i < leftLen) _concatLeft.eval(i) else _concatRight.eval(i - leftLen)
-      } else if (isRange) {
-        if (_reversed) Val.cachedNum(pos, _rangeFrom - i)
-        else Val.cachedNum(pos, _rangeFrom + i)
       } else if (_reversed) {
         arr(arr.length - 1 - i)
       } else {
@@ -421,7 +403,6 @@ object Val {
      */
     def asLazyArray: Array[Eval] = {
       if (isConcatView) materialize()
-      if (isRange) materializeRange()
       if (_reversed) {
         val len = arr.length
         val result = new Array[Eval](len)
@@ -464,26 +445,6 @@ object Val {
       arr = result
       _concatLeft = null
       _concatRight = null
-    }
-
-    /**
-     * Materialize a lazy range view into a flat array. After this call, `arr` holds the full
-     * Val.Num elements and the range flag is cleared. Handles both forward and reversed ranges.
-     */
-    private def materializeRange(): Unit = {
-      val len = _length
-      val from = _rangeFrom
-      val rev = _reversed
-      val p = pos
-      val result = new Array[Eval](len)
-      var i = 0
-      while (i < len) {
-        result(i) = Val.cachedNum(p, if (rev) from - i else from + i)
-        i += 1
-      }
-      arr = result
-      _isRange = false // clear range flag
-      _reversed = false // range is now materialized in correct order
     }
 
     /**
@@ -552,35 +513,79 @@ object Val {
      * Double-reversal cancels out.
      */
     def reversed(newPos: Position): Arr = {
-      if (isRange) {
-        // Double-reverse of a range cancels out: return a forward range with original start
-        if (_reversed) {
-          // Currently reversed: _rangeFrom is the high end, counting down.
-          // Reversing again restores the original forward range.
-          val originalFrom = _rangeFrom - _length + 1
-          val result = new Arr(newPos, null)
-          result._isRange = true
-          result._rangeFrom = originalFrom
-          result._length = _length
-          // _reversed defaults to false — forward range
-          result
-        } else {
-          // Forward range: reverse to [from+len-1, from+len-2, ..., from]
-          val len = _length
-          val newFrom = _rangeFrom + len - 1
-          val result = new Arr(newPos, null)
-          result._isRange = true
-          result._rangeFrom = newFrom
-          result._length = len
-          result._reversed = true // signal to compute from-i instead of from+i
-          result
-        }
+      if (isConcatView) materialize() // flatten before reverse
+      val result = Arr(newPos, arr)
+      result._reversed = !this._reversed
+      result
+    }
+  }
+
+  /**
+   * Lazy range array representing the integer sequence [from, from+1, ..., from+size-1]. Separate
+   * subclass keeps the `rangeFrom` field out of regular `Arr` instances, saving ~9 bytes per
+   * non-range array (boolean + int + padding).
+   *
+   * Elements are computed on demand via `Val.cachedNum`. When bulk access is needed (asLazyArray,
+   * concat eager path), the range materializes into a flat array and subsequent calls delegate to
+   * the parent `Arr` implementation.
+   *
+   * Inspired by jrsonnet's RangeArray (arr/spec.rs).
+   */
+  final class RangeArr(pos0: Position, private val rangeFrom: Int, size: Int)
+      extends Arr(pos0, null) {
+    _length = size
+
+    // After materialization arr becomes non-null; delegate to parent Arr logic.
+    @inline private def isMaterialized: Boolean = arr ne null
+
+    override def value(i: Int): Val = {
+      if (isMaterialized || isConcatView) super.value(i)
+      else if (_reversed) Val.cachedNum(pos, rangeFrom - i)
+      else Val.cachedNum(pos, rangeFrom + i)
+    }
+
+    override def eval(i: Int): Eval = {
+      if (isMaterialized || isConcatView) super.eval(i)
+      else if (_reversed) Val.cachedNum(pos, rangeFrom - i)
+      else Val.cachedNum(pos, rangeFrom + i)
+    }
+
+    override def asLazyArray: Array[Eval] = {
+      if (!isMaterialized && !isConcatView) materializeRange()
+      super.asLazyArray
+    }
+
+    override def reversed(newPos: Position): Arr = {
+      if (isMaterialized || isConcatView) {
+        super.reversed(newPos)
+      } else if (_reversed) {
+        // Double-reverse: restore the original forward range.
+        // rangeFrom is the high end when reversed, so recover the original start.
+        val originalFrom = rangeFrom - _length + 1
+        new RangeArr(newPos, originalFrom, _length)
       } else {
-        if (isConcatView) materialize() // flatten before reverse
-        val result = Arr(newPos, arr)
-        result._reversed = !this._reversed
+        // Forward range → reversed: store high end as rangeFrom, flag as reversed.
+        val newFrom = rangeFrom + _length - 1
+        val result = new RangeArr(newPos, newFrom, _length)
+        result._reversed = true
         result
       }
+    }
+
+    /** Materialize this range into a flat Val.Num array. */
+    private def materializeRange(): Unit = {
+      val len = _length
+      val from = rangeFrom
+      val rev = _reversed
+      val p = pos
+      val result = new Array[Eval](len)
+      var i = 0
+      while (i < len) {
+        result(i) = Val.cachedNum(p, if (rev) from - i else from + i)
+        i += 1
+      }
+      arr = result
+      _reversed = false // materialized in correct order
     }
   }
 
@@ -594,13 +599,7 @@ object Val {
      *
      * Inspired by jrsonnet's RangeArray (arr/spec.rs) which uses the same deferred approach.
      */
-    def range(pos: Position, from: Int, size: Int): Arr = {
-      val a = new Arr(pos, null)
-      a._isRange = true
-      a._rangeFrom = from
-      a._length = size
-      a
-    }
+    def range(pos: Position, from: Int, size: Int): Arr = new RangeArr(pos, from, size)
 
     /**
      * Threshold for lazy concat. Arrays with left.length >= this value use a virtual ConcatView
