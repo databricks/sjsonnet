@@ -2,6 +2,7 @@ package sjsonnet
 
 import java.io.OutputStream
 
+import scala.inline
 import upickle.core.{ArrVisitor, ObjVisitor}
 
 /**
@@ -255,52 +256,156 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
     try {
       obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-      val keys =
-        if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
-        else obj.visibleKeyNames
+      if (obj.canDirectIterate) {
+        // Fast path: inline objects (no super chain, no excludedKeys).
+        // Bypasses visibleKeyNames allocation and value() HashMap lookup per key,
+        // invoking members directly by array index.
+        if (ctx.sort) materializeDirectSortedInlineObj(obj, matDepth, ctx)
+        else materializeDirectInlineObj(obj, matDepth, ctx)
+      } else {
+        materializeDirectGenericObj(obj, matDepth, ctx)
+      }
+    } finally {
+      ctx.exitObject(obj)
+    }
+  }
 
-      // Inline of visitObject — open brace
-      elemBuilder.append('{')
-      newlineBuffered = true
-      depth += 1
-      resetEmpty()
+  /** Open an object brace and initialize depth/empty state. */
+  @inline private def openObjBrace(): Unit = {
+    elemBuilder.append('{')
+    newlineBuffered = true
+    depth += 1
+    resetEmpty()
+  }
+
+  /** Close an object brace, handling empty vs non-empty formatting. */
+  @inline private def closeObjBrace(): Unit = {
+    commaBuffered = false
+    newlineBuffered = false
+    val wasEmpty = isEmpty
+    resetEmpty()
+    depth -= 1
+    if (wasEmpty) elemBuilder.append(' ')
+    else renderIndent()
+    elemBuilder.append('}')
+    flushByteBuilder()
+  }
+
+  /** Render a single key-value pair (comma buffering assumed by caller). */
+  @inline private def renderKeyValue(
+      key: String,
+      childVal: Val,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    markNonEmpty()
+    flushBuffer()
+    renderQuotedString(key)
+    elemBuilder.append(':')
+    elemBuilder.append(' ')
+    materializeChild(childVal, matDepth, ctx)
+  }
+
+  /** Fused inline object rendering — bypasses visibleKeyNames and value() lookup. */
+  private def materializeDirectInlineObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+      val rawN = rawKeys.length
+
+      openObjBrace()
 
       var i = 0
-      while (i < keys.length) {
-        val key = keys(i)
-        val childVal = obj.value(key, ctx.emptyPos)
+      while (i < rawN) {
+        val m = rawMembers(i)
+        if (m.visibility != Expr.Member.Visibility.Hidden) {
+          val childVal = m.invoke(obj, null, fs, evaluator)
+          if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(i), childVal)
+          renderKeyValue(rawKeys(i), childVal, matDepth, ctx)
+          commaBuffered = true
+        }
+        i += 1
+      }
 
-        markNonEmpty()
-
-        // Flush comma+indent from previous pair, then render key+value
-        // without intermediate flushes
-        flushBuffer()
-        renderQuotedString(key)
-
-        // Key-value separator ": "
-        elemBuilder.append(':')
+      closeObjBrace()
+    } else {
+      // Single-field object
+      val sfm = obj.singleMem
+      if (sfm.visibility != Expr.Member.Visibility.Hidden) {
+        openObjBrace()
+        val childVal = sfm.invoke(obj, null, fs, evaluator)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(obj.singleKey, childVal)
+        renderKeyValue(obj.singleKey, childVal, matDepth, ctx)
+        closeObjBrace()
+      } else {
+        // Empty object (single hidden field)
+        elemBuilder.append('{')
         elemBuilder.append(' ')
+        elemBuilder.append('}')
+        flushByteBuilder()
+      }
+    }
+  }
 
-        // Render value directly — no flush overhead
-        materializeChild(childVal, matDepth, ctx)
+  /** Fused sorted inline object rendering — uses cached sorted field order. */
+  private def materializeDirectSortedInlineObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val fs = ctx.emptyPos.fileScope
+    val rawKeys = obj.inlineKeys
+    if (rawKeys != null) {
+      val rawMembers = obj.inlineMembers
+      val order = {
+        val cached = obj._sortedInlineOrder
+        if (cached != null) cached
+        else Materializer.computeSortedInlineOrder(rawKeys, rawMembers)
+      }
+      val visCount = order.length
 
+      openObjBrace()
+
+      var i = 0
+      while (i < visCount) {
+        val idx = order(i)
+        val childVal = rawMembers(idx).invoke(obj, null, fs, evaluator)
+        if (!obj._skipFieldCache) obj.cacheFieldValue(rawKeys(idx), childVal)
+        renderKeyValue(rawKeys(idx), childVal, matDepth, ctx)
         commaBuffered = true
         i += 1
       }
 
-      // Inline of visitEnd — close brace
-      commaBuffered = false
-      newlineBuffered = false
-      val wasEmpty = isEmpty
-      resetEmpty()
-      depth -= 1
-      if (wasEmpty) elemBuilder.append(' ')
-      else renderIndent()
-      elemBuilder.append('}')
-      flushByteBuilder()
-    } finally {
-      ctx.exitObject(obj)
+      closeObjBrace()
+    } else {
+      // Single-field: sorted = unsorted
+      materializeDirectInlineObj(obj, matDepth, ctx)
     }
+  }
+
+  /** Generic object rendering — uses visibleKeyNames + value() lookup. */
+  private def materializeDirectGenericObj(
+      obj: Val.Obj,
+      matDepth: Int,
+      ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
+    val keys =
+      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      else obj.visibleKeyNames
+
+    openObjBrace()
+
+    var i = 0
+    while (i < keys.length) {
+      val key = keys(i)
+      val childVal = obj.value(key, ctx.emptyPos)
+      renderKeyValue(key, childVal, matDepth, ctx)
+      commaBuffered = true
+      i += 1
+    }
+
+    closeObjBrace()
   }
 
   private def materializeDirectArr(
