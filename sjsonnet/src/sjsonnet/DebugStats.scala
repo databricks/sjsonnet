@@ -29,8 +29,6 @@ final class DebugStats {
   var addSuperChainWalks: Long = 0
   var maxSuperChainDepth: Int = 0
   var valueCacheOverflows: Long = 0
-  var fieldLookups: Long = 0
-  var fieldCacheHits: Long = 0
 
   // -- Parse / import --
   var filesParsed: Long = 0
@@ -59,8 +57,6 @@ final class DebugStats {
     sb.append(formatLine("add_super_chain_walks", addSuperChainWalks))
     sb.append(formatLine("max_super_chain_depth", maxSuperChainDepth))
     sb.append(formatLine("value_cache_overflows", valueCacheOverflows))
-    sb.append(formatLine("field_lookups", fieldLookups))
-    sb.append(formatLine("field_cache_hits", fieldCacheHits))
     sb.append(formatLine("files_parsed", filesParsed))
     sb.append(formatLine("import_calls", importCalls))
     sb.append(formatLine("import_cache_hits", importCacheHits))

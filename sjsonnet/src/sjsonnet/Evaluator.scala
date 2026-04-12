@@ -1748,9 +1748,10 @@ class Evaluator(
         inlineFieldKeys = finalKeys,
         inlineFieldMembers = finalMembers
       )
-      // Cache sorted field order on MemberList (shared across all objects from same expression)
+      // Cache sorted field order on MemberList (shared across all objects from same expression).
+      // Only safe when all field names are fixed (not computed at runtime).
       var sortedOrder = e._cachedSortedOrder
-      if (sortedOrder == null && sup == null) {
+      if (sortedOrder == null && sup == null && e.allFieldNamesFixed) {
         sortedOrder = Materializer.computeSortedInlineOrder(finalKeys, finalMembers)
         e._cachedSortedOrder = sortedOrder
       }
@@ -1767,40 +1768,119 @@ class Evaluator(
         sup
       )
     }
+    // Only share key-name caches when all field names are fixed (compile-time constants).
+    // MemberLists with computed (Dyn) field names produce different keys per evaluation,
+    // so sharing allKeyNames/visibleKeyNames across objects would be incorrect.
+    if (sup == null && e.allFieldNamesFixed) factory.cachedObj._sourceMemberList = e
     factory.cachedObj
   }
 
   def visitObjComp(e: ObjBody.ObjComp, sup: Val.Obj)(implicit scope: ValScope): Val.Obj = {
     val binds = e.preLocals ++ e.postLocals
     val compScope: ValScope = scope // .clearSuper
-    val builder = new java.util.LinkedHashMap[String, Val.Obj.Member]
     val compScopes = visitComp(e.first :: e.rest, Array(compScope))
     if (debugStats != null) debugStats.objectCompIterations += compScopes.length
+
+    var builder: java.util.LinkedHashMap[String, Val.Obj.Member] = null
+    var singleKey: String = null
+    var singleMember: Val.Obj.Member = null
+    var inlineKeys: Array[String] = null
+    var inlineMembers: Array[Val.Obj.Member] = null
+    var fieldCount = 0
+    val maxInlineFields = 8
+
     for (s <- compScopes) {
       visitExpr(e.key)(s) match {
         case Val.Str(_, k) =>
-          val previousValue = builder.put(
-            k,
-            new Val.Obj.Member(e.plus, Visibility.Normal, deprecatedSkipAsserts = true) {
-              def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
-                checkStackDepth(e.value.pos, "object comprehension")
-                try {
-                  lazy val newScope: ValScope = s.extend(newBindings, self, sup)
-                  lazy val newBindings = visitBindings(binds, newScope)
-                  visitExpr(e.value)(newScope)
-                } finally decrementStackDepth()
-              }
-            }
+          val member = new ObjCompMember(
+            e.plus,
+            this,
+            binds,
+            s,
+            e.value
           )
-          if (previousValue != null) {
-            Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
+          if (fieldCount == 0) {
+            singleKey = k
+            singleMember = member
+          } else if (fieldCount == 1) {
+            inlineKeys = new Array[String](math.min(compScopes.length, maxInlineFields))
+            inlineMembers = new Array[Val.Obj.Member](inlineKeys.length)
+            inlineKeys(0) = singleKey
+            inlineMembers(0) = singleMember
+            if (singleKey.equals(k))
+              Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
+            inlineKeys(1) = k
+            inlineMembers(1) = member
+            singleKey = null
+            singleMember = null
+          } else if (fieldCount <= maxInlineFields && inlineKeys != null) {
+            var di = 0
+            while (di < fieldCount) {
+              if (inlineKeys(di).equals(k))
+                Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
+              di += 1
+            }
+            if (fieldCount < inlineKeys.length) {
+              inlineKeys(fieldCount) = k
+              inlineMembers(fieldCount) = member
+            } else {
+              builder = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](compScopes.length)
+              var mi = 0
+              while (mi < fieldCount) {
+                builder.put(inlineKeys(mi), inlineMembers(mi))
+                mi += 1
+              }
+              inlineKeys = null
+              inlineMembers = null
+              builder.put(k, member)
+            }
+          } else {
+            val previousValue = builder.put(k, member)
+            if (previousValue != null)
+              Error.fail(s"Duplicate key $k in evaluated object comprehension.", e.pos)
           }
+          fieldCount += 1
         case Val.Null(_) => // do nothing
         case x           => fieldNameTypeError(x, e.pos)
       }
     }
     if (debugStats != null) debugStats.objectsCreated += 1
-    new Val.Obj(e.pos, builder, false, null, sup)
+    if (fieldCount == 1 && singleKey != null) {
+      new Val.Obj(
+        e.pos,
+        null,
+        false,
+        null,
+        sup,
+        singleFieldKey = singleKey,
+        singleFieldMember = singleMember
+      )
+    } else if (inlineKeys != null && fieldCount >= 2) {
+      val finalKeys =
+        if (fieldCount == inlineKeys.length) inlineKeys
+        else java.util.Arrays.copyOf(inlineKeys, fieldCount)
+      val finalMembers =
+        if (fieldCount == inlineMembers.length) inlineMembers
+        else java.util.Arrays.copyOf(inlineMembers, fieldCount)
+      new Val.Obj(
+        e.pos,
+        null,
+        false,
+        null,
+        sup,
+        inlineFieldKeys = finalKeys,
+        inlineFieldMembers = finalMembers
+      )
+    } else {
+      new Val.Obj(
+        e.pos,
+        if (builder != null) builder
+        else Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](0),
+        false,
+        null,
+        sup
+      )
+    }
   }
 
   @tailrec
@@ -2095,6 +2175,27 @@ private[sjsonnet] final class ObjectScopeFactory(
       }
     }
     newScope
+  }
+}
+
+/**
+ * Concrete [[Val.Obj.Member]] for object comprehension fields. Replaces the anonymous inner class
+ * in `visitObjComp`, giving the JIT a monomorphic type at `invoke` call sites.
+ */
+private[sjsonnet] final class ObjCompMember(
+    plus0: Boolean,
+    private val evaluator: Evaluator,
+    private val binds: Array[Expr.Bind],
+    private val compScope: ValScope,
+    private val valueExpr: Expr)
+    extends Val.Obj.Member(plus0, Visibility.Normal, deprecatedSkipAsserts = true) {
+  def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
+    evaluator.checkStackDepth(valueExpr.pos, "object comprehension")
+    try {
+      lazy val newScope: ValScope = compScope.extend(newBindings, self, sup)
+      lazy val newBindings = evaluator.visitBindings(binds, newScope)
+      evaluator.visitExpr(valueExpr)(newScope)
+    } finally evaluator.decrementStackDepth()
   }
 }
 
