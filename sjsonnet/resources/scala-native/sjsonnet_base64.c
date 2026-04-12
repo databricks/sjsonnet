@@ -1002,6 +1002,9 @@ static long avx512_decode_chunk(const uint8_t *in, size_t valid_len, uint8_t *ou
 /*  Public API                                                               */
 /* ========================================================================= */
 
+/* Forward declaration */
+long sjsonnet_base64_decode(const uint8_t *input, size_t input_len, uint8_t *output);
+
 size_t sjsonnet_base64_encode(const uint8_t *input, size_t input_len, uint8_t *output) {
     if (input_len == 0) return 0;
 
@@ -1023,6 +1026,51 @@ size_t sjsonnet_base64_encode(const uint8_t *input, size_t input_len, uint8_t *o
     scalar_encode_tail(input, input_len, output, &i, &j);
 
     return j;
+}
+
+/**
+ * Validated base64 decode: single-pass validation + decoding.
+ *
+ * Returns: >= 0: output length (success)
+ *          -1:   invalid character (*error_info = bad byte value)
+ *          -2:   last unit doesn't have enough valid bits
+ */
+long sjsonnet_base64_decode_validated(
+    const uint8_t *input, size_t input_len, uint8_t *output,
+    int32_t *error_info)
+{
+    if (input_len == 0) return 0;
+
+    const uint8_t *tbl = B64_DECODE_TABLE;
+
+    /* Single pass: validate all bytes, count valid + padding */
+    size_t valid_count = 0;
+    size_t padding_count = 0;
+    for (size_t ci = 0; ci < input_len; ci++) {
+        uint8_t v = tbl[input[ci]];
+        if (v <= 63) valid_count++;
+        else if (v == 0xFE) padding_count++;
+        else {
+            *error_info = (int32_t)input[ci];
+            return -1;
+        }
+    }
+
+    size_t total = valid_count + padding_count;
+    if (total % 4 == 1) return -2;
+
+    /* Calculate output length */
+    size_t full_groups = valid_count / 4;
+    size_t leftover = valid_count % 4;
+    size_t out_len = full_groups * 3 +
+        (leftover == 3 ? 2 : leftover == 2 ? 1 : 0);
+
+    if (out_len == 0) return 0;
+
+    /* Decode using the SIMD-accelerated path */
+    sjsonnet_base64_decode(input, input_len, output);
+
+    return (long)out_len;
 }
 
 long sjsonnet_base64_decode(const uint8_t *input, size_t input_len, uint8_t *output) {
