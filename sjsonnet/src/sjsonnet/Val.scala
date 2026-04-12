@@ -639,12 +639,12 @@ object Val {
      * A member whose value is created lazily on first access. Used by stdlib to defer builtin
      * function instantiation until actually needed, reducing startup overhead.
      */
-    final class LazyConstMember(add2: Boolean, visibility2: Visibility, init: () => Val)
+    final class LazyConstMember(add2: Boolean, visibility2: Visibility, private var init: () => Val)
         extends Member(add2, visibility2, cached = true, deprecatedSkipAsserts = true) {
       private var _val: Val = _
       def invoke(self: Obj, sup: Obj, fs: FileScope, ev: EvalScope): Val = {
         var v = _val
-        if (v eq null) { v = init(); _val = v }
+        if (v eq null) { v = init(); _val = v; init = null }
         v
       }
     }

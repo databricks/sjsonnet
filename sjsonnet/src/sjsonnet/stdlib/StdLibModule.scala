@@ -26,17 +26,14 @@ final class StdLibModule(
 
   val module: Val.Obj = {
     // Estimate total size: module functions + additional std functions + native/trace/extVar + pi/thisFile
-    val totalSize = nameToModule.size + additionalStdFunctions.size + 3 + additionalStdMembers.size
+    val totalSize =
+      sharedLazyMembers.size + additionalStdFunctions.size + 3 + additionalStdMembers.size
     val entries = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](totalSize)
 
-    // Lazy members — Val.Builtin created on first access, per-module granularity
-    val iter = nameToModule.entrySet().iterator()
-    while (iter.hasNext) {
-      val e = iter.next()
-      val n = e.getKey
-      val m = e.getValue
-      entries.put(n, new Val.Obj.LazyConstMember(false, Visibility.Hidden, () => m.getFunction(n)))
-    }
+    // Shared lazy members — created once in companion object, reused across all instances.
+    // After first StdLibModule evaluation, LazyConstMember._val is populated and subsequent
+    // instances get the cached values directly (single null-check fast path).
+    entries.putAll(sharedLazyMembers)
 
     // Additional std functions (eager — typically empty or small)
     for ((k, v) <- additionalStdFunctions)
@@ -81,6 +78,21 @@ object StdLibModule {
         j += 1
       }
       i += 1
+    }
+    m
+  }
+
+  // Shared LazyConstMember objects — created once at class loading, reused across all
+  // StdLibModule instances. After first evaluation, each member caches its resolved Val.Func,
+  // so subsequent instances pay only a null-check per member access (no closure or Map lookup).
+  private val sharedLazyMembers: java.util.LinkedHashMap[String, Val.Obj.Member] = {
+    val m = new java.util.LinkedHashMap[String, Val.Obj.Member](256)
+    val iter = nameToModule.entrySet().iterator()
+    while (iter.hasNext) {
+      val e = iter.next()
+      val n = e.getKey
+      val mod = e.getValue
+      m.put(n, new Val.Obj.LazyConstMember(false, Visibility.Hidden, () => mod.getFunction(n)))
     }
     m
   }

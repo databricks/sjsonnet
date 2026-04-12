@@ -18,14 +18,18 @@ abstract class AbstractFunctionModule extends FunctionModule {
   def functions: Seq[(String, Val.Func)]
 
   /**
-   * Lazy function lookup map, built on first access to any function in this module.
+   * Unsynchronized lazy function lookup map — single-threaded, no synchronization needed.
    */
-  private lazy val functionMap: Map[String, Val.Func] = functions.toMap
+  private var _functionMap: Map[String, Val.Func] = _
 
   /**
    * Get a function by name, triggering module initialization if needed.
    */
-  def getFunction(name: String): Val.Func = functionMap(name)
+  def getFunction(name: String): Val.Func = {
+    var m = _functionMap
+    if (m eq null) { m = functions.toMap; _functionMap = m }
+    m(name)
+  }
 
   /**
    * the holder of the module object
