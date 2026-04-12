@@ -144,14 +144,15 @@ object Util {
     while (i1 < n1 && i2 < n2) {
       val c1 = s1.charAt(i1)
       val c2 = s2.charAt(i2)
-      val c1Sur = Character.isSurrogate(c1)
-      val c2Sur = Character.isSurrogate(c2)
-
-      if (!c1Sur && !c2Sur) {
-        // Both are non-surrogates, compare directly
-        if (c1 != c2) return Character.compare(c1, c2)
+      // Fast path: equal chars can be skipped without surrogate checks.
+      // Even for surrogate pairs, equal high surrogates at position i lead to
+      // comparing low surrogates at i+1, producing the correct codepoint ordering.
+      if (c1 == c2) {
         i1 += 1
         i2 += 1
+      } else if (!Character.isSurrogate(c1) && !Character.isSurrogate(c2)) {
+        // Both non-surrogates and different: direct char subtraction
+        return c1 - c2
       } else {
         // At least one is a surrogate, use full codepoint logic
         val cp1 = s1.codePointAt(i1)
