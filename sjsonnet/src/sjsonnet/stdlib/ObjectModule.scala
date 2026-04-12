@@ -38,14 +38,26 @@ object ObjectModule extends AbstractFunctionModule {
   private object ObjectFields extends Val.Builtin1("objectFields", "o") {
     def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
       val keys = getVisibleKeys(ev, o.value.asObj)
-      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+      val result = new Array[Eval](keys.length)
+      var i = 0
+      while (i < keys.length) {
+        result(i) = Val.Str(pos, keys(i))
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
   private object ObjectFieldsAll extends Val.Builtin1("objectFieldsAll", "o") {
     def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
       val keys = getAllKeys(ev, o.value.asObj)
-      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+      val result = new Array[Eval](keys.length)
+      var i = 0
+      while (i < keys.length) {
+        result(i) = Val.Str(pos, keys(i))
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
@@ -54,7 +66,13 @@ object ObjectModule extends AbstractFunctionModule {
       val keys =
         if (incHidden.value.asBoolean) getAllKeys(ev, o.value.asObj)
         else getVisibleKeys(ev, o.value.asObj)
-      Val.Arr(pos, keys.map(k => Val.Str(pos, k)))
+      val result = new Array[Eval](keys.length)
+      var i = 0
+      while (i < keys.length) {
+        result(i) = Val.Str(pos, keys(i))
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
@@ -165,13 +183,16 @@ object ObjectModule extends AbstractFunctionModule {
       pos: Position,
       ev: EvalScope,
       v1: Val.Obj,
-      keys: Array[String]): Val.Arr =
-    Val.Arr(
-      pos,
-      keys.map { k =>
-        new LazyFunc(() => v1.value(k, pos.noOffset)(ev))
-      }
-    )
+      keys: Array[String]): Val.Arr = {
+    val result = new Array[Eval](keys.length)
+    var i = 0
+    while (i < keys.length) {
+      val k = keys(i)
+      result(i) = new LazyFunc(() => v1.value(k, pos.noOffset)(ev))
+      i += 1
+    }
+    Val.Arr(pos, result)
+  }
 
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin(ObjectHas),
@@ -193,45 +214,43 @@ object ObjectModule extends AbstractFunctionModule {
     builtin(MapWithKey),
     builtin("objectKeysValues", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getVisibleKeys(ev, o)
-      Val.Arr(
-        pos,
-        keys.map(k =>
-          Val.Obj.mk(
-            pos.fileScope.noOffsetPos,
-            "key" -> new Val.Obj.ConstMember(
-              false,
-              Visibility.Normal,
-              Val.Str(pos.fileScope.noOffsetPos, k)
-            ),
-            "value" -> new Val.Obj.ConstMember(
-              false,
-              Visibility.Normal,
-              o.value(k, pos.fileScope.noOffsetPos)(ev)
-            )
+      val noOffsetPos = pos.fileScope.noOffsetPos
+      val result = new Array[Eval](keys.length)
+      var i = 0
+      while (i < keys.length) {
+        val k = keys(i)
+        result(i) = Val.Obj.mk(
+          noOffsetPos,
+          "key" -> new Val.Obj.ConstMember(false, Visibility.Normal, Val.Str(noOffsetPos, k)),
+          "value" -> new Val.Obj.ConstMember(
+            false,
+            Visibility.Normal,
+            o.value(k, noOffsetPos)(ev)
           )
         )
-      )
+        i += 1
+      }
+      Val.Arr(pos, result)
     },
     builtin("objectKeysValuesAll", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getAllKeys(ev, o)
-      Val.Arr(
-        pos,
-        keys.map(k =>
-          Val.Obj.mk(
-            pos.fileScope.noOffsetPos,
-            "key" -> new Val.Obj.ConstMember(
-              false,
-              Visibility.Normal,
-              Val.Str(pos.fileScope.noOffsetPos, k)
-            ),
-            "value" -> new Val.Obj.ConstMember(
-              false,
-              Visibility.Normal,
-              o.value(k, pos.fileScope.noOffsetPos)(ev)
-            )
+      val noOffsetPos = pos.fileScope.noOffsetPos
+      val result = new Array[Eval](keys.length)
+      var i = 0
+      while (i < keys.length) {
+        val k = keys(i)
+        result(i) = Val.Obj.mk(
+          noOffsetPos,
+          "key" -> new Val.Obj.ConstMember(false, Visibility.Normal, Val.Str(noOffsetPos, k)),
+          "value" -> new Val.Obj.ConstMember(
+            false,
+            Visibility.Normal,
+            o.value(k, noOffsetPos)(ev)
           )
         )
-      )
+        i += 1
+      }
+      Val.Arr(pos, result)
     },
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
       o.removeKeys(pos, key)
@@ -348,8 +367,13 @@ object ObjectModule extends AbstractFunctionModule {
             outArray
           }
         } else {
-          // Fallback: Use hash-based deduplication for large RHS arrays:
-          (lKeys ++ rKeys).distinct
+          // Fallback: Use LinkedHashSet for large RHS arrays (preserves order, avoids quadratic):
+          val allKeys = new java.util.LinkedHashSet[String](lKeys.length + rKeys.length)
+          var li = 0
+          while (li < lKeys.length) { allKeys.add(lKeys(li)); li += 1 }
+          var ri = 0
+          while (ri < rKeys.length) { allKeys.add(rKeys(ri)); ri += 1 }
+          allKeys.toArray(new Array[String](allKeys.size))
         }
       }
       recPair(target.value, patch.value)

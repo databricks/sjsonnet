@@ -27,15 +27,20 @@ object ArrayModule extends AbstractFunctionModule {
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.min(ev)
       } else {
-        val minTuple = arr.asStrictArray
-          .map(v =>
-            keyF
-              .asInstanceOf[Val.Func]
-              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          )
-          .zipWithIndex
-          .min((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.value(minTuple._2)
+        val strict = arr.asStrictArray
+        val func = keyF.asInstanceOf[Val.Func]
+        var bestIdx = 0
+        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var i = 1
+        while (i < strict.length) {
+          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          if (ev.compare(v, bestVal) < 0) {
+            bestVal = v
+            bestIdx = i
+          }
+          i += 1
+        }
+        strict(bestIdx)
       }
     }
   }
@@ -59,28 +64,45 @@ object ArrayModule extends AbstractFunctionModule {
       } else if (keyF.isInstanceOf[Val.False]) {
         arr.asStrictArray.max(ev)
       } else {
-        val maxTuple = arr.asStrictArray
-          .map(v =>
-            keyF
-              .asInstanceOf[Val.Func]
-              .apply1(v, pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          )
-          .zipWithIndex
-          .max((x: (Val, Int), y: (Val, Int)) => ev.compare(x._1, y._1))
-        arr.value(maxTuple._2)
+        val strict = arr.asStrictArray
+        val func = keyF.asInstanceOf[Val.Func]
+        var bestIdx = 0
+        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var i = 1
+        while (i < strict.length) {
+          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+          if (ev.compare(v, bestVal) > 0) {
+            bestVal = v
+            bestIdx = i
+          }
+          i += 1
+        }
+        strict(bestIdx)
       }
     }
   }
 
   private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(arr.value.asArr.forall(v => v.asBoolean))
+      val a = arr.value.asArr
+      var i = 0
+      while (i < a.length) {
+        if (!a.value(i).asBoolean) return Val.staticFalse
+        i += 1
+      }
+      Val.staticTrue
     }
   }
 
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.bool(arr.value.asArr.iterator.exists(v => v.asBoolean))
+      val a = arr.value.asArr
+      var i = 0
+      while (i < a.length) {
+        if (a.value(i).asBoolean) return Val.staticTrue
+        i += 1
+      }
+      Val.staticFalse
     }
   }
 
@@ -271,7 +293,14 @@ object ArrayModule extends AbstractFunctionModule {
             }
             str.str.contains(secondArg)
           case a: Val.Arr =>
-            a.asLazyArray.indexWhere(v => ev.equal(v.value, x.value)) >= 0
+            val la = a.asLazyArray
+            var i = 0
+            var found = false
+            while (i < la.length && !found) {
+              if (ev.equal(la(i).value, x.value)) found = true
+              i += 1
+            }
+            found
           case arr =>
             Error.fail(
               "std.member first argument must be an array or a string, got " + arr.prettyName
@@ -543,14 +572,14 @@ object ArrayModule extends AbstractFunctionModule {
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
           val lazyArray = a.asLazyArray
-          val out = new mutable.ArrayBuilder.ofRef[Eval]
-          out.sizeHint(lazyArray.length * count)
+          val elemLen = lazyArray.length
+          val result = new Array[Eval](elemLen * count)
           var i = 0
           while (i < count) {
-            out ++= lazyArray
+            System.arraycopy(lazyArray, 0, result, i * elemLen, elemLen)
             i += 1
           }
-          Val.Arr(pos, out.result())
+          Val.Arr(pos, result)
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
@@ -579,10 +608,23 @@ object ArrayModule extends AbstractFunctionModule {
       )
     },
     builtin("contains", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem)) != -1
+      val la = arr.asLazyArray
+      var i = 0
+      var found = false
+      while (i < la.length && !found) {
+        if (ev.equal(la(i).value, elem)) found = true
+        i += 1
+      }
+      found
     },
     builtin("remove", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
-      val idx = arr.asLazyArray.indexWhere(s => ev.equal(s.value, elem))
+      val la = arr.asLazyArray
+      var idx = -1
+      var i = 0
+      while (i < la.length && idx == -1) {
+        if (ev.equal(la(i).value, elem)) idx = i
+        i += 1
+      }
       if (idx == -1) {
         arr
       } else {

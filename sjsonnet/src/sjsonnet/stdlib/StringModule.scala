@@ -518,15 +518,17 @@ object StringModule extends AbstractFunctionModule {
     },
     builtin("escapeStringXML", "str") { (_, _, str: String) =>
       val out = new java.io.StringWriter()
-      for (c <- str) {
-        c match {
+      var i = 0
+      while (i < str.length) {
+        str.charAt(i) match {
           case '<'  => out.write("&lt;")
           case '>'  => out.write("&gt;")
           case '&'  => out.write("&amp;")
           case '"'  => out.write("&quot;")
           case '\'' => out.write("&apos;")
-          case _    => out.write(c)
+          case c    => out.write(c)
         }
+        i += 1
       }
       out.toString
     },
