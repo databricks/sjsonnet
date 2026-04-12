@@ -28,7 +28,21 @@ object Format {
       val specs: Array[FormatSpec],
       val literals: Array[String],
       val hasAnyStar: Boolean,
-      val staticChars: Int)
+      val staticChars: Int,
+      /** Original format string for offset-based appends. */
+      val source: String,
+      /** Char offsets into `source` for the leading literal: [start, end). */
+      val leadingStart: Int,
+      val leadingEnd: Int,
+      /** Char offsets into `source` for each literal following a format spec. */
+      val literalStarts: Array[Int],
+      val literalEnds: Array[Int],
+      /**
+       * True when ALL specs are simple `%(key)s` with a named label and no formatting flags. In
+       * this case we can use a fast path that caches the object key lookup and avoids widenRaw
+       * entirely.
+       */
+      val allSimpleNamedString: Boolean)
       extends CompiledFormat
 
   final case class FormatSpec(
@@ -43,6 +57,14 @@ object Format {
       precision: Option[Int],
       precisionStar: Boolean,
       conversion: Char) {
+
+    /** True when this spec is a simple `%s` or `%(key)s` with no formatting flags. */
+    val isSimpleString: Boolean =
+      conversion == 's' && width.isEmpty && precision.isEmpty &&
+      !alternate && !zeroPadded && !leftAdjusted &&
+      !blankBeforePositive && !signCharacter &&
+      !widthStar && !precisionStar
+
     def updateWithStarValues(newWidth: Option[Int], newPrecision: Option[Int]): FormatSpec = {
       this.copy(
         width = newWidth.orElse(this.width),
@@ -139,14 +161,19 @@ object Format {
     val len = s.length
     val specsBuilder = new java.util.ArrayList[FormatSpec]()
     val literalsBuilder = new java.util.ArrayList[String]()
+    val litStartsBuilder = new java.util.ArrayList[java.lang.Integer]()
+    val litEndsBuilder = new java.util.ArrayList[java.lang.Integer]()
     var staticChars = 0
     var hasAnyStar = false
+    var allSimpleNamed = true
 
     // Find the first '%' to extract the leading literal
     var pos = s.indexOf('%')
     val leading =
       if (pos < 0) s // No format specs at all
       else s.substring(0, pos)
+    val leadingStart = 0
+    val leadingEnd = if (pos < 0) len else pos
     staticChars += leading.length
 
     while (pos >= 0 && pos < len) {
@@ -162,7 +189,7 @@ object Format {
           val key = s.substring(pos + 1, closeIdx)
           pos = closeIdx + 1
           Some(key)
-        } else None
+        } else { allSimpleNamed = false; None }
 
       // 2. Flags: #0- +
       var alternate = false
@@ -243,29 +270,31 @@ object Format {
       if ("diouxXeEfFgGcrsa%".indexOf(conversion) < 0)
         throw new Exception(s"Unrecognized conversion type: $conversion")
 
-      specsBuilder.add(
-        FormatSpec(
-          label,
-          alternate,
-          zeroPadded,
-          leftAdjusted,
-          blankBeforePositive,
-          signCharacter,
-          width,
-          widthStar,
-          precision,
-          precisionStar,
-          conversion
-        )
+      val spec = FormatSpec(
+        label,
+        alternate,
+        zeroPadded,
+        leftAdjusted,
+        blankBeforePositive,
+        signCharacter,
+        width,
+        widthStar,
+        precision,
+        precisionStar,
+        conversion
       )
+      specsBuilder.add(spec)
       hasAnyStar ||= widthStar || precisionStar
+      if (!spec.isSimpleString || label.isEmpty) allSimpleNamed = false
 
       // Find next '%' to extract the literal between this spec and the next
       val nextPct = s.indexOf('%', pos)
-      val literal =
-        if (nextPct < 0) s.substring(pos) // Rest of string is literal
-        else s.substring(pos, nextPct)
+      val litStart = pos
+      val litEnd = if (nextPct < 0) len else nextPct
+      val literal = s.substring(litStart, litEnd)
       literalsBuilder.add(literal)
+      litStartsBuilder.add(litStart)
+      litEndsBuilder.add(litEnd)
       staticChars += literal.length
 
       pos = nextPct
@@ -274,13 +303,29 @@ object Format {
     val size = specsBuilder.size()
     val specs = new Array[FormatSpec](size)
     val literals = new Array[String](size)
+    val litStarts = new Array[Int](size)
+    val litEnds = new Array[Int](size)
     var idx = 0
     while (idx < size) {
       specs(idx) = specsBuilder.get(idx)
       literals(idx) = literalsBuilder.get(idx)
+      litStarts(idx) = litStartsBuilder.get(idx)
+      litEnds(idx) = litEndsBuilder.get(idx)
       idx += 1
     }
-    new RuntimeFormat(leading, specs, literals, hasAnyStar, staticChars)
+    new RuntimeFormat(
+      leading,
+      specs,
+      literals,
+      hasAnyStar,
+      staticChars,
+      s,
+      leadingStart,
+      leadingEnd,
+      litStarts,
+      litEnds,
+      allSimpleNamed
+    )
   }
 
   /** Convert a parsed format (leading + Seq of tuples) into a RuntimeFormat with arrays. */
@@ -290,8 +335,11 @@ object Format {
     val size = chunks.size
     val specs = new Array[FormatSpec](size)
     val literals = new Array[String](size)
+    val emptyStarts = new Array[Int](size)
+    val emptyEnds = new Array[Int](size)
     var staticChars = leading.length
     var hasAnyStar = false
+    var allSimpleNamed = true
     var idx = 0
     while (idx < size) {
       val (formatted, literal) = chunks(idx)
@@ -299,9 +347,23 @@ object Format {
       literals(idx) = literal
       staticChars += literal.length
       hasAnyStar ||= formatted.widthStar || formatted.precisionStar
+      if (!formatted.isSimpleString || formatted.label.isEmpty) allSimpleNamed = false
       idx += 1
     }
-    new RuntimeFormat(leading, specs, literals, hasAnyStar, staticChars)
+    // No source string available for fastparse path; offset arrays are unused
+    new RuntimeFormat(
+      leading,
+      specs,
+      literals,
+      hasAnyStar,
+      staticChars,
+      "",
+      0,
+      0,
+      emptyStarts,
+      emptyEnds,
+      allSimpleNamed
+    )
   }
 
   def format(leading: String, chunks: scala.Seq[(FormatSpec, String)], values0: Val, pos: Position)(
@@ -311,6 +373,13 @@ object Format {
 
   private def format(parsed: RuntimeFormat, values0: Val, pos: Position)(implicit
       evaluator: EvalScope): String = {
+
+    // Super-fast path: all specs are simple %(key)s with an object value.
+    // Avoids per-spec pattern matching, widenRaw, and uses offset-based literal appends.
+    if (parsed.allSimpleNamedString && values0.isInstanceOf[Val.Obj]) {
+      return formatSimpleNamedString(parsed, values0.asInstanceOf[Val.Obj], pos)
+    }
+
     val values = values0 match {
       case x: Val.Arr => x
       case x: Val.Obj => x
@@ -486,6 +555,70 @@ object Format {
       )
     }
     output.toString()
+  }
+
+  /**
+   * Super-fast path for format strings where ALL specs are simple `%(key)s` with a `Val.Obj`. This
+   * avoids per-spec pattern matching, widenRaw overhead, and caches repeated key lookups. For the
+   * large_string_template benchmark (605KB, 256 `%(x)s` interpolations), this eliminates 256
+   * redundant object lookups and the generic dispatch overhead.
+   */
+  private def formatSimpleNamedString(parsed: RuntimeFormat, obj: Val.Obj, pos: Position)(implicit
+      evaluator: EvalScope): String = {
+    val output = new java.lang.StringBuilder(parsed.staticChars + parsed.specs.length * 16)
+    val source = parsed.source
+
+    // Append leading literal using offsets if source is available, else use string
+    if (source.nonEmpty) output.append(source, parsed.leadingStart, parsed.leadingEnd)
+    else output.append(parsed.leading)
+
+    // Cache for repeated key lookups: most format strings reuse the same key many times
+    var cachedKey: String = null
+    var cachedStr: String = null
+
+    var idx = 0
+    while (idx < parsed.specs.length) {
+      val spec = parsed.specs(idx)
+      val key = spec.label.get
+
+      // Look up and cache the string value for this key
+      // String.equals already does identity check (eq) internally
+      val str =
+        if (key == cachedKey) cachedStr
+        else {
+          val rawVal = obj.value(key, pos)(evaluator).value
+          val s = rawVal match {
+            case vs: Val.Str => vs.str
+            case vn: Val.Num =>
+              if (vn.asDouble.toLong.toDouble == vn.asDouble) vn.asDouble.toLong.toString
+              else vn.asDouble.toString
+            case _: Val.True  => "true"
+            case _: Val.False => "false"
+            case _: Val.Null  => "null"
+            case f: Val.Func  => Error.fail("Cannot format function value", f)
+            case other        =>
+              // Complex types: materialize via Renderer
+              val value = other match {
+                case r: Val.Arr => Materializer.apply0(r, new Renderer(indent = -1))
+                case r: Val.Obj => Materializer.apply0(r, new Renderer(indent = -1))
+                case _          => Materializer(other)
+              }
+              value.toString
+          }
+          cachedKey = key
+          cachedStr = s
+          s
+        }
+
+      output.append(str)
+
+      // Append trailing literal using offsets if source is available
+      if (source.nonEmpty) output.append(source, parsed.literalStarts(idx), parsed.literalEnds(idx))
+      else output.append(parsed.literals(idx))
+
+      idx += 1
+    }
+    output.toString
   }
 
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
