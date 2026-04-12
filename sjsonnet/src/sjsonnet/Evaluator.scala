@@ -1745,19 +1745,24 @@ class Evaluator(
       fieldCount += 1
     }
 
-    fields.foreach {
-      case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
-        val k = visitFieldName(fieldName, offset)
-        if (k != null) {
-          trackField(k, new ExprFieldMember(plus, sep, rhs, k, factory), offset)
-        }
-      case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
-        val k = visitFieldName(fieldName, offset)
-        if (k != null) {
-          trackField(k, new MethodFieldMember(sep, rhs, argSpec, offset, k, factory), offset)
-        }
-      case _ =>
-        Error.fail("This case should never be hit", objPos)
+    var fi = 0
+    val flen = fields.length
+    while (fi < flen) {
+      fields(fi) match {
+        case Member.Field(offset, fieldName, plus, null, sep, rhs) =>
+          val k = visitFieldName(fieldName, offset)
+          if (k != null) {
+            trackField(k, new ExprFieldMember(plus, sep, rhs, k, factory), offset)
+          }
+        case Member.Field(offset, fieldName, false, argSpec, sep, rhs) =>
+          val k = visitFieldName(fieldName, offset)
+          if (k != null) {
+            trackField(k, new MethodFieldMember(sep, rhs, argSpec, offset, k, factory), offset)
+          }
+        case _ =>
+          Error.fail("This case should never be hit", objPos)
+      }
+      fi += 1
     }
     // Compute no-self-ref flag once per MemberList (shared across all objects from same expression).
     // When true, the Materializer can skip cacheFieldValue() during inline iteration, eliminating
