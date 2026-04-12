@@ -330,7 +330,11 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   /**
-   * Detect pattern: function(acc, elem) acc + elem with string init → use StringBuilder O(n).
+   * Detect string-concat patterns in foldl function bodies and use StringBuilder for O(n) total.
+   * Supported patterns:
+   *   - `function(acc, elem) acc + elem`
+   *   - `function(acc, elem) acc + SEP + elem` (separator)
+   *   - `function(acc, elem) if acc == "" then elem else acc + SEP + elem` (conditional separator)
    * Returns null if the pattern doesn't match, letting the caller fall through to the general path.
    */
   private def tryStringBuilderFoldl(
@@ -342,25 +346,113 @@ object ArrayModule extends AbstractFunctionModule {
   ): Val = {
     val body = func.bodyExpr
     if (body == null) return null
+    val base = func.defSiteValScope.bindings.length
     body match {
       case e: Expr.BinaryOp if e.op == Expr.BinaryOp.OP_+ =>
-        (e.lhs, e.rhs) match {
-          case (l: Expr.ValidId, r: Expr.ValidId) =>
-            val base = func.defSiteValScope.bindings.length
-            if (l.nameIdx == base && r.nameIdx == base + 1) {
-              val sb = new java.lang.StringBuilder(initStr)
-              val lazyArr = arr.asLazyArray
-              var i = 0
-              while (i < lazyArr.length) {
-                lazyArr(i).value match {
-                  case s: Val.Str => sb.append(s.str)
-                  case v          => sb.append(Materializer.stringify(v)(ev))
-                }
-                i += 1
+        tryStringBuilderFromBinaryOp(e, base, arr, initStr, null, ev, pos)
+      case ifElse: Expr.IfElse =>
+        tryStringBuilderFromIfElse(ifElse, base, arr, initStr, ev, pos)
+      case _ => null
+    }
+  }
+
+  /**
+   * Match BinaryOp patterns:
+   *   - `acc + elem` (simple concat)
+   *   - `acc + SEP + elem` (separator concat)
+   * If `skipSepForFirst` is non-null, the separator is omitted for the first element.
+   */
+  private def tryStringBuilderFromBinaryOp(
+      e: Expr.BinaryOp,
+      base: Int,
+      arr: Val.Arr,
+      initStr: String,
+      skipSepForFirst: String, // non-null means skip sep when acc equals this
+      ev: EvalScope,
+      pos: Position
+  ): Val = {
+    (e.lhs, e.rhs) match {
+      // Pattern: acc + elem
+      case (l: Expr.ValidId, r: Expr.ValidId) if l.nameIdx == base && r.nameIdx == base + 1 =>
+        val lazyArr = arr.asLazyArray
+        val sb = new java.lang.StringBuilder(initStr.length + lazyArr.length * 8)
+        sb.append(initStr)
+        var i = 0
+        while (i < lazyArr.length) {
+          lazyArr(i).value match {
+            case s: Val.Str => sb.append(s.str)
+            case v          => sb.append(Materializer.stringify(v)(ev))
+          }
+          i += 1
+        }
+        Val.Str(pos, sb.toString)
+
+      // Pattern: (acc + SEP) + elem  →  acc + SEP + elem
+      case (inner: Expr.BinaryOp, r: Expr.ValidId)
+          if inner.op == Expr.BinaryOp.OP_+ && r.nameIdx == base + 1 =>
+        (inner.lhs, inner.rhs) match {
+          case (l: Expr.ValidId, sep: Val.Str) if l.nameIdx == base =>
+            val sepStr = sep.str
+            val lazyArr = arr.asLazyArray
+            val sb =
+              new java.lang.StringBuilder(initStr.length + lazyArr.length * (sepStr.length + 8))
+            sb.append(initStr)
+            var i = 0
+            while (i < lazyArr.length) {
+              if (skipSepForFirst == null || i > 0 || initStr != skipSepForFirst)
+                sb.append(sepStr)
+              lazyArr(i).value match {
+                case s: Val.Str => sb.append(s.str)
+                case v          => sb.append(Materializer.stringify(v)(ev))
               }
-              return Val.Str(pos, sb.toString)
+              i += 1
             }
-            null
+            Val.Str(pos, sb.toString)
+          case _ => null
+        }
+
+      case _ => null
+    }
+  }
+
+  /**
+   * Match conditional separator pattern: `if acc == "" then elem else acc + SEP + elem`
+   */
+  private def tryStringBuilderFromIfElse(
+      ifElse: Expr.IfElse,
+      base: Int,
+      arr: Val.Arr,
+      initStr: String,
+      ev: EvalScope,
+      pos: Position
+  ): Val = {
+    ifElse.cond match {
+      case eq: Expr.BinaryOp if eq.op == Expr.BinaryOp.OP_== =>
+        (eq.lhs, eq.rhs) match {
+          // if acc == "" then elem else <body>
+          case (accId: Expr.ValidId, emptyStr: Val.Str)
+              if accId.nameIdx == base && emptyStr.str.isEmpty =>
+            ifElse.`then` match {
+              case elemId: Expr.ValidId if elemId.nameIdx == base + 1 =>
+                ifElse.`else` match {
+                  case sepBody: Expr.BinaryOp if sepBody.op == Expr.BinaryOp.OP_+ =>
+                    tryStringBuilderFromBinaryOp(sepBody, base, arr, initStr, "", ev, pos)
+                  case _ => null
+                }
+              case _ => null
+            }
+          // if "" == acc then elem else <body>
+          case (emptyStr: Val.Str, accId: Expr.ValidId)
+              if accId.nameIdx == base && emptyStr.str.isEmpty =>
+            ifElse.`then` match {
+              case elemId: Expr.ValidId if elemId.nameIdx == base + 1 =>
+                ifElse.`else` match {
+                  case sepBody: Expr.BinaryOp if sepBody.op == Expr.BinaryOp.OP_+ =>
+                    tryStringBuilderFromBinaryOp(sepBody, base, arr, initStr, "", ev, pos)
+                  case _ => null
+                }
+              case _ => null
+            }
           case _ => null
         }
       case _ => null
