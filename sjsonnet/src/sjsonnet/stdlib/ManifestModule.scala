@@ -270,16 +270,24 @@ object ManifestModule extends AbstractFunctionModule {
       }
       v match {
         case arr: Val.Arr =>
-          arr.asLazyArray
-            .map { item =>
+          val items = arr.asLazyArray
+          val sb = new java.lang.StringBuilder()
+          var i = 0
+          while (i < items.length) {
+            if (i > 0) sb.append("\n---\n")
+            else sb.append("---\n")
+            sb.append(
               Materializer
                 .apply0(
-                  item.value,
+                  items(i).value,
                   new YamlRenderer(indentArrayInObject = indentArrayInObject, quoteKeys = quoteKeys)
                 )(ev)
                 .toString
-            }
-            .mkString("---\n", "\n---\n", if (cDocumentEnd) "\n...\n" else "\n")
+            )
+            i += 1
+          }
+          if (cDocumentEnd) sb.append("\n...\n") else sb.append('\n')
+          sb.toString
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
