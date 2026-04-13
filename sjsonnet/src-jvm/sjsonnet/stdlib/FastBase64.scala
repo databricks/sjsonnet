@@ -3,8 +3,8 @@ package sjsonnet.stdlib
 import java.util.Base64
 
 /**
- * JVM-specific Base64 implementation. Delegates to java.util.Base64 which is
- * highly optimized on the JVM via C2 intrinsics. No point reinventing this.
+ * JVM-specific Base64 implementation. Delegates to java.util.Base64 which is highly optimized on
+ * the JVM via C2 intrinsics. No point reinventing this.
  */
 object FastBase64 {
 

@@ -6,14 +6,13 @@ import scala.scalanative.unsigned._
 /**
  * Scala Native base64 encoder/decoder using platform SIMD via C FFI.
  *
- * AArch64: NEON — vld3/vst4 interleaved load/store + vqtbl4q 64-byte lookup
- * x86_64:  SSSE3/AVX2/AVX-512 — pshufb/vpshufb/vpermi2b
- * Other:   Scalar fallback with loop unrolling
+ * AArch64: NEON — vld3/vst4 interleaved load/store + vqtbl4q 64-byte lookup x86_64:
+ * SSSE3/AVX2/AVX-512 — pshufb/vpshufb/vpermi2b Other: Scalar fallback with loop unrolling
  *
  * RFC 4648 compliant: A-Za-z0-9+/ alphabet with '=' padding.
  *
- * Performance: reusable buffers eliminate per-call allocations (safe because
- * Scala Native is single-threaded with nativeMultithreading = None).
+ * Performance: reusable buffers eliminate per-call allocations (safe because Scala Native is
+ * single-threaded with nativeMultithreading = None).
  */
 object FastBase64 {
 
@@ -56,8 +55,7 @@ object FastBase64 {
   }
 
   /**
-   * Encode a String to base64.
-   * ASCII fast-path avoids UTF-8 encoding overhead for the common case.
+   * Encode a String to base64. ASCII fast-path avoids UTF-8 encoding overhead for the common case.
    */
   def encodeString(s: String): String = {
     val len = s.length
@@ -89,8 +87,8 @@ object FastBase64 {
   }
 
   /**
-   * Internal encode using reusable output buffer + char array for String construction.
-   * Only 1 allocation per call: the final String (which copies the char array internally).
+   * Internal encode using reusable output buffer + char array for String construction. Only 1
+   * allocation per call: the final String (which copies the char array internally).
    */
   private def encodeBytesReusable(bytes: Array[Byte], len: Int): String = {
     val outLen = 4 * ((len + 2) / 3)
@@ -109,8 +107,8 @@ object FastBase64 {
   }
 
   /**
-   * Decode a base64 string to a UTF-8 string.
-   * ASCII fast-path avoids charset lookup for the common case.
+   * Decode a base64 string to a UTF-8 string. ASCII fast-path avoids charset lookup for the common
+   * case.
    */
   def decodeToString(s: String): String = {
     val len = s.length
@@ -170,8 +168,8 @@ object FastBase64 {
   }
 
   /**
-   * Decode a base64 string to a byte array.
-   * Uses C-side validated decode for single-pass processing.
+   * Decode a base64 string to a byte array. Uses C-side validated decode for single-pass
+   * processing.
    */
   def decodeToBytes(s: String): Array[Byte] = {
     val len = s.length
@@ -218,8 +216,8 @@ object FastBase64 {
   }
 
   /**
-   * Inline UTF-8 encoding for non-ASCII strings.
-   * Only called on the slow path when encodeString detects non-ASCII chars.
+   * Inline UTF-8 encoding for non-ASCII strings. Only called on the slow path when encodeString
+   * detects non-ASCII chars.
    */
   private def encodeStringUtf8(s: String): Array[Byte] = {
     val len = s.length
