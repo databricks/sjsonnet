@@ -46,8 +46,8 @@ object CharSWAR {
   }
 
   /**
-   * Compare two strings by Unicode codepoint values. Scalar fallback for Scala.js.
-   * Uses equal-char-skip fast path with deferred surrogate check.
+   * Compare two strings by Unicode codepoint values. Scalar fallback for Scala.js. Uses
+   * equal-char-skip fast path with deferred surrogate check.
    */
   def compareStrings(s1: String, s2: String): Int = {
     if (s1 eq s2) return 0
