@@ -159,9 +159,16 @@ object CharSWAR {
   // compareStrings — codepoint-correct string comparison
   // =========================================================================
 
+  // Pre-allocated char buffers for string comparison.
+  // Scala Native is single-threaded, so module-level buffers are safe.
+  private final val CMP_BUF_SIZE = 32768
+  private val cmpBuf1: Array[Char] = new Array[Char](CMP_BUF_SIZE)
+  private val cmpBuf2: Array[Char] = new Array[Char](CMP_BUF_SIZE)
+
   /**
    * Compare two strings by Unicode codepoint values. Uses bulk getChars + tight array loop for
    * LLVM auto-vectorization. Surrogate checks deferred to mismatch point only.
+   * Pre-allocated module-level buffers avoid per-call allocation overhead.
    */
   def compareStrings(s1: String, s2: String): Int = {
     if (s1 eq s2) return 0
@@ -169,11 +176,12 @@ object CharSWAR {
     val n2 = s2.length
     val minLen = math.min(n1, n2)
 
-    if (minLen < 16) return compareStringsScalar(s1, n1, s2, n2)
+    if (minLen < 16 || n1 > CMP_BUF_SIZE || n2 > CMP_BUF_SIZE)
+      return compareStringsScalar(s1, n1, s2, n2)
 
-    // Bulk-copy to arrays — enables LLVM auto-vectorization
-    val c1 = new Array[Char](n1)
-    val c2 = new Array[Char](n2)
+    // Bulk-copy to pre-allocated arrays — zero allocation, enables LLVM auto-vectorization
+    val c1 = cmpBuf1
+    val c2 = cmpBuf2
     s1.getChars(0, n1, c1, 0)
     s2.getChars(0, n2, c2, 0)
 
