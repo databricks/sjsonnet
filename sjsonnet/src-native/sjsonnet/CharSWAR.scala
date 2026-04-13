@@ -166,9 +166,9 @@ object CharSWAR {
   private val cmpBuf2: Array[Char] = new Array[Char](CMP_BUF_SIZE)
 
   /**
-   * Compare two strings by Unicode codepoint values. Uses bulk getChars + tight array loop for
-   * LLVM auto-vectorization. Surrogate checks deferred to mismatch point only.
-   * Pre-allocated module-level buffers avoid per-call allocation overhead.
+   * Compare two strings by Unicode codepoint values. Uses bulk getChars + tight array loop for LLVM
+   * auto-vectorization. Surrogate checks deferred to mismatch point only. Pre-allocated
+   * module-level buffers avoid per-call allocation overhead.
    */
   def compareStrings(s1: String, s2: String): Int = {
     if (s1 eq s2) return 0
