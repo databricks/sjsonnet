@@ -3,8 +3,6 @@ package sjsonnet.stdlib
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-import java.util.Base64
-
 object EncodingModule extends AbstractFunctionModule {
   def name = "encoding"
 
@@ -15,17 +13,22 @@ object EncodingModule extends AbstractFunctionModule {
 
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin(MD5),
-    builtin("base64", "input") { (_, _, input: Val) =>
-      input match {
+    builtin("base64", "input") { (pos, _, input: Val) =>
+      val result: Val = input match {
         case Val.Str(_, value) =>
-          Base64.getEncoder.encodeToString(value.getBytes("UTF-8"))
+          Val.Str.asciiSafe(pos, FastBase64.encodeString(value))
+        case ba: Val.ByteArr =>
+          // Zero-copy fast path for byte-backed arrays (e.g. from base64DecodeBytes)
+          Val.Str.asciiSafe(pos, FastBase64.encodeBytes(ba.rawBytes))
         case arr: Val.Arr =>
           val byteArr = new Array[Byte](arr.length)
           var i = 0
           while (i < arr.length) {
             val v = arr.value(i)
             if (!v.isInstanceOf[Val.Num]) {
-              Error.fail(f"Expected an array of numbers, got a ${v.prettyName} at position $i")
+              Error.fail(
+                f"Expected an array of numbers, got a ${v.prettyName} at position $i"
+              )
             }
             val vInt = v.asInt
             if (vInt < 0 || vInt > 255) {
@@ -36,13 +39,14 @@ object EncodingModule extends AbstractFunctionModule {
             byteArr(i) = vInt.toByte
             i += 1
           }
-          Base64.getEncoder.encodeToString(byteArr)
+          Val.Str.asciiSafe(pos, FastBase64.encodeBytes(byteArr))
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }
+      result
     },
     builtin("base64Decode", "str") { (_, _, str: String) =>
       try {
-        new String(Base64.getDecoder.decode(str))
+        FastBase64.decodeToString(str)
       } catch {
         case e: IllegalArgumentException =>
           Error.fail("Invalid base64 string: " + e.getMessage)
@@ -50,14 +54,7 @@ object EncodingModule extends AbstractFunctionModule {
     },
     builtin("base64DecodeBytes", "str") { (pos, _, str: String) =>
       try {
-        val decoded = Base64.getDecoder.decode(str)
-        val result = new Array[Eval](decoded.length)
-        var i = 0
-        while (i < decoded.length) {
-          result(i) = Val.cachedNum(pos, (decoded(i) & 0xff).toDouble)
-          i += 1
-        }
-        Val.Arr(pos, result)
+        Val.Arr.fromBytes(pos, FastBase64.decodeToBytes(str))
       } catch {
         case e: IllegalArgumentException =>
           Error.fail("Invalid base64 string: " + e.getMessage)
