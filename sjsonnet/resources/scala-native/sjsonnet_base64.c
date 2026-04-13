@@ -810,7 +810,7 @@ static long avx2_decode_chunk(const uint8_t *in, size_t valid_len, uint8_t *out,
  * Uses vpermi2b (VBMI) for 64-byte table lookup — one instruction for the
  * entire base64 alphabet! This matches NEON's vqtbl4q throughput.
  */
-__attribute__((target("avx512vbmi,avx512bw,avx512f")))
+__attribute__((target("avx512vbmi,avx512bw,avx512f,avx512dq")))
 static void avx512_encode_chunk(const uint8_t *in, size_t len, uint8_t *out,
                                 size_t *i_ptr, size_t *j_ptr) {
     size_t i = *i_ptr, j = *j_ptr;
@@ -898,7 +898,7 @@ static void avx512_encode_chunk(const uint8_t *in, size_t len, uint8_t *out,
 /**
  * AVX-512 VBMI base64 decode: 64 input chars -> 48 output bytes per iteration.
  */
-__attribute__((target("avx512vbmi,avx512bw,avx512f")))
+__attribute__((target("avx512vbmi,avx512bw,avx512f,avx512dq")))
 static long avx512_decode_chunk(const uint8_t *in, size_t valid_len, uint8_t *out,
                                 size_t *i_ptr, size_t *j_ptr) {
     size_t i = *i_ptr, j = *j_ptr;
