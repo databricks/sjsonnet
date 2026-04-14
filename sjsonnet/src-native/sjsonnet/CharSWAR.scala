@@ -1,7 +1,6 @@
 package sjsonnet
 
 import scala.scalanative.runtime.{CharArray, Intrinsics}
-import scala.scalanative.annotation.alwaysinline
 
 /**
  * SWAR (SIMD Within A Register) escape-char scanner for Scala Native.
