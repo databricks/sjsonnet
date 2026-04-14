@@ -328,7 +328,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       elemBuilder.length = pos + bLen + 2
     } else {
       // Dirty string — chunked rendering: copy clean segments, escape inline
-      // Worst case expansion: each byte → \uXXXX (6 bytes), plus 2 quotes
+      // Worst case expansion: each byte → \\uXXXX (6 bytes), plus 2 quotes
       elemBuilder.ensureLength(bLen + bLen + 2) // 2x is sufficient for realistic strings
       elemBuilder.appendUnsafeC('"')
 
@@ -362,11 +362,11 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * Inline JSON escape for a single byte. Handles the 7 named escapes plus \uXXXX for other control
-   * chars. Only called for bytes that actually need escaping (< 0x20, '"', '\\').
+   * Inline JSON escape for a single byte. Handles the 7 named escapes plus \\uXXXX for other
+   * control chars. Only called for bytes that actually need escaping (< 0x20, '"', '\\').
    */
   private def escapeByteInline(b: Int): Unit = {
-    // Ensure space for longest escape sequence (\uXXXX = 6 bytes)
+    // Ensure space for longest escape sequence (\\uXXXX = 6 bytes)
     elemBuilder.ensureLength(6)
     (b: @scala.annotation.switch) match {
       case '"' =>
@@ -391,7 +391,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
         elemBuilder.appendUnsafeC('\\')
         elemBuilder.appendUnsafeC('t')
       case c =>
-        // Other control chars → \u00XX
+        // Other control chars → \\u00XX
         elemBuilder.appendUnsafeC('\\')
         elemBuilder.appendUnsafeC('u')
         elemBuilder.appendUnsafeC('0')
@@ -446,7 +446,7 @@ object BaseByteRenderer {
     a
   }
 
-  /** Hex digit lookup for \uXXXX escape sequences. */
+  /** Hex digit lookup for \\uXXXX escape sequences. */
   private[sjsonnet] val HEX_CHARS: Array[Char] =
     Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 

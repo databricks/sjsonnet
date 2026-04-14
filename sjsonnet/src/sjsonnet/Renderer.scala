@@ -418,7 +418,7 @@ final case class MaterializeJsonRenderer(
       case '\r' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('r')
       case '\t' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('t')
       case _    =>
-        // Control chars → \u00XX
+        // Control chars → \\u00XX
         elemBuilder.appendUnsafe('\\')
         elemBuilder.appendUnsafe('u')
         elemBuilder.appendUnsafe('0')
