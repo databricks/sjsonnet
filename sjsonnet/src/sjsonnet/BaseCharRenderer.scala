@@ -260,17 +260,51 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     s match {
       case str: String if !escapeUnicode =>
         val len = str.length
-        if (!CharSWAR.hasEscapeChar(str)) {
-          elemBuilder.ensureLength(len + 2)
+        if (len == 0) {
+          elemBuilder.ensureLength(2)
           elemBuilder.appendUnsafe('"')
-          val cbArr = elemBuilder.arr
-          val pos = elemBuilder.getLength
-          str.getChars(0, len, cbArr, pos)
-          elemBuilder.length = pos + len
           elemBuilder.appendUnsafe('"')
         } else {
-          upickle.core.RenderUtils
-            .escapeChar(null, elemBuilder, s, escapeUnicode = escapeUnicode, wrapQuotes = true)
+          // Convert to char[] for SWAR scanning + bulk copy
+          val chars = new Array[Char](len)
+          str.getChars(0, len, chars, 0)
+          val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
+          if (firstEscape < 0) {
+            // Clean string — direct bulk copy
+            elemBuilder.ensureLength(len + 2)
+            elemBuilder.appendUnsafe('"')
+            val cbArr = elemBuilder.arr
+            val pos = elemBuilder.getLength
+            System.arraycopy(chars, 0, cbArr, pos, len)
+            elemBuilder.length = pos + len
+            elemBuilder.appendUnsafe('"')
+          } else {
+            // Dirty string — chunked rendering: bulk copy clean segments, escape inline
+            elemBuilder.ensureLength(len + len + 2)
+            elemBuilder.appendUnsafe('"')
+            var from = 0
+            var escPos = firstEscape
+            while (escPos >= 0) {
+              if (escPos > from) {
+                val chunkLen = escPos - from
+                val cbArr = elemBuilder.arr
+                val pos = elemBuilder.getLength
+                System.arraycopy(chars, from, cbArr, pos, chunkLen)
+                elemBuilder.length = pos + chunkLen
+              }
+              escapeCharInline(chars(escPos))
+              from = escPos + 1
+              escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
+            }
+            if (from < len) {
+              val tailLen = len - from
+              val cbArr = elemBuilder.arr
+              val pos = elemBuilder.getLength
+              System.arraycopy(chars, from, cbArr, pos, tailLen)
+              elemBuilder.length = pos + tailLen
+            }
+            elemBuilder.appendUnsafe('"')
+          }
         }
       case _ =>
         upickle.core.RenderUtils.escapeChar(
@@ -283,6 +317,27 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     }
     flushCharBuilder()
     out
+  }
+
+  /** Inline JSON escape for a single char. */
+  private def escapeCharInline(c: Char): Unit = {
+    elemBuilder.ensureLength(6)
+    (c: @scala.annotation.switch) match {
+      case '"'  => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('"')
+      case '\\' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('\\')
+      case '\b' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('b')
+      case '\f' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('f')
+      case '\n' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('n')
+      case '\r' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('r')
+      case '\t' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('t')
+      case _    =>
+        elemBuilder.appendUnsafe('\\')
+        elemBuilder.appendUnsafe('u')
+        elemBuilder.appendUnsafe('0')
+        elemBuilder.appendUnsafe('0')
+        elemBuilder.appendUnsafe(sjsonnet.BaseByteRenderer.HEX_CHARS((c >> 4) & 0xf))
+        elemBuilder.appendUnsafe(sjsonnet.BaseByteRenderer.HEX_CHARS(c & 0xf))
+    }
   }
 
   final def renderIndent(): Unit = {
