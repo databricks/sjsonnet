@@ -574,13 +574,18 @@ object Format {
     }
     val labels = parsed.labels
     val specBits = parsed.specBits
-    // Pre-size StringBuilder based on static chars + estimated dynamic content
-    val output = new java.lang.StringBuilder(parsed.staticChars + specBits.length * 8)
-    appendLeading(output, parsed)
+    val numSpecs = specBits.length
+    if (numSpecs == 0) {
+      if (valuesArr != null && valuesArr.length > 0) {
+        Error.fail("Too many values to format: %d, expected %d".format(valuesArr.length, 0))
+      }
+      return parsed.leading
+    }
+
+    val formattedValues = new Array[String](numSpecs)
     var i = 0
     var idx = 0
-    // Use while-loop instead of for/zipWithIndex to avoid iterator allocation
-    while (idx < specBits.length) {
+    while (idx < numSpecs) {
       val rawFormatted = FormatSpec.fromBits(specBits(idx))
       var formatted = rawFormatted
       val cooked0 = formatted.conversion match {
@@ -731,8 +736,7 @@ object Format {
           i += 1
           formattedValue
       }
-      output.append(cooked0)
-      appendLiteral(output, parsed, idx)
+      formattedValues(idx) = cooked0
       idx += 1
     }
 
@@ -741,7 +745,58 @@ object Format {
         "Too many values to format: %d, expected %d".format(valuesArr.length, i)
       )
     }
-    output.toString()
+
+    var totalLen = parsed.staticChars
+    idx = 0
+    while (idx < numSpecs) {
+      totalLen += formattedValues(idx).length
+      idx += 1
+    }
+
+    val chars = new Array[Char](totalLen)
+    var cPos = 0
+    val source = parsed.source
+    if (source != null) {
+      val leadLen = parsed.leadingEnd - parsed.leadingStart
+      if (leadLen > 0) {
+        source.getChars(parsed.leadingStart, parsed.leadingEnd, chars, cPos)
+        cPos += leadLen
+      }
+    } else {
+      val leading = parsed.leading
+      val leadLen = leading.length
+      if (leadLen > 0) {
+        leading.getChars(0, leadLen, chars, cPos)
+        cPos += leadLen
+      }
+    }
+    idx = 0
+    while (idx < numSpecs) {
+      val fv = formattedValues(idx)
+      val fvLen = fv.length
+      if (fvLen > 0) {
+        fv.getChars(0, fvLen, chars, cPos)
+        cPos += fvLen
+      }
+      if (source != null) {
+        val litStart = parsed.literalStarts(idx)
+        val litEnd = parsed.literalEnds(idx)
+        val litLen = litEnd - litStart
+        if (litLen > 0) {
+          source.getChars(litStart, litEnd, chars, cPos)
+          cPos += litLen
+        }
+      } else {
+        val lit = parsed.literals(idx)
+        val litLen = lit.length
+        if (litLen > 0) {
+          lit.getChars(0, litLen, chars, cPos)
+          cPos += litLen
+        }
+      }
+      idx += 1
+    }
+    new String(chars)
   }
 
   /**
