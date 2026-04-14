@@ -316,15 +316,22 @@ object Format {
       case x: Val.Obj => x
       case x          => Val.Arr(pos, Array[Eval](x))
     }
-    // Pre-size StringBuilder based on static chars + estimated dynamic content
-    val output = new StringBuilder(parsed.staticChars + parsed.specs.length * 8)
-    output.append(parsed.leading)
+    val numSpecs = parsed.specs.length
+    if (numSpecs == 0) {
+      if (values.isInstanceOf[Val.Arr] && values.cast[Val.Arr].length > 0) {
+        Error.fail(
+          "Too many values to format: %d, expected %d".format(values.cast[Val.Arr].length, 0)
+        )
+      }
+      return parsed.leading
+    }
+
+    // Pass 1: compute all formatted values into an array
+    val formattedValues = new Array[String](numSpecs)
     var i = 0
     var idx = 0
-    // Use while-loop instead of for/zipWithIndex to avoid iterator allocation
-    while (idx < parsed.specs.length) {
+    while (idx < numSpecs) {
       val rawFormatted = parsed.specs(idx)
-      val literal = parsed.literals(idx)
       var formatted = rawFormatted
       val cooked0 = formatted.conversion match {
         case '%' => widenRaw(formatted, "%")
@@ -475,8 +482,7 @@ object Format {
           i += 1
           formattedValue
       }
-      output.append(cooked0)
-      output.append(literal)
+      formattedValues(idx) = cooked0
       idx += 1
     }
 
@@ -485,7 +491,42 @@ object Format {
         "Too many values to format: %d, expected %d".format(values.cast[Val.Arr].length, i)
       )
     }
-    output.toString()
+
+    // Pass 2: compute exact output length
+    var totalLen = parsed.leading.length
+    idx = 0
+    while (idx < numSpecs) {
+      totalLen += formattedValues(idx).length + parsed.literals(idx).length
+      idx += 1
+    }
+
+    // Pass 3: assemble into pre-sized char[] — eliminates StringBuilder overhead
+    // (capacity checks, resizing, final toString copy)
+    val chars = new Array[Char](totalLen)
+    var cPos = 0
+    val leading = parsed.leading
+    val leadLen = leading.length
+    if (leadLen > 0) {
+      leading.getChars(0, leadLen, chars, cPos)
+      cPos += leadLen
+    }
+    idx = 0
+    while (idx < numSpecs) {
+      val fv = formattedValues(idx)
+      val fvLen = fv.length
+      if (fvLen > 0) {
+        fv.getChars(0, fvLen, chars, cPos)
+        cPos += fvLen
+      }
+      val lit = parsed.literals(idx)
+      val litLen = lit.length
+      if (litLen > 0) {
+        lit.getChars(0, litLen, chars, cPos)
+        cPos += litLen
+      }
+      idx += 1
+    }
+    new String(chars)
   }
 
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
