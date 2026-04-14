@@ -278,6 +278,48 @@ object sjsonnet extends VersionFileModule {
     def nativeLTO = LTO.Full
     def nativeMultithreading = None
 
+    // Build aklomp/base64 as a static library for SIMD-accelerated base64.
+    // We pin to a specific upstream commit (no git submodule) and clone on
+    // demand into the task's sandboxed dest. The pinned SHA below is the single
+    // source of truth — bump it here when upgrading the upstream library.
+    def aklompBase64Repo = "https://github.com/aklomp/base64.git"
+    def aklompBase64Commit = "9e8ed65048ff0f703fad3deb03bf66ac7f78a4d7" // v0.5.2-26-g9e8ed65
+    def aklompBase64Source = Task {
+      val cloneDir = Task.ctx().dest / "base64-src"
+      os.remove.all(cloneDir)
+      os.proc("git", "clone", "--filter=blob:none", aklompBase64Repo, cloneDir.toString).call()
+      os.proc("git", "checkout", "--detach", aklompBase64Commit).call(cwd = cloneDir)
+      PathRef(cloneDir)
+    }
+    def buildBase64Lib = Task {
+      val srcDir = aklompBase64Source().path
+      val buildDir = Task.ctx().dest / "base64-build"
+      os.makeDir.all(buildDir)
+      os.proc(
+        "cmake",
+        srcDir.toString,
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+        "-DBASE64_WITH_OpenMP=OFF",
+        "-DBASE64_BUILD_TESTS=OFF",
+        "-DBASE64_BUILD_CLI=OFF",
+        "-DCMAKE_BUILD_TYPE=Release"
+      ).call(cwd = buildDir)
+      os.proc("cmake", "--build", buildDir.toString, "--config", "Release").call()
+      PathRef(buildDir)
+    }
+
+    def nativeLinkingOptions = Task {
+      super.nativeLinkingOptions() ++ Seq(
+        (buildBase64Lib().path / "libbase64.a").toString
+      )
+    }
+
+    def nativeCompileOptions = Task {
+      super.nativeCompileOptions() ++ Seq(
+        s"-I${aklompBase64Source().path / "include"}"
+      )
+    }
+
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
       def nativeMultithreading = None
@@ -286,6 +328,16 @@ object sjsonnet extends VersionFileModule {
         "SCALANATIVE_THREAD_STACK_SIZE" -> stackSize
       )
       def nativeLTO = LTO.None
+      def nativeLinkingOptions = Task {
+        super.nativeLinkingOptions() ++ Seq(
+          (SjsonnetNativeModule.this.buildBase64Lib().path / "libbase64.a").toString
+        )
+      }
+      def nativeCompileOptions = Task {
+        super.nativeCompileOptions() ++ Seq(
+          s"-I${SjsonnetNativeModule.this.aklompBase64Source().path / "include"}"
+        )
+      }
     }
   }
 

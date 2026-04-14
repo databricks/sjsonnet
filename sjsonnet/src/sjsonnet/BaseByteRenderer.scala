@@ -243,6 +243,27 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
+   * Fast path for strings known to be ASCII-safe (no escaping needed, all chars 0x20-0x7E). Skips
+   * SWAR scanning and UTF-8 encoding — writes bytes directly from chars.
+   */
+  private[sjsonnet] def renderAsciiSafeString(str: String): Unit = {
+    val len = str.length
+    elemBuilder.ensureLength(len + 2)
+    val arr = elemBuilder.arr
+    var pos = elemBuilder.length
+    arr(pos) = '"'.toByte
+    pos += 1
+    var i = 0
+    while (i < len) {
+      arr(pos) = str.charAt(i).toByte
+      pos += 1
+      i += 1
+    }
+    arr(pos) = '"'.toByte
+    elemBuilder.length = pos + 1
+  }
+
+  /**
    * Zero-allocation fast path for short ASCII strings (the vast majority of JSON keys/values). Uses
    * getChars to bulk-copy into a reusable char buffer, then scans the buffer directly (avoiding
    * per-char String.charAt virtual dispatch). If any char needs escaping or is non-ASCII, falls
