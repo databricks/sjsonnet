@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @see <a href="https://richardstartin.github.io/posts/finding-bytes">Finding Bytes in Arrays</a>
  */
-final class CharSWAR {
+public final class CharSWAR {
     private CharSWAR() {}
 
     // VarHandle for reading longs from byte[] — replaces sun.misc.Unsafe.
@@ -62,7 +62,7 @@ final class CharSWAR {
      * Check if any char in {@code str} needs JSON string escaping.
      * Scan-first API: call on the String before copying to the output buffer.
      */
-    static boolean hasEscapeChar(String str) {
+    public static boolean hasEscapeChar(String str) {
         int len = str.length();
         if (len < SWAR_THRESHOLD) {
             return hasEscapeCharScalar(str, len);
@@ -80,14 +80,14 @@ final class CharSWAR {
      * UTF-8 multi-byte sequences never produce bytes matching '"', '\\', or &lt; 0x20,
      * so this is safe for scanning UTF-8 encoded data.
      */
-    static boolean hasEscapeChar(byte[] arr, int from, int to) {
+    public static boolean hasEscapeChar(byte[] arr, int from, int to) {
         return hasEscapeCharSWAR(arr, from, to);
     }
 
     /**
      * Check if any char in {@code arr[from..to)} needs JSON string escaping.
      */
-    static boolean hasEscapeChar(char[] arr, int from, int to) {
+    public static boolean hasEscapeChar(char[] arr, int from, int to) {
         for (int i = from; i < to; i++) {
             char c = arr[i];
             if (c < 32 || c == '"' || c == '\\') return true;
@@ -155,7 +155,7 @@ final class CharSWAR {
      * <p>Uses SWAR to scan 8 bytes per iteration, then pinpoints the exact byte
      * within a matched 8-byte word via scalar fallback.
      */
-    static int findFirstEscapeChar(byte[] arr, int from, int to) {
+    public static int findFirstEscapeChar(byte[] arr, int from, int to) {
         int i = from;
         int limit = to - 7;
         while (i < limit) {
@@ -176,6 +176,36 @@ final class CharSWAR {
             i++;
         }
         return -1;
+    }
+
+    /**
+     * Find the index of the first char in {@code arr[from..to)} that needs JSON
+     * string escaping. Returns {@code -1} if no escape char is found.
+     * Scalar scan on char[] — used by char-based chunked rendering.
+     */
+    public static int findFirstEscapeCharChar(char[] arr, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = arr[i];
+            if (c < 32 || c == '"' || c == '\\') return i;
+        }
+        return -1;
+    }
+
+    // =========================================================================
+    // isAllAscii — check if all chars are ASCII (< 0x80)
+    // =========================================================================
+
+    /**
+     * Returns true if all characters in the string are ASCII (&lt; 0x80).
+     * Uses ISO-8859-1 encoding + SWAR for long strings. For ASCII-only strings,
+     * codepoint operations can be replaced with direct char indexing.
+     */
+    public static boolean isAllAscii(String s) {
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            if (s.charAt(i) >= 0x80) return false;
+        }
+        return true;
     }
 
     // =========================================================================
@@ -202,7 +232,7 @@ final class CharSWAR {
      * O(n)), which is correct because equal chars — even surrogates — can be
      * skipped without affecting ordering.
      */
-    static int compareStrings(String s1, String s2) {
+    public static int compareStrings(String s1, String s2) {
         if (s1 == s2) return 0;
         int n1 = s1.length(), n2 = s2.length();
         int minLen = Math.min(n1, n2);

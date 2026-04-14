@@ -10,21 +10,19 @@ object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
-    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v.value, MaterializeJsonRenderer())(ev).toString)
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val = {
+      val renderer = MaterializeJsonRenderer()
+      renderer.materializeDirect(v.value)(ev)
+      Val.Str(pos, renderer.out.toString)
+    }
   }
 
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "value") {
-    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(
-        pos,
-        Materializer
-          .apply0(
-            v.value,
-            MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
-          )(ev)
-          .toString
-      )
+    def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val = {
+      val renderer = MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
+      renderer.materializeDirect(v.value)(ev)
+      Val.Str(pos, renderer.out.toString)
+    }
   }
 
   private object ManifestJsonEx
@@ -42,20 +40,15 @@ object ManifestModule extends AbstractFunctionModule {
         newline: Eval,
         keyValSep: Eval,
         ev: EvalScope,
-        pos: Position): Val =
-      Val.Str(
-        pos,
-        Materializer
-          .apply0(
-            v.value,
-            MaterializeJsonRenderer(
-              indent = i.value.asString.length,
-              newline = newline.value.asString,
-              keyValueSeparator = keyValSep.value.asString
-            )
-          )(ev)
-          .toString
+        pos: Position): Val = {
+      val renderer = MaterializeJsonRenderer(
+        indent = i.value.asString.length,
+        newline = newline.value.asString,
+        keyValueSeparator = keyValSep.value.asString
       )
+      renderer.materializeDirect(v.value)(ev)
+      Val.Str(pos, renderer.out.toString)
+    }
   }
 
   private object ParseJson extends Val.Builtin1("parseJson", "str") {

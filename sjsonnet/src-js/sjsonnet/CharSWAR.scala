@@ -45,6 +45,30 @@ object CharSWAR {
     -1
   }
 
+  /** Scalar scan for char[] returning position of first escape char, or -1 if none. */
+  def findFirstEscapeCharChar(arr: Array[Char], from: Int, to: Int): Int = {
+    var i = from
+    while (i < to) {
+      val c = arr(i)
+      if (c < 32 || c == '"' || c == '\\') return i
+      i += 1
+    }
+    -1
+  }
+
+  /**
+   * Returns true if all characters in the string are ASCII (< 0x80). Scalar fallback for Scala.js.
+   */
+  def isAllAscii(s: String): Boolean = {
+    var i = 0
+    val len = s.length
+    while (i < len) {
+      if (s.charAt(i) >= 0x80) return false
+      i += 1
+    }
+    true
+  }
+
   /**
    * Compare two strings by Unicode codepoint values. Scalar fallback for Scala.js. Uses
    * equal-char-skip fast path with deferred surrogate check.
