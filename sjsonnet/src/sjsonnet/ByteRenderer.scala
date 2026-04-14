@@ -192,9 +192,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     val vt: Int = v.valTag.toInt
     (vt: @scala.annotation.switch) match {
       case 0 => // TAG_STR
-        val s = v.asInstanceOf[Val.Str]
-        if (s._asciiSafe) renderAsciiSafeString(s.str)
-        else renderQuotedString(s.str)
+        renderQuotedString(v.asInstanceOf[Val.Str].str)
       case 1 => // TAG_NUM
         renderDouble(v.asDouble)
       case 2 => // TAG_TRUE
@@ -422,32 +420,18 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     depth += 1
     resetEmpty()
 
-    // Fast path for byte-backed arrays: emit numbers directly without per-element dispatch
-    xs match {
-      case ba: Val.ByteArr =>
-        val bytes = ba.rawBytes
-        var i = 0
-        while (i < len) {
-          markNonEmpty()
-          flushBuffer()
-          renderDouble((bytes(i) & 0xff).toDouble)
-          commaBuffered = true
-          i += 1
-        }
-      case _ =>
-        var i = 0
-        while (i < len) {
-          val childVal = xs.value(i)
+    var i = 0
+    while (i < len) {
+      val childVal = xs.value(i)
 
-          markNonEmpty()
-          flushBuffer()
+      markNonEmpty()
+      flushBuffer()
 
-          // Render element directly — no flush overhead
-          materializeChild(childVal, matDepth, ctx)
+      // Render element directly — no flush overhead
+      materializeChild(childVal, matDepth, ctx)
 
-          commaBuffered = true
-          i += 1
-        }
+      commaBuffered = true
+      i += 1
     }
 
     // Inline of visitEnd — close bracket

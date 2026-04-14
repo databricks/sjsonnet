@@ -232,25 +232,6 @@ abstract class Materializer {
       depth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
     storePos(xs.pos)
-    // Fast path for byte-backed arrays: skip per-element value() + type dispatch
-    xs match {
-      case ba: Val.ByteArr =>
-        val bytes = ba.rawBytes
-        val len = bytes.length
-        val av = visitor.visitArray(len, -1)
-        var i = 0
-        while (i < len) {
-          av.visitValue(
-            av.subVisitor
-              .asInstanceOf[Visitor[T, T]]
-              .visitFloat64((bytes(i) & 0xff).toDouble, -1),
-            -1
-          )
-          i += 1
-        }
-        return av.visitEnd(-1)
-      case _ =>
-    }
     val len = xs.length
     val av = visitor.visitArray(len, -1)
     var i = 0
@@ -376,22 +357,6 @@ abstract class Materializer {
         case frame: Materializer.MaterializeArrFrame[T @unchecked] =>
           val arr = frame.arr
           val av = frame.arrVisitor
-          // Fast path for byte-backed arrays: emit all elements directly
-          if (frame.index == 0) {
-            arr match {
-              case ba: Val.ByteArr =>
-                val bytes = ba.rawBytes
-                val len = bytes.length
-                var i = 0
-                while (i < len) {
-                  val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
-                  av.visitValue(sub.visitFloat64((bytes(i) & 0xff).toDouble, -1), -1)
-                  i += 1
-                }
-                frame.index = len // mark as done
-              case _ =>
-            }
-          }
           if (frame.index < arr.length) {
             val childVal = arr.value(frame.index)
             frame.index += 1
