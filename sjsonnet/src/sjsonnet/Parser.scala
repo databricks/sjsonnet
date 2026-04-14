@@ -729,7 +729,12 @@ class Parser(
     // cost more than the potential memory savings for strings that are unlikely
     // to repeat (e.g., 600KB text block literals)
     val unique = if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
-    Val.Str(pos, unique)
+    val result = Val.Str(pos, unique)
+    // Mark string literals that are printable ASCII with no JSON escape chars.
+    // This allows the renderer to skip SWAR escape scanning and UTF-8 encoding.
+    if (!CharSWAR.hasEscapeChar(unique) && CharSWAR.isAllAscii(unique))
+      result._asciiSafe = true
+    result
   }
 
   // Any `expr` that isn't naively left-recursive

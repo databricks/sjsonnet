@@ -417,11 +417,15 @@ object Val {
       if (ls != null && ls.isEmpty) return right
       if (rs != null && rs.isEmpty) return left
       // Small string eagerness: both flat and combined length <= 128
-      if (ls != null && rs != null && ls.length + rs.length <= 128)
-        return new Str(pos, ls + rs)
+      if (ls != null && rs != null && ls.length + rs.length <= 128) {
+        val result = new Str(pos, ls + rs)
+        if (left._asciiSafe && right._asciiSafe) result._asciiSafe = true
+        return result
+      }
       // Rope node: O(1)
       val node = new Str(pos, null)
       node._children = Array(left, right)
+      if (left._asciiSafe && right._asciiSafe) node._asciiSafe = true
       node
     }
   }
