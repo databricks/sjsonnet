@@ -648,6 +648,26 @@ object Val {
     }
 
     /**
+     * If this array is known to be sorted in ascending numeric order (e.g. a forward range), return
+     * it directly. If it is a reversed range, return the equivalent forward range in O(1). Returns
+     * null if sort order is unknown and a full sort is needed.
+     */
+    private[sjsonnet] def asSortedIfKnown(newPos: Position): Arr = {
+      if (isRange) {
+        if (_reversed) reversed(newPos) else this
+      } else null
+    }
+
+    /**
+     * O(1) equality check for range arrays. Two ranges are equal if they describe the same integer
+     * sequence (same start, length, and direction). Returns false if either array is not a range.
+     */
+    private[sjsonnet] def rangeEquals(other: Arr): Boolean = {
+      isRange && other.isRange && _length == other._length &&
+      _reversed == other._reversed && _rangeFrom == other._rangeFrom
+    }
+
+    /**
      * Create a reversed view of this array without copying. The returned Arr shares the same
      * backing array but flips the reversed flag, so element access is O(1) with zero allocation.
      * Double-reversal cancels out.

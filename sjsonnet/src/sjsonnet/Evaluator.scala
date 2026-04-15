@@ -2058,8 +2058,10 @@ class Evaluator(
     case x: Val.Arr =>
       y match {
         case y: Val.Arr =>
+          if (x eq y) return true
           val xlen = x.length
           if (xlen != y.length) return false
+          if (x.rangeEquals(y)) return true
           // Skip shared ConcatView prefix — elements are reference-identical
           var i = x.sharedConcatPrefixLength(y)
           while (i < xlen) {

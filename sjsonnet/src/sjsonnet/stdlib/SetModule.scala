@@ -82,7 +82,21 @@ object SetModule extends AbstractFunctionModule {
     Val.Arr(pos, out.result())
   }
 
-  private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
+  private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val): Val = {
+    // Fast path: range arrays are already sorted ascending by construction.
+    // Avoids O(n) materialization + O(n log n) sort for already-sorted data.
+    if (keyF == null || keyF.isInstanceOf[Val.False]) {
+      arr match {
+        case a: Val.Arr =>
+          val sorted = a.asSortedIfKnown(pos)
+          if (sorted != null) return sorted
+        case _ =>
+      }
+    }
+    sortArrSlow(pos, ev, arr, keyF)
+  }
+
+  private def sortArrSlow(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
     val vs = toArrOrString(arr, pos, ev)
     if (vs.length <= 1) {
       arr
