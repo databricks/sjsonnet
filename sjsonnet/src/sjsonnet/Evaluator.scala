@@ -460,6 +460,24 @@ class Evaluator(
       isNonCapturingBody(ie.cond) && isNonCapturingBody(ie.`then`) && isNonCapturingBody(
         ie.`else`
       )
+    case ExprTags.ApplyBuiltin0 => true
+    case ExprTags.ApplyBuiltin1 =>
+      isNonCapturingBody(e.asInstanceOf[ApplyBuiltin1].a1)
+    case ExprTags.ApplyBuiltin2 =>
+      val ab = e.asInstanceOf[ApplyBuiltin2]
+      isNonCapturingBody(ab.a1) && isNonCapturingBody(ab.a2)
+    case ExprTags.ApplyBuiltin3 =>
+      val ab = e.asInstanceOf[ApplyBuiltin3]
+      isNonCapturingBody(ab.a1) && isNonCapturingBody(ab.a2) && isNonCapturingBody(ab.a3)
+    case ExprTags.ApplyBuiltin4 =>
+      val ab = e.asInstanceOf[ApplyBuiltin4]
+      isNonCapturingBody(ab.a1) && isNonCapturingBody(ab.a2) &&
+      isNonCapturingBody(ab.a3) && isNonCapturingBody(ab.a4)
+    case ExprTags.Select =>
+      isNonCapturingBody(e.asInstanceOf[Select].value)
+    case ExprTags.Lookup =>
+      val l = e.asInstanceOf[Lookup]
+      isNonCapturingBody(l.value) && isNonCapturingBody(l.index)
     case _ =>
       e.isInstanceOf[Val.Literal]
   }
