@@ -391,7 +391,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       matDepth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     val keys =
-      if (ctx.sort) obj.visibleKeyNames.sorted(Util.CodepointStringOrdering)
+      if (ctx.sort) obj.sortedVisibleKeyNames
       else obj.visibleKeyNames
 
     openObjBrace()

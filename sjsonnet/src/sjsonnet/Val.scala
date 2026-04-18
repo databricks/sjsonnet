@@ -884,7 +884,18 @@ object Val {
      * Cached sorted field order for inline objects. Shared across all objects from the same
      * MemberList to avoid per-object sort + allocation.
      */
-    @volatile private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
+    private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
+
+    private[sjsonnet] var _sortedVisibleKeyNames: Array[String] = null
+
+    private[sjsonnet] def sortedVisibleKeyNames: Array[String] = {
+      var r = _sortedVisibleKeyNames
+      if (r == null) {
+        r = visibleKeyNames.sorted(Util.CodepointStringOrdering)
+        _sortedVisibleKeyNames = r
+      }
+      r
+    }
 
     /**
      * When true, field caching can be skipped during materialization because no field body
@@ -1402,7 +1413,7 @@ object Val {
 
     def foreachElement(sort: Boolean, pos: Position)(f: (String, Val) => Unit)(implicit
         ev: EvalScope): Unit = {
-      val keys = if (sort) visibleKeyNames.sorted(Util.CodepointStringOrdering) else visibleKeyNames
+      val keys = if (sort) sortedVisibleKeyNames else visibleKeyNames
       for (k <- keys) {
         val v = value(k, pos)
         f(k, v)
