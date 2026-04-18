@@ -10,8 +10,20 @@ import scala.collection.immutable.IntMap
  *
  * Each [[Expr]] represents an expression in the Jsonnet program, and contains an integer offset
  * into the file that is later used to provide error messages.
+ *
+ * '''Why `abstract class` and not `trait`?''' This is an intentional JVM performance decision.
+ * Method calls on a class reference use `invokevirtual` (O(1) vtable lookup), while calls on a
+ * trait/interface reference use `invokeinterface` (itable search, ~2-5ns slower per call). The
+ * evaluator calls `e.tag` and pattern-matches on `Expr`-typed references millions of times per
+ * evaluation; `instanceof` checks against a class hierarchy are also cheaper than against an
+ * interface (single depth-indexed comparison vs. interface table scan). Since `Expr` does not
+ * require multiple inheritance — no class mixes in `Expr` alongside an unrelated base class — an
+ * `abstract class` is strictly faster with no loss of flexibility.
+ *
+ * @see
+ *   [[Val]] which extends `Expr` to unify the type hierarchy for dispatch efficiency.
  */
-trait Expr {
+abstract class Expr {
 
   /**
    * Source position of this expression, used for error messages.
