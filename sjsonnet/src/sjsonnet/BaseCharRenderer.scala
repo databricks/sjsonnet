@@ -259,53 +259,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     flushBuffer()
     s match {
       case str: String if !escapeUnicode =>
-        val len = str.length
-        if (len == 0) {
-          elemBuilder.ensureLength(2)
-          elemBuilder.appendUnsafe('"')
-          elemBuilder.appendUnsafe('"')
-        } else {
-          // Convert to char[] for SWAR scanning + bulk copy
-          val chars = new Array[Char](len)
-          str.getChars(0, len, chars, 0)
-          val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
-          if (firstEscape < 0) {
-            // Clean string — direct bulk copy
-            elemBuilder.ensureLength(len + 2)
-            elemBuilder.appendUnsafe('"')
-            val cbArr = elemBuilder.arr
-            val pos = elemBuilder.getLength
-            System.arraycopy(chars, 0, cbArr, pos, len)
-            elemBuilder.length = pos + len
-            elemBuilder.appendUnsafe('"')
-          } else {
-            // Dirty string — chunked rendering: bulk copy clean segments, escape inline
-            elemBuilder.ensureLength(len + len + 2)
-            elemBuilder.appendUnsafe('"')
-            var from = 0
-            var escPos = firstEscape
-            while (escPos >= 0) {
-              if (escPos > from) {
-                val chunkLen = escPos - from
-                val cbArr = elemBuilder.arr
-                val pos = elemBuilder.getLength
-                System.arraycopy(chars, from, cbArr, pos, chunkLen)
-                elemBuilder.length = pos + chunkLen
-              }
-              escapeCharInline(chars(escPos))
-              from = escPos + 1
-              escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
-            }
-            if (from < len) {
-              val tailLen = len - from
-              val cbArr = elemBuilder.arr
-              val pos = elemBuilder.getLength
-              System.arraycopy(chars, from, cbArr, pos, tailLen)
-              elemBuilder.length = pos + tailLen
-            }
-            elemBuilder.appendUnsafe('"')
-          }
-        }
+        renderQuotedStringSWAR(str)
       case _ =>
         upickle.core.RenderUtils.escapeChar(
           null,
@@ -319,8 +273,55 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     out
   }
 
+  protected def renderQuotedStringSWAR(str: String): Unit = {
+    val len = str.length
+    if (len == 0) {
+      elemBuilder.ensureLength(2)
+      elemBuilder.appendUnsafe('"')
+      elemBuilder.appendUnsafe('"')
+      return
+    }
+    val chars = new Array[Char](len)
+    str.getChars(0, len, chars, 0)
+    val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
+    if (firstEscape < 0) {
+      elemBuilder.ensureLength(len + 2)
+      elemBuilder.appendUnsafe('"')
+      val cbArr = elemBuilder.arr
+      val pos = elemBuilder.getLength
+      System.arraycopy(chars, 0, cbArr, pos, len)
+      elemBuilder.length = pos + len
+      elemBuilder.appendUnsafe('"')
+    } else {
+      elemBuilder.ensureLength(len + len + 2)
+      elemBuilder.appendUnsafe('"')
+      var from = 0
+      var escPos = firstEscape
+      while (escPos >= 0) {
+        if (escPos > from) {
+          val chunkLen = escPos - from
+          val cbArr = elemBuilder.arr
+          val pos = elemBuilder.getLength
+          System.arraycopy(chars, from, cbArr, pos, chunkLen)
+          elemBuilder.length = pos + chunkLen
+        }
+        escapeCharInline(chars(escPos))
+        from = escPos + 1
+        escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
+      }
+      if (from < len) {
+        val tailLen = len - from
+        val cbArr = elemBuilder.arr
+        val pos = elemBuilder.getLength
+        System.arraycopy(chars, from, cbArr, pos, tailLen)
+        elemBuilder.length = pos + tailLen
+      }
+      elemBuilder.appendUnsafe('"')
+    }
+  }
+
   /** Inline JSON escape for a single char. */
-  private def escapeCharInline(c: Char): Unit = {
+  protected def escapeCharInline(c: Char): Unit = {
     elemBuilder.ensureLength(6)
     (c: @scala.annotation.switch) match {
       case '"'  => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('"')

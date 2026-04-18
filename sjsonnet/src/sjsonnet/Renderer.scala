@@ -17,9 +17,7 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
     flushBuffer()
     val i = d.toLong
     if (d == i) {
-      // Fast path: render integers directly to char buffer, avoiding String allocation.
-      // Most numbers in Jsonnet output are integers (array indices, counters, etc.).
-      RenderUtils.appendLong(elemBuilder, i)
+      writeLongDirect(i)
     } else if (d % 1 == 0) {
       appendString(
         BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
@@ -352,81 +350,7 @@ final case class MaterializeJsonRenderer(
   }
 
   /** Render a quoted string into elemBuilder (char-based) with chunked SWAR scanning. */
-  private def renderQuotedString(str: String): Unit = {
-    val len = str.length
-    if (len == 0) {
-      elemBuilder.ensureLength(2)
-      elemBuilder.appendUnsafe('"')
-      elemBuilder.appendUnsafe('"')
-      return
-    }
-    // Convert to char[] for SWAR scanning + bulk copy
-    val chars = new Array[Char](len)
-    str.getChars(0, len, chars, 0)
-    val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
-    if (firstEscape < 0) {
-      // Clean string — direct bulk copy
-      elemBuilder.ensureLength(len + 2)
-      elemBuilder.appendUnsafe('"')
-      val cbArr = elemBuilder.arr
-      val pos = elemBuilder.getLength
-      System.arraycopy(chars, 0, cbArr, pos, len)
-      elemBuilder.length = pos + len
-      elemBuilder.appendUnsafe('"')
-    } else {
-      // Dirty string — chunked rendering: bulk copy clean segments, escape inline
-      elemBuilder.ensureLength(len + len + 2)
-      elemBuilder.appendUnsafe('"')
-      var from = 0
-      var escPos = firstEscape
-      while (escPos >= 0) {
-        // Copy clean chunk before escape char
-        if (escPos > from) {
-          val chunkLen = escPos - from
-          val cbArr = elemBuilder.arr
-          val pos = elemBuilder.getLength
-          System.arraycopy(chars, from, cbArr, pos, chunkLen)
-          elemBuilder.length = pos + chunkLen
-        }
-        // Escape the char inline
-        escapeCharInline(chars(escPos))
-        from = escPos + 1
-        // Find next escape char using SWAR
-        escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
-      }
-      // Copy remaining clean tail
-      if (from < len) {
-        val tailLen = len - from
-        val cbArr = elemBuilder.arr
-        val pos = elemBuilder.getLength
-        System.arraycopy(chars, from, cbArr, pos, tailLen)
-        elemBuilder.length = pos + tailLen
-      }
-      elemBuilder.appendUnsafe('"')
-    }
-  }
-
-  /** Inline JSON escape for a single char. */
-  private def escapeCharInline(c: Char): Unit = {
-    elemBuilder.ensureLength(6)
-    (c: @scala.annotation.switch) match {
-      case '"'  => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('"')
-      case '\\' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('\\')
-      case '\b' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('b')
-      case '\f' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('f')
-      case '\n' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('n')
-      case '\r' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('r')
-      case '\t' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('t')
-      case _    =>
-        // Control chars → \\u00XX
-        elemBuilder.appendUnsafe('\\')
-        elemBuilder.appendUnsafe('u')
-        elemBuilder.appendUnsafe('0')
-        elemBuilder.appendUnsafe('0')
-        elemBuilder.appendUnsafe(BaseByteRenderer.HEX_CHARS((c >> 4) & 0xf))
-        elemBuilder.appendUnsafe(BaseByteRenderer.HEX_CHARS(c & 0xf))
-    }
-  }
+  private def renderQuotedString(str: String): Unit = renderQuotedStringSWAR(str)
 
   /** Render a double value directly into the char buffer. */
   @inline private def renderDouble(d: Double): Unit = {
@@ -652,55 +576,5 @@ object RenderUtils {
     else if (d % 1 == 0) {
       BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
     } else d.toString
-  }
-
-  /** Maximum number of digits in a Long value (Long.MinValue = -9223372036854775808, 20 chars). */
-  private final val MaxLongChars = 20
-
-  /**
-   * Render a long value directly into a [[upickle.core.CharBuilder]], avoiding the intermediate
-   * `String` allocation that `Long.toString` would create. For small absolute values (the common
-   * case in Jsonnet output — array lengths, indices, counters), this saves one allocation per
-   * number. The algorithm writes digits in reverse then reverses in-place.
-   */
-  def appendLong(cb: upickle.core.CharBuilder, value: Long): Unit = {
-    if (value == 0) {
-      cb.append('0')
-      return
-    }
-
-    cb.ensureLength(MaxLongChars)
-    val arr = cb.arr
-    var pos = cb.getLength
-
-    val negative = value < 0
-    // Use negative accumulator to handle Long.MinValue correctly
-    var n = if (negative) value else -value
-    val startPos = pos
-
-    while (n != 0) {
-      val digit = -(n % 10).toInt
-      arr(pos) = ('0' + digit).toChar
-      pos += 1
-      n /= 10
-    }
-
-    if (negative) {
-      arr(pos) = '-'
-      pos += 1
-    }
-
-    // Reverse the digits in-place
-    var lo = startPos
-    var hi = pos - 1
-    while (lo < hi) {
-      val tmp = arr(lo)
-      arr(lo) = arr(hi)
-      arr(hi) = tmp
-      lo += 1
-      hi -= 1
-    }
-
-    cb.length = pos
   }
 }
