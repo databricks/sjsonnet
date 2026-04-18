@@ -141,7 +141,7 @@ object StringModule extends AbstractFunctionModule {
 
       if (length <= 0) {
         Val.Str(pos, "")
-      } else if (CharSWAR.isAllAscii(str)) {
+      } else if (srcAsciiSafe || CharSWAR.isAllAscii(str)) {
         val strLen = str.length
         val safeOffset = math.min(offset, strLen)
         val safeLength = math.min(length, strLen - safeOffset)
@@ -440,7 +440,9 @@ object StringModule extends AbstractFunctionModule {
           val sepLen = s.length
           var totalLen = 0L
           var count = 0
-          var allAsciiSafe = CharSWAR.isAllAscii(s) && !CharSWAR.hasEscapeChar(s)
+          val sepVal = sep.value.asInstanceOf[Val.Str]
+          var allAsciiSafe =
+            sepVal._asciiSafe || (CharSWAR.isAllAscii(s) && !CharSWAR.hasEscapeChar(s))
           var i = 0
           while (i < arr.length) {
             arr.value(i) match {
@@ -455,6 +457,8 @@ object StringModule extends AbstractFunctionModule {
             i += 1
           }
           if (count == 0) return Val.Str(pos, "")
+          if (totalLen > Int.MaxValue)
+            Error.fail("Join result too large: " + totalLen + " characters")
           // Pass 2: build result in pre-sized char array.
           val chars = new Array[Char](totalLen.toInt)
           var cPos = 0
