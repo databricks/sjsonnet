@@ -189,6 +189,7 @@ object SjsonnetMainBase {
           throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
           maxParserRecursionDepth = config.maxParserRecursionDepth,
           brokenAssertionLogic = config.brokenAssertionLogic.value,
+          useNewEvaluator = config.newEvaluator.value,
           maxStack = config.maxStack
         ),
         parseCache,

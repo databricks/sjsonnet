@@ -174,6 +174,11 @@ final case class Config(
     )
     profile: Option[String] = None,
     @arg(
+      name = "new-evaluator",
+      doc = "Use the new tag-based evaluator (hybrid instanceof + tableswitch dispatch)"
+    )
+    newEvaluator: Flag = Flag(),
+    @arg(
       doc = "The jsonnet file you wish to evaluate",
       positional = true
     )

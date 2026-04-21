@@ -2066,13 +2066,24 @@ class NewEvaluator(
     fc: FormatCache = FormatCache.SharedDefault)
     extends Evaluator(r, e, w, s, wa, ds, fc) {
 
+  // Hot path: top 7 types cover 96.1% of all visitExpr calls across benchmarks.
+  // ~120 bytes bytecode — within JIT FreqInlineSize=325, unlike the old evaluator's ~700 bytes.
+  // Order matches old evaluator's first 4 types (ValidId, BinaryOp, Select, Val) for C1 parity.
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
+    if (e.isInstanceOf[ValidId]) visitValidId(e.asInstanceOf[ValidId])
+    else if (e.isInstanceOf[BinaryOp]) visitBinaryOp(e.asInstanceOf[BinaryOp])
+    else if (e.isInstanceOf[Select]) visitSelect(e.asInstanceOf[Select])
+    else if (e.isInstanceOf[Val]) e.asInstanceOf[Val]
+    else if (e.isInstanceOf[Apply1]) visitApply1(e.asInstanceOf[Apply1])
+    else if (e.isInstanceOf[ObjExtend]) visitObjExtend(e.asInstanceOf[ObjExtend])
+    else if (e.isInstanceOf[IfElse]) visitIfElse(e.asInstanceOf[IfElse])
+    else visitExprCold(e)
+  } catch {
+    Error.withStackFrame(e)
+  }
+
+  private def visitExprCold(e: Expr)(implicit scope: ValScope): Val =
     (e.tag: @switch) match {
-      case ExprTags.ValidId       => visitValidId(e.asInstanceOf[ValidId])
-      case ExprTags.BinaryOp      => visitBinaryOp(e.asInstanceOf[BinaryOp])
-      case ExprTags.Select        => visitSelect(e.asInstanceOf[Select])
-      case ExprTags.`Val.Func`    => e.asInstanceOf[Val.Func]
-      case ExprTags.`Val.Literal` => e.asInstanceOf[Val.Literal]
       case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
       case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
       case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
@@ -2081,14 +2092,12 @@ class NewEvaluator(
       case ExprTags.And           => visitAnd(e.asInstanceOf[And])
       case ExprTags.Or            => visitOr(e.asInstanceOf[Or])
       case ExprTags.UnaryOp       => visitUnaryOp(e.asInstanceOf[UnaryOp])
-      case ExprTags.Apply1        => visitApply1(e.asInstanceOf[Apply1])
       case ExprTags.Lookup        => visitLookup(e.asInstanceOf[Lookup])
       case ExprTags.Function      =>
         val f = e.asInstanceOf[Function]
         visitMethod(f.body, f.params, f.pos)
       case ExprTags.LocalExpr            => visitLocalExpr(e.asInstanceOf[LocalExpr])
       case ExprTags.Apply                => visitApply(e.asInstanceOf[Apply])
-      case ExprTags.IfElse               => visitIfElse(e.asInstanceOf[IfElse])
       case ExprTags.Apply3               => visitApply3(e.asInstanceOf[Apply3])
       case ExprTags.`ObjBody.MemberList` =>
         val oml = e.asInstanceOf[ObjBody.MemberList]
@@ -2101,7 +2110,6 @@ class NewEvaluator(
       case ExprTags.SelectSuper       => visitSelectSuper(e.asInstanceOf[SelectSuper])
       case ExprTags.LookupSuper       => visitLookupSuper(e.asInstanceOf[LookupSuper])
       case ExprTags.InSuper           => visitInSuper(e.asInstanceOf[InSuper])
-      case ExprTags.ObjExtend         => visitObjExtend(e.asInstanceOf[ObjExtend])
       case ExprTags.`ObjBody.ObjComp` => visitObjComp(e.asInstanceOf[ObjBody.ObjComp], null)
       case ExprTags.Slice             => visitSlice(e.asInstanceOf[Slice])
       case ExprTags.Import            => visitImport(e.asInstanceOf[Import])
@@ -2111,9 +2119,6 @@ class NewEvaluator(
       case ExprTags.Error             => visitError(e.asInstanceOf[Expr.Error])
       case _                          => visitInvalid(e)
     }
-  } catch {
-    Error.withStackFrame(e)
-  }
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
   override def visitInvalid(e: Expr): Nothing = (e.tag: @switch) match {
     case ExprTags.Id =>
