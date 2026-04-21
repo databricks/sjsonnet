@@ -736,19 +736,33 @@ object ArrayModule extends AbstractFunctionModule {
       )
     },
     builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
+      val a = arr.asLazyArray
+      var sum = 0.0
+      var i = 0
+      while (i < a.length) {
+        a(i).value match {
+          case n: Val.Num => sum += n.asDouble
+          case x          => Error.fail("std.sum expected number, got " + x.prettyName)
+        }
+        i += 1
       }
-      arr.asLazyArray.map(_.value.asDouble).sum
+      sum
     },
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
-      if (!arr.forall(_.isInstanceOf[Val.Num])) {
-        Error.fail("Argument must be an array of numbers")
-      }
-      if (arr.length == 0) {
+      val a = arr.asLazyArray
+      if (a.length == 0) {
         Error.fail("Cannot calculate average of an empty array")
       }
-      arr.asLazyArray.map(_.value.asDouble).sum / arr.length
+      var sum = 0.0
+      var i = 0
+      while (i < a.length) {
+        a(i).value match {
+          case n: Val.Num => sum += n.asDouble
+          case x          => Error.fail("std.avg expected number, got " + x.prettyName)
+        }
+        i += 1
+      }
+      sum / a.length
     }
   )
 }
