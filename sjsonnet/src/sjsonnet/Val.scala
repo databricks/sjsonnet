@@ -652,20 +652,21 @@ object Val {
      * it directly. If it is a reversed range, return the equivalent forward range in O(1). Returns
      * null if sort order is unknown and a full sort is needed.
      */
-    private[sjsonnet] def asSortedIfKnown(newPos: Position): Arr = {
-      if (isRange) {
-        if (_reversed) reversed(newPos) else this
-      } else null
+    private[sjsonnet] def asSortedIfKnown(newPos: Position): Arr = this match {
+      case _: RangeArr => if (_reversed) reversed(newPos) else this
+      case _           => null
     }
 
     /**
      * O(1) equality check for range arrays. Two ranges are equal if they describe the same integer
      * sequence (same start, length, and direction). Returns false if either array is not a range.
      */
-    private[sjsonnet] def rangeEquals(other: Arr): Boolean = {
-      isRange && other.isRange && _length == other._length &&
-      _reversed == other._reversed && _rangeFrom == other._rangeFrom
-    }
+    private[sjsonnet] def rangeEquals(other: Arr): Boolean =
+      (this, other) match {
+        case (r1: RangeArr, r2: RangeArr) =>
+          r1._length == r2._length && r1._reversed == r2._reversed && r1.rangeFrom == r2.rangeFrom
+        case _ => false
+      }
 
     /**
      * Create a reversed view of this array without copying. The returned Arr shares the same
@@ -691,7 +692,7 @@ object Val {
    *
    * Inspired by jrsonnet's RangeArray (arr/spec.rs).
    */
-  final class RangeArr(pos0: Position, private val rangeFrom: Int, size: Int)
+  final class RangeArr(pos0: Position, private[sjsonnet] val rangeFrom: Int, size: Int)
       extends Arr(pos0, null) {
     _length = size
 
