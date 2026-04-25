@@ -136,9 +136,7 @@ class Interpreter(
       resolver: CachedResolver,
       extVars: String => Option[Expr],
       wd: Path,
-      settings: Settings): Evaluator = if (settings.useNewEvaluator)
-    new NewEvaluator(resolver, extVars, wd, settings, logger, debugStats, formatCache)
-  else
+      settings: Settings): Evaluator =
     new Evaluator(resolver, extVars, wd, settings, logger, debugStats, formatCache)
 
   /**

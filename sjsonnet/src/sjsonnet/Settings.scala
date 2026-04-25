@@ -8,7 +8,6 @@ final case class Settings(
     preserveOrder: Boolean = false,
     strict: Boolean = false,
     throwErrorForInvalidSets: Boolean = false,
-    useNewEvaluator: Boolean = false,
     maxParserRecursionDepth: Int = 1000,
     brokenAssertionLogic: Boolean = false,
     maxMaterializeDepth: Int = 1000,

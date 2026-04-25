@@ -66,63 +66,76 @@ class Evaluator(
   val cachedImports: collection.mutable.HashMap[Path, Val] =
     collection.mutable.HashMap.empty[Path, Val]
 
+  // Hot path: top 7 types cover 96.1% of all visitExpr calls across benchmarks.
+  // Order matches the empirically-measured frequency for C1 monomorphic dispatch parity.
+  // The instanceof chain stays under JIT FreqInlineSize=325 so this whole method inlines
+  // at hot call sites; uncommon types fall through to visitExprCold's tableswitch.
   override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
     val p = profiler
     val saved: (AnyRef, Int) = if (p != null) p.enter(e) else null
     try {
-      e match {
-        case e: ValidId            => visitValidId(e)
-        case e: BinaryOp           => visitBinaryOp(e)
-        case e: Select             => visitSelect(e)
-        case e: Val                => e
-        case e: ApplyBuiltin0      => visitApplyBuiltin0(e)
-        case e: ApplyBuiltin1      => visitApplyBuiltin1(e)
-        case e: ApplyBuiltin2      => visitApplyBuiltin2(e)
-        case e: ApplyBuiltin3      => visitApplyBuiltin3(e)
-        case e: ApplyBuiltin4      => visitApplyBuiltin4(e)
-        case e: And                => visitAnd(e)
-        case e: Or                 => visitOr(e)
-        case e: UnaryOp            => visitUnaryOp(e)
-        case e: Apply1             => visitApply1(e)
-        case e: Lookup             => visitLookup(e)
-        case e: Function           => visitMethod(e.body, e.params, e.pos)
-        case e: LocalExpr          => visitLocalExpr(e)
-        case e: Apply              => visitApply(e)
-        case e: IfElse             => visitIfElse(e)
-        case e: Apply3             => visitApply3(e)
-        case e: ObjBody.MemberList => visitMemberList(e.pos, e, null)
-        case e: Apply2             => visitApply2(e)
-        case e: AssertExpr         => visitAssert(e)
-        case e: ApplyBuiltin       => visitApplyBuiltin(e)
-        case e: Comp               => visitComp(e)
-        case e: Arr                => visitArr(e)
-        case e: SelectSuper        => visitSelectSuper(e)
-        case e: LookupSuper        => visitLookupSuper(e)
-        case e: InSuper            => visitInSuper(e)
-        case e: ObjExtend          => visitObjExtend(e)
-        case e: ObjBody.ObjComp    => visitObjComp(e, null)
-        case e: Slice              => visitSlice(e)
-        case e: Import             => visitImport(e)
-        case e: Apply0             => visitApply0(e)
-        case e: ImportStr          => visitImportStr(e)
-        case e: ImportBin          => visitImportBin(e)
-        case e: Expr.Error         => visitError(e)
-        case e                     => visitInvalid(e)
-      }
+      if (e.isInstanceOf[ValidId]) visitValidId(e.asInstanceOf[ValidId])
+      else if (e.isInstanceOf[BinaryOp]) visitBinaryOp(e.asInstanceOf[BinaryOp])
+      else if (e.isInstanceOf[Select]) visitSelect(e.asInstanceOf[Select])
+      else if (e.isInstanceOf[Val]) e.asInstanceOf[Val]
+      else if (e.isInstanceOf[Apply1]) visitApply1(e.asInstanceOf[Apply1])
+      else if (e.isInstanceOf[ObjExtend]) visitObjExtend(e.asInstanceOf[ObjExtend])
+      else if (e.isInstanceOf[IfElse]) visitIfElse(e.asInstanceOf[IfElse])
+      else visitExprCold(e)
     } finally if (p != null) p.exit(saved)
   } catch {
     Error.withStackFrame(e)
   }
+
+  private def visitExprCold(e: Expr)(implicit scope: ValScope): Val =
+    (e.tag: @switch) match {
+      case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
+      case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
+      case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
+      case ExprTags.ApplyBuiltin3 => visitApplyBuiltin3(e.asInstanceOf[ApplyBuiltin3])
+      case ExprTags.ApplyBuiltin4 => visitApplyBuiltin4(e.asInstanceOf[ApplyBuiltin4])
+      case ExprTags.And           => visitAnd(e.asInstanceOf[And])
+      case ExprTags.Or            => visitOr(e.asInstanceOf[Or])
+      case ExprTags.UnaryOp       => visitUnaryOp(e.asInstanceOf[UnaryOp])
+      case ExprTags.Lookup        => visitLookup(e.asInstanceOf[Lookup])
+      case ExprTags.Function      =>
+        val f = e.asInstanceOf[Function]
+        visitMethod(f.body, f.params, f.pos)
+      case ExprTags.LocalExpr            => visitLocalExpr(e.asInstanceOf[LocalExpr])
+      case ExprTags.Apply                => visitApply(e.asInstanceOf[Apply])
+      case ExprTags.Apply3               => visitApply3(e.asInstanceOf[Apply3])
+      case ExprTags.`ObjBody.MemberList` =>
+        val oml = e.asInstanceOf[ObjBody.MemberList]
+        visitMemberList(oml.pos, oml, null)
+      case ExprTags.Apply2            => visitApply2(e.asInstanceOf[Apply2])
+      case ExprTags.AssertExpr        => visitAssert(e.asInstanceOf[AssertExpr])
+      case ExprTags.ApplyBuiltin      => visitApplyBuiltin(e.asInstanceOf[ApplyBuiltin])
+      case ExprTags.Comp              => visitComp(e.asInstanceOf[Comp])
+      case ExprTags.Arr               => visitArr(e.asInstanceOf[Arr])
+      case ExprTags.SelectSuper       => visitSelectSuper(e.asInstanceOf[SelectSuper])
+      case ExprTags.LookupSuper       => visitLookupSuper(e.asInstanceOf[LookupSuper])
+      case ExprTags.InSuper           => visitInSuper(e.asInstanceOf[InSuper])
+      case ExprTags.`ObjBody.ObjComp` => visitObjComp(e.asInstanceOf[ObjBody.ObjComp], null)
+      case ExprTags.Slice             => visitSlice(e.asInstanceOf[Slice])
+      case ExprTags.Import            => visitImport(e.asInstanceOf[Import])
+      case ExprTags.Apply0            => visitApply0(e.asInstanceOf[Apply0])
+      case ExprTags.ImportStr         => visitImportStr(e.asInstanceOf[ImportStr])
+      case ExprTags.ImportBin         => visitImportBin(e.asInstanceOf[ImportBin])
+      case ExprTags.Error             => visitError(e.asInstanceOf[Expr.Error])
+      case _                          => visitInvalid(e)
+    }
+
   // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
-  def visitInvalid(e: Expr): Nothing = e match {
-    case Id(pos, name) =>
-      Error.fail("Unknown variable: " + name, pos)
-    case Self(pos) =>
-      Error.fail("Can't use self outside of an object", pos)
-    case $(pos) =>
-      Error.fail("Can't use $ outside of an object", pos)
-    case Super(pos) =>
-      Error.fail("Can't use super outside of an object", pos)
+  def visitInvalid(e: Expr): Nothing = (e.tag: @switch) match {
+    case ExprTags.Id =>
+      val id = e.asInstanceOf[Id]
+      Error.fail("Unknown variable: " + id.name, id.pos)
+    case ExprTags.Self =>
+      Error.fail("Can't use self outside of an object", e.pos)
+    case ExprTags.`$` =>
+      Error.fail("Can't use $ outside of an object", e.pos)
+    case ExprTags.Super =>
+      Error.fail("Can't use super outside of an object", e.pos)
     case _ =>
       Error.fail("Should not have happened.", e.pos)
   }
@@ -2054,83 +2067,6 @@ class Evaluator(
       }
     case _ => false
   })
-}
-
-class NewEvaluator(
-    private val r: CachedResolver,
-    private val e: String => Option[Expr],
-    private val w: Path,
-    private val s: Settings,
-    private val wa: Evaluator.Logger = null,
-    ds: DebugStats = null,
-    fc: FormatCache = FormatCache.SharedDefault)
-    extends Evaluator(r, e, w, s, wa, ds, fc) {
-
-  // Hot path: top 7 types cover 96.1% of all visitExpr calls across benchmarks.
-  // ~120 bytes bytecode — within JIT FreqInlineSize=325, unlike the old evaluator's ~700 bytes.
-  // Order matches old evaluator's first 4 types (ValidId, BinaryOp, Select, Val) for C1 parity.
-  override def visitExpr(e: Expr)(implicit scope: ValScope): Val = try {
-    if (e.isInstanceOf[ValidId]) visitValidId(e.asInstanceOf[ValidId])
-    else if (e.isInstanceOf[BinaryOp]) visitBinaryOp(e.asInstanceOf[BinaryOp])
-    else if (e.isInstanceOf[Select]) visitSelect(e.asInstanceOf[Select])
-    else if (e.isInstanceOf[Val]) e.asInstanceOf[Val]
-    else if (e.isInstanceOf[Apply1]) visitApply1(e.asInstanceOf[Apply1])
-    else if (e.isInstanceOf[ObjExtend]) visitObjExtend(e.asInstanceOf[ObjExtend])
-    else if (e.isInstanceOf[IfElse]) visitIfElse(e.asInstanceOf[IfElse])
-    else visitExprCold(e)
-  } catch {
-    Error.withStackFrame(e)
-  }
-
-  private def visitExprCold(e: Expr)(implicit scope: ValScope): Val =
-    (e.tag: @switch) match {
-      case ExprTags.ApplyBuiltin0 => visitApplyBuiltin0(e.asInstanceOf[ApplyBuiltin0])
-      case ExprTags.ApplyBuiltin1 => visitApplyBuiltin1(e.asInstanceOf[ApplyBuiltin1])
-      case ExprTags.ApplyBuiltin2 => visitApplyBuiltin2(e.asInstanceOf[ApplyBuiltin2])
-      case ExprTags.ApplyBuiltin3 => visitApplyBuiltin3(e.asInstanceOf[ApplyBuiltin3])
-      case ExprTags.ApplyBuiltin4 => visitApplyBuiltin4(e.asInstanceOf[ApplyBuiltin4])
-      case ExprTags.And           => visitAnd(e.asInstanceOf[And])
-      case ExprTags.Or            => visitOr(e.asInstanceOf[Or])
-      case ExprTags.UnaryOp       => visitUnaryOp(e.asInstanceOf[UnaryOp])
-      case ExprTags.Lookup        => visitLookup(e.asInstanceOf[Lookup])
-      case ExprTags.Function      =>
-        val f = e.asInstanceOf[Function]
-        visitMethod(f.body, f.params, f.pos)
-      case ExprTags.LocalExpr            => visitLocalExpr(e.asInstanceOf[LocalExpr])
-      case ExprTags.Apply                => visitApply(e.asInstanceOf[Apply])
-      case ExprTags.Apply3               => visitApply3(e.asInstanceOf[Apply3])
-      case ExprTags.`ObjBody.MemberList` =>
-        val oml = e.asInstanceOf[ObjBody.MemberList]
-        visitMemberList(oml.pos, oml, null)
-      case ExprTags.Apply2            => visitApply2(e.asInstanceOf[Apply2])
-      case ExprTags.AssertExpr        => visitAssert(e.asInstanceOf[AssertExpr])
-      case ExprTags.ApplyBuiltin      => visitApplyBuiltin(e.asInstanceOf[ApplyBuiltin])
-      case ExprTags.Comp              => visitComp(e.asInstanceOf[Comp])
-      case ExprTags.Arr               => visitArr(e.asInstanceOf[Arr])
-      case ExprTags.SelectSuper       => visitSelectSuper(e.asInstanceOf[SelectSuper])
-      case ExprTags.LookupSuper       => visitLookupSuper(e.asInstanceOf[LookupSuper])
-      case ExprTags.InSuper           => visitInSuper(e.asInstanceOf[InSuper])
-      case ExprTags.`ObjBody.ObjComp` => visitObjComp(e.asInstanceOf[ObjBody.ObjComp], null)
-      case ExprTags.Slice             => visitSlice(e.asInstanceOf[Slice])
-      case ExprTags.Import            => visitImport(e.asInstanceOf[Import])
-      case ExprTags.Apply0            => visitApply0(e.asInstanceOf[Apply0])
-      case ExprTags.ImportStr         => visitImportStr(e.asInstanceOf[ImportStr])
-      case ExprTags.ImportBin         => visitImportBin(e.asInstanceOf[ImportBin])
-      case ExprTags.Error             => visitError(e.asInstanceOf[Expr.Error])
-      case _                          => visitInvalid(e)
-    }
-  // This is only needed for --no-static-errors, otherwise these expression types do not make it past the optimizer
-  override def visitInvalid(e: Expr): Nothing = (e.tag: @switch) match {
-    case ExprTags.Id =>
-      val id = e.asInstanceOf[Id]
-      Error.fail("Unknown variable: " + id.name, id.pos)
-    case ExprTags.Self =>
-      Error.fail("Can't use self outside of an object", e.pos)
-    case ExprTags.`$` =>
-      Error.fail("Can't use $ outside of an object", e.pos)
-    case ExprTags.Super =>
-      Error.fail("Can't use super outside of an object", e.pos)
-  }
 }
 
 object Evaluator {

@@ -241,19 +241,13 @@ object AggressiveStaticOptimizationTests extends TestSuite {
       }
     }
 
-    // -------------------------------------------------------------------------
-    // Interaction with useNewEvaluator
-    // -------------------------------------------------------------------------
-    test("withNewEvaluator") {
-      def evalBoth(s: String): ujson.Value =
-        eval(s, useNewEvaluator = true)
-
-      evalBoth("1 + 2") ==> ujson.Num(3)
-      evalBoth("if true then 'yes' else 'no'") ==> ujson.Str("yes")
-      evalBoth("true && false") ==> ujson.False
-      evalBoth("false || true") ==> ujson.True
-      evalBoth("~0") ==> ujson.Num(-1)
-      evalBoth("12 & 10") ==> ujson.Num(8)
+    test("smokeAfterOptimizer") {
+      eval("1 + 2") ==> ujson.Num(3)
+      eval("if true then 'yes' else 'no'") ==> ujson.Str("yes")
+      eval("true && false") ==> ujson.False
+      eval("false || true") ==> ujson.True
+      eval("~0") ==> ujson.Num(-1)
+      eval("12 & 10") ==> ujson.Num(8)
     }
   }
 }
