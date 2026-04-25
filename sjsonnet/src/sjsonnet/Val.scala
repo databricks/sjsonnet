@@ -480,8 +480,18 @@ object Val {
     private var _isRange: Boolean = false
     private var _rangeFrom: Int = 0
 
+    // Lazy repeat state. When _isRepeated is true, this array represents
+    // the repetition of a base array N times. Inspired by jrsonnet's RepeatedArray (arr/spec.rs).
+    // _repeatedBase holds the underlying array; _repeatedCount is the repetition count.
+    // Total length = base.length * _repeatedCount, computed lazily in _length.
+    // Element access uses modulo: value(i) = base.value(i % base.length)
+    private var _isRepeated: Boolean = false
+    private var _repeatedBase: Arr = _
+    private var _repeatedCount: Int = 0
+
     @inline private def isConcatView: Boolean = _concatLeft ne null
     @inline private def isRange: Boolean = _isRange
+    @inline private def isRepeated: Boolean = _isRepeated
 
     override def asArr: Arr = this
 
@@ -491,6 +501,7 @@ object Val {
       else {
         val computed =
           if (isConcatView) _concatLeft.length + _concatRight.length
+          else if (isRepeated) _repeatedBase.length * _repeatedCount
           else arr.length // isRange always has _length pre-set, never reaches here
         _length = computed
         computed
@@ -501,6 +512,8 @@ object Val {
       if (isConcatView) {
         val leftLen = _concatLeft.length
         if (i < leftLen) _concatLeft.value(i) else _concatRight.value(i - leftLen)
+      } else if (isRepeated) {
+        _repeatedBase.value(i % _repeatedBase.length)
       } else if (isRange) {
         // For reversed ranges, _rangeFrom is the last element and we count down
         if (_reversed) Val.cachedNum(pos, _rangeFrom - i)
@@ -521,6 +534,8 @@ object Val {
       if (isConcatView) {
         val leftLen = _concatLeft.length
         if (i < leftLen) _concatLeft.eval(i) else _concatRight.eval(i - leftLen)
+      } else if (isRepeated) {
+        _repeatedBase.eval(i % _repeatedBase.length)
       } else if (isRange) {
         if (_reversed) Val.cachedNum(pos, _rangeFrom - i)
         else Val.cachedNum(pos, _rangeFrom + i)
@@ -550,6 +565,7 @@ object Val {
     def asLazyArray: Array[Eval] = {
       if (isConcatView) materialize()
       if (isRange) materializeRange()
+      if (isRepeated) materializeRepeated()
       if (_reversed) {
         val len = arr.length
         val result = new Array[Eval](len)
@@ -612,6 +628,27 @@ object Val {
       arr = result
       _isRange = false // clear range flag
       _reversed = false // range is now materialized in correct order
+    }
+
+    /**
+     * Materialize a lazy repeated view into a flat array. After this call, `arr` holds the full
+     * repeated contents and the repeated state is cleared. The base array is materialized first via
+     * asLazyArray to handle nested views (e.g., repeated range).
+     */
+    private def materializeRepeated(): Unit = {
+      val baseArr = _repeatedBase.asLazyArray
+      val baseLen = baseArr.length
+      val count = _repeatedCount
+      val totalLen = baseLen * count
+      val result = new Array[Eval](totalLen)
+      var i = 0
+      while (i < count) {
+        System.arraycopy(baseArr, 0, result, i * baseLen, baseLen)
+        i += 1
+      }
+      arr = result
+      _isRepeated = false // clear repeated flag
+      _repeatedBase = null // allow GC of base reference
     }
 
     /**
@@ -728,6 +765,25 @@ object Val {
       a._rangeFrom = from
       a._length = size
       a
+    }
+
+    /**
+     * Create a lazy repeated array representing the base array repeated `count` times. Elements are
+     * computed on demand via modulo indexing (index % base.length). This turns
+     * `std.repeat([1, 2, 3], 1000)` from O(n) to O(1) creation and O(1) memory.
+     *
+     * Inspired by jrsonnet's RepeatedArray (arr/spec.rs) which uses the same deferred approach.
+     */
+    def repeated(pos: Position, base: Arr, count: Int): Arr = {
+      if (count <= 0) Arr(pos, EMPTY_EVAL_ARRAY)
+      else {
+        val a = new Arr(pos, null)
+        a._isRepeated = true
+        a._repeatedBase = base
+        a._repeatedCount = count
+        a._length = base.length * count
+        a
+      }
     }
 
     /**

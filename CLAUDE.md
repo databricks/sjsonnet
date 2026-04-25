@@ -103,6 +103,14 @@ JMH benchmarks live in `bench/`. Benchmark suites in `bench/resources/`: `bug_su
 
 For ad-hoc benchmarking, `hyperfine` is available on the PATH.
 
+## Upstream Sync Tracking
+
+When syncing from upstream, process commits in upstream commit order and track every evaluated commit in `sync/upstream-sync-points.tsv`. Keep the TSV machine-friendly: one row per sync point, no comments, factual values only, and leave fields empty rather than guessing.
+
+Use `status=pending|migrated|skipped`. Skipped commits must record one of `reason_code=already-implemented|existing-pr|not-applicable|license-only|superseded` plus short notes. Migrated commits must link the upstream commit/PR, local branch, draft PR, local commit, and report reference so review can trace `tracking row <-> local branch <-> draft PR <-> local commit <-> upstream source`.
+
+Use one dedicated branch per migrated commit (`sync/<order>-<sha7>` or an equivalent PR-specific branch). Commit messages and PR descriptions must include `Upstream-Commit`, `Upstream-PR`, and `Sync-Point` references.
+
 ## Architecture
 
 ### Pipeline

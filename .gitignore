@@ -16,3 +16,11 @@ out/
 *.rej
 *.bak
 .bazelbsp/
+/jsonnet/
+/go-jsonnet/
+/jrsonnet/
+/rsjsonnet/
+/scala-js/
+/scala-native/
+/fastparse/
+/.claude/

@@ -655,6 +655,7 @@ object ArrayModule extends AbstractFunctionModule {
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
       val res: Val = what match {
         case Val.Str(_, str) =>
+          // For strings, concatenation still uses StringBuilder (O(n) memory minimum for result)
           val builder = new StringBuilder(str.length * count)
           var i = 0
           while (i < count) {
@@ -663,15 +664,8 @@ object ArrayModule extends AbstractFunctionModule {
           }
           Val.Str(pos, builder.toString())
         case a: Val.Arr =>
-          val lazyArray = a.asLazyArray
-          val elemLen = lazyArray.length
-          val result = new Array[Eval](elemLen * count)
-          var i = 0
-          while (i < count) {
-            System.arraycopy(lazyArray, 0, result, i * elemLen, elemLen)
-            i += 1
-          }
-          Val.Arr(pos, result)
+          // For arrays, use lazy repeated view — O(1) memory, O(1) creation time
+          Val.Arr.repeated(pos, a, count)
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
