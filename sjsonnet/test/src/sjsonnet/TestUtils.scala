@@ -7,7 +7,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      useNewEvaluator: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default)
@@ -22,7 +21,6 @@ object TestUtils {
         preserveOrder = preserveOrder,
         strict = strict,
         throwErrorForInvalidSets = true,
-        useNewEvaluator = useNewEvaluator,
         brokenAssertionLogic = brokenAssertionLogic,
         maxStack = maxStack
       ),
@@ -34,7 +32,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      useNewEvaluator: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): Value = {
@@ -42,7 +39,6 @@ object TestUtils {
       s,
       preserveOrder,
       strict,
-      useNewEvaluator,
       brokenAssertionLogic,
       maxStack,
       std
@@ -56,7 +52,6 @@ object TestUtils {
       s: String,
       preserveOrder: Boolean = false,
       strict: Boolean = false,
-      useNewEvaluator: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
       std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): String = {
@@ -64,7 +59,6 @@ object TestUtils {
       s,
       preserveOrder,
       strict,
-      useNewEvaluator,
       brokenAssertionLogic,
       maxStack,
       std
