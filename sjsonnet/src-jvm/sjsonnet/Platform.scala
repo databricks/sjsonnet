@@ -21,6 +21,9 @@ import scala.jdk.CollectionConverters.*
 object Platform {
   private val hexFormat = HexFormat.of()
 
+  // JVM JMH runs faster with Int masks and the ASCII single-char shortcut.
+  final val useIntStripCharsBitset: Boolean = true
+
   def repeatString(s: String, count: Int): String =
     if (count <= 0) "" else s.repeat(count)
 

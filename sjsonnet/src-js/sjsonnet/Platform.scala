@@ -7,6 +7,9 @@ import java.util.regex.Pattern
 import scala.collection.mutable
 
 object Platform {
+  // Scala.js Long is expensive, so keep the ASCII stripChars fast path on Int masks.
+  final val useIntStripCharsBitset: Boolean = true
+
   private def repeatCapacity(s: String, count: Int): Int =
     if (count > 0 && s.length <= Int.MaxValue / count) s.length * count else 0
 

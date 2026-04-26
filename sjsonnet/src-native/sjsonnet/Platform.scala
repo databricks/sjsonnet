@@ -13,6 +13,9 @@ import org.virtuslab.yaml.*
 object Platform {
   private val hexChars = "0123456789abcdef".toCharArray
 
+  // Scala Native local hyperfine is steadier on the Long-mask path than the single-char shortcut.
+  final val useIntStripCharsBitset: Boolean = false
+
   private def repeatCapacity(s: String, count: Int): Int =
     if (count > 0 && s.length <= Int.MaxValue / count) s.length * count else 0
 
