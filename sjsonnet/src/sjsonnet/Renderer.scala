@@ -297,7 +297,9 @@ final case class MaterializeJsonRenderer(
     val vt: Int = v.valTag.toInt
     (vt: @scala.annotation.switch) match {
       case 0 => // TAG_STR
-        renderQuotedString(v.asInstanceOf[Val.Str].str)
+        val s = v.asInstanceOf[Val.Str]
+        if (s._asciiSafe) renderAsciiSafeString(s.str)
+        else renderQuotedString(s.str)
       case 1 => // TAG_NUM
         renderDouble(v.asDouble)
       case 2 => // TAG_TRUE
