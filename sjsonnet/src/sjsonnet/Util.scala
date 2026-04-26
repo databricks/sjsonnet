@@ -173,6 +173,39 @@ object Util {
     override def compare(x: String, y: String): Int = compareStringsByCodepoint(x, y)
   }
 
+  def compareJsonnetStd(v1: Val, v2: Val, ev: EvalScope): Int = {
+    val t1 = v1.prettyName
+    val t2 = v2.prettyName
+    if (t1 != t2) {
+      Error.fail("Comparison requires matching types. Got " + t1 + " and " + t2)
+    }
+
+    v1 match {
+      case arr1: Val.Arr =>
+        compareJsonnetStdArrays(arr1, v2.asInstanceOf[Val.Arr], ev)
+      case _: Val.Func | _: Val.Obj | _: Val.Bool =>
+        Error.fail("Values of type " + t1 + " are not comparable.")
+      case _: Val.Null =>
+        Error.fail("binary operator < does not operate on null.")
+      case _ =>
+        val cmp = ev.compare(v1, v2)
+        if (cmp < 0) -1 else if (cmp > 0) 1 else 0
+    }
+  }
+
+  def compareJsonnetStdArrays(arr1: Val.Arr, arr2: Val.Arr, ev: EvalScope): Int = {
+    val len1 = arr1.length
+    val len2 = arr2.length
+    val minLen = math.min(len1, len2)
+    var i = 0
+    while (i < minLen) {
+      val cmp = compareJsonnetStd(arr1.eval(i).value, arr2.eval(i).value, ev)
+      if (cmp != 0) return cmp
+      i += 1
+    }
+    java.lang.Integer.compare(len1, len2)
+  }
+
   val isWindows: Boolean = {
     // This is normally non-null on the JVM, but it might be null in ScalaJS hence the Option:
     Option(System.getProperty("os.name")).exists(_.toLowerCase.startsWith("windows"))
