@@ -60,6 +60,31 @@ object StdObjectRemoveKeyTests extends TestSuite {
       ujson.Obj("a" -> 10, "b" -> 1)
     }
 
+    test("removed key does not participate in outer nested field inheritance") {
+      eval("""std.objectRemoveKey({a: 100}, "a") + {a+: 2}""") ==>
+      ujson.Obj("a" -> 2)
+
+      eval("""std.objectRemoveKey({a: 1} + {b: super.a}, "a") + {a+: 2}""") ==>
+      ujson.Obj("b" -> 1, "a" -> 2)
+    }
+
+    test("removed hidden key does not leak visibility") {
+      eval("""{a+: 3} + std.objectRemoveKey({a+:: 100}, "a") + {a+: 2}""") ==>
+      ujson.Obj("a" -> 5)
+
+      eval("""{a: 1} + std.objectRemoveKey({a+:: 100}, "a")""") ==>
+      ujson.Obj("a" -> 1)
+    }
+
+    test("hidden LHS key preserved when RHS removes the same key") {
+      eval("""{a:: 1} + std.objectRemoveKey({a: 2}, "a")""") ==> ujson.Obj()
+      eval("""std.objectHasAll({a:: 1} + std.objectRemoveKey({a: 2}, "a"), "a")""") ==>
+      ujson.True
+      eval("""std.objectHas({a:: 1} + std.objectRemoveKey({a: 2}, "a"), "a")""") ==>
+      ujson.False
+      eval("""({a:: 1} + std.objectRemoveKey({a: 2}, "a")).a""") ==> ujson.Num(1)
+    }
+
     test("containsKey and objectFields reflect re-added key") {
       eval(
         """local r = std.objectRemoveKey({a: 1}, "a") + {a: 2};
