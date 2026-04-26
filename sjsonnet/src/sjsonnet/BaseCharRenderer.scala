@@ -320,6 +320,23 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     }
   }
 
+  /**
+   * Fast path for strings known to be ASCII-safe (no escaping needed, all chars 0x20-0x7E). Skips
+   * the temporary char[] allocation and escape scan.
+   */
+  protected def renderAsciiSafeString(str: String): Unit = {
+    val len = str.length
+    elemBuilder.ensureLength(len + 2)
+    val cbArr = elemBuilder.arr
+    var pos = elemBuilder.getLength
+    cbArr(pos) = '"'
+    pos += 1
+    str.getChars(0, len, cbArr, pos)
+    pos += len
+    cbArr(pos) = '"'
+    elemBuilder.length = pos + 1
+  }
+
   /** Inline JSON escape for a single char. */
   protected def escapeCharInline(c: Char): Unit = {
     elemBuilder.ensureLength(6)

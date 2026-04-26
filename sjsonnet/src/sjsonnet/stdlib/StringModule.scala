@@ -26,8 +26,10 @@ object StringModule extends AbstractFunctionModule {
       Val.cachedNum(
         pos,
         (x.value match {
-          case Val.Str(_, s) =>
-            if (CharSWAR.isAllAscii(s)) s.length else s.codePointCount(0, s.length)
+          case v: Val.Str =>
+            val s = v.str
+            if (v._asciiSafe || CharSWAR.isAllAscii(s)) s.length
+            else s.codePointCount(0, s.length)
           case a: Val.Arr  => a.length
           case o: Val.Obj  => o.visibleKeyNames.length
           case o: Val.Func => o.params.names.length
