@@ -116,8 +116,8 @@ object ObjectModule extends AbstractFunctionModule {
     def evalRhs(_func: Eval, _obj: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
       val obj = _obj.value.asObj
-      val allKeys = obj.allKeyNames
-      val n = allKeys.length
+      val keys = obj.visibleKeyNames
+      val n = keys.length
       if (n == 1) {
         new Val.Obj(
           pos,
@@ -125,14 +125,14 @@ object ObjectModule extends AbstractFunctionModule {
           false,
           null,
           null,
-          singleFieldKey = allKeys(0),
-          singleFieldMember = new MapWithKeyMember(func, obj, allKeys(0), pos)
+          singleFieldKey = keys(0),
+          singleFieldMember = new MapWithKeyMember(func, obj, keys(0), pos)
         )
       } else if (n <= 8) {
         val members = new Array[Val.Obj.Member](n)
         var i = 0
         while (i < n) {
-          members(i) = new MapWithKeyMember(func, obj, allKeys(i), pos)
+          members(i) = new MapWithKeyMember(func, obj, keys(i), pos)
           i += 1
         }
         new Val.Obj(
@@ -141,14 +141,14 @@ object ObjectModule extends AbstractFunctionModule {
           false,
           null,
           null,
-          inlineFieldKeys = allKeys,
+          inlineFieldKeys = keys,
           inlineFieldMembers = members
         )
       } else {
         val m = Util.preSizedJavaLinkedHashMap[String, Val.Obj.Member](n)
         var i = 0
         while (i < n) {
-          m.put(allKeys(i), new MapWithKeyMember(func, obj, allKeys(i), pos))
+          m.put(keys(i), new MapWithKeyMember(func, obj, keys(i), pos))
           i += 1
         }
         new Val.Obj(pos, m, false, null, null)
