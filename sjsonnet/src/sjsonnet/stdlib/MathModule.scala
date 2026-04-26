@@ -50,7 +50,7 @@ object MathModule extends AbstractFunctionModule {
       math.abs(x)
     },
     builtin("sign", "n") { (_, _, x: Double) =>
-      math.signum(x)
+      if (x > 0) 1 else if (x < 0) -1 else 0
     },
     builtin("sin", "x") { (pos, ev, x: Double) =>
       math.sin(x)

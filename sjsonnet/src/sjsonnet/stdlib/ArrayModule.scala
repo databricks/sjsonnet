@@ -613,10 +613,10 @@ object ArrayModule extends AbstractFunctionModule {
             val codepointStr = Character.toString(codePoint)
             val fres =
               func.apply1(Val.Str(pos, codepointStr), pos.noOffset)(ev, TailstrictModeDisabled)
+            // Official std.flatMap on strings concatenates callback string results only.
             builder.append(
               fres match {
                 case fstr: Val.Str => fstr.str
-                case _: Val.Null   => ""
                 case x             =>
                   Error.fail(
                     "std.flatMap on strings, provided function must return a string, got " + fres
@@ -638,13 +638,12 @@ object ArrayModule extends AbstractFunctionModule {
       (pos, ev, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
         val noOff = pos.noOffset
         val src = arr.asLazyArray
-        // While-loop with ArrayBuilder avoids flatMap + Option boxing
+        // Equivalent to std.map(map_func, std.filter(filter_func, arr)): callback args stay lazy.
         val b = new mutable.ArrayBuilder.ofRef[Eval]
         b.sizeHint(src.length) // Worst case: all elements pass filter
         var i = 0
         while (i < src.length) {
           val elem = src(i)
-          elem.value
           if (filter_func.apply1(elem, noOff)(ev, TailstrictModeDisabled).asBoolean) {
             b += new LazyApply1(map_func, elem, noOff, ev)
           }

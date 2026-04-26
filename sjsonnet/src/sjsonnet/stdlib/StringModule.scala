@@ -361,33 +361,87 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
-    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      try {
-        Val.cachedNum(pos, str.value.asString.toLong.toDouble)
-      } catch {
-        case _: NumberFormatException =>
-          Error.fail("Cannot parse '" + str.value.asString + "' as an integer in base 10")
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val s = str.value.asString
+      if (s.isEmpty || s == "-") {
+        Error.fail("Cannot parse '" + s + "' as an integer in base 10")
       }
+      if (s.charAt(0) == '-') Val.cachedNum(pos, -parseNat(s, 1, 10, "base 10"))
+      else Val.cachedNum(pos, parseNat(s, 0, 10, "base 10"))
+    }
   }
 
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
-    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.cachedNum(pos, java.lang.Long.parseLong(str.value.asString, 8).toDouble)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val s = str.value.asString
+      if (s.isEmpty) Error.fail("Cannot parse '' as an integer in base 8")
+      Val.cachedNum(pos, parseNat(s, 0, 8, "base 8"))
+    }
   }
 
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
-    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.cachedNum(pos, java.lang.Long.parseLong(str.value.asString, 16).toDouble)
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val s = str.value.asString
+      if (s.isEmpty) Error.fail("Cannot parse '' as an integer in base 16")
+      Val.cachedNum(pos, parseNat(s, 0, 16, "base 16"))
+    }
+  }
+
+  private def parseNat(str: String, start: Int, base: Int, baseName: String): Double = {
+    var acc = 0.0
+    var i = start
+    while (i < str.length) {
+      val code = str.codePointAt(i)
+      val digit =
+        if (code >= 'a') code - 'a' + 10
+        else if (code >= 'A') code - 'A' + 10
+        else code - '0'
+      if (digit < 0 || digit >= base) {
+        Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
+      }
+      acc = base * acc + digit
+      i += Character.charCount(code)
+    }
+    acc
+  }
+
+  // Official asciiUpper/asciiLower convert ASCII letters only; non-ASCII codepoints are preserved.
+  private def asciiUpper(str: String): String = {
+    var out: Array[Char] = null
+    var i = 0
+    while (i < str.length) {
+      val c = str.charAt(i)
+      if (c >= 'a' && c <= 'z') {
+        if (out == null) out = str.toCharArray
+        out(i) = (c - ('a' - 'A')).toChar
+      }
+      i += 1
+    }
+    if (out == null) str else new String(out)
+  }
+
+  private def asciiLower(str: String): String = {
+    var out: Array[Char] = null
+    var i = 0
+    while (i < str.length) {
+      val c = str.charAt(i)
+      if (c >= 'A' && c <= 'Z') {
+        if (out == null) out = str.toCharArray
+        out(i) = (c + ('a' - 'A')).toChar
+      }
+      i += 1
+    }
+    if (out == null) str else new String(out)
   }
 
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.value.asString.toUpperCase)
+      Val.Str(pos, asciiUpper(str.value.asString))
   }
 
   private object AsciiLower extends Val.Builtin1("asciiLower", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, str.value.asString.toLowerCase)
+      Val.Str(pos, asciiLower(str.value.asString))
   }
 
   private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "str") {
@@ -500,7 +554,8 @@ object StringModule extends AbstractFunctionModule {
       StripUtils.unspecializedStrip(str, whiteSpaces, true, true)
     },
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
-      str1.equalsIgnoreCase(str2)
+      // Official equalsIgnoreCase is defined through asciiLower, not Unicode case folding.
+      asciiLower(str1) == asciiLower(str2)
     },
     builtin("escapeStringJson", "str_") { (pos, ev, str: Val) =>
       if (str.value.isInstanceOf[Val.Str]) {
