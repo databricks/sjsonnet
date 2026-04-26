@@ -41,6 +41,16 @@ final class StdLibModule(
   )
 }
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-trace std.trace(str, rest)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-extVar std.extVar(x)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-thisFile std.thisFile]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#math std.pi]]
+ */
 object StdLibModule {
   // Combine all functions from all modules
   private val allModuleFunctions: Map[String, Val.Func] = (
@@ -56,6 +66,13 @@ object StdLibModule {
   ).toMap
 
   // Core std library functions that belong directly in StdLibModule
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-trace std.trace(str, rest)]].
+   *
+   * Since: 0.11.0. Group: Debugging.
+   *
+   * Outputs the given string str to stderr and returns rest as the result.
+   */
   private val traceFunction = new Val.Builtin2("trace", "str", "rest") {
     def evalRhs(str: Eval, rest: Eval, ev: EvalScope, pos: Position): Val = {
       ev.trace(
@@ -65,6 +82,14 @@ object StdLibModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-extVar std.extVar(x)]].
+   *
+   * Since: 0.10.0. Group: External Variables.
+   *
+   * If an external variable with the given name was defined, return its value. Otherwise, raise an
+   * error.
+   */
   private val extVarFunction = new Val.Builtin1("extVar", "x") {
     def evalRhs(_x: Eval, ev: EvalScope, pos: Position): Val = {
       val x = _x.value.asString
@@ -75,6 +100,13 @@ object StdLibModule {
   }
 
   private val additionalStdMembers = Seq(
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-thisFile std.thisFile]].
+     *
+     * Since: 0.10.0. Group: Types and Reflection.
+     *
+     * Note that this is a field. It contains the current Jsonnet filename as a string.
+     */
     (
       "thisFile",
       new Val.Obj.Member(false, Visibility.Hidden, cached = false, deprecatedSkipAsserts = true) {
@@ -82,6 +114,13 @@ object StdLibModule {
           Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
       }
     ),
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#math std.pi]].
+     *
+     * Since: 0.21.0. Group: Mathematical Utilities.
+     *
+     * The constant std.pi is available as the mathematical constant pi.
+     */
     (
       "pi",
       new Val.Obj.Member(false, Visibility.Hidden, cached = false, deprecatedSkipAsserts = true) {

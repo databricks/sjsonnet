@@ -6,14 +6,50 @@ import sjsonnet.functions.AbstractFunctionModule
 import java.io.StringWriter
 import scala.collection.mutable
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestJson std.manifestJson(value)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestJsonMinified std.manifestJsonMinified(value)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestJsonEx std.manifestJsonEx(value, indent, newline, key_val_sep)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-parseJson std.parseJson(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-parseYaml std.parseYaml(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestTomlEx std.manifestTomlEx(value, indent)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-lines std.lines(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-deepJoin std.deepJoin(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestYamlDoc std.manifestYamlDoc(value, indent_array_in_object=false, quote_keys=true)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestYamlStream std.manifestYamlStream(value, indent_array_in_object=false, c_document_end=false, quote_keys=true)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestIni std.manifestIni(ini)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestPython std.manifestPython(v)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestPythonVars std.manifestPythonVars(conf)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-manifestXmlJsonml std.manifestXmlJsonml(value)]]
+ */
 object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-manifestJson std.manifestJson(value)]].
+   *
+   * Since: 0.10.0. Group: Manifestation.
+   *
+   * Convert the given object to a JSON form. Under the covers, it calls std.manifestJsonEx with a
+   * 4-space indent.
+   */
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Materializer.apply0(v.value, MaterializeJsonRenderer())(ev).toString)
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-manifestJsonMinified std.manifestJsonMinified(value)]].
+   *
+   * Since: 0.18.0. Group: Manifestation.
+   *
+   * Convert the given object to a minified JSON form. Under the covers, it calls
+   * std.manifestJsonEx.
+   */
   private object ManifestJsonMinified extends Val.Builtin1("manifestJsonMinified", "value") {
     def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(
@@ -27,6 +63,16 @@ object ManifestModule extends AbstractFunctionModule {
       )
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-manifestJsonEx std.manifestJsonEx(value, indent, newline, key_val_sep)]].
+   *
+   * Since: 0.10.0. Group: Manifestation.
+   *
+   * Convert the given object to a JSON form. indent is a string containing one or more whitespaces
+   * that are used for indentation. newline is by default \n and is inserted where a newline would
+   * normally be used to break long lines. key_val_sep is used to separate the key and value of an
+   * object field.
+   */
   private object ManifestJsonEx
       extends Val.Builtin4(
         "manifestJsonEx",
@@ -58,6 +104,13 @@ object ManifestModule extends AbstractFunctionModule {
       )
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-parseJson std.parseJson(str)]].
+   *
+   * Since: 0.13.0. Group: Parsing.
+   *
+   * Parses a JSON string.
+   */
   private object ParseJson extends Val.Builtin1("parseJson", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       try {
@@ -69,6 +122,18 @@ object ManifestModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-parseYaml std.parseYaml(str)]].
+   *
+   * Since: 0.18.0. Group: Parsing.
+   *
+   * Parses a YAML string. This is provided as a "best-effort" mechanism and should not be relied on
+   * to provide a fully standards compliant YAML parser. YAML is a superset of JSON, consequently
+   * "downcasting" or manifestation of YAML into JSON or Jsonnet values will only succeed when using
+   * the subset of YAML that is compatible with JSON. The parser does not support YAML documents
+   * with scalar values at the root. The root node of a YAML document must start with either a YAML
+   * sequence or map to be successfully parsed.
+   */
   private object ParseYaml extends Val.Builtin1("parseYaml", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val input = str.value.asString
@@ -79,6 +144,14 @@ object ManifestModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-manifestTomlEx std.manifestTomlEx(value, indent)]].
+   *
+   * Since: 0.18.0. Group: Manifestation.
+   *
+   * Convert the given object to a TOML form. indent is a string containing one or more whitespaces
+   * that are used for indentation.
+   */
   private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
     private def isTableArray(v: Val) = v.value match {
       case s: Val.Arr => s.length > 0 && s.asLazyArray.forall(_.isInstanceOf[Val.Obj])
@@ -167,6 +240,14 @@ object ManifestModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-lines std.lines(arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Concatenate an array of strings into a text file with newline characters after each string.
+   * This is suitable for constructing bash scripts and the like.
+   */
   private object Lines extends Val.Builtin1("lines", "arr") {
     def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = {
       v1.value.asArr.foreach {
@@ -190,6 +271,15 @@ object ManifestModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-deepJoin std.deepJoin(arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Concatenate an array containing strings and arrays to form a single string. If arr is a string,
+   * it is returned unchanged. If it is an array, it is flattened and the string elements are
+   * concatenated together with no separator.
+   */
   private object DeepJoin extends Val.Builtin1("deepJoin", "arr") {
     def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
       val out = new StringWriter()
@@ -221,6 +311,21 @@ object ManifestModule extends AbstractFunctionModule {
     builtin("manifestToml", "value") { (pos, ev, value: Val) =>
       ManifestTomlEx.evalRhs(value, Val.Str(pos, ""), ev, pos)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestYamlDoc std.manifestYamlDoc(value, indent_array_in_object=false, quote_keys=true)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Convert the given value to a YAML form. Note that std.manifestJson could also be used for
+     * this purpose, because any JSON is also valid YAML. But this function will produce more
+     * canonical-looking YAML.
+     *
+     * The indent_array_in_object param adds additional indentation which some people may find
+     * easier to read.
+     *
+     * The quote_keys parameter controls whether YAML identifiers are always quoted or only when
+     * necessary.
+     */
     builtinWithDefaults(
       "manifestYamlDoc",
       "value" -> null,
@@ -245,6 +350,18 @@ object ManifestModule extends AbstractFunctionModule {
         )(ev)
         .toString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestYamlStream std.manifestYamlStream(value, indent_array_in_object=false, c_document_end=false, quote_keys=true)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Given an array of values, emit a YAML "stream", which is a sequence of documents separated by
+     * --- and ending with ....
+     *
+     * The indent_array_in_object and quote_keys params are the same as in manifestYamlDoc.
+     *
+     * The c_document_end param adds the optional terminating ....
+     */
     builtinWithDefaults(
       "manifestYamlStream",
       "value" -> null,
@@ -291,6 +408,15 @@ object ManifestModule extends AbstractFunctionModule {
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestIni std.manifestIni(ini)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Convert the given structure to a string in INI format. This allows using Jsonnet's object
+     * model to build a configuration to be consumed by an application expecting an INI file. The
+     * data is in the form of a set of sections, each containing a key/value mapping.
+     */
     builtin("manifestIni", "ini") { (pos, ev, v: Val) =>
       val materialized = Materializer(v)(ev)
       def render(x: ujson.Value) = x match {
@@ -320,15 +446,44 @@ object ManifestModule extends AbstractFunctionModule {
           )
       lines.flatMap(Seq(_, "\n")).mkString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestPython std.manifestPython(v)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Convert the given value to a JSON-like form that is compatible with Python. The chief
+     * differences are True / False / None instead of true / false / null.
+     */
     builtin("manifestPython", "v") { (pos, ev, v: Val) =>
       Materializer.apply0(v, new PythonRenderer())(ev).toString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestPythonVars std.manifestPythonVars(conf)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Convert the given object to a JSON-like form that is compatible with Python. The key
+     * difference to std.manifestPython is that the top level is represented as a list of Python
+     * global variables.
+     */
     builtin("manifestPythonVars", "conf") { (pos, ev, v: Val.Obj) =>
       // TODO remove the `toSeq` once this is fixed in scala3
       Materializer(v)(ev).obj.toSeq.map { case (k, v) =>
         k + " = " + v.transform(new PythonRenderer()).toString + "\n"
       }.mkString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-manifestXmlJsonml std.manifestXmlJsonml(value)]].
+     *
+     * Since: 0.10.0. Group: Manifestation.
+     *
+     * Convert the given JsonML-encoded value to a string containing the XML.
+     *
+     * JsonML is designed to preserve "mixed-mode content" (i.e., textual data outside of or next to
+     * elements). This includes the whitespace needed to avoid having all the XML on one line, which
+     * is meaningful in XML. In order to have whitespace in the XML output, it must be present in
+     * the JsonML input.
+     */
     builtin("manifestXmlJsonml", "value") { (pos, ev, value: Val) =>
       import scalatags.Text.all.{value => _, _}
       def rec(v: ujson.Value): Frag = {

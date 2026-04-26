@@ -5,6 +5,37 @@ import sjsonnet.functions.AbstractFunctionModule
 
 import scala.collection.mutable
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-minArray std.minArray(arr, keyF, onEmpty)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-maxArray std.maxArray(arr, keyF, onEmpty)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-all std.all(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-any std.any(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-count std.count(arr, x)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-filter std.filter(func, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-map std.map(func, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-mapWithIndex std.mapWithIndex(func, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-find std.find(value, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-flattenArrays std.flattenArrays(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-flattenDeepArray std.flattenDeepArray(value)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-reverse std.reverse(arrs)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-member std.member(arr, x)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-range std.range(from, to)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-foldl std.foldl(func, arr, init)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-foldr std.foldr(func, arr, init)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-flatMap std.flatMap(func, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-filterMap std.filterMap(filter_func, map_func, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-repeat std.repeat(what, count)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-makeArray std.makeArray(sz, func)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-contains std.contains(arr, elem)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-remove std.remove(arr, elem)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-removeAt std.removeAt(arr, idx)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-sum std.sum(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-avg std.avg(arr)]]
+ */
 object ArrayModule extends AbstractFunctionModule {
   def name = "array"
 
@@ -19,6 +50,17 @@ object ArrayModule extends AbstractFunctionModule {
     if (isDefaultKeyF(keyF)) elem
     else keyF.asFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled)
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-minArray std.minArray(arr, keyF, onEmpty)]].
+   *
+   * Since: 0.21.0. Group: Arrays.
+   *
+   * Return the minimum of all elements in arr. If keyF is provided, it is called on each element of
+   * the array and should return a comparator value, and in this case minArray will return an
+   * element with the minimum comparator value. If onEmpty is provided, and arr is empty, then
+   * minArray will return the provided onEmpty value. If onEmpty is not provided, then an empty arr
+   * will raise an error.
+   */
   private object MinArray
       extends Val.Builtin(
         "minArray",
@@ -54,6 +96,17 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-maxArray std.maxArray(arr, keyF, onEmpty)]].
+   *
+   * Since: 0.21.0. Group: Arrays.
+   *
+   * Return the maximum of all elements in arr. If keyF is provided, it is called on each element of
+   * the array and should return a comparator value, and in this case maxArray will return an
+   * element with the maximum comparator value. If onEmpty is provided, and arr is empty, then
+   * maxArray will return the provided onEmpty value. If onEmpty is not provided, then an empty arr
+   * will raise an error.
+   */
   private object MaxArray
       extends Val.Builtin(
         "maxArray",
@@ -89,6 +142,15 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-all std.all(arr)]].
+   *
+   * Since: 0.19.0. Group: Arrays.
+   *
+   * Return true if all elements of arr is true, false otherwise. all([]) evaluates to true.
+   *
+   * It's an error if 1) arr is not an array, or 2) arr contains non-boolean values.
+   */
   private object All extends Val.Builtin1("all", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
       val a = arr.value.asArr
@@ -101,6 +163,15 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-any std.any(arr)]].
+   *
+   * Since: 0.19.0. Group: Arrays.
+   *
+   * Return true if any element of arr is true, false otherwise. any([]) evaluates to false.
+   *
+   * It's an error if 1) arr is not an array, or 2) arr contains non-boolean values.
+   */
   private object Any extends Val.Builtin1("any", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
       val a = arr.value.asArr
@@ -113,6 +184,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-count std.count(arr, x)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Return the number of times that x occurs in arr.
+   */
   private object Count extends Val.Builtin2("count", "arr", "x") {
     def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
       var count = 0
@@ -121,6 +199,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-filter std.filter(func, arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Return a new array containing all the elements of arr for which the func function returns true.
+   */
   private object Filter extends Val.Builtin2("filter", "func", "arr") {
     def evalRhs(_func: Eval, arr: Eval, ev: EvalScope, pos: Position): Val = {
       val p = pos.noOffset
@@ -178,6 +263,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-map std.map(func, arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Apply the given function to every element of the array to form a new array.
+   */
   private object Map_ extends Val.Builtin2("map", "func", "arr") {
     def evalRhs(_func: Eval, arr: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
@@ -209,6 +301,15 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-mapWithIndex std.mapWithIndex(func, arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Similar to map above, but it also passes to the function the element's index in the array. The
+   * function func is expected to take the index as the first parameter and the element as the
+   * second.
+   */
   private object MapWithIndex extends Val.Builtin2("mapWithIndex", "func", "arr") {
     def evalRhs(_func: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
@@ -229,6 +330,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-find std.find(value, arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Returns an array that contains the indexes of all occurrences of value in arr.
+   */
   private object Find extends Val.Builtin2("find", "value", "arr") {
     def evalRhs(value: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val arr = _arr.value.asArr
@@ -246,6 +354,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-flattenArrays std.flattenArrays(arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Concatenate an array of arrays into a single array.
+   */
   private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
       val out = new mutable.ArrayBuilder.ofRef[Eval]
@@ -262,6 +377,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-flattenDeepArray std.flattenDeepArray(value)]].
+   *
+   * Since: 0.21.0. Group: Arrays.
+   *
+   * Concatenate an array containing values and arrays into a single flattened array.
+   */
   private object FlattenDeepArrays extends Val.Builtin1("flattenDeepArray", "value") {
     def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
       val value0 = value.value
@@ -286,6 +408,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-reverse std.reverse(arrs)]].
+   *
+   * Since: 0.13.0. Group: Arrays.
+   *
+   * Reverses an array.
+   */
   private object Reverse extends Val.Builtin1("reverse", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
       // Zero-copy reverse: create a reversed view sharing the same backing array.
@@ -294,6 +423,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-member std.member(arr, x)]].
+   *
+   * Since: 0.15.0. Group: Arrays.
+   *
+   * Returns whether x occurs in arr. Argument arr may be an array or a string.
+   */
   private object Member extends Val.Builtin2("member", "arr", "x") {
     def evalRhs(arr: Eval, x: Eval, ev: EvalScope, pos: Position): Val = {
       Val.bool(
@@ -324,6 +460,13 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-range std.range(from, to)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Return an array of ascending numbers between the two limits, inclusively.
+   */
   private object Range extends Val.Builtin2("range", "from", "to") {
     def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
       val fromInt = from.value.asInt
@@ -473,6 +616,17 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-foldl std.foldl(func, arr, init)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Classic foldl function. Calls the function for each array element, passing the result from the
+   * previous call (or init for the first call), and the array element. Traverses the array from
+   * left to right.
+   *
+   * For example: foldl(f, [1,2,3], 0) is equivalent to f(f(f(0, 1), 2), 3).
+   */
   private object Foldl extends Val.Builtin3("foldl", "func", "arr", "init") {
     def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
@@ -519,6 +673,17 @@ object ArrayModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-foldr std.foldr(func, arr, init)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * Classic foldr function. Calls the function for each array element, passing the array element
+   * and the result from the previous call (or init for the first call). Traverses the array from
+   * right to left.
+   *
+   * For example: foldr(f, [1,2,3], 0) is equivalent to f(1, f(2, f(3, 0))).
+   */
   private object Foldr extends Val.Builtin3("foldr", "func", "arr", "init") {
     def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
@@ -582,6 +747,18 @@ object ArrayModule extends AbstractFunctionModule {
     builtin(Range),
     builtin(Foldl),
     builtin(Foldr),
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-flatMap std.flatMap(func, arr)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * Apply the given function to every element of arr to form a new array then flatten the result.
+     * The argument arr must be an array or a string. If arr is an array, function func must return
+     * an array. If arr is a string, function func must return an string.
+     *
+     * The std.flatMap function can be thought of as a generalized std.map, with each element mapped
+     * to 0, 1 or more elements.
+     */
     builtin("flatMap", "func", "arr") { (pos, ev, func: Val.Func, arr: Val) =>
       val res: Val = arr match {
         case a: Val.Arr =>
@@ -648,6 +825,13 @@ object ArrayModule extends AbstractFunctionModule {
       }
       res
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-filterMap std.filterMap(filter_func, map_func, arr)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * It first filters, then maps the given array, using the two functions provided.
+     */
     builtin("filterMap", "filter_func", "map_func", "arr") {
       (pos, ev, filter_func: Val.Func, map_func: Val.Func, arr: Val.Arr) =>
         val noOff = pos.noOffset
@@ -665,6 +849,13 @@ object ArrayModule extends AbstractFunctionModule {
         }
         Val.Arr(pos, b.result())
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-repeat std.repeat(what, count)]].
+     *
+     * Since: 0.15.0. Group: Arrays.
+     *
+     * Repeats an array or a string what a number of times specified by an integer count.
+     */
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
       if (count < 0) {
         Error.fail("makeArray requires size >= 0, got " + count)
@@ -692,6 +883,15 @@ object ArrayModule extends AbstractFunctionModule {
       }
       res
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-makeArray std.makeArray(sz, func)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * Create a new array of sz elements by calling func(i) to initialize each element. Func is
+     * expected to be a function that takes a single parameter, the index of the element it should
+     * initialize.
+     */
     builtin("makeArray", "sz", "func") { (pos, ev, size: Val, func: Val.Func) =>
       Val.Arr(
         pos, {
@@ -715,6 +915,13 @@ object ArrayModule extends AbstractFunctionModule {
         }
       )
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-contains std.contains(arr, elem)]].
+     *
+     * Since: 0.21.0. Group: Arrays.
+     *
+     * Return true if given elem is present in arr, false otherwise.
+     */
     builtin("contains", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
       val la = arr.asLazyArray
       var i = 0
@@ -725,6 +932,13 @@ object ArrayModule extends AbstractFunctionModule {
       }
       found
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-remove std.remove(arr, elem)]].
+     *
+     * Since: 0.21.0. Group: Arrays.
+     *
+     * Remove first occurrence of elem from arr.
+     */
     builtin("remove", "arr", "elem") { (_, ev, arr: Val.Arr, elem: Val) =>
       val la = arr.asLazyArray
       var idx = -1
@@ -742,6 +956,13 @@ object ArrayModule extends AbstractFunctionModule {
         )
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-removeAt std.removeAt(arr, idx)]].
+     *
+     * Since: 0.21.0. Group: Arrays.
+     *
+     * Remove element at idx index from arr.
+     */
     builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Val) =>
       val removeIdx = idx match {
         case n: Val.Num =>
@@ -757,6 +978,13 @@ object ArrayModule extends AbstractFunctionModule {
         )
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-sum std.sum(arr)]].
+     *
+     * Since: 0.20.0. Group: Arrays.
+     *
+     * Return sum of all element in arr.
+     */
     builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
       val a = arr.asLazyArray
       var sum = 0.0
@@ -770,6 +998,13 @@ object ArrayModule extends AbstractFunctionModule {
       }
       sum
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-avg std.avg(arr)]].
+     *
+     * Since: 0.21.0. Group: Arrays.
+     *
+     * Return average of all element in arr.
+     */
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
       val a = arr.asLazyArray
       if (a.length == 0) {
