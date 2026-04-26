@@ -1,3 +1,6 @@
-sjsonnet.Error: [std.splitLimitR] maxSplits should be -1 or non-negative, got -2
-    at [<root>].(builtinSplitLimitR5.jsonnet:1:16)
-
+[
+   "foo",
+   "bar",
+   "baz",
+   "qux"
+]

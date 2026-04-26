@@ -9,6 +9,18 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.clamp(-3, 0, 5)") ==> ujson.Num(0)
       eval("std.clamp(4, 0, 5)") ==> ujson.Num(4)
       eval("std.clamp(7, 0, 5)") ==> ujson.Num(5)
+      eval("""std.clamp("b", "a", "c")""") ==> ujson.Str("b")
+      eval("""std.clamp("a", "b", "c")""") ==> ujson.Str("b")
+      eval("""std.clamp("d", "b", "c")""") ==> ujson.Str("c")
+      eval("""std.clamp([2], [1], [3])""") ==> ujson.Arr(2)
+      eval("""std.clamp([0], [1], [3])""") ==> ujson.Arr(1)
+      eval("""std.clamp([4], [1], [3])""") ==> ujson.Arr(3)
+      eval("""std.clamp(0, 1, error "maxVal forced")""") ==> ujson.Num(1)
+      eval("""std.clamp(x=0, minVal=1, maxVal=error "maxVal forced")""") ==> ujson.Num(1)
+      assert(evalErr("""std.clamp(true, false, true)""").contains("booleans"))
+      assert(evalErr("""std.clamp(1, "a", 2)""").contains("requires matching types"))
+      assert(evalErr("""std.clamp([true], [true], [true])""").contains("boolean"))
+      assert(evalErr("""local p = [true]; std.clamp(p + [1], p + [0], p + [2])""").contains("boolean"))
     }
     test("member") {
       eval("std.member('foo', 'o')") ==> ujson.True
@@ -46,6 +58,15 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.slice([1, 2, 3, 4, 5, 6], 0, 4, 1)") ==> ujson.read("[ 1, 2, 3, 4 ]")
       eval("std.slice([1, 2, 3, 4, 5, 6], 1, 6, 2)") ==> ujson.read("[ 2, 4, 6 ]")
       eval("""std.slice("jsonnet", 0, 4, 1)""") ==> ujson.Str("json")
+    }
+
+    test("splitLimit negative maxsplits") {
+      eval("""std.splitLimit("a,b,c", ",", -2)""") ==> ujson.Arr("a", "b", "c")
+      eval("""std.splitLimit("a,b,c", ",", -2.5)""") ==> ujson.Arr("a", "b", "c")
+      eval("""std.splitLimitR("a,b,c", ",", -2)""") ==> ujson.Arr("a", "b", "c")
+      eval("""std.splitLimitR("a,b,c", ",", -2.5)""") ==> ujson.Arr("a", "b", "c")
+      eval("""std.splitLimit("a,b,c", ",", 1.5)""") ==> ujson.Arr("a", "b,c")
+      eval("""std.splitLimitR("a,b,c", ",", 1.5)""") ==> ujson.Arr("a,b", "c")
     }
 
     test("manifestJsonMinified") {
