@@ -7,6 +7,9 @@ import java.util.regex.Pattern
 import scala.collection.mutable
 
 object Platform {
+  // Scala.js Long is expensive, so keep the ASCII stripChars fast path on Int masks.
+  final val useIntStripCharsBitset: Boolean = true
+
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {

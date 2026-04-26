@@ -16,6 +16,9 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 object Platform {
+  // JVM JMH runs faster with Int masks and the ASCII single-char shortcut.
+  final val useIntStripCharsBitset: Boolean = true
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
