@@ -1,0 +1,38 @@
+{
+   "clampArrayHigh": [
+      3
+   ],
+   "clampArrayLow": [
+      1
+   ],
+   "clampArrayMiddle": [
+      2
+   ],
+   "clampLazyMax": 1,
+   "clampStringHigh": "c",
+   "clampStringLow": "b",
+   "clampStringMiddle": "b",
+   "splitLimitFractionalNegative": [
+      "a",
+      "b",
+      "c"
+   ],
+   "splitLimitFractionalPositive": [
+      "a",
+      "b,c"
+   ],
+   "splitLimitNegative": [
+      "a",
+      "b",
+      "c"
+   ],
+   "splitLimitRFractionalNegative": [
+      "a",
+      "b",
+      "c"
+   ],
+   "splitLimitRFractionalPositive": [
+      "a,b",
+      "c"
+   ]
+}

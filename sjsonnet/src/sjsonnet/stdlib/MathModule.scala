@@ -6,6 +6,170 @@ import sjsonnet.functions.AbstractFunctionModule
 object MathModule extends AbstractFunctionModule {
   def name = "math"
 
+  private object Clamp extends Val.Builtin3("clamp", "x", "minVal", "maxVal") {
+    private def applyClamp(
+        x: Eval,
+        minVal: Eval,
+        maxVal: Eval,
+        ev: EvalScope,
+        pos: Position): Val = {
+      val xValue = x.value
+      val minValue = minVal.value
+      if (compareForClamp("<", xValue, minValue, pos)(ev) < 0) {
+        minValue
+      } else {
+        val maxValue = maxVal.value
+        if (compareForClamp(">", xValue, maxValue, pos)(ev) > 0) maxValue else xValue
+      }
+    }
+
+    def evalRhs(x: Eval, minVal: Eval, maxVal: Eval, ev: EvalScope, pos: Position): Val =
+      applyClamp(x, minVal, maxVal, ev, pos)
+
+    override def apply3(x: Eval, minVal: Eval, maxVal: Eval, outerPos: Position)(implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
+      if (tailstrictMode == TailstrictModeEnabled) {
+        x.value
+        minVal.value
+        maxVal.value
+      }
+      applyClamp(x, minVal, maxVal, ev, outerPos)
+    }
+
+    override def apply(argsL: Array[? <: Eval], namedNames: Array[String], outerPos: Position)(
+        implicit
+        ev: EvalScope,
+        tailstrictMode: TailstrictMode): Val = {
+      val args = new Array[Eval](3)
+      val positionalArgCount =
+        if (namedNames == null) argsL.length else argsL.length - namedNames.length
+
+      if (argsL.length > 3) Error.fail("Too many args, has 3 parameter(s)", outerPos)
+
+      var i = 0
+      while (i < positionalArgCount) {
+        args(i) = argsL(i)
+        i += 1
+      }
+
+      if (namedNames != null) {
+        var namedIndex = 0
+        var argIndex = positionalArgCount
+        while (namedIndex < namedNames.length) {
+          val paramIndex = namedNames(namedIndex) match {
+            case "x"      => 0
+            case "minVal" => 1
+            case "maxVal" => 2
+            case name     => Error.fail(s"has no parameter $name", outerPos)
+          }
+          if (args(paramIndex) != null) {
+            Error.fail(
+              s"binding parameter a second time: ${namedNames(namedIndex)} in function clamp",
+              outerPos
+            )
+          }
+          args(paramIndex) = argsL(argIndex)
+          namedIndex += 1
+          argIndex += 1
+        }
+      }
+
+      var missing: String = null
+      var missingCount = 0
+      i = 0
+      while (i < args.length) {
+        if (args(i) == null) {
+          if (missing == null) missing = params.names(i) else missing += ", " + params.names(i)
+          missingCount += 1
+        }
+        i += 1
+      }
+      if (missingCount > 0) {
+        val plural = if (missingCount > 1) "s" else ""
+        Error.fail(s"parameter$plural $missing not bound in call", outerPos)
+      }
+
+      if (tailstrictMode == TailstrictModeEnabled) args.foreach(_.value)
+      applyClamp(args(0), args(1), args(2), ev, outerPos)
+    }
+  }
+
+  private def compareForClamp(op: String, left: Val, right: Val, pos: Position)(implicit
+      ev: EvalScope): Int = {
+    (left, right) match {
+      case (l: Val.Num, r: Val.Num)   => compareNumbers(l.asDouble, r.asDouble)
+      case (l: Val.Str, r: Val.Str)   => Util.compareStringsByCodepoint(l.str, r.str)
+      case (l: Val.Arr, r: Val.Arr)   => compareArraysForClamp(l, r, pos)
+      case (_: Val.Bool, _: Val.Bool) =>
+        Error.fail(s"binary operator $op does not operate on booleans.", pos)
+      case (_: Val.Null, _: Val.Null) =>
+        Error.fail(s"binary operator $op does not operate on null.", pos)
+      case (_: Val.Obj, _: Val.Obj) =>
+        Error.fail(s"binary operator $op does not operate on objects.", pos)
+      case (_: Val.Func, _: Val.Func) =>
+        Error.fail(s"binary operator $op does not operate on functions.", pos)
+      case _ =>
+        Error.fail(
+          s"binary operator $op requires matching types, got ${left.prettyName} and ${right.prettyName}.",
+          pos
+        )
+    }
+  }
+
+  private def compareArrayValuesForClamp(left: Val, right: Val, pos: Position)(implicit
+      ev: EvalScope): Int = {
+    (left, right) match {
+      case (l: Val.Num, r: Val.Num)   => compareNumbers(l.asDouble, r.asDouble)
+      case (l: Val.Str, r: Val.Str)   => Util.compareStringsByCodepoint(l.str, r.str)
+      case (l: Val.Arr, r: Val.Arr)   => compareArraysForClamp(l, r, pos)
+      case (_: Val.Null, _: Val.Null) =>
+        Error.fail("binary operator < does not operate on null.", pos)
+      case (_: Val.Bool, _: Val.Bool) =>
+        Error.fail("Values of type boolean are not comparable.", pos)
+      case (_: Val.Obj, _: Val.Obj) =>
+        Error.fail("Values of type object are not comparable.", pos)
+      case (_: Val.Func, _: Val.Func) =>
+        Error.fail("Values of type function are not comparable.", pos)
+      case _ =>
+        Error.fail(
+          s"Comparison requires matching types. Got ${left.prettyName} and ${right.prettyName}",
+          pos
+        )
+    }
+  }
+
+  private def compareArraysForClamp(left: Val.Arr, right: Val.Arr, pos: Position)(implicit
+      ev: EvalScope): Int = {
+    val leftLength = left.length
+    val rightLength = right.length
+    val length = math.min(leftLength, rightLength)
+    var i = 0
+    while (i < length) {
+      val leftEval = left.eval(i)
+      val rightEval = right.eval(i)
+      val comparison =
+        if (
+          (leftEval eq rightEval) &&
+          leftEval.isInstanceOf[Val] &&
+          isPrimitiveComparable(leftEval.asInstanceOf[Val])
+        ) {
+          0
+        } else {
+          compareArrayValuesForClamp(leftEval.value, rightEval.value, pos)
+        }
+      if (comparison != 0) return comparison
+      i += 1
+    }
+    Integer.compare(leftLength, rightLength)
+  }
+
+  @inline private def compareNumbers(left: Double, right: Double): Int =
+    if (left < right) -1 else if (left > right) 1 else 0
+
+  @inline private def isPrimitiveComparable(value: Val): Boolean =
+    value.isInstanceOf[Val.Num] || value.isInstanceOf[Val.Str]
+
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
       math.sqrt(x)
@@ -30,10 +194,7 @@ object MathModule extends AbstractFunctionModule {
     builtin("modulo", "a", "b") { (pos, ev, a: Double, b: Double) =>
       a % b
     },
-    builtin("clamp", "x", "minVal", "maxVal") {
-      (pos, ev, x: Double, minVal: Double, maxVal: Double) =>
-        math.max(minVal, math.min(x, maxVal))
-    },
+    builtin(Clamp),
     builtin("pow", "x", "n") { (pos, ev, x: Double, n: Double) =>
       math.pow(x, n)
     },

@@ -303,15 +303,12 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Eval] = {
-    if (maxSplits < 0 && maxSplits != -1) {
-      Error.fail("maxSplits should be -1 or non-negative, got " + maxSplits)
-    }
     if (cStr.isEmpty) {
       Error.fail("Cannot split by an empty string")
     }
 
     val b = new mutable.ArrayBuilder.ofRef[Eval]
-    b.sizeHint(maxSplits)
+    if (maxSplits >= 0 && maxSplits < Int.MaxValue) b.sizeHint(maxSplits + 1)
     var sz = 0
     var i = 0
     var start = 0
