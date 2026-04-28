@@ -1130,21 +1130,23 @@ object Val {
           Util.intersect(s.excludedKeys, keysInThisChain)
         } else null
 
-        // If this object has excluded keys that the LHS provides as visible,
-        // re-introduce them with synthetic members that delegate to the LHS.
-        // This ensures `lhs + removeKey(rhs, k)` preserves lhs's visible key `k`.
+        // If this object has excluded keys that the LHS provides, re-introduce them with synthetic
+        // members that delegate to the LHS. This ensures `lhs + removeKey(rhs, k)` preserves lhs's
+        // key `k`, including its visibility.
         if (filteredExcludedKeys != null) {
           val iter = filteredExcludedKeys.iterator()
           while (iter.hasNext) {
             val key = iter.next()
-            if (lhs.containsVisibleKey(key)) {
+            if (lhs.containsKey(key)) {
               if (members eq s.getValue0) {
                 members = new util.LinkedHashMap[String, Obj.Member](s.getValue0)
               }
               val capturedKey = key
+              val visibility =
+                if (lhs.containsVisibleKey(key)) Visibility.Unhide else Visibility.Hidden
               members.put(
                 key,
-                new Obj.Member(false, Visibility.Normal, deprecatedSkipAsserts = true) {
+                new Obj.Member(false, visibility, deprecatedSkipAsserts = true) {
                   def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
                     lhs.value(capturedKey, pos, self)(ev)
                 }
@@ -1452,6 +1454,7 @@ object Val {
         if (cacheOwner != null && v != null) cacheOwner.putCache(cacheKey, v)
         v
       } else {
+        if (excludedKeys != null && excludedKeys.contains(k)) return null
         val s = this.`super`
         val sfk = singleFieldKey
         if (sfk != null) {
