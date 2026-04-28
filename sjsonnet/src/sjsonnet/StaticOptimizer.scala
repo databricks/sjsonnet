@@ -74,11 +74,11 @@ class StaticOptimizer(
 
       case e @ Id(pos, name) =>
         scope.get(name) match {
-          case ScopedVal(v: Val with Expr, _, _) => v
-          case ScopedVal(_, _, idx)              => ValidId(pos, name, idx)
-          case null if name == f"$$std"          => std
-          case null if name == "std"             => std
-          case null                              =>
+          case ScopedVal(v: Val, _, _)  => v
+          case ScopedVal(_, _, idx)     => ValidId(pos, name, idx)
+          case null if name == f"$$std" => std
+          case null if name == "std"    => std
+          case null                     =>
             variableResolver(name) match {
               case Some(v) => v // additional variable resolution
               case None    =>
@@ -363,8 +363,8 @@ class StaticOptimizer(
     while (i < target.length) {
       if (target(i) == null) {
         params.defaultExprs(i) match {
-          case v: Val with Expr => target(i) = v
-          case _                => return null // no default or non-constant
+          case v: Val => target(i) = v
+          case _      => return null // no default or non-constant
         }
       }
       i += 1

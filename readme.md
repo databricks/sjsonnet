@@ -169,7 +169,7 @@ These three phases are encapsulated in the `sjsonnet.Interpreter` object.
 
 Some notes on the values used in parts of the pipeline:
 
-- `sjsonnet.Expr`: this represents `{...}` object literal nodes, `a + b` binary
+- `sjsonnet.Expr`: this abstract class represents `{...}` object literal nodes, `a + b` binary
   operation nodes, `function(a) {...}` definitions and `f(a)` invocations, etc..
   Also keeps track of source-offset information so failures can be correlated
   with line numbers.
@@ -182,9 +182,10 @@ Some notes on the values used in parts of the pipeline:
   raise an error because the first (erroneous) entry of the array is un-used and
   thus not evaluated.
 
-- Classes representing literals extend `sjsonnet.Val.Literal` which in turn extends
-  _both_, `Expr` and `Val`. This allows the evaluator to skip over them instead of
-  having to convert them from one representation to the other.
+- `sjsonnet.Val` extends `Expr`, and classes representing literals extend
+  `sjsonnet.Val.Literal`. This allows the evaluator to skip already-computed values
+  instead of having to convert them from one representation to the other, while
+  keeping the hot `Expr` dispatch path on an abstract class hierarchy.
 
 ## Performance
 
@@ -214,11 +215,14 @@ The Jsonnet language is _lazy_: expressions don't get evaluated unless
 their value is needed, and thus even erroneous expressions do not cause
 a failure if un-used.
 
-Sjsonnet models this with a flat type hierarchy rooted at `sjsonnet.Eval`:
+Sjsonnet models this with a flat evaluation hierarchy rooted at `sjsonnet.Eval`,
+and a separate `sjsonnet.Expr` abstract class for AST dispatch. `Val` is the bridge:
+it is an already-computed `Eval` and also an `Expr` so literals and functions can
+appear directly in optimized ASTs.
 
 ```
-    Eval (trait)          — common interface: def value: Val
-   /          \
+    Eval (trait)                 Expr (abstract class)
+   /          \                        |
 Lazy           Val (sealed abstract class)
 (final class)    |
               Val.Str, Val.Num, Val.Arr, Val.Obj, Val.Func, ...
@@ -232,8 +236,8 @@ Lazy           Val (sealed abstract class)
   and is thread-safe. After the value is computed, the closure reference is
   cleared to allow it to be garbage collected.
 
-- **`Val`** represents an already-computed value. It extends `Eval` directly and
-  implements `value` as simply returning `this`.
+- **`Val`** represents an already-computed value. It extends `Eval` and `Expr`,
+  and implements `value` as simply returning `this`.
 
 The hierarchy is intentionally kept flat (only two direct implementors of `Eval`)
 to enable the JVM JIT compiler's bimorphic inlining optimization on the
