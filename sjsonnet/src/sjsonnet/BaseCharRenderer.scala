@@ -34,6 +34,9 @@ object BaseCharRenderer {
     while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
     a
   }
+
+  /** Below this length, scalar string scanning avoids a temporary char[] allocation. */
+  private final val StringSWARThreshold = 128
 }
 
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
@@ -281,43 +284,96 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       elemBuilder.appendUnsafe('"')
       return
     }
+    if (len < BaseCharRenderer.StringSWARThreshold) {
+      val firstEscape = findFirstEscapeChar(str, 0, len)
+      if (firstEscape < 0) renderQuotedStringNoEscape(str, len)
+      else renderQuotedStringScalarEscaped(str, len, firstEscape)
+      return
+    }
+    if (!CharSWAR.hasEscapeChar(str)) {
+      renderQuotedStringNoEscape(str, len)
+      return
+    }
     val chars = new Array[Char](len)
     str.getChars(0, len, chars, 0)
     val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
     if (firstEscape < 0) {
-      elemBuilder.ensureLength(len + 2)
-      elemBuilder.appendUnsafe('"')
-      val cbArr = elemBuilder.arr
-      val pos = elemBuilder.getLength
-      System.arraycopy(chars, 0, cbArr, pos, len)
-      elemBuilder.length = pos + len
-      elemBuilder.appendUnsafe('"')
-    } else {
-      elemBuilder.ensureLength(len + len + 2)
-      elemBuilder.appendUnsafe('"')
-      var from = 0
-      var escPos = firstEscape
-      while (escPos >= 0) {
-        if (escPos > from) {
-          val chunkLen = escPos - from
-          val cbArr = elemBuilder.arr
-          val pos = elemBuilder.getLength
-          System.arraycopy(chars, from, cbArr, pos, chunkLen)
-          elemBuilder.length = pos + chunkLen
-        }
-        escapeCharInline(chars(escPos))
-        from = escPos + 1
-        escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
-      }
-      if (from < len) {
-        val tailLen = len - from
-        val cbArr = elemBuilder.arr
-        val pos = elemBuilder.getLength
-        System.arraycopy(chars, from, cbArr, pos, tailLen)
-        elemBuilder.length = pos + tailLen
-      }
-      elemBuilder.appendUnsafe('"')
+      renderQuotedCharsNoEscape(chars, len)
+      return
     }
+    renderQuotedCharsEscaped(chars, len, firstEscape)
+  }
+
+  private def renderQuotedStringNoEscape(str: String, len: Int): Unit = {
+    elemBuilder.ensureLength(len + 2)
+    elemBuilder.appendUnsafe('"')
+    appendStringRange(str, 0, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedCharsNoEscape(chars: Array[Char], len: Int): Unit = {
+    elemBuilder.ensureLength(len + 2)
+    elemBuilder.appendUnsafe('"')
+    appendCharRange(chars, 0, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedStringScalarEscaped(str: String, len: Int, firstEscape: Int): Unit = {
+    elemBuilder.ensureLength(len + len + 2)
+    elemBuilder.appendUnsafe('"')
+    var from = 0
+    var escPos = firstEscape
+    while (escPos >= 0) {
+      if (escPos > from) appendStringRange(str, from, escPos)
+      escapeCharInline(str.charAt(escPos))
+      from = escPos + 1
+      escPos = if (from < len) findFirstEscapeChar(str, from, len) else -1
+    }
+    if (from < len) appendStringRange(str, from, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedCharsEscaped(chars: Array[Char], len: Int, firstEscape: Int): Unit = {
+    elemBuilder.ensureLength(len + len + 2)
+    elemBuilder.appendUnsafe('"')
+    var from = 0
+    var escPos = firstEscape
+    while (escPos >= 0) {
+      if (escPos > from) appendCharRange(chars, from, escPos)
+      escapeCharInline(chars(escPos))
+      from = escPos + 1
+      escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
+    }
+    if (from < len) appendCharRange(chars, from, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  @inline private def appendStringRange(str: String, from: Int, until: Int): Unit = {
+    val chunkLen = until - from
+    elemBuilder.ensureLength(chunkLen)
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    str.getChars(from, until, cbArr, pos)
+    elemBuilder.length = pos + chunkLen
+  }
+
+  @inline private def appendCharRange(chars: Array[Char], from: Int, until: Int): Unit = {
+    val chunkLen = until - from
+    elemBuilder.ensureLength(chunkLen)
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    System.arraycopy(chars, from, cbArr, pos, chunkLen)
+    elemBuilder.length = pos + chunkLen
+  }
+
+  @inline private def findFirstEscapeChar(str: String, from: Int, until: Int): Int = {
+    var i = from
+    while (i < until) {
+      val c = str.charAt(i)
+      if (c < 32 || c == '"' || c == '\\') return i
+      i += 1
+    }
+    -1
   }
 
   /**
