@@ -431,6 +431,23 @@ object StringModule extends AbstractFunctionModule {
     if (out == null) str else new String(out)
   }
 
+  private def escapeStringXmlString(string: String): String = {
+    val out = new java.io.StringWriter()
+    var i = 0
+    while (i < string.length) {
+      string.charAt(i) match {
+        case '<'  => out.write("&lt;")
+        case '>'  => out.write("&gt;")
+        case '&'  => out.write("&amp;")
+        case '"'  => out.write("&quot;")
+        case '\'' => out.write("&apos;")
+        case c    => out.write(c)
+      }
+      i += 1
+    }
+    out.toString
+  }
+
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, asciiUpper(str.value.asString))
@@ -598,22 +615,11 @@ object StringModule extends AbstractFunctionModule {
       BaseRenderer.escape(out, stdToString(str)(ev), unicode = true)
       out.toString
     },
+    builtin("escapeStringXml", "str") { (_, ev, str: Val) =>
+      escapeStringXmlString(stdToString(str)(ev))
+    },
     builtin("escapeStringXML", "str") { (_, ev, str: Val) =>
-      val string = stdToString(str)(ev)
-      val out = new java.io.StringWriter()
-      var i = 0
-      while (i < string.length) {
-        string.charAt(i) match {
-          case '<'  => out.write("&lt;")
-          case '>'  => out.write("&gt;")
-          case '&'  => out.write("&amp;")
-          case '"'  => out.write("&quot;")
-          case '\'' => out.write("&apos;")
-          case c    => out.write(c)
-        }
-        i += 1
-      }
-      out.toString
+      escapeStringXmlString(stdToString(str)(ev))
     },
     builtin("escapeStringBash", "str_") { (pos, ev, str: Val) =>
       "'" + stdToString(str)(ev).replace("'", """'"'"'""") + "'"

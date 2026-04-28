@@ -47,6 +47,7 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
       eval("""std.escapeStringBash(10)""") ==> ujson.Str("'10'")
       eval("""std.escapeStringDollars("$a")""") ==> ujson.Str("$$a")
       eval("""std.escapeStringDollars(10)""") ==> ujson.Str("10")
+      eval("""std.escapeStringXml(10)""") ==> ujson.Str("10")
       eval("""std.escapeStringXML(10)""") ==> ujson.Str("10")
     }
 
