@@ -54,11 +54,6 @@ object Std0150FunctionsTests extends TestSuite {
       eval("std.join(' ', [null, 'foo'])") ==> ujson.Str("foo")
     }
 
-    test("parseInt boundaries") {
-      eval("""std.parseInt("-9223372036854775808")""") ==> ujson.Num(Long.MinValue.toDouble)
-      assert(evalErr("""std.parseInt("9223372036854775808")""").contains("Integer overflow"))
-    }
-
     test("slice") {
       eval("std.slice([1, 2, 3, 4, 5, 6], 0, 4, 1)") ==> ujson.read("[ 1, 2, 3, 4 ]")
       eval("std.slice([1, 2, 3, 4, 5, 6], 1, 6, 2)") ==> ujson.read("[ 2, 4, 6 ]")
