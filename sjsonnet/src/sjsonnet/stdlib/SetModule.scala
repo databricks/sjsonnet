@@ -34,7 +34,25 @@ object SetModule extends AbstractFunctionModule {
   private def validateSet(ev: EvalScope, pos: Position, keyF: Val, arr: Val): Unit = {
     if (ev.settings.throwErrorForInvalidSets) {
       val sorted = uniqArr(pos.noOffset, ev, sortArr(pos.noOffset, ev, arr, keyF), keyF)
-      if (!ev.equal(arr, sorted)) {
+      val isSet = arr match {
+        case Val.Str(_, str) =>
+          sorted match {
+            case Val.Str(_, sortedStr) => str == sortedStr
+            case sortedArr: Val.Arr    =>
+              val chars = sortedArr.asLazyArray
+              val sb = new java.lang.StringBuilder(str.length)
+              var i = 0
+              while (i < chars.length) {
+                sb.append(chars(i).value.asString)
+                i += 1
+              }
+              str == sb.toString
+            case _ => false
+          }
+        case _ =>
+          ev.equal(arr, sorted)
+      }
+      if (!isSet) {
         Error.fail("Set operation on " + arr.value.prettyName + " was called with a non-set")
       }
     }
@@ -380,7 +398,7 @@ object SetModule extends AbstractFunctionModule {
       (args, pos, ev) =>
         val keyF = args(2)
         validateSet(ev, pos, keyF, args(1))
-        val arr = args(1).asArr.asLazyArray
+        val arr = toArrOrString(args(1), pos, ev)
         existsInSet(ev, pos, keyF, arr, args(0))
     }
   )

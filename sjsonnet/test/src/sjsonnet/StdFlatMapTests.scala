@@ -13,8 +13,11 @@ object StdFlatMapTests extends TestSuite {
 
       eval("std.flatMap(function(x) x + x, 'Hello')") ==> ujson.Str("HHeelllloo")
 
-      eval("std.flatMap(function (x) if x == \" \" then null else x, \"a b c d e\")") ==> ujson.Str(
-        "abcde"
+      assert(
+        evalErr("""std.flatMap(function(x) null, "Hello")""")
+          .startsWith(
+            "sjsonnet.Error: [std.flatMap] std.flatMap on strings, provided function must return a string, got null"
+          )
       )
 
       assert(
