@@ -33,10 +33,7 @@ abstract class Materializer {
       case Val.False(_)  => "false"
       case Val.Null(_)   => "null"
       case Val.Num(_, _) =>
-        val d = v.asDouble
-        val l = d.toLong
-        if (l.toDouble == d) java.lang.Long.toString(l)
-        else RenderUtils.renderDouble(d)
+        RenderUtils.renderDouble(v.asDouble)
       case _ => apply0(v, new sjsonnet.Renderer()).toString
     }
   }
