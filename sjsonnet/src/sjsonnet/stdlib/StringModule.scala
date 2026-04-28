@@ -104,6 +104,97 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private object StripUtils {
+
+    /**
+     * Strip with an ASCII-only char set without allocating `Set[Int]`. If the char set contains any
+     * non-ASCII character, fall back to the existing codepoint-aware implementation.
+     */
+    def strip(str: String, charsStr: String, left: Boolean, right: Boolean): String = {
+      if (str.isEmpty || charsStr.isEmpty) return str
+
+      // JVM/JS benchmark faster with Int masks and the single-char shortcut. Scala Native's
+      // LLVM output is faster on the Long-mask path, so it deliberately skips that shortcut.
+      if (sjsonnet.Platform.useIntStripCharsBitset) {
+        if (charsStr.length == 1) {
+          val ch = charsStr.charAt(0)
+          if (ch.toInt < 128) return stripSingleChar(str, ch, left, right)
+        }
+        stripAsciiInt(str, charsStr, left, right)
+      } else {
+        stripAsciiLong(str, charsStr, left, right)
+      }
+    }
+
+    private def stripAsciiLong(
+        str: String,
+        charsStr: String,
+        left: Boolean,
+        right: Boolean): String = {
+      var loBits = 0L
+      var hiBits = 0L
+      var i = 0
+      while (i < charsStr.length) {
+        val c = charsStr.charAt(i).toInt
+        if (c >= 128) {
+          return unspecializedStrip(str, codePointsSet(charsStr), left, right)
+        } else {
+          if (c < 64) loBits |= 1L << c
+          else hiBits |= 1L << (c - 64)
+        }
+        i += 1
+      }
+      asciiStripLong(str, loBits, hiBits, left, right)
+    }
+
+    @inline private def asciiContainsLong(loBits: Long, hiBits: Long, c: Char): Boolean = {
+      val cp = c.toInt
+      if (cp < 64) ((loBits >>> cp) & 1L) != 0L
+      else if (cp < 128) ((hiBits >>> (cp - 64)) & 1L) != 0L
+      else false
+    }
+
+    private def stripAsciiInt(
+        str: String,
+        charsStr: String,
+        left: Boolean,
+        right: Boolean): String = {
+      var bits0 = 0
+      var bits1 = 0
+      var bits2 = 0
+      var bits3 = 0
+      var i = 0
+      while (i < charsStr.length) {
+        val c = charsStr.charAt(i).toInt
+        if (c >= 128) {
+          return unspecializedStrip(str, codePointsSet(charsStr), left, right)
+        } else if (c < 32) {
+          bits0 |= 1 << c
+        } else if (c < 64) {
+          bits1 |= 1 << (c - 32)
+        } else if (c < 96) {
+          bits2 |= 1 << (c - 64)
+        } else {
+          bits3 |= 1 << (c - 96)
+        }
+        i += 1
+      }
+      asciiStripInt(str, bits0, bits1, bits2, bits3, left, right)
+    }
+
+    @inline private def asciiContainsInt(
+        bits0: Int,
+        bits1: Int,
+        bits2: Int,
+        bits3: Int,
+        c: Char): Boolean = {
+      val cp = c.toInt
+      if (cp < 32) ((bits0 >>> cp) & 1) != 0
+      else if (cp < 64) ((bits1 >>> (cp - 32)) & 1) != 0
+      else if (cp < 96) ((bits2 >>> (cp - 64)) & 1) != 0
+      else if (cp < 128) ((bits3 >>> (cp - 96)) & 1) != 0
+      else false
+    }
+
     def codePointsSet(str: String): collection.Set[Int] = {
       val chars = Set.newBuilder[Int]
       chars.sizeHint(str.codePointCount(0, str.length))
@@ -214,49 +305,79 @@ object StringModule extends AbstractFunctionModule {
       }
       str.substring(start, end)
     }
+
+    private def asciiStripLong(
+        str: String,
+        loBits: Long,
+        hiBits: Long,
+        left: Boolean,
+        right: Boolean): String = {
+      var start = 0
+      var end = str.length
+      if (left) {
+        while (start < end && asciiContainsLong(loBits, hiBits, str.charAt(start)))
+          start += 1
+      }
+      if (right) {
+        while (end > start && asciiContainsLong(loBits, hiBits, str.charAt(end - 1)))
+          end -= 1
+      }
+      if (start == 0 && end == str.length) str
+      else str.substring(start, end)
+    }
+
+    private def asciiStripInt(
+        str: String,
+        bits0: Int,
+        bits1: Int,
+        bits2: Int,
+        bits3: Int,
+        left: Boolean,
+        right: Boolean): String = {
+      var start = 0
+      var end = str.length
+      if (left) {
+        while (start < end && asciiContainsInt(bits0, bits1, bits2, bits3, str.charAt(start)))
+          start += 1
+      }
+      if (right) {
+        while (end > start && asciiContainsInt(bits0, bits1, bits2, bits3, str.charAt(end - 1)))
+          end -= 1
+      }
+      if (start == 0 && end == str.length) str
+      else str.substring(start, end)
+    }
   }
 
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
+      val strValue = str.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = true,
-          right = true
-        )
+        StripUtils.strip(strValue, charsStr, left = true, right = true)
       )
     }
   }
 
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
+      val strValue = str.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = true,
-          right = false
-        )
+        StripUtils.strip(strValue, charsStr, left = true, right = false)
       )
     }
   }
 
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsSet = StripUtils.codePointsSet(chars.value.asString)
+      val charsStr = chars.value.asString
+      val strValue = str.value.asString
       Val.Str(
         pos,
-        StripUtils.unspecializedStrip(
-          str.value.asString,
-          charsSet,
-          left = false,
-          right = true
-        )
+        StripUtils.strip(strValue, charsStr, left = false, right = true)
       )
     }
   }

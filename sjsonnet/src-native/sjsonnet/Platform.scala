@@ -9,6 +9,9 @@ import scala.collection.mutable
 import org.virtuslab.yaml.*
 
 object Platform {
+  // Scala Native local hyperfine is steadier on the Long-mask path than the single-char shortcut.
+  final val useIntStripCharsBitset: Boolean = false
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)
