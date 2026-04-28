@@ -18,5 +18,20 @@ object StdMapTests extends TestSuite {
       // Test returning arbitrary values from the mapping function
       eval("std.map(function(x) std.codepoint(x), 'AB')") ==> ujson.Arr(65, 66)
     }
+
+    test("stdMapWithKey ignores hidden fields") {
+      eval("""std.mapWithKey(function(k, v) v + 1, {a: 1, b:: 2, c::: 3})""") ==>
+      ujson.Obj("a" -> 2, "c" -> 4)
+
+      eval("""std.objectFieldsAll(std.mapWithKey(function(k, v) v + 1, {a: 1, b:: 2}))""") ==>
+      ujson.Arr("a")
+
+      eval("""
+             |std.mapWithKey(
+             |  function(k, v) if k == "hidden" then error "hidden field mapped" else v,
+             |  {visible: 1, hidden:: error "hidden field evaluated"}
+             |)
+             |""".stripMargin) ==> ujson.Obj("visible" -> 1)
+    }
   }
 }
