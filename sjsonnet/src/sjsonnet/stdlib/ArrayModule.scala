@@ -8,34 +8,43 @@ import scala.collection.mutable
 object ArrayModule extends AbstractFunctionModule {
   def name = "array"
 
+  private val DefaultKeyF = Val.Null(dummyPos)
+  private val DefaultOnEmpty = Val.Null(dummyPos)
+
+  @inline private def isDefaultKeyF(v: Val): Boolean = v.asInstanceOf[AnyRef] eq DefaultKeyF
+  @inline private def isDefaultOnEmpty(v: Val): Boolean =
+    v.asInstanceOf[AnyRef] eq DefaultOnEmpty
+
+  private def applyArrayKey(keyF: Val, elem: Val, pos: Position, ev: EvalScope): Val =
+    if (isDefaultKeyF(keyF)) elem
+    else keyF.asFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled)
+
   private object MinArray
       extends Val.Builtin(
         "minArray",
         Array("arr", "keyF", "onEmpty"),
-        Array(null, Val.False(dummyPos), Val.False(dummyPos))
+        Array(null, DefaultKeyF, DefaultOnEmpty)
       ) {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
-      val onEmpty = args(2)
+      val onEmpty = args(2).value
       if (arr.length == 0) {
-        if (onEmpty.value.isInstanceOf[Val.False]) {
+        if (isDefaultOnEmpty(onEmpty)) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
-          onEmpty.value
+          onEmpty
         }
-      } else if (keyF.isInstanceOf[Val.False]) {
-        arr.asStrictArray.min(ev)
       } else {
         val strict = arr.asStrictArray
-        val func = keyF.asInstanceOf[Val.Func]
         var bestIdx = 0
-        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var bestKey = applyArrayKey(keyF, strict(0), pos, ev)
+        Util.compareJsonnetStd(bestKey, bestKey, ev)
         var i = 1
         while (i < strict.length) {
-          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          if (ev.compare(v, bestVal) < 0) {
-            bestVal = v
+          val v = applyArrayKey(keyF, strict(i), pos, ev)
+          if (Util.compareJsonnetStd(v, bestKey, ev) < 0) {
+            bestKey = v
             bestIdx = i
           }
           i += 1
@@ -49,30 +58,28 @@ object ArrayModule extends AbstractFunctionModule {
       extends Val.Builtin(
         "maxArray",
         Array("arr", "keyF", "onEmpty"),
-        Array(null, Val.False(dummyPos), Val.False(dummyPos))
+        Array(null, DefaultKeyF, DefaultOnEmpty)
       ) {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
-      val onEmpty = args(2)
+      val onEmpty = args(2).value
       if (arr.length == 0) {
-        if (onEmpty.value.isInstanceOf[Val.False]) {
+        if (isDefaultOnEmpty(onEmpty)) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
-          onEmpty.value
+          onEmpty
         }
-      } else if (keyF.isInstanceOf[Val.False]) {
-        arr.asStrictArray.max(ev)
       } else {
         val strict = arr.asStrictArray
-        val func = keyF.asInstanceOf[Val.Func]
         var bestIdx = 0
-        var bestVal = func.apply1(strict(0), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
+        var bestKey = applyArrayKey(keyF, strict(0), pos, ev)
+        Util.compareJsonnetStd(bestKey, bestKey, ev)
         var i = 1
         while (i < strict.length) {
-          val v = func.apply1(strict(i), pos.fileScope.noOffsetPos)(ev, TailstrictModeDisabled)
-          if (ev.compare(v, bestVal) > 0) {
-            bestVal = v
+          val v = applyArrayKey(keyF, strict(i), pos, ev)
+          if (Util.compareJsonnetStd(v, bestKey, ev) > 0) {
+            bestKey = v
             bestIdx = i
           }
           i += 1
@@ -205,7 +212,10 @@ object ArrayModule extends AbstractFunctionModule {
   private object MapWithIndex extends Val.Builtin2("mapWithIndex", "func", "arr") {
     def evalRhs(_func: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
-      val arr = _arr.value.asArr.asLazyArray
+      val arr = _arr.value match {
+        case Val.Str(_, str) => stringChars(pos, str).asLazyArray
+        case v               => v.asArr.asLazyArray
+      }
       val a = new Array[Eval](arr.length)
       val noOff = pos.noOffset
       var i = 0
@@ -243,9 +253,9 @@ object ArrayModule extends AbstractFunctionModule {
       out.sizeHint(arr.length * 4) // Rough size hint
       for (x <- arr) {
         x.value match {
-          case Val.Null(_) => // do nothing
-          case v: Val.Arr  => out ++= v.asLazyArray
-          case x           => Error.fail("Cannot call flattenArrays on " + x)
+          case v: Val.Arr => out ++= v.asLazyArray
+          case x          =>
+            Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
         }
       }
       Val.Arr(pos, out.result())
@@ -254,7 +264,11 @@ object ArrayModule extends AbstractFunctionModule {
 
   private object FlattenDeepArrays extends Val.Builtin1("flattenDeepArray", "value") {
     def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
-      val lazyArray = value.value.asArr.asLazyArray
+      val value0 = value.value
+      if (!value0.isInstanceOf[Val.Arr]) {
+        return Val.Arr(pos, Array[Eval](value0))
+      }
+      val lazyArray = value0.asInstanceOf[Val.Arr].asLazyArray
       val out = new mutable.ArrayBuilder.ofRef[Eval]
       out.sizeHint(lazyArray.length)
       val q = new java.util.ArrayDeque[Eval](lazyArray.length)
@@ -652,6 +666,9 @@ object ArrayModule extends AbstractFunctionModule {
         Val.Arr(pos, b.result())
     },
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
+      if (count < 0) {
+        Error.fail("makeArray requires size >= 0, got " + count)
+      }
       val res: Val = what match {
         case Val.Str(_, str) =>
           val builder = new StringBuilder(str.length * count)
@@ -725,14 +742,20 @@ object ArrayModule extends AbstractFunctionModule {
         )
       }
     },
-    builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Int) =>
-      if (!(0 <= idx && idx < arr.length)) {
-        Error.fail("index out of bounds: 0 <= " + idx + " < " + arr.length)
+    builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Val) =>
+      val removeIdx = idx match {
+        case n: Val.Num =>
+          val d = n.asDouble
+          if (d.isWhole && d >= 0 && d < arr.length) d.toInt else -1
+        case _ => -1
       }
-      Val.Arr(
-        arr.pos,
-        arr.asLazyArray.slice(0, idx) ++ arr.asLazyArray.slice(idx + 1, arr.length)
-      )
+      if (removeIdx == -1) arr
+      else {
+        Val.Arr(
+          arr.pos,
+          arr.asLazyArray.slice(0, removeIdx) ++ arr.asLazyArray.slice(removeIdx + 1, arr.length)
+        )
+      }
     },
     builtin("sum", "arr") { (_, _, arr: Val.Arr) =>
       val a = arr.asLazyArray

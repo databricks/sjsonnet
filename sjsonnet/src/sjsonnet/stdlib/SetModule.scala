@@ -9,18 +9,19 @@ import scala.collection.Searching.*
 object SetModule extends AbstractFunctionModule {
   def name = "set"
 
-  private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, Val.False(dummyPos))) {
+  private val DefaultKeyF = Val.Null(dummyPos)
+
+  @inline private def isDefaultKeyF(v: Val): Boolean = v.asInstanceOf[AnyRef] eq DefaultKeyF
+
+  private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, DefaultKeyF)) {
     def evalRhs(arr: Eval, keyF: Eval, ev: EvalScope, pos: Position): Val = {
       uniqArr(pos, ev, sortArr(pos, ev, arr.value, keyF.value), keyF.value)
     }
   }
 
   private def applyKeyFunc(elem: Val, keyF: Val, pos: Position, ev: EvalScope): Val = {
-    keyF match {
-      case keyFFunc: Val.Func =>
-        keyFFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).value
-      case _ => elem
-    }
+    if (isDefaultKeyF(keyF)) elem
+    else keyF.asFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).value
   }
 
   private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
@@ -64,6 +65,7 @@ object SetModule extends AbstractFunctionModule {
       keyF: Val,
       arr: mutable.IndexedSeq[? <: Eval],
       toFind: Val): Boolean = {
+    if (arr.isEmpty) return false
     val appliedX = applyKeyFunc(toFind, keyF, pos, ev)
     arr
       .search(appliedX)((toFind: Eval, value: Eval) => {
@@ -88,8 +90,8 @@ object SetModule extends AbstractFunctionModule {
     while (i < arrValue.length) {
       val v = arrValue(i)
       val vKey =
-        if (keyF.isInstanceOf[Val.False]) v.value
-        else keyF.asInstanceOf[Val.Func].apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
+        if (isDefaultKeyF(keyF)) v.value
+        else keyF.asFunc.apply1(v, pos.noOffset)(ev, TailstrictModeDisabled)
       if (lastAddedKey == null || !ev.equal(vKey, lastAddedKey)) {
         out.+=(v)
         lastAddedKey = vKey
@@ -120,7 +122,7 @@ object SetModule extends AbstractFunctionModule {
       arr
     } else {
       val keyFFunc =
-        if (keyF == null || keyF.isInstanceOf[Val.False]) null else keyF.asInstanceOf[Val.Func]
+        if (keyF == null || isDefaultKeyF(keyF)) null else keyF.asFunc
       Val.Arr(
         pos,
         if (keyFFunc != null) {
@@ -243,13 +245,13 @@ object SetModule extends AbstractFunctionModule {
       (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
-    builtinWithDefaults("uniq", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
+    builtinWithDefaults("uniq", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
       uniqArr(pos, ev, args(0), args(1))
     },
-    builtinWithDefaults("sort", "arr" -> null, "keyF" -> Val.False(dummyPos)) { (args, pos, ev) =>
+    builtinWithDefaults("sort", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
       sortArr(pos, ev, args(0), args(1))
     },
-    builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
+    builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
         validateSet(ev, pos, keyF, args(0))
@@ -306,7 +308,7 @@ object SetModule extends AbstractFunctionModule {
           Val.Arr(pos, out.result())
         }
     },
-    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
+    builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
         validateSet(ev, pos, keyF, args(0))
@@ -346,7 +348,7 @@ object SetModule extends AbstractFunctionModule {
 
         Val.Arr(pos, out.result())
     },
-    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> Val.False(dummyPos)) {
+    builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
         validateSet(ev, pos, keyF, args(0))
@@ -394,7 +396,7 @@ object SetModule extends AbstractFunctionModule {
 
         Val.Arr(pos, out.result())
     },
-    builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> Val.False(dummyPos)) {
+    builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
         validateSet(ev, pos, keyF, args(1))

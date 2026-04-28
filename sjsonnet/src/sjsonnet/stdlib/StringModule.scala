@@ -485,6 +485,12 @@ object StringModule extends AbstractFunctionModule {
       }
   }
 
+  private def stdToString(v: Val)(implicit ev: EvalScope): String =
+    v match {
+      case Val.Str(_, s) => s
+      case other         => Materializer.stringify(other)(ev)
+    }
+
   private def stringChars(pos: Position, str: String): Val.Arr = {
     val chars = new Array[Eval](str.codePointCount(0, str.length))
     var charIndex = 0
@@ -514,6 +520,23 @@ object StringModule extends AbstractFunctionModule {
     builtin(Split),
     builtin(SplitLimit),
     builtin(SplitLimitR),
+    builtin("resolvePath", "f", "r") { (_, _, f: String, r: String) =>
+      val parts = f.split("/", -1)
+      val prefixCount = parts.length - 1
+      if (prefixCount <= 0) r
+      else {
+        val out = new java.lang.StringBuilder(f.length + r.length)
+        var i = 0
+        while (i < prefixCount) {
+          if (i > 0) out.append('/')
+          out.append(parts(i))
+          i += 1
+        }
+        out.append('/')
+        out.append(r)
+        out.toString
+      }
+    },
     builtin(StringChars),
     builtin(ParseInt),
     builtin(ParseOctal),
@@ -547,8 +570,15 @@ object StringModule extends AbstractFunctionModule {
         }
       }
     },
-    builtin("isEmpty", "str") { (_, _, str: String) =>
-      str.isEmpty
+    builtin("isEmpty", "str") { (_, _, value: Val) =>
+      value match {
+        case Val.Str(_, s) => s.isEmpty
+        case a: Val.Arr    => a.length == 0
+        case o: Val.Obj    => o.visibleKeyNames.isEmpty
+        case f: Val.Func   => f.params.names.isEmpty
+        case x             =>
+          Error.fail("length operates on strings, objects, and arrays, got " + x.prettyName)
+      }
     },
     builtin("trim", "str") { (_, _, str: String) =>
       StripUtils.unspecializedStrip(str, whiteSpaces, true, true)
@@ -566,16 +596,17 @@ object StringModule extends AbstractFunctionModule {
         out.toString
       }
     },
-    builtin("escapeStringPython", "str") { (pos, ev, str: String) =>
+    builtin("escapeStringPython", "str") { (pos, ev, str: Val) =>
       val out = new java.io.StringWriter()
-      BaseRenderer.escape(out, str, unicode = true)
+      BaseRenderer.escape(out, stdToString(str)(ev), unicode = true)
       out.toString
     },
-    builtin("escapeStringXML", "str") { (_, _, str: String) =>
+    builtin("escapeStringXML", "str") { (_, ev, str: Val) =>
+      val string = stdToString(str)(ev)
       val out = new java.io.StringWriter()
       var i = 0
-      while (i < str.length) {
-        str.charAt(i) match {
+      while (i < string.length) {
+        string.charAt(i) match {
           case '<'  => out.write("&lt;")
           case '>'  => out.write("&gt;")
           case '&'  => out.write("&amp;")
@@ -587,11 +618,11 @@ object StringModule extends AbstractFunctionModule {
       }
       out.toString
     },
-    builtin("escapeStringBash", "str_") { (pos, ev, str: String) =>
-      "'" + str.replace("'", """'"'"'""") + "'"
+    builtin("escapeStringBash", "str_") { (pos, ev, str: Val) =>
+      "'" + stdToString(str)(ev).replace("'", """'"'"'""") + "'"
     },
-    builtin("escapeStringDollars", "str_") { (pos, ev, str: String) =>
-      str.replace("$", "$$")
+    builtin("escapeStringDollars", "str_") { (pos, ev, str: Val) =>
+      stdToString(str)(ev).replace("$", "$$")
     }
   )
 }

@@ -197,7 +197,7 @@ object Std0150FunctionsTests extends TestSuite {
       assert(
         evalErr("""std.isEmpty(10)""")
           .startsWith(
-            "sjsonnet.Error: [std.isEmpty] Wrong parameter type: expected String, got number"
+            "sjsonnet.Error: [std.isEmpty] length operates on strings, objects, and arrays, got number"
           )
       )
     }

@@ -60,6 +60,19 @@ object TypeModule extends AbstractFunctionModule {
     }
   }
 
+  private object Compare extends Val.Builtin2("__compare", "v1", "v2") {
+    def evalRhs(v1: Eval, v2: Eval, ev: EvalScope, pos: Position): Val =
+      Val.cachedNum(pos, Util.compareJsonnetStd(v1.value, v2.value, ev).toDouble)
+  }
+
+  private object CompareArray extends Val.Builtin2("__compare_array", "arr1", "arr2") {
+    def evalRhs(arr1: Eval, arr2: Eval, ev: EvalScope, pos: Position): Val =
+      Val.cachedNum(
+        pos,
+        Util.compareJsonnetStdArrays(arr1.value.asArr, arr2.value.asArr, ev).toDouble
+      )
+  }
+
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin(AssertEqual),
     builtin(IsString),
@@ -94,6 +107,20 @@ object TypeModule extends AbstractFunctionModule {
             )
         }
       }
+    },
+    builtin(Compare),
+    builtin(CompareArray),
+    builtin("__array_less", "arr1", "arr2") { (_, ev, arr1: Val.Arr, arr2: Val.Arr) =>
+      Util.compareJsonnetStdArrays(arr1, arr2, ev) == -1
+    },
+    builtin("__array_greater", "arr1", "arr2") { (_, ev, arr1: Val.Arr, arr2: Val.Arr) =>
+      Util.compareJsonnetStdArrays(arr1, arr2, ev) == 1
+    },
+    builtin("__array_less_or_equal", "arr1", "arr2") { (_, ev, arr1: Val.Arr, arr2: Val.Arr) =>
+      Util.compareJsonnetStdArrays(arr1, arr2, ev) <= 0
+    },
+    builtin("__array_greater_or_equal", "arr1", "arr2") { (_, ev, arr1: Val.Arr, arr2: Val.Arr) =>
+      Util.compareJsonnetStdArrays(arr1, arr2, ev) >= 0
     }
   )
 }
