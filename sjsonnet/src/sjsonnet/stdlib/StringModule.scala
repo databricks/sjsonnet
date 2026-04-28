@@ -26,11 +26,14 @@ object StringModule extends AbstractFunctionModule {
       Val.cachedNum(
         pos,
         (x.value match {
-          case Val.Str(_, s) => s.codePointCount(0, s.length)
-          case a: Val.Arr    => a.length
-          case o: Val.Obj    => o.visibleKeyNames.length
-          case o: Val.Func   => o.params.names.length
-          case x             => Error.fail("Cannot get length of " + x.prettyName)
+          case v: Val.Str =>
+            val s = v.str
+            if (v._asciiSafe || CharSWAR.isAllAscii(s)) s.length
+            else s.codePointCount(0, s.length)
+          case a: Val.Arr  => a.length
+          case o: Val.Obj  => o.visibleKeyNames.length
+          case o: Val.Func => o.params.names.length
+          case x           => Error.fail("Cannot get length of " + x.prettyName)
         }).toDouble
       )
   }
@@ -49,7 +52,9 @@ object StringModule extends AbstractFunctionModule {
 
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
     def evalRhs(_s: Eval, from: Eval, len: Eval, ev: EvalScope, pos: Position): Val = {
-      val str = _s.value.asString
+      val srcVal = _s.value
+      val str = srcVal.asString
+      val srcAsciiSafe = srcVal.isInstanceOf[Val.Str] && srcVal.asInstanceOf[Val.Str]._asciiSafe
       val offset = from.value match {
         case v: Val.Num => v.asPositiveInt
         case _ => Error.fail("Expected a number for offset in substr, got " + from.value.prettyName)
@@ -59,16 +64,28 @@ object StringModule extends AbstractFunctionModule {
         case _ => Error.fail("Expected a number for len in substr, got " + len.value.prettyName)
       }
 
-      val unicodeLength = str.codePointCount(0, str.length)
-      val safeOffset = math.min(offset, unicodeLength)
-      val safeLength = math.min(length, unicodeLength - safeOffset)
-
-      if (safeLength <= 0) {
-        Val.Str(pos, "")
+      if (srcAsciiSafe || CharSWAR.isAllAscii(str)) {
+        val strLen = str.length
+        val safeOffset = math.min(offset, strLen)
+        val safeLength = math.min(length, strLen - safeOffset)
+        if (safeLength <= 0) Val.Str(pos, "")
+        else {
+          val result = Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
+          if (srcAsciiSafe) result._asciiSafe = true
+          result
+        }
       } else {
-        val startUtf16 = if (safeOffset == 0) 0 else str.offsetByCodePoints(0, safeOffset)
-        val endUtf16 = str.offsetByCodePoints(startUtf16, safeLength)
-        Val.Str(pos, str.substring(startUtf16, endUtf16))
+        val unicodeLength = str.codePointCount(0, str.length)
+        val safeOffset = math.min(offset, unicodeLength)
+        val safeLength = math.min(length, unicodeLength - safeOffset)
+
+        if (safeLength <= 0) {
+          Val.Str(pos, "")
+        } else {
+          val startUtf16 = if (safeOffset == 0) 0 else str.offsetByCodePoints(0, safeOffset)
+          val endUtf16 = str.offsetByCodePoints(startUtf16, safeLength)
+          Val.Str(pos, str.substring(startUtf16, endUtf16))
+        }
       }
     }
   }
@@ -266,21 +283,69 @@ object StringModule extends AbstractFunctionModule {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
       sep.value match {
         case Val.Str(_, s) =>
-          val b = new java.lang.StringBuilder()
+          // Two-pass approach: pre-calculate total length to avoid StringBuilder resizing.
+          // Pass 1: force values, compute total length, count non-null elements.
+          val sepLen = s.length
+          var totalLen = 0L
+          var count = 0
+          val sepVal = sep.value.asInstanceOf[Val.Str]
+          var allAsciiSafe =
+            sepVal._asciiSafe || (CharSWAR.isAllAscii(s) && !CharSWAR.hasEscapeChar(s))
           var i = 0
-          var added = false
           while (i < arr.length) {
             arr.value(i) match {
-              case _: Val.Null   =>
-              case Val.Str(_, x) =>
-                if (added) b.append(s)
-                added = true
-                b.append(x)
+              case _: Val.Null =>
+              case vs: Val.Str =>
+                if (count > 0) totalLen += sepLen
+                totalLen += vs.str.length
+                if (allAsciiSafe && !vs._asciiSafe) allAsciiSafe = false
+                count += 1
               case x => Error.fail("Cannot join " + x.prettyName)
             }
             i += 1
           }
-          Val.Str(pos, b.toString)
+          if (count == 0) return Val.Str(pos, "")
+          if (totalLen > Int.MaxValue)
+            Error.fail("Join result too large: " + totalLen + " characters")
+          // Pass 2: build result in pre-sized char array.
+          val chars = new Array[Char](totalLen.toInt)
+          var cPos = 0
+          var added = false
+          i = 0
+          if (sepLen == 1) {
+            // Single-char separator fast path: direct char write
+            val sepChar = s.charAt(0)
+            while (i < arr.length) {
+              arr.value(i) match {
+                case _: Val.Null   =>
+                case Val.Str(_, x) =>
+                  if (added) { chars(cPos) = sepChar; cPos += 1 }
+                  added = true
+                  val xLen = x.length
+                  x.getChars(0, xLen, chars, cPos)
+                  cPos += xLen
+                case _ => // already validated in pass 1
+              }
+              i += 1
+            }
+          } else {
+            while (i < arr.length) {
+              arr.value(i) match {
+                case _: Val.Null   =>
+                case Val.Str(_, x) =>
+                  if (added) { s.getChars(0, sepLen, chars, cPos); cPos += sepLen }
+                  added = true
+                  val xLen = x.length
+                  x.getChars(0, xLen, chars, cPos)
+                  cPos += xLen
+                case _ => // already validated in pass 1
+              }
+              i += 1
+            }
+          }
+          val result = Val.Str(pos, new String(chars))
+          if (allAsciiSafe) result._asciiSafe = true
+          result
         case sep: Val.Arr =>
           val out = new mutable.ArrayBuilder.ofRef[Eval]
           // Set a reasonable size hint based on estimated result size

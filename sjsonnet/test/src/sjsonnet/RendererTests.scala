@@ -43,26 +43,14 @@ object RendererTests extends TestSuite {
         |]""".stripMargin
     }
 
-    test("appendLong") {
-      def render(v: Long): String = {
-        val cb = new upickle.core.CharBuilder
-        RenderUtils.appendLong(cb, v)
-        cb.makeString()
-      }
-      test("zero") { render(0L) ==> "0" }
-      test("positive") { render(42L) ==> "42" }
-      test("negative") { render(-1L) ==> "-1" }
-      test("large") { render(9999999999L) ==> "9999999999" }
-      test("maxValue") { render(Long.MaxValue) ==> Long.MaxValue.toString }
-      test("minValue") { render(Long.MinValue) ==> Long.MinValue.toString }
-    }
-
     test("visitFloat64Integers") {
-      // Verify that integer-valued doubles render correctly via the Renderer
       ujson.transform(ujson.Num(0), new Renderer()).toString ==> "0"
       ujson.transform(ujson.Num(42), new Renderer()).toString ==> "42"
       ujson.transform(ujson.Num(-1), new Renderer()).toString ==> "-1"
       ujson.transform(ujson.Num(1e15), new Renderer()).toString ==> "1000000000000000"
+      ujson.transform(ujson.Num(9999999999.0), new Renderer()).toString ==> "9999999999"
+      ujson.transform(ujson.Num(Long.MaxValue.toDouble), new Renderer()).toString ==>
+        Long.MaxValue.toDouble.toLong.toString
     }
 
     test("indentZero") {

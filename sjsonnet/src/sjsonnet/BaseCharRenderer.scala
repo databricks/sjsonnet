@@ -34,6 +34,9 @@ object BaseCharRenderer {
     while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
     a
   }
+
+  /** Below this length, scalar string scanning avoids a temporary char[] allocation. */
+  private final val StringSWARThreshold = 128
 }
 
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
@@ -259,19 +262,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     flushBuffer()
     s match {
       case str: String if !escapeUnicode =>
-        val len = str.length
-        if (!CharSWAR.hasEscapeChar(str)) {
-          elemBuilder.ensureLength(len + 2)
-          elemBuilder.appendUnsafe('"')
-          val cbArr = elemBuilder.arr
-          val pos = elemBuilder.getLength
-          str.getChars(0, len, cbArr, pos)
-          elemBuilder.length = pos + len
-          elemBuilder.appendUnsafe('"')
-        } else {
-          upickle.core.RenderUtils
-            .escapeChar(null, elemBuilder, s, escapeUnicode = escapeUnicode, wrapQuotes = true)
-        }
+        renderQuotedStringSWAR(str)
       case _ =>
         upickle.core.RenderUtils.escapeChar(
           null,
@@ -283,6 +274,144 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     }
     flushCharBuilder()
     out
+  }
+
+  protected def renderQuotedStringSWAR(str: String): Unit = {
+    val len = str.length
+    if (len == 0) {
+      elemBuilder.ensureLength(2)
+      elemBuilder.appendUnsafe('"')
+      elemBuilder.appendUnsafe('"')
+      return
+    }
+    if (len < BaseCharRenderer.StringSWARThreshold) {
+      val firstEscape = findFirstEscapeChar(str, 0, len)
+      if (firstEscape < 0) renderQuotedStringNoEscape(str, len)
+      else renderQuotedStringScalarEscaped(str, len, firstEscape)
+      return
+    }
+    if (!CharSWAR.hasEscapeChar(str)) {
+      renderQuotedStringNoEscape(str, len)
+      return
+    }
+    val chars = new Array[Char](len)
+    str.getChars(0, len, chars, 0)
+    val firstEscape = CharSWAR.findFirstEscapeCharChar(chars, 0, len)
+    if (firstEscape < 0) {
+      renderQuotedCharsNoEscape(chars, len)
+      return
+    }
+    renderQuotedCharsEscaped(chars, len, firstEscape)
+  }
+
+  private def renderQuotedStringNoEscape(str: String, len: Int): Unit = {
+    elemBuilder.ensureLength(len + 2)
+    elemBuilder.appendUnsafe('"')
+    appendStringRange(str, 0, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedCharsNoEscape(chars: Array[Char], len: Int): Unit = {
+    elemBuilder.ensureLength(len + 2)
+    elemBuilder.appendUnsafe('"')
+    appendCharRange(chars, 0, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedStringScalarEscaped(str: String, len: Int, firstEscape: Int): Unit = {
+    elemBuilder.ensureLength(len + len + 2)
+    elemBuilder.appendUnsafe('"')
+    var from = 0
+    var escPos = firstEscape
+    while (escPos >= 0) {
+      if (escPos > from) appendStringRange(str, from, escPos)
+      escapeCharInline(str.charAt(escPos))
+      from = escPos + 1
+      escPos = if (from < len) findFirstEscapeChar(str, from, len) else -1
+    }
+    if (from < len) appendStringRange(str, from, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  private def renderQuotedCharsEscaped(chars: Array[Char], len: Int, firstEscape: Int): Unit = {
+    elemBuilder.ensureLength(len + len + 2)
+    elemBuilder.appendUnsafe('"')
+    var from = 0
+    var escPos = firstEscape
+    while (escPos >= 0) {
+      if (escPos > from) appendCharRange(chars, from, escPos)
+      escapeCharInline(chars(escPos))
+      from = escPos + 1
+      escPos = if (from < len) CharSWAR.findFirstEscapeCharChar(chars, from, len) else -1
+    }
+    if (from < len) appendCharRange(chars, from, len)
+    elemBuilder.appendUnsafe('"')
+  }
+
+  @inline private def appendStringRange(str: String, from: Int, until: Int): Unit = {
+    val chunkLen = until - from
+    elemBuilder.ensureLength(chunkLen)
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    str.getChars(from, until, cbArr, pos)
+    elemBuilder.length = pos + chunkLen
+  }
+
+  @inline private def appendCharRange(chars: Array[Char], from: Int, until: Int): Unit = {
+    val chunkLen = until - from
+    elemBuilder.ensureLength(chunkLen)
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    System.arraycopy(chars, from, cbArr, pos, chunkLen)
+    elemBuilder.length = pos + chunkLen
+  }
+
+  @inline private def findFirstEscapeChar(str: String, from: Int, until: Int): Int = {
+    var i = from
+    while (i < until) {
+      val c = str.charAt(i)
+      if (c < 32 || c == '"' || c == '\\') return i
+      i += 1
+    }
+    -1
+  }
+
+  /**
+   * Fast path for strings known to be ASCII-safe (no escaping needed, all chars 0x20-0x7E). Skips
+   * the temporary char[] allocation and escape scan.
+   */
+  protected def renderAsciiSafeString(str: String): Unit = {
+    val len = str.length
+    elemBuilder.ensureLength(len + 2)
+    val cbArr = elemBuilder.arr
+    var pos = elemBuilder.getLength
+    cbArr(pos) = '"'
+    pos += 1
+    str.getChars(0, len, cbArr, pos)
+    pos += len
+    cbArr(pos) = '"'
+    elemBuilder.length = pos + 1
+  }
+
+  /** Inline JSON escape for a single char. */
+  protected def escapeCharInline(c: Char): Unit = {
+    elemBuilder.ensureLength(6)
+    (c: @scala.annotation.switch) match {
+      case '"'  => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('"')
+      case '\\' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('\\')
+      case '\b' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('b')
+      case '\f' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('f')
+      case '\n' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('n')
+      case '\r' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('r')
+      case '\t' => elemBuilder.appendUnsafe('\\'); elemBuilder.appendUnsafe('t')
+      case _    =>
+        elemBuilder.appendUnsafe('\\')
+        elemBuilder.appendUnsafe('u')
+        elemBuilder.appendUnsafe('0')
+        elemBuilder.appendUnsafe('0')
+        elemBuilder.appendUnsafe(sjsonnet.BaseByteRenderer.HEX_CHARS((c >> 4) & 0xf))
+        elemBuilder.appendUnsafe(sjsonnet.BaseByteRenderer.HEX_CHARS(c & 0xf))
+    }
   }
 
   final def renderIndent(): Unit = {
