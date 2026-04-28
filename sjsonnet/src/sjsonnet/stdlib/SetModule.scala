@@ -6,6 +6,20 @@ import sjsonnet.functions.AbstractFunctionModule
 import scala.collection.mutable
 import scala.collection.Searching.*
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-set std.set(arr, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-slice std.slice(indexable, index, end, step)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-uniq std.uniq(arr, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-sort std.sort(arr, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-setUnion std.setUnion(a, b, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-setInter std.setInter(a, b, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-setDiff std.setDiff(a, b, keyF=id)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-setMember std.setMember(x, arr, keyF=id)]]
+ */
 object SetModule extends AbstractFunctionModule {
   def name = "set"
 
@@ -13,6 +27,13 @@ object SetModule extends AbstractFunctionModule {
 
   @inline private def isDefaultKeyF(v: Val): Boolean = v.asInstanceOf[AnyRef] eq DefaultKeyF
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-set std.set(arr, keyF=id)]].
+   *
+   * Since: 0.10.0. Group: Sets.
+   *
+   * Shortcut for std.uniq(std.sort(arr)).
+   */
   private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, DefaultKeyF)) {
     def evalRhs(arr: Eval, keyF: Eval, ev: EvalScope, pos: Position): Val = {
       uniqArr(pos, ev, sortArr(pos, ev, arr.value, keyF.value), keyF.value)
@@ -241,16 +262,56 @@ object SetModule extends AbstractFunctionModule {
 
   val functions: Seq[(String, Val.Func)] = Seq(
     builtin(Set_),
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-slice std.slice(indexable, index, end, step)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * Selects the elements of an array or a string from index to end with step and returns an array
+     * or a string respectively.
+     *
+     * Note that it's recommended to use dedicated slicing syntax both for arrays and strings (e.g.
+     * arr[0:4:1] instead of std.slice(arr, 0, 4, 1)).
+     */
     builtin("slice", "indexable", "index", "end", "step") {
       (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-uniq std.uniq(arr, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * Removes successive duplicates. When given a sorted array, removes all duplicates.
+     *
+     * Optional argument keyF is a single argument function used to extract comparison key from each
+     * array element. Default value is identity function keyF=function(x) x.
+     */
     builtinWithDefaults("uniq", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
       uniqArr(pos, ev, args(0), args(1))
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-sort std.sort(arr, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Arrays.
+     *
+     * Sorts the array using the <= operator.
+     *
+     * Optional argument keyF is a single argument function used to extract comparison key from each
+     * array element. Default value is identity function keyF=function(x) x.
+     */
     builtinWithDefaults("sort", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
       sortArr(pos, ev, args(0), args(1))
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-setUnion std.setUnion(a, b, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Sets.
+     *
+     * Set union operation (values in any of a or b). Note that + on sets will simply concatenate
+     * the arrays, possibly forming an array that is not a set (due to not being ordered without
+     * duplicates).
+     */
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
@@ -308,6 +369,13 @@ object SetModule extends AbstractFunctionModule {
           Val.Arr(pos, out.result())
         }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-setInter std.setInter(a, b, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Sets.
+     *
+     * Set intersection operation (values in both a and b).
+     */
     builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
@@ -348,6 +416,13 @@ object SetModule extends AbstractFunctionModule {
 
         Val.Arr(pos, out.result())
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-setDiff std.setDiff(a, b, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Sets.
+     *
+     * Set difference operation (values in a but not b).
+     */
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
@@ -396,6 +471,13 @@ object SetModule extends AbstractFunctionModule {
 
         Val.Arr(pos, out.result())
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-setMember std.setMember(x, arr, keyF=id)]].
+     *
+     * Since: 0.10.0. Group: Sets.
+     *
+     * Returns true if x is a member of array, otherwise false.
+     */
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)

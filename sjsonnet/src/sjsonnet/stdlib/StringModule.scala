@@ -6,11 +6,57 @@ import sjsonnet.functions.AbstractFunctionModule
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.collection.mutable
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-toString std.toString(a)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-length std.length(x)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-codepoint std.codepoint(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-substr std.substr(str, from, len)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-startsWith std.startsWith(a, b)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-endsWith std.endsWith(a, b)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-char std.char(n)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-strReplace std.strReplace(str, from, to)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-stripChars std.stripChars(str, chars)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-lstripChars std.lstripChars(str, chars)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-rstripChars std.rstripChars(str, chars)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-join std.join(sep, arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-split std.split(str, c)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-splitLimit std.splitLimit(str, c, maxsplits)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-splitLimitR std.splitLimitR(str, c, maxsplits)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-stringChars std.stringChars(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-parseInt std.parseInt(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-parseOctal std.parseOctal(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-parseHex std.parseHex(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-asciiUpper std.asciiUpper(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-asciiLower std.asciiLower(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-encodeUTF8 std.encodeUTF8(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-decodeUTF8 std.decodeUTF8(arr)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-format std.format(str, vals)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-findSubstr std.findSubstr(pat, str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-isEmpty std.isEmpty(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-trim std.trim(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-equalsIgnoreCase std.equalsIgnoreCase(str1, str2)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-escapeStringJson std.escapeStringJson(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-escapeStringPython std.escapeStringPython(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-escapeStringXML std.escapeStringXML(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-escapeStringBash std.escapeStringBash(str)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-escapeStringDollars std.escapeStringDollars(str)]]
+ */
 object StringModule extends AbstractFunctionModule {
   def name = "string"
 
   private val whiteSpaces = StripUtils.codePointsSet(" \t\n\f\r\u0085\u00A0")
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-toString std.toString(a)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Convert the given argument to a string.
+   */
   private object ToString extends Val.Builtin1("toString", "a") {
     def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = Val.Str(
       pos,
@@ -21,6 +67,15 @@ object StringModule extends AbstractFunctionModule {
     )
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-length std.length(x)]].
+   *
+   * Since: 0.10.0. Group: Types and Reflection.
+   *
+   * Depending on the type of the value given, either returns the number of elements in the array,
+   * the number of codepoints in the string, the number of parameters in the function, or the number
+   * of fields in the object. Raises an error if given a primitive value, i.e. null, true or false.
+   */
   private object Length extends Val.Builtin1("length", "x") {
     def evalRhs(x: Eval, ev: EvalScope, pos: Position): Val =
       Val.cachedNum(
@@ -35,6 +90,14 @@ object StringModule extends AbstractFunctionModule {
       )
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-codepoint std.codepoint(str)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns the positive integer representing the unicode codepoint of the character in the given
+   * single-character string. This function is the inverse of std.char(n).
+   */
   private object Codepoint extends Val.Builtin1("codepoint", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val s = str.value.asString
@@ -47,6 +110,19 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-substr std.substr(str, from, len)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns a string that is the part of str that starts at offset from and is len codepoints long.
+   * If the string str is shorter than from+len, the suffix starting at position from will be
+   * returned.
+   *
+   * The slice operator (e.g., str[from:to]) can also be used on strings, as an alternative to this
+   * function. However, note that the slice operator takes a start and an end index, but std.substr
+   * takes a start index and a length.
+   */
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
     def evalRhs(_s: Eval, from: Eval, len: Eval, ev: EvalScope, pos: Position): Val = {
       val str = _s.value.asString
@@ -73,16 +149,38 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-startsWith std.startsWith(a, b)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns whether the string a is prefixed by the string b.
+   */
   private object StartsWith extends Val.Builtin2("startsWith", "a", "b") {
     def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
       Val.bool(a.value.asString.startsWith(b.value.asString))
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-endsWith std.endsWith(a, b)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns whether the string a is suffixed by the string b.
+   */
   private object EndsWith extends Val.Builtin2("endsWith", "a", "b") {
     def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val =
       Val.bool(a.value.asString.endsWith(b.value.asString))
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-char std.char(n)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns a string of length one whose only unicode codepoint has integer id n. This function is
+   * the inverse of std.codepoint(str).
+   */
   private object Char_ extends Val.Builtin1("char", "n") {
     def evalRhs(n: Eval, ev: EvalScope, pos: Position): Val = {
       val c = n.value.asInt
@@ -93,6 +191,14 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-strReplace std.strReplace(str, from, to)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns a copy of the string in which all occurrences of string from have been replaced with
+   * string to.
+   */
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
     def evalRhs(str: Eval, from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
       val fromForce = from.value.asString
@@ -216,6 +322,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-stripChars std.stripChars(str, chars)]].
+   *
+   * Since: 0.15.0. Group: String Manipulation.
+   *
+   * Removes characters chars from the beginning and from the end of str.
+   */
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
       val charsSet = StripUtils.codePointsSet(chars.value.asString)
@@ -231,6 +344,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-lstripChars std.lstripChars(str, chars)]].
+   *
+   * Since: 0.15.0. Group: String Manipulation.
+   *
+   * Removes characters chars from the beginning of str.
+   */
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
       val charsSet = StripUtils.codePointsSet(chars.value.asString)
@@ -246,6 +366,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-rstripChars std.rstripChars(str, chars)]].
+   *
+   * Since: 0.15.0. Group: String Manipulation.
+   *
+   * Removes characters chars from the end of str.
+   */
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
       val charsSet = StripUtils.codePointsSet(chars.value.asString)
@@ -261,6 +388,15 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-join std.join(sep, arr)]].
+   *
+   * Since: 0.10.0. Group: Arrays.
+   *
+   * If sep is a string, then arr must be an array of strings, in which case they are concatenated
+   * with sep used as a delimiter. If sep is an array, then arr must be an array of arrays, in which
+   * case the arrays are concatenated in the same way, to produce a single array.
+   */
   private object Join extends Val.Builtin2("join", "sep", "arr") {
     def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
@@ -329,18 +465,44 @@ object StringModule extends AbstractFunctionModule {
     b.result()
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-split std.split(str, c)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Split the string str into an array of strings, divided by the string c.
+   *
+   * Note: Versions up to and including 0.18.0 require c to be a single character.
+   */
   private object Split extends Val.Builtin2("split", "str", "c") {
     def evalRhs(str: Eval, c: Eval, ev: EvalScope, pos: Position): Val = {
       Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, -1))
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-splitLimit std.splitLimit(str, c, maxsplits)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * As std.split(str, c) but will stop after maxsplits splits, thereby the largest array it will
+   * return has length maxsplits + 1. A limit of -1 means unlimited.
+   *
+   * Note: Versions up to and including 0.18.0 require c to be a single character.
+   */
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, maxSplits.value.asInt))
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-splitLimitR std.splitLimitR(str, c, maxsplits)]].
+   *
+   * Since: 0.19.0. Group: String Manipulation.
+   *
+   * As std.splitLimit(str, c, maxsplits) but will split from right to left.
+   */
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       Val.Arr(
@@ -352,11 +514,25 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-stringChars std.stringChars(str)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Split the string str into an array of strings, each containing a single codepoint.
+   */
   private object StringChars extends Val.Builtin1("stringChars", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       stringChars(pos, str.value.asString)
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-parseInt std.parseInt(str)]].
+   *
+   * Since: 0.10.0. Group: Parsing.
+   *
+   * Parses a signed decimal integer from the input string.
+   */
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val s = str.value.asString
@@ -368,6 +544,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-parseOctal std.parseOctal(str)]].
+   *
+   * Since: 0.10.0. Group: Parsing.
+   *
+   * Parses an unsigned octal integer from the input string. Initial zeroes are tolerated.
+   */
   private object ParseOctal extends Val.Builtin1("parseOctal", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val s = str.value.asString
@@ -376,6 +559,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-parseHex std.parseHex(str)]].
+   *
+   * Since: 0.10.0. Group: Parsing.
+   *
+   * Parses an unsigned hexadecimal integer, from the input string. Case insensitive.
+   */
   private object ParseHex extends Val.Builtin1("parseHex", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val s = str.value.asString
@@ -431,16 +621,37 @@ object StringModule extends AbstractFunctionModule {
     if (out == null) str else new String(out)
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-asciiUpper std.asciiUpper(str)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns a copy of the string in which all ASCII letters are capitalized.
+   */
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, asciiUpper(str.value.asString))
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-asciiLower std.asciiLower(str)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Returns a copy of the string in which all ASCII letters are lower cased.
+   */
   private object AsciiLower extends Val.Builtin1("asciiLower", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, asciiLower(str.value.asString))
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-encodeUTF8 std.encodeUTF8(str)]].
+   *
+   * Since: 0.13.0. Group: Parsing.
+   *
+   * Encode a string using UTF8. Returns an array of numbers representing bytes.
+   */
   private object EncodeUTF8 extends Val.Builtin1("encodeUTF8", "str") {
     def evalRhs(s: Eval, ev: EvalScope, pos: Position): Val = {
       val bytes = s.value.asString.getBytes(UTF_8)
@@ -454,6 +665,13 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-decodeUTF8 std.decodeUTF8(arr)]].
+   *
+   * Since: 0.13.0. Group: Parsing.
+   *
+   * Decode an array of numbers representing bytes using UTF8. Returns a string.
+   */
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
       for ((v, idx) <- arr.value.asArr.iterator.zipWithIndex) {
@@ -470,6 +688,15 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-format std.format(str, vals)]].
+   *
+   * Since: 0.10.0. Group: String Manipulation.
+   *
+   * Format the string str using the values in vals. The values can be an array, an object, or in
+   * other cases are treated as if they were provided in a singleton array. The string formatting
+   * follows the same rules as Python. The % operator can be used as a shorthand for this function.
+   */
   private object Format_ extends Val.Builtin2("format", "str", "vals") {
     def evalRhs(str: Eval, vals: Eval, ev: EvalScope, pos: Position): Val =
       Val.Str(pos, Format.format(str.value.asString, vals.value, pos)(ev))
@@ -543,6 +770,13 @@ object StringModule extends AbstractFunctionModule {
     builtin(EncodeUTF8),
     builtin(DecodeUTF8),
     builtin(Format_),
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-findSubstr std.findSubstr(pat, str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Returns an array that contains the indexes of all occurrences of pat in str.
+     */
     builtin("findSubstr", "pat", "str") { (pos, ev, pat: String, str: String) =>
       if (pat.isEmpty) Val.Arr(pos, new Array[Eval](0))
       else {
@@ -567,6 +801,13 @@ object StringModule extends AbstractFunctionModule {
         }
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-isEmpty std.isEmpty(str)]].
+     *
+     * Since: 0.20.0. Group: String Manipulation.
+     *
+     * Returns true if the given string is of zero length.
+     */
     builtin("isEmpty", "str") { (_, _, value: Val) =>
       value match {
         case Val.Str(_, s) => s.isEmpty
@@ -577,13 +818,36 @@ object StringModule extends AbstractFunctionModule {
           Error.fail("length operates on strings, objects, and arrays, got " + x.prettyName)
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-trim std.trim(str)]].
+     *
+     * Since: 0.21.0. Group: String Manipulation.
+     *
+     * Returns a copy of string after eliminating leading and trailing whitespaces.
+     */
     builtin("trim", "str") { (_, _, str: String) =>
       StripUtils.unspecializedStrip(str, whiteSpaces, true, true)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-equalsIgnoreCase std.equalsIgnoreCase(str1, str2)]].
+     *
+     * Since: 0.21.0. Group: String Manipulation.
+     *
+     * Returns true if the the given str1 is equal to str2 by doing case insensitive comparison,
+     * false otherwise.
+     */
     builtin("equalsIgnoreCase", "str1", "str2") { (_, _, str1: String, str2: String) =>
       // Official equalsIgnoreCase is defined through asciiLower, not Unicode case folding.
       asciiLower(str1) == asciiLower(str2)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-escapeStringJson std.escapeStringJson(str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Convert str to allow it to be embedded in a JSON representation, within a string. This adds
+     * quotes, escapes backslashes, and escapes unprintable characters.
+     */
     builtin("escapeStringJson", "str_") { (pos, ev, str: Val) =>
       if (str.value.isInstanceOf[Val.Str]) {
         Materializer.stringify(str)(ev)
@@ -593,11 +857,26 @@ object StringModule extends AbstractFunctionModule {
         out.toString
       }
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-escapeStringPython std.escapeStringPython(str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Convert str to allow it to be embedded in Python. This is an alias for std.escapeStringJson.
+     */
     builtin("escapeStringPython", "str") { (pos, ev, str: Val) =>
       val out = new java.io.StringWriter()
       BaseRenderer.escape(out, stdToString(str)(ev), unicode = true)
       out.toString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-escapeStringXML std.escapeStringXML(str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Convert str to allow it to be embedded in XML (or HTML). It escapes XML-sensitive characters
+     * (<, >, &, ", and ').
+     */
     builtin("escapeStringXML", "str") { (_, ev, str: Val) =>
       val string = stdToString(str)(ev)
       val out = new java.io.StringWriter()
@@ -615,9 +894,26 @@ object StringModule extends AbstractFunctionModule {
       }
       out.toString
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-escapeStringBash std.escapeStringBash(str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Wrap str in single quotes, and escape any single quotes within str by changing them to a
+     * sequence '"'"'. This allows injection of arbitrary strings as arguments of commands in bash
+     * scripts.
+     */
     builtin("escapeStringBash", "str_") { (pos, ev, str: Val) =>
       "'" + stdToString(str)(ev).replace("'", """'"'"'""") + "'"
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-escapeStringDollars std.escapeStringDollars(str)]].
+     *
+     * Since: 0.10.0. Group: String Manipulation.
+     *
+     * Convert $ to $$ in str. This allows injection of arbitrary strings into systems that use $
+     * for string interpolation (like Terraform).
+     */
     builtin("escapeStringDollars", "str_") { (pos, ev, str: Val) =>
       stdToString(str)(ev).replace("$", "$$")
     }

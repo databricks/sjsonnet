@@ -4,9 +4,37 @@ import sjsonnet._
 import sjsonnet.Expr.Member.Visibility
 import sjsonnet.functions.AbstractFunctionModule
 
+/**
+ * Native implementations for Jsonnet standard-library entries in this module.
+ *
+ * Official Jsonnet stdlib documentation links for this module:
+ *
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectHas std.objectHas(o, f)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectHasAll std.objectHasAll(o, f)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectFields std.objectFields(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectFieldsAll std.objectFieldsAll(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectValues std.objectValues(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectValuesAll std.objectValuesAll(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-get std.get(o, f, default=null, inc_hidden=true)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-mapWithKey std.mapWithKey(func, obj)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectKeysValues std.objectKeysValues(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectKeysValuesAll std.objectKeysValuesAll(o)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-objectRemoveKey std.objectRemoveKey(obj, key)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-mergePatch std.mergePatch(target, patch)]]
+ *   - [[https://jsonnet.org/ref/stdlib.html#std-prune std.prune(a)]]
+ */
 object ObjectModule extends AbstractFunctionModule {
   def name = "object"
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectHas std.objectHas(o, f)]].
+   *
+   * Since: 0.10.0. Group: Objects.
+   *
+   * Returns true if the given object has the field (given as a string), otherwise false. Raises an
+   * error if the arguments are not object and string respectively. Returns false if the field is
+   * hidden.
+   */
   private object ObjectHas extends Val.Builtin2("objectHas", "o", "f") {
     def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
       Val.bool(o.value.asObj.containsVisibleKey(f.value.asString))
@@ -21,6 +49,13 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectHasAll std.objectHasAll(o, f)]].
+   *
+   * Since: 0.10.0. Group: Objects.
+   *
+   * As std.objectHas but also includes hidden fields.
+   */
   private object ObjectHasAll extends Val.Builtin2("objectHasAll", "o", "f") {
     def evalRhs(o: Eval, f: Eval, ev: EvalScope, pos: Position): Val =
       Val.bool(o.value.asObj.containsKey(f.value.asString))
@@ -35,6 +70,14 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectFields std.objectFields(o)]].
+   *
+   * Since: 0.10.0. Group: Objects.
+   *
+   * Returns an array of strings, each element being a field from the given object. Does not include
+   * hidden fields.
+   */
   private object ObjectFields extends Val.Builtin1("objectFields", "o") {
     def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
       val keys = getVisibleKeys(ev, o.value.asObj)
@@ -48,6 +91,13 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectFieldsAll std.objectFieldsAll(o)]].
+   *
+   * Since: 0.10.0. Group: Objects.
+   *
+   * As std.objectFields but also includes hidden fields.
+   */
   private object ObjectFieldsAll extends Val.Builtin1("objectFieldsAll", "o") {
     def evalRhs(o: Eval, ev: EvalScope, pos: Position): Val = {
       val keys = getAllKeys(ev, o.value.asObj)
@@ -76,6 +126,13 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectValues std.objectValues(o)]].
+   *
+   * Since: 0.17.0. Group: Objects.
+   *
+   * Returns an array of the values in the given object. Does not include hidden fields.
+   */
   private object ObjectValues extends Val.Builtin1("objectValues", "o") {
     def evalRhs(_o: Eval, ev: EvalScope, pos: Position): Val = {
       val o = _o.value.asObj
@@ -84,6 +141,13 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-objectValuesAll std.objectValuesAll(o)]].
+   *
+   * Since: 0.17.0. Group: Objects.
+   *
+   * As std.objectValues but also includes hidden fields.
+   */
   private object ObjectValuesAll extends Val.Builtin1("objectValuesAll", "o") {
     def evalRhs(_o: Eval, ev: EvalScope, pos: Position): Val = {
       val o = _o.value.asObj
@@ -92,6 +156,14 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-get std.get(o, f, default=null, inc_hidden=true)]].
+   *
+   * Since: 0.18.0. Group: Objects.
+   *
+   * Returns the object's field if it exists or default value otherwise. inc_hidden controls whether
+   * to include hidden fields.
+   */
   private object Get
       extends Val.Builtin(
         "get",
@@ -112,6 +184,15 @@ object ObjectModule extends AbstractFunctionModule {
     }
   }
 
+  /**
+   * [[https://jsonnet.org/ref/stdlib.html#std-mapWithKey std.mapWithKey(func, obj)]].
+   *
+   * Since: 0.10.0. Group: Objects.
+   *
+   * Apply the given function to all fields of the given object, also passing the field name. The
+   * function func is expected to take the field name as the first parameter and the field value as
+   * the second.
+   */
   private object MapWithKey extends Val.Builtin2("mapWithKey", "func", "obj") {
     def evalRhs(_func: Eval, _obj: Eval, ev: EvalScope, pos: Position): Val = {
       val func = _func.value.asFunc
@@ -212,6 +293,14 @@ object ObjectModule extends AbstractFunctionModule {
     builtin(ObjectValuesAll),
     builtin(Get),
     builtin(MapWithKey),
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-objectKeysValues std.objectKeysValues(o)]].
+     *
+     * Since: 0.20.0. Group: Objects.
+     *
+     * Returns an array of objects from the given object, each object having two fields: key
+     * (string) and value (object). Does not include hidden fields.
+     */
     builtin("objectKeysValues", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getVisibleKeys(ev, o)
       val noOffsetPos = pos.fileScope.noOffsetPos
@@ -232,6 +321,13 @@ object ObjectModule extends AbstractFunctionModule {
       }
       Val.Arr(pos, result)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-objectKeysValuesAll std.objectKeysValuesAll(o)]].
+     *
+     * Since: 0.20.0. Group: Objects.
+     *
+     * As std.objectKeysValues but also includes hidden fields.
+     */
     builtin("objectKeysValuesAll", "o") { (pos, ev, o: Val.Obj) =>
       val keys = getAllKeys(ev, o)
       val noOffsetPos = pos.fileScope.noOffsetPos
@@ -252,9 +348,23 @@ object ObjectModule extends AbstractFunctionModule {
       }
       Val.Arr(pos, result)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-objectRemoveKey std.objectRemoveKey(obj, key)]].
+     *
+     * Since: 0.21.0. Group: Objects.
+     *
+     * Returns a new object after removing the given key from object.
+     */
     builtin("objectRemoveKey", "obj", "key") { (pos, ev, o: Val.Obj, key: String) =>
       o.removeKeys(pos, key)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-mergePatch std.mergePatch(target, patch)]].
+     *
+     * Since: 0.10.0. Group: JSON Merge Patch.
+     *
+     * Applies patch to target according to RFC7396
+     */
     builtin("mergePatch", "target", "patch") { (pos, ev, target: Val, patch: Val) =>
       val mergePosition = pos
       def createLazyMember(v: => Val) =
@@ -378,6 +488,14 @@ object ObjectModule extends AbstractFunctionModule {
       }
       recPair(target.value, patch.value)
     },
+    /**
+     * [[https://jsonnet.org/ref/stdlib.html#std-prune std.prune(a)]].
+     *
+     * Since: 0.10.0. Group: Types and Reflection.
+     *
+     * Recursively remove all "empty" members of a. "Empty" is defined as zero length `arrays`, zero
+     * length `objects`, or `null` values. The argument a may have any type.
+     */
     builtin("prune", "a") { (pos, ev, s: Val) =>
       def filter(x: Val) = x match {
         case c: Val.Arr if c.length == 0                 => false
