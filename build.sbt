@@ -1,11 +1,12 @@
 val sjsonnetVersion = IO.readLines(new File("sjsonnet/version")).head.trim
 cancelable in Global := true
 
-val options = Seq("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
+val options = Seq("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all", "-release", "17")
 
 lazy val commonSettings = Seq(
   scalaVersion := "3.3.7",
-  scalacOptions ++= options
+  scalacOptions ++= options,
+  javacOptions ++= Seq("--release", "17")
 )
 
 lazy val main = (project in file("sjsonnet"))

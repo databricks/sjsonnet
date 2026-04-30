@@ -358,6 +358,9 @@ object sjsonnet extends VersionFileModule {
     def forkArgs =
       Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
 
+    def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
+    def javacOptions = super.javacOptions() ++ Seq("--release", "17")
+
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.11",
       mvn"at.yawk.lz4:lz4-java::1.10.3",
@@ -372,6 +375,7 @@ object sjsonnet extends VersionFileModule {
 
     object client extends JavaModule with SjsonnetPublishModule {
       def artifactName = "sjsonnet-server"
+      def javacOptions = super.javacOptions() ++ Seq("--release", "17")
       def mvnDeps = Seq(
         mvn"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
           "net.java.dev.jna" -> "jna",
@@ -385,6 +389,8 @@ object sjsonnet extends VersionFileModule {
       def artifactName = "sjsonnet-server"
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
+      def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
+      def javacOptions = super.javacOptions() ++ Seq("--release", "17")
       def mvnDeps = Seq(
         mvn"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
           "net.java.dev.jna" -> "jna",
@@ -432,8 +438,7 @@ object sjsonnet extends VersionFileModule {
   object graal extends NativeImageModule {
     def finalMainClass = jvm(scalaVersions(0)).mainClass().get
     def runClasspath = Seq()
-    def jvmId = "graalvm-community:25.0.1"
-    def jvmIndexVersion = "0.0.4-128-8f0ad3"
+    def jvmId = "graalvm-community:25"
     def localBinName = "sjsonnet-native"
     def nativeImageClasspath = Seq(jvm(scalaVersions(0)).assembly())
 
