@@ -11,27 +11,15 @@ object InterpretAsyncTests extends TestSuite {
 
   /**
    * Wraps a synchronous file map as a JS Promise-returning loader, so the test exercises the real
-   * async code path. Records the order of resolved loads.
+   * async code path.
    */
   private def makeAsyncLoader(
-      files: Map[String, String],
-      bin: Map[String, Array[Byte]] = Map.empty,
-      log: scala.collection.mutable.ArrayBuffer[String] =
-        scala.collection.mutable.ArrayBuffer.empty)
-      : js.Function2[String, Boolean, js.Promise[Any]] = {
-    (path: String, binaryData: Boolean) =>
+      files: Map[String, String]): js.Function2[String, Boolean, js.Promise[Any]] = {
+    (path: String, _: Boolean) =>
       Future {
-        log += path
-        if (binaryData) {
-          bin.get(path) match {
-            case Some(b) => b.toJSArray.asInstanceOf[Any]
-            case None    => throw js.JavaScriptException(s"missing binary file: $path")
-          }
-        } else {
-          files.get(path) match {
-            case Some(s) => s.asInstanceOf[Any]
-            case None    => throw js.JavaScriptException(s"missing file: $path")
-          }
+        files.get(path) match {
+          case Some(s) => s.asInstanceOf[Any]
+          case None    => throw js.JavaScriptException(s"missing file: $path")
         }
       }.toJSPromise
   }
@@ -39,12 +27,9 @@ object InterpretAsyncTests extends TestSuite {
   private def makeResolver(known: Set[String]): js.Function2[String, String, String] =
     (_: String, name: String) => if (known.contains(name)) name else null
 
-  private def runAsync(
-      text: String,
-      files: Map[String, String] = Map.empty,
-      bin: Map[String, Array[Byte]] = Map.empty): Future[ujson.Value] = {
-    val loader = makeAsyncLoader(files, bin)
-    val resolver = makeResolver(files.keySet ++ bin.keySet)
+  private def runAsync(text: String, files: Map[String, String]): Future[ujson.Value] = {
+    val loader = makeAsyncLoader(files)
+    val resolver = makeResolver(files.keySet)
     SjsonnetMain
       .interpretAsync(
         text,
