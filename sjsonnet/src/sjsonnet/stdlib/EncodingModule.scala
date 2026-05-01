@@ -5,8 +5,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-import java.nio.charset.StandardCharsets.UTF_8
-
 /**
  * Native implementations for Jsonnet standard-library entries in this module.
  *

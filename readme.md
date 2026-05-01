@@ -125,6 +125,30 @@ filesystem, you have to provide an explicit import callback that you can
 use to resolve imports yourself (whether through Node's `fs` module, or
 by emulating a filesystem in-memory)
 
+#### Async imports
+
+`SjsonnetMain.interpret` is synchronous, which is awkward in browsers where
+files come from `fetch` or `FileReader`. Use `SjsonnetMain.interpretAsync`
+instead: the loader returns a `Promise` and the call returns a `Promise` of
+the result. Imports are statically discovered from each parsed file's AST,
+loaded concurrently, then evaluated synchronously against the populated cache.
+
+```javascript
+const result = await SjsonnetMain.interpretAsync(
+  "local lib = import 'lib.libsonnet'; lib.greet('world')",
+  {}, // extVars
+  {}, // tlaVars
+  "", // initial working directory
+  (wd, imported) => imported, // resolver, same shape as `interpret`
+  // loader: returns a Promise of the file contents (string for `import` /
+  // `importstr`, or bytes for `importbin`)
+  async (path, binary) => {
+    const response = await fetch("/files/" + path);
+    return binary ? new Uint8Array(await response.arrayBuffer()) : await response.text();
+  }
+);
+```
+
 ### Running deeply recursive Jsonnet programs
 
 The depth of recursion is limited by running environment stack size. You can run Sjsonnet with increased
