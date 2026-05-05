@@ -5,7 +5,7 @@ import utest._
 object ValArrayViewTests extends TestSuite {
   private val testPos = new Position(null, -1)
 
-  private final class NoBulkArr(size: Int) extends Val.Arr(testPos, Val.Arr.EMPTY_EVAL_ARRAY) {
+  private final class NoBulkArr(size: Int) extends Val.Arr(testPos, null) {
     var bulkCalls: Int = 0
 
     override def length: Int = size
@@ -42,6 +42,22 @@ object ValArrayViewTests extends TestSuite {
       materialized.length ==> 2967
       materialized(2).value.asDouble ==> 106.0
       source.bulkCalls ==> 0
+    }
+
+    test("copyEvalToAvoidsBulkMaterializingConcatChildren") {
+      val left = new NoBulkArr(5000)
+      val right = new NoBulkArr(5000)
+      val concat = left.concat(testPos, right)
+
+      val result = new Array[Eval](concat.length)
+      concat.copyEvalTo(result, 0) ==> 10000
+
+      result(0).value.asDouble ==> 0.0
+      result(4999).value.asDouble ==> 4999.0
+      result(5000).value.asDouble ==> 0.0
+      result(9999).value.asDouble ==> 4999.0
+      left.bulkCalls ==> 0
+      right.bulkCalls ==> 0
     }
   }
 }

@@ -418,15 +418,7 @@ object StringModule extends AbstractFunctionModule {
    */
   private object Join extends Val.Builtin2("join", "sep", "arr") {
     private def appendArray(out: mutable.ArrayBuilder.ofRef[Eval], arr: Val.Arr): Unit = {
-      val direct = arr.directBackingArray
-      if (direct != null) out ++= direct
-      else {
-        var i = 0
-        while (i < arr.length) {
-          out += arr.eval(i)
-          i += 1
-        }
-      }
+      arr.copyEvalTo(out)
     }
 
     def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {

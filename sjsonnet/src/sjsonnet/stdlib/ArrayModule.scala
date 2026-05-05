@@ -387,11 +387,7 @@ object ArrayModule extends AbstractFunctionModule {
       for (x <- arr) {
         x.value match {
           case v: Val.Arr =>
-            var i = 0
-            while (i < v.length) {
-              out += v.eval(i)
-              i += 1
-            }
+            v.copyEvalTo(out)
           case x =>
             Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
         }
@@ -820,12 +816,7 @@ object ArrayModule extends AbstractFunctionModule {
           while (i < subArrays.length) {
             val sub = subArrays(i)
             if (sub != null) {
-              var j = 0
-              while (j < sub.length) {
-                result(offset + j) = sub.eval(j)
-                j += 1
-              }
-              offset += sub.length
+              offset = sub.copyEvalTo(result, offset)
             }
             i += 1
           }
