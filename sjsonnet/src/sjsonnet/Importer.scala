@@ -155,6 +155,23 @@ trait ResolvedFile {
 
   // Used by importbin
   def readRawBytes(): Array[Byte]
+
+  /**
+   * Optional pre-parsed AST. When defined, [[CachedResolver.parse]] uses this instead of running
+   * fastparse again. Set by [[Preloader]] to avoid parsing each file twice (once during async
+   * import discovery, once during evaluation).
+   */
+  def preParsedAst: Option[(Expr, FileScope)] = None
+}
+
+/** Wraps another [[ResolvedFile]] with an attached pre-parsed AST so the parser can be skipped. */
+final case class PreParsedResolvedFile(underlying: ResolvedFile, expr: Expr, fileScope: FileScope)
+    extends ResolvedFile {
+  def getParserInput(): ParserInput = underlying.getParserInput()
+  def readString(): String = underlying.readString()
+  def contentHash(): String = underlying.contentHash()
+  def readRawBytes(): Array[Byte] = underlying.readRawBytes()
+  override val preParsedAst: Option[(Expr, FileScope)] = Some((expr, fileScope))
 }
 
 final case class StaticResolvedFile(content: String) extends ResolvedFile {
@@ -209,25 +226,28 @@ class CachedResolver(
       ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
     parseCache.getOrElseUpdate(
       (path, content.contentHash()), {
-        val parsed =
-          try {
-            fastparse.parse(
-              content.getParserInput(),
-              parser(path).document(_)
-            ) match {
-              case f @ Parsed.Failure(_, _, _) =>
-                val traced = f.trace()
-                val pos = new Position(new FileScope(path), traced.index)
-                Left(new ParseError(traced.msg).addFrame(pos))
-              case Parsed.Success(r, _) => Right(r)
+        val parsed: Either[Error, (Expr, FileScope)] = content.preParsedAst match {
+          case Some(pre) => Right(pre)
+          case None      =>
+            try {
+              fastparse.parse(
+                content.getParserInput(),
+                parser(path).document(_)
+              ) match {
+                case f @ Parsed.Failure(_, _, _) =>
+                  val traced = f.trace()
+                  val pos = new Position(new FileScope(path), traced.index)
+                  Left(new ParseError(traced.msg).addFrame(pos))
+                case Parsed.Success(r, _) => Right(r)
+              }
+            } catch {
+              case e: ParseError if e.offset >= 0 =>
+                val pos = new Position(new FileScope(path), e.offset)
+                Left(new ParseError(e.getMessage).addFrame(pos))
+              case e: ParseError =>
+                Left(e)
             }
-          } catch {
-            case e: ParseError if e.offset >= 0 =>
-              val pos = new Position(new FileScope(path), e.offset)
-              Left(new ParseError(e.getMessage).addFrame(pos))
-            case e: ParseError =>
-              Left(e)
-          }
+        }
         parsed.flatMap { case (e, fs) => process(e, fs) }
       }
     )

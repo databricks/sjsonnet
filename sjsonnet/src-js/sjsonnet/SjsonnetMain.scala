@@ -168,9 +168,19 @@ object SjsonnetMain {
    * Async variant of [[interpret]]. Accepts an `importLoader` that returns a `Promise` of the file
    * contents, and returns a `Promise` resolving to the rendered output.
    *
-   * Implementation: imports are statically discovered by parsing each file's AST, loaded
-   * concurrently via the user-supplied async loader, and inserted into a cache. Once the transitive
-   * closure is loaded, evaluation runs synchronously against the cache.
+   * Imports are eagerly front-loaded: every `import`, `importstr`, and `importbin` reachable from
+   * the entry source (plus from any extVar/tlaVar code snippets) is statically discovered and
+   * loaded before evaluation begins. This includes imports inside branches the evaluator will never
+   * force, e.g. `if false then import 'x' else 1` will still ask the loader for `x`. The tradeoff
+   * is that all I/O happens up front, which is what lets evaluation run synchronously.
+   *
+   *   - Loader rejection (missing file, network error, etc.) fails the returned Promise.
+   *   - A parse error on a discovered (non-entry) file is tolerated; it only surfaces if evaluation
+   *     actually forces that branch.
+   *   - The entry source's own parse error fails immediately.
+   *
+   * Each discovered file is parsed once during preload and again referenced by the evaluator; the
+   * parsed AST is shared so fastparse runs only once per file.
    */
   @JSExport
   def interpretAsync(

@@ -116,6 +116,58 @@ object PreloaderTests extends TestSuite {
       assert(result == Right(ujson.Str("hello, world")))
     }
 
+    test("preloaded files carry pre-parsed AST so fastparse runs once") {
+      // Wrap each ResolvedFile with a counter so we can detect re-parsing. The Preloader parses
+      // once during discover; the Interpreter should consume the attached AST without re-parsing.
+      val parseCount = mutable.HashMap.empty[Path, Int].withDefaultValue(0)
+      class CountingResolvedFile(content: String, path: Path) extends ResolvedFile {
+        def getParserInput(): fastparse.ParserInput = {
+          parseCount(path) = parseCount(path) + 1
+          fastparse.IndexedParserInput(content)
+        }
+        def readString(): String           = content
+        def contentHash(): String          = content
+        def readRawBytes(): Array[Byte]    =
+          content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+      }
+      val files = Map(
+        "lib.libsonnet" -> "{ x: 1 }",
+        "entry"         -> "(import 'lib.libsonnet').x"
+      )
+      val importer = new Importer {
+        def resolve(docBase: Path, importName: String): Option[Path] =
+          if (files.contains(importName)) Some(DummyPath(importName)) else None
+        def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
+          throw new RuntimeException(s"unexpected read: $path")
+      }
+      val preloader = new Preloader(importer)
+      val entryPath = DummyPath("entry")
+      preloader.add(entryPath, new CountingResolvedFile(files("entry"), entryPath))
+      while (!preloader.isComplete) {
+        val batch = preloader.takePendingImports()
+        batch.foreach { p =>
+          val key = p.path.asInstanceOf[DummyPath].segments.head
+          preloader.add(p.path, new CountingResolvedFile(files(key), p.path), p.kind)
+        }
+      }
+      // Both files have been parsed exactly once — the Preloader's parse pass.
+      assert(parseCount(DummyPath("lib.libsonnet")) == 1)
+      assert(parseCount(entryPath) == 1)
+
+      // Run a full interpret. The Interpreter must not re-parse; getParserInput would bump the
+      // counter again if it did.
+      val interp = new Interpreter(
+        Map.empty[String, String],
+        Map.empty[String, String],
+        DummyPath(),
+        preloader.importer,
+        parseCache = new DefaultParseCache
+      )
+      val result = interp.interpret(files("entry"), entryPath)
+      assert(result == Right(ujson.Num(1)))
+      assert(parseCount(DummyPath("lib.libsonnet")) == 1)
+    }
+
     test("resolves imports relative to the importing file's parent directory") {
       // Resolver records what docBase it was called with, and only resolves names against the
       // expected `dir/` parent — proving the preloader passes parent(), not the file path itself.

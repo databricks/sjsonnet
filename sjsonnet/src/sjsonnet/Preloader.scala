@@ -13,6 +13,17 @@ import scala.collection.mutable
  * them, parse the loaded code files for further imports, and repeat until the closure is known.
  * Once all files are in the cache, normal synchronous evaluation can run.
  *
+ * Eager front-loading: every reachable import is loaded up front, including ones inside branches
+ * the evaluator will never force (`if false then import 'x' else 1`). This trades laziness for the
+ * ability to do all I/O before evaluation. Parse errors on discovered (non-entry) files are
+ * tolerated for the same reason — they only surface at evaluation time if the branch is actually
+ * forced. Loader failures (a rejected Promise, missing file, etc.) are real I/O problems and
+ * propagate up to the caller.
+ *
+ * The parsed AST of each loaded code file is attached to its cache entry as a
+ * [[PreParsedResolvedFile]] so the Interpreter does not re-run fastparse during evaluation; the
+ * static optimizer still runs once on cache hit.
+ *
  * Usage (pseudo-code):
  * {{{
  *   val preloader = new Preloader(parentImporter)
@@ -99,7 +110,10 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
         case f: Parsed.Failure =>
           val traced = f.trace()
           Left(new ParseError(s"$path: ${traced.msg}", offset = traced.index))
-        case Parsed.Success((expr, _), _) =>
+        case Parsed.Success((expr, fs), _) =>
+          // Stash the parsed AST on the cache entry so the Interpreter doesn't re-run fastparse.
+          // The optimizer still runs once at evaluation time on cache hit.
+          cache.put(path, PreParsedResolvedFile(content, expr, fs))
           // Match the synchronous evaluator's docBase: resolve relative to the importing file's
           // parent directory, not the file path itself. See Importer.resolveAndReadOrFail, which
           // calls resolve(pos.fileScope.currentFile.parent(), ...).
