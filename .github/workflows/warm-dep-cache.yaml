@@ -32,7 +32,7 @@ jobs:
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -43,17 +43,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          ./mill "__.checkFormat"
-          ./mill "__.prepareOffline"
-          ./mill "__.scalaCompilerClasspath"
-          ./mill "__.scalaJSWorkerClasspath"
-          ./mill "__.scalaJSLinkerClasspath"
-          ./mill "__.scalaNativeWorkerClasspath"
-          ./mill "__.bridgeFullClassPath"
-          ./mill "__.scalaJSTestDeps"
-          ./mill "__.resolvedMvnDeps"
-          ./mill "__.resolvedRunMvnDeps"
-          ./mill "sjsonnet.graal.javaHome"
+          ./mill -j1 "__.checkFormat"
+          ./mill -j1 "__.prepareOffline"
+          ./mill -j1 "__.scalaCompilerClasspath"
+          ./mill -j1 "__.scalaJSWorkerClasspath"
+          ./mill -j1 "__.scalaJSLinkerClasspath"
+          ./mill -j1 "__.scalaNativeWorkerClasspath"
+          ./mill -j1 "__.bridgeFullClassPath"
+          ./mill -j1 "__.scalaJSTestDeps"
+          ./mill -j1 "__.resolvedMvnDeps"
+          ./mill -j1 "__.resolvedRunMvnDeps"
+          ./mill -j1 "sjsonnet.graal.javaHome"
           sbt update || true
 
           echo "Dependency resolution complete"

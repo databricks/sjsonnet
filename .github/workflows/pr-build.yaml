@@ -15,7 +15,7 @@ jobs:
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     name: Sjsonnet jvm build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -23,16 +23,16 @@ jobs:
         with:
           sbt: 'true'
       - name: Check Formatting
-        run: ./mill "_.jvm[_].__.checkFormat"
+        run: ./mill -j1 "_.jvm[_].__.checkFormat"
       - name: Run mill tests
-        run: ./mill "_.jvm[_].__.test"
+        run: ./mill -j1 "_.jvm[_].__.test"
       - name: Run sbt tests
         run: sbt test
   build-graal:
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     name: Sjsonnet Graal Native build
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
@@ -43,7 +43,7 @@ jobs:
     runs-on:
       group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +56,6 @@ jobs:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
           sbt: 'true'
       - name: Check Formatting
-        run: ./mill _.${{ matrix.lang }}[_].__.checkFormat
+        run: ./mill -j1 _.${{ matrix.lang }}[_].__.checkFormat
       - name: Run mill tests for ${{ matrix.lang }}
-        run: ./mill _.${{ matrix.lang }}[_].__.test
+        run: ./mill -j1 _.${{ matrix.lang }}[_].__.test
