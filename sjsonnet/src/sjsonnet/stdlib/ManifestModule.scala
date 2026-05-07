@@ -153,7 +153,7 @@ object ManifestModule extends AbstractFunctionModule {
    * that are used for indentation.
    */
   private object ManifestTomlEx extends Val.Builtin2("manifestTomlEx", "value", "indent") {
-    private def isTableArray(v: Val) = v.value match {
+    private def isTableArray(v: Val) = v match {
       case s: Val.Arr =>
         if (s.length == 0) false
         else {
@@ -168,68 +168,114 @@ object ManifestModule extends AbstractFunctionModule {
       case _ => false
     }
 
-    private def isSection(v: Val) = v.value.isInstanceOf[Val.Obj] || isTableArray(v.value)
+    private def isSection(v: Val) = v.isInstanceOf[Val.Obj] || isTableArray(v)
+
+    private def sortedKeyIndex(keys: Array[String], key: String): Int = {
+      var low = 0
+      var high = keys.length - 1
+      while (low <= high) {
+        val mid = (low + high) >>> 1
+        val comparison = Util.CodepointStringOrdering.compare(keys(mid), key)
+        if (comparison < 0) low = mid + 1
+        else if (comparison > 0) high = mid - 1
+        else return mid
+      }
+      -1
+    }
 
     private def renderTableInternal(
         out: StringWriter,
         v: Val.Obj,
         cumulatedIndent: String,
         indent: String,
-        path: Seq[String],
-        indexedPath: Seq[String])(implicit ev: EvalScope): StringWriter = {
-      val (sections, nonSections) =
-        v.visibleKeyNames.partition(k => isSection(v.value(k, v.pos)(ev)))
-      for (k <- nonSections.sorted(Util.CodepointStringOrdering)) {
-        out.write(cumulatedIndent)
-        out.write(TomlRenderer.escapeKey(k))
-        out.write(" = ")
-        Materializer.apply0(v.value(k, v.pos)(ev), new TomlRenderer(out, cumulatedIndent, indent))(
-          ev
-        )
+        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): StringWriter = {
+      val keys = v.sortedVisibleKeyNames
+      if (keys.length == 0) {
+        out.write('\n')
+        return out
+      }
+
+      val sectionFlags = new Array[Boolean](keys.length)
+      val visibleKeys = v.visibleKeyNames
+      var visibleKeyIdx = 0
+      while (visibleKeyIdx < visibleKeys.length) {
+        val k = visibleKeys(visibleKeyIdx)
+        val sortedIdx = sortedKeyIndex(keys, k)
+        sectionFlags(sortedIdx) = isSection(v.value(k, v.pos)(ev))
+        visibleKeyIdx += 1
+      }
+
+      val renderer = new TomlRenderer(out, cumulatedIndent, indent)
+      var keyIdx = 0
+      while (keyIdx < keys.length) {
+        if (!sectionFlags(keyIdx)) {
+          val k = keys(keyIdx)
+          out.write(cumulatedIndent)
+          TomlRenderer.writeEscapedKey(out, k)
+          out.write(" = ")
+          Materializer.apply0(v.value(k, v.pos)(ev), renderer)(ev)
+        }
+        keyIdx += 1
       }
       out.write('\n')
 
-      for (k <- sections.sorted(Util.CodepointStringOrdering)) {
-        val v0 = v.value(k, v.pos, v)(ev)
-        if (isTableArray(v0)) {
-          for (i <- 0 until v0.asArr.length) {
-            out.write(cumulatedIndent)
-            renderTableArrayHeader(out, path :+ k)
-            out.write('\n')
-            renderTableInternal(
-              out,
-              v0.asArr.value(i).asObj,
-              cumulatedIndent + indent,
-              indent,
-              path :+ k,
-              indexedPath ++ Seq(k, i.toString)
-            )
+      keyIdx = 0
+      while (keyIdx < keys.length) {
+        if (sectionFlags(keyIdx)) {
+          val k = keys(keyIdx)
+          val v0 = v.value(k, v.pos, v)(ev)
+          val childIndent = cumulatedIndent + indent
+          path += k
+          v0 match {
+            case arr: Val.Arr =>
+              var i = 0
+              while (i < arr.length) {
+                out.write(cumulatedIndent)
+                renderTableArrayHeader(out, path)
+                out.write('\n')
+                renderTableInternal(
+                  out,
+                  arr.value(i).asObj,
+                  childIndent,
+                  indent,
+                  path
+                )
+                i += 1
+              }
+            case obj: Val.Obj =>
+              out.write(cumulatedIndent)
+              renderTableHeader(out, path)
+              out.write('\n')
+              renderTableInternal(
+                out,
+                obj,
+                childIndent,
+                indent,
+                path
+              )
+            case _ =>
+              ()
           }
-        } else {
-          out.write(cumulatedIndent)
-          renderTableHeader(out, path :+ k)
-          out.write('\n')
-          renderTableInternal(
-            out,
-            v0.asObj,
-            cumulatedIndent + indent,
-            indent,
-            path :+ k,
-            indexedPath :+ k
-          )
+          path.remove(path.length - 1)
         }
+        keyIdx += 1
       }
       out
     }
 
-    private def renderTableHeader(out: StringWriter, path: Seq[String]) = {
+    private def renderTableHeader(out: StringWriter, path: mutable.ArrayBuffer[String]) = {
       out.write('[')
-      out.write(path.map(TomlRenderer.escapeKey).mkString("."))
+      var i = 0
+      while (i < path.length) {
+        if (i != 0) out.write('.')
+        TomlRenderer.writeEscapedKey(out, path(i))
+        i += 1
+      }
       out.write(']')
       out
     }
 
-    private def renderTableArrayHeader(out: StringWriter, path: Seq[String]) = {
+    private def renderTableArrayHeader(out: StringWriter, path: mutable.ArrayBuffer[String]) = {
       out.write('[')
       renderTableHeader(out, path)
       out.write(']')
@@ -243,8 +289,7 @@ object ManifestModule extends AbstractFunctionModule {
         v.value.asObj,
         "",
         indent.value.asString,
-        Seq.empty[String],
-        Seq.empty[String]
+        new mutable.ArrayBuffer[String](8)
       )(ev)
       Val.Str(pos, out.toString.strip)
     }

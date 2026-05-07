@@ -1,6 +1,6 @@
 package sjsonnet
 
-import upickle.core.{ArrVisitor, CharBuilder, ObjVisitor, SimpleVisitor, Visitor}
+import upickle.core.{ArrVisitor, ObjVisitor, SimpleVisitor, Visitor}
 
 import java.io.StringWriter
 
@@ -20,7 +20,7 @@ class TomlRenderer(
     override def visitString(s: CharSequence, index: Int): StringWriter = {
       if (s == null) visitNull(index)
       else {
-        out.write(TomlRenderer.escapeKey(s.toString))
+        TomlRenderer.writeEscapedKey(out, s)
         out
       }
     }
@@ -29,8 +29,7 @@ class TomlRenderer(
   private var depth = 0
 
   private def flush = {
-    if (depth == 0) out.write("\n")
-    out.flush()
+    if (depth == 0) out.write('\n')
     out
   }
 
@@ -50,15 +49,7 @@ class TomlRenderer(
     if (s == null) {
       visitNull(index)
     } else {
-      val charBuilder = new CharBuilder()
-      upickle.core.RenderUtils.escapeChar(
-        null,
-        charBuilder,
-        s,
-        escapeUnicode = true,
-        wrapQuotes = true
-      )
-      out.write(charBuilder.makeString())
+      BaseRenderer.escape(out, s, unicode = true)
       flush
     }
   }
@@ -83,9 +74,13 @@ class TomlRenderer(
       private var addComma = false
 
       depth += 1
-      out.write("[" + separator)
+      out.write('[')
+      out.write(separator)
       def subVisitor: Visitor[StringWriter, StringWriter] = {
-        if (addComma) out.write("," + separator)
+        if (addComma) {
+          out.write(',')
+          out.write(separator)
+        }
         out.write(newElementIndent)
         TomlRenderer.this
       }
@@ -131,11 +126,35 @@ class TomlRenderer(
 }
 
 object TomlRenderer {
-  private val bareAllowed = Platform.getPatternFromCache("[A-Za-z0-9_-]+")
-  def escapeKey(key: String): String = if (bareAllowed.matcher(key).matches()) key
+  @inline private def isBareKeyChar(c: Char): Boolean =
+    (c >= 'A' && c <= 'Z') ||
+    (c >= 'a' && c <= 'z') ||
+    (c >= '0' && c <= '9') ||
+    c == '_' ||
+    c == '-'
+
+  private def isBareKey(key: CharSequence): Boolean = {
+    val len = key.length
+    if (len == 0) false
+    else {
+      var i = 0
+      while (i < len) {
+        if (!isBareKeyChar(key.charAt(i))) return false
+        i += 1
+      }
+      true
+    }
+  }
+
+  def writeEscapedKey(out: StringWriter, key: CharSequence): Unit = {
+    if (isBareKey(key)) out.write(key.toString)
+    else BaseRenderer.escape(out, key, unicode = true)
+  }
+
+  def escapeKey(key: String): String = if (isBareKey(key)) key
   else {
     val out = new StringWriter()
-    BaseRenderer.escape(out, key, unicode = true)
+    writeEscapedKey(out, key)
     out.toString
   }
 }
