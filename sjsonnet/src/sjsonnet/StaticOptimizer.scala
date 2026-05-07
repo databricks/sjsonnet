@@ -657,9 +657,12 @@ class StaticOptimizer(
         // lhs is NOT in tail position, but provides a control-flow exit path (returns true
         // when lhs is true). We must still check rhs for non-recursive exits.
         hasNonRecursiveExit(e.rhs, selfName, selfIdx, paramCount)
-      case _: Expr.Error =>
-        // error value is the last thing evaluated before throwing -> non-recursive exit
-        true
+      case e: Expr.Error =>
+        // error value is in tail position, so it is only a non-recursive exit if the value
+        // expression itself has a non-recursive exit. Treating every error expression as an exit
+        // would auto-TCO `local f() = error f()`, turning a max-stack diagnostic into an infinite
+        // trampoline loop.
+        hasNonRecursiveExit(e.value, selfName, selfIdx, paramCount)
       case e if isSelfTailCall(e) =>
         false // this path IS a self-recursive tail call → not a non-recursive exit
       case _ =>

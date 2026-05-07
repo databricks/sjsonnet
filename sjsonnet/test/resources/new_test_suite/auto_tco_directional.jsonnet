@@ -123,6 +123,7 @@ local asymmetric_if(n) =
   else asymmetric_if(n - 1);
 
 // 1.18 Tail call through error expression value
+// Erroring behavior is covered by error.auto_tco_error_value_tail_call.jsonnet.
 local error_value(n) =
   if n <= 0 then error "done at " + n
   else error_value(n - 1);

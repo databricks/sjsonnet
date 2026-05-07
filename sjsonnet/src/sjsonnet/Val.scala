@@ -2518,31 +2518,66 @@ final class TailCall(
     val args: Array[Eval],
     val namedNames: Array[String],
     val callSiteExpr: Expr,
-    val strict: Boolean = false,
-    private var booleanCheck: TailCall.BooleanCheck = null)
+    val strict: Boolean = false)
     extends Val {
   private[sjsonnet] def valTag: Byte = -1
   var pos: Position = callSiteExpr.pos
   def prettyName = "tailcall"
   override def exprErrorString: String = callSiteExpr.exprErrorString
 
-  def withBooleanCheck(check: TailCall.BooleanCheck): TailCall = {
-    if (booleanCheck eq null) booleanCheck = check
+  private[sjsonnet] var resultBooleanIsAnd: Boolean = false
+  private[sjsonnet] var resultBooleanPos: Position = null
+  private[sjsonnet] var resultErrorValuePos: Position = null
+
+  @inline def withBooleanCheck(isAnd: Boolean, pos: Position): TailCall = {
+    if ((resultBooleanPos eq null) && (resultErrorValuePos eq null)) {
+      resultBooleanIsAnd = isAnd
+      resultBooleanPos = pos
+    }
     this
   }
 
-  private[sjsonnet] def pendingBooleanCheck: TailCall.BooleanCheck = booleanCheck
+  @inline def withErrorValueCheck(pos: Position): TailCall = {
+    if (resultErrorValuePos eq null) resultErrorValuePos = pos
+    this
+  }
 }
 
 object TailCall {
-  // Delayed result validation for tail-position &&/||. It deliberately lives on the TailCall rather
-  // than resolving nested TailCalls inside Evaluator.visitAndRhsTailPos/visitOrRhsTailPos, because
-  // nested resolution would undermine stack-safety and could force work at a different lazy boundary.
-  final class BooleanCheck(val op: String, val pos: Position) {
-    def check(result: Val)(implicit ev: EvalErrorScope): Val = result match {
-      case b: Val.Bool => b
-      case unknown     =>
-        Error.fail(s"binary operator $op does not operate on ${unknown.prettyName}s.", pos)
+  private def materializeErrorValue(value: Val)(implicit ev: EvalScope): String = value match {
+    case Val.Str(_, s) => s
+    case r             => Materializer.stringify(r)
+  }
+
+  @inline private def applyResultChecks(
+      result: Val,
+      booleanIsAnd: Boolean,
+      booleanPos: Position,
+      errorValuePos: Position)(implicit ev: EvalScope): Val = {
+    val checked =
+      if (booleanPos eq null) result
+      else
+        result match {
+          case b: Val.Bool => b
+          case unknown     =>
+            val op = if (booleanIsAnd) "&&" else "||"
+            Error.fail(
+              s"binary operator $op does not operate on ${unknown.prettyName}s.",
+              booleanPos
+            )
+        }
+    if (errorValuePos eq null) checked
+    else Error.fail(materializeErrorValue(checked), errorValuePos)
+  }
+
+  @inline private def resolveNext(tc: TailCall)(implicit ev: EvalScope): Val = {
+    val mode: TailstrictMode =
+      if (tc.strict) TailstrictModeEnabled else TailstrictModeAutoTCO
+    try {
+      tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)(ev, mode)
+    } catch {
+      case e: Error =>
+        throw e.addFrame(tc.callSiteExpr.pos, tc.callSiteExpr)
     }
   }
 
@@ -2560,26 +2595,41 @@ object TailCall {
    * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
    * not alter user-visible stack traces.
    */
-  def resolve(current: Val)(implicit ev: EvalScope): Val = resolve(current, null)
+  def resolve(current: Val)(implicit ev: EvalScope): Val = resolve(current, false, null, null)
 
   @tailrec
-  private def resolve(current: Val, booleanCheck: BooleanCheck)(implicit ev: EvalScope): Val =
+  private def resolve(
+      current: Val,
+      booleanIsAnd: Boolean,
+      booleanPos: Position,
+      errorValuePos: Position)(implicit ev: EvalScope): Val =
     current match {
       case tc: TailCall =>
-        val mode: TailstrictMode =
-          if (tc.strict) TailstrictModeEnabled else TailstrictModeAutoTCO
-        val nextCheck =
-          if (tc.pendingBooleanCheck != null) tc.pendingBooleanCheck else booleanCheck
-        val next =
-          try {
-            tc.func.apply(tc.args, tc.namedNames, tc.callSiteExpr.pos)(ev, mode)
-          } catch {
-            case e: Error =>
-              throw e.addFrame(tc.callSiteExpr.pos, tc.callSiteExpr)
-          }
-        resolve(next, nextCheck)
+        val tcErrorPos = tc.resultErrorValuePos
+        val tcBooleanPos = tc.resultBooleanPos
+        if (tcErrorPos ne null) {
+          // Inner error throws before any outer continuation can run.
+          resolve(
+            resolveNext(tc),
+            tc.resultBooleanIsAnd,
+            tcBooleanPos,
+            tcErrorPos
+          )
+        } else if (tcBooleanPos ne null) {
+          // If the inner boolean check passes, outer boolean checks necessarily pass on the same
+          // boolean value. Preserve only an outer error, which still runs after the inner check.
+          resolve(
+            resolveNext(tc),
+            tc.resultBooleanIsAnd,
+            tcBooleanPos,
+            errorValuePos
+          )
+        } else {
+          resolve(resolveNext(tc), booleanIsAnd, booleanPos, errorValuePos)
+        }
       case result =>
-        if (booleanCheck == null) result else booleanCheck.check(result)
+        if ((booleanPos eq null) && (errorValuePos eq null)) result
+        else applyResultChecks(result, booleanIsAnd, booleanPos, errorValuePos)
     }
 }
 

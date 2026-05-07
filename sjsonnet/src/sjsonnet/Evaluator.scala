@@ -1515,7 +1515,7 @@ class Evaluator(
   private def visitAndRhsTailPos(rhs: Expr, andPos: Position)(implicit scope: ValScope): Val = {
     visitExprWithTailCallSupport(rhs) match {
       case b: Val.Bool  => b
-      case tc: TailCall => tc.withBooleanCheck(new TailCall.BooleanCheck("&&", andPos))
+      case tc: TailCall => tc.withBooleanCheck(isAnd = true, andPos)
       case unknown      =>
         Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", andPos)
     }
@@ -1524,11 +1524,22 @@ class Evaluator(
   private def visitOrRhsTailPos(rhs: Expr, orPos: Position)(implicit scope: ValScope): Val = {
     visitExprWithTailCallSupport(rhs) match {
       case b: Val.Bool  => b
-      case tc: TailCall => tc.withBooleanCheck(new TailCall.BooleanCheck("||", orPos))
+      case tc: TailCall => tc.withBooleanCheck(isAnd = false, orPos)
       case unknown      =>
         Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", orPos)
     }
   }
+
+  // The value of `error value` is evaluated immediately before throwing. If that value is a
+  // tail-position TailCall, keep the throw as delayed continuation state on the TailCall so the
+  // trampoline remains stack-safe. Resolving here would re-enter the trampoline inside the current
+  // function body and can restore recursive stack growth for deep `error f(n - 1)` chains.
+  private def visitErrorValueTailPos(value: Expr, errorPos: Position)(implicit
+      scope: ValScope): Val =
+    visitExprWithTailCallSupport(value) match {
+      case tc: TailCall => tc.withErrorValueCheck(errorPos)
+      case value        => Error.fail(materializeError(value), errorPos)
+    }
 
   /**
    * Evaluate an expression with tail-call support. When a `tailstrict` call is encountered at a
@@ -1536,8 +1547,8 @@ class Evaluator(
    * `TailCall.resolve` in `visitApply*` to iterate rather than grow the JVM stack.
    *
    * Potential tail positions are propagated through: IfElse (both branches), LocalExpr (returned),
-   * AssertExpr (returned), And (rhs), and Or (rhs). All other expression types delegate to normal
-   * `visitExpr`.
+   * AssertExpr (returned), And (rhs), Or (rhs), and Expr.Error (value). All other expression types
+   * delegate to normal `visitExpr`.
    */
   @tailrec
   private def visitExprWithTailCallSupport(e: Expr)(implicit scope: ValScope): Val = e match {
@@ -1600,7 +1611,7 @@ class Evaluator(
           Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
       }
     case e: Expr.Error =>
-      Error.fail(materializeError(visitExpr(e.value)), e.pos)
+      visitErrorValueTailPos(e.value, e.pos)
     // Tail-position tailstrict calls: match TailstrictableExpr to unify the tailstrict guard,
     // then dispatch by concrete type.
     //
