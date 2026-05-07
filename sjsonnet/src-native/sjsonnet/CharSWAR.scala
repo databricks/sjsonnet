@@ -21,12 +21,14 @@ object CharSWAR {
   private final val QUOTE = 0x2222222222222222L
   private final val BSLAS = 0x5c5c5c5c5c5c5c5cL
   private final val CTRL = 0xe0e0e0e0e0e0e0e0L
+  private final val LITTLE_ENDIAN =
+    java.nio.ByteOrder.nativeOrder() == java.nio.ByteOrder.LITTLE_ENDIAN
 
   /**
-   * SWAR: returns true if any byte lane in `word` contains '"' (0x22), '\\' (0x5C), or a control
+   * SWAR: returns a mask for byte lanes in `word` containing '"' (0x22), '\\' (0x5C), or a control
    * char (< 0x20).
    */
-  @inline private def swarHasMatch(word: Long): Boolean = {
+  @inline private def swarMatchMask(word: Long): Long = {
     // 1. Detect '"' via XOR + zero-detection
     val q = word ^ QUOTE
     val qz = ~((q & HOLE) + HOLE | q | HOLE)
@@ -39,8 +41,12 @@ object CharSWAR {
     val c = word & CTRL
     val cz = ~((c & HOLE) + HOLE | c | HOLE)
 
-    (qz | bz | cz) != 0L
+    qz | bz | cz
   }
+
+  @inline private def firstMatchedByte(mask: Long): Int =
+    (if (LITTLE_ENDIAN) java.lang.Long.numberOfTrailingZeros(mask)
+     else java.lang.Long.numberOfLeadingZeros(mask)) >>> 3
 
   def hasEscapeChar(s: String): Boolean = {
     val len = s.length
@@ -77,7 +83,7 @@ object CharSWAR {
     val limit = to - 7
     while (i < limit) {
       val word = Intrinsics.loadLong(barr.atRawUnsafe(i))
-      if (swarHasMatch(word)) return true
+      if (swarMatchMask(word) != 0L) return true
       i += 8
     }
     // Tail: remaining 0-7 bytes
@@ -97,13 +103,9 @@ object CharSWAR {
     val limit = to - 7
     while (i < limit) {
       val word = Intrinsics.loadLong(barr.atRawUnsafe(i))
-      if (swarHasMatch(word)) {
-        var j = i
-        while (j < i + 8) {
-          val b = arr(j) & 0xff
-          if (b < 32 || b == '"' || b == '\\') return j
-          j += 1
-        }
+      val mask = swarMatchMask(word)
+      if (mask != 0L) {
+        return i + firstMatchedByte(mask)
       }
       i += 8
     }

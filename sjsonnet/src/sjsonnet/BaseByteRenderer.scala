@@ -325,32 +325,29 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     } else {
       val escapedLen = escapedStringLength(bytes, bLen, firstEscape)
       elemBuilder.ensureLength(escapedLen)
-      elemBuilder.appendUnsafeC('"')
+      val arr = elemBuilder.arr
+      var outPos = elemBuilder.length
+      arr(outPos) = '"'.toByte
+      outPos += 1
       var from = 0
       var escPos = firstEscape
       while (escPos >= 0) {
         if (escPos > from) {
           val chunkLen = escPos - from
-          elemBuilder.ensureLength(chunkLen)
-          val arr = elemBuilder.arr
-          val pos = elemBuilder.length
-          System.arraycopy(bytes, from, arr, pos, chunkLen)
-          elemBuilder.length = pos + chunkLen
+          System.arraycopy(bytes, from, arr, outPos, chunkLen)
+          outPos += chunkLen
         }
-        escapeByteInline(bytes(escPos) & 0xff)
+        outPos = escapeByteInline(bytes(escPos) & 0xff, arr, outPos)
         from = escPos + 1
         escPos = if (from < bLen) CharSWAR.findFirstEscapeChar(bytes, from, bLen) else -1
       }
       if (from < bLen) {
         val tailLen = bLen - from
-        elemBuilder.ensureLength(tailLen)
-        val arr = elemBuilder.arr
-        val pos = elemBuilder.length
-        System.arraycopy(bytes, from, arr, pos, tailLen)
-        elemBuilder.length = pos + tailLen
+        System.arraycopy(bytes, from, arr, outPos, tailLen)
+        outPos += tailLen
       }
-      elemBuilder.ensureLength(1)
-      elemBuilder.appendUnsafeC('"')
+      arr(outPos) = '"'.toByte
+      elemBuilder.length = outPos + 1
     }
   }
 
@@ -373,37 +370,45 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     }
 
   /** Inline JSON escape for one byte that is known to require escaping. */
-  private def escapeByteInline(b: Int): Unit = {
-    elemBuilder.ensureLength(6)
+  @inline private def escapeByteInline(b: Int, arr: Array[Byte], outPos0: Int): Int = {
+    val outPos = outPos0
     (b: @scala.annotation.switch) match {
       case '"' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('"')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = '"'.toByte
+        outPos + 2
       case '\\' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('\\')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = '\\'.toByte
+        outPos + 2
       case '\b' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('b')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 'b'.toByte
+        outPos + 2
       case '\f' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('f')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 'f'.toByte
+        outPos + 2
       case '\n' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('n')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 'n'.toByte
+        outPos + 2
       case '\r' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('r')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 'r'.toByte
+        outPos + 2
       case '\t' =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('t')
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 't'.toByte
+        outPos + 2
       case c =>
-        elemBuilder.appendUnsafeC('\\')
-        elemBuilder.appendUnsafeC('u')
-        elemBuilder.appendUnsafeC('0')
-        elemBuilder.appendUnsafeC('0')
-        elemBuilder.appendUnsafeC(BaseByteRenderer.HEX_CHARS((c >> 4) & 0xf))
-        elemBuilder.appendUnsafeC(BaseByteRenderer.HEX_CHARS(c & 0xf))
+        arr(outPos) = '\\'.toByte
+        arr(outPos + 1) = 'u'.toByte
+        arr(outPos + 2) = '0'.toByte
+        arr(outPos + 3) = '0'.toByte
+        arr(outPos + 4) = BaseByteRenderer.HEX_BYTES((c >> 4) & 0xf)
+        arr(outPos + 5) = BaseByteRenderer.HEX_BYTES(c & 0xf)
+        outPos + 6
     }
   }
 
@@ -453,7 +458,24 @@ object BaseByteRenderer {
   }
 
   /** Hex digits used by inline byte escaping for control chars. */
-  private[sjsonnet] val HEX_CHARS: Array[Char] = "0123456789abcdef".toCharArray
+  private[sjsonnet] val HEX_BYTES: Array[Byte] = Array(
+    '0'.toByte,
+    '1'.toByte,
+    '2'.toByte,
+    '3'.toByte,
+    '4'.toByte,
+    '5'.toByte,
+    '6'.toByte,
+    '7'.toByte,
+    '8'.toByte,
+    '9'.toByte,
+    'a'.toByte,
+    'b'.toByte,
+    'c'.toByte,
+    'd'.toByte,
+    'e'.toByte,
+    'f'.toByte
+  )
 
   /**
    * Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue). Not thread-safe,
