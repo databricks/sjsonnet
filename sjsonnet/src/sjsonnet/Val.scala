@@ -645,8 +645,8 @@ object Val {
     }
 
     /**
-     * Concatenate two arrays. For large left-side arrays where neither operand is already a concat
-     * view, creates a lazy ConcatView that defers the copy until bulk access is needed. This is
+     * Concatenate two arrays. For large results where neither operand is already a concat view,
+     * creates a lazy ConcatView that defers the copy until bulk access is needed. This is
      * particularly beneficial for patterns like `big_array + [x] < big_array + [y]` where
      * element-wise comparison via value(i) never needs the flattened backing array.
      *
@@ -655,27 +655,33 @@ object Val {
      */
     def concat(newPos: Position, rhs: Arr): Arr = {
       val leftLen = this.length
-      // Use lazy concat when the left side is large enough that avoiding the
+      val rhsLen = rhs.length
+      val totalLenLong = leftLen.toLong + rhsLen.toLong
+      if (totalLenLong > Int.MaxValue) Error.fail("array too large")
+      val totalLen = totalLenLong.toInt
+      // Use lazy concat when the result is large enough that avoiding the
       // arraycopy is worthwhile. Limit to depth-1 (neither side is a concat view)
       // to prevent O(depth) access chains and ensure value(i) stays O(1).
-      if (leftLen >= Arr.LAZY_CONCAT_THRESHOLD && !this.isConcatView && !rhs.isConcatView) {
+      if (totalLen >= Arr.LAZY_CONCAT_THRESHOLD && !this.isConcatView && !rhs.isConcatView) {
         val result = Arr(newPos, Arr.EMPTY_EVAL_ARRAY)
         result._concatLeft = this
         result._concatRight = rhs
-        result._length = leftLen + rhs.length
+        result._length = totalLen
         result
       } else {
         // Eager path: allocate + arraycopy (also used when either side is a concat view
         // to flatten and prevent deep nesting)
         val lArr = this.asLazyArray
         val rArr = rhs.asLazyArray
-        val rLen = rArr.length
-        val result = new Array[Eval](leftLen + rLen)
+        val result = new Array[Eval](totalLen)
         System.arraycopy(lArr, 0, result, 0, leftLen)
-        System.arraycopy(rArr, 0, result, leftLen, rLen)
+        System.arraycopy(rArr, 0, result, leftLen, rhsLen)
         Arr(newPos, result)
       }
     }
+
+    def sliced(newPos: Position, start: Int, end: Int, step: Int): Arr =
+      Arr.sliced(newPos, this, start, end, step)
 
     def iterator: Iterator[Val] = {
       val self = this
@@ -859,6 +865,46 @@ object Val {
 
     override def reversed(newPos: Position): Arr =
       new RepeatedArr(newPos, source.reversed(newPos), count)
+  }
+
+  private final class SliceArr(
+      pos0: Position,
+      private[this] var source: Arr,
+      private[this] val start: Int,
+      private[this] val step: Int,
+      size: Int)
+      extends Arr(pos0, null) {
+    _length = size
+
+    @inline private[this] def sourceIndex(i: Int): Int = start + i * step
+
+    override def value(i: Int): Val =
+      if ((arr ne null) || isConcatView) super.value(i)
+      else source.value(sourceIndex(i))
+
+    override def eval(i: Int): Eval =
+      if ((arr ne null) || isConcatView) super.eval(i)
+      else source.eval(sourceIndex(i))
+
+    override def asLazyArray: Array[Eval] = {
+      if ((arr ne null) || isConcatView) super.asLazyArray
+      else {
+        val len = _length
+        val result = new Array[Eval](len)
+        var i = 0
+        while (i < len) {
+          result(i) = source.eval(sourceIndex(i))
+          i += 1
+        }
+        arr = result
+        source = null
+        result
+      }
+    }
+
+    override def reversed(newPos: Position): Arr =
+      if ((arr ne null) || isConcatView) super.reversed(newPos)
+      else new SliceArr(newPos, source, sourceIndex(_length - 1), -step, _length)
   }
 
   /**
@@ -1236,6 +1282,57 @@ object Val {
       if (count == 0 || source.length == 0) Arr(pos, EMPTY_EVAL_ARRAY)
       else new RepeatedArr(pos, source, count)
 
+    def sliced(pos: Position, source: Arr, start: Int, end: Int, step: Int): Arr = {
+      val sourceLen = source.length
+      val first = firstSliceIndex(sourceLen, start, end, step)
+      val len = sliceLength(sourceLen, first, end, step)
+      if (len == 0) Arr(pos, EMPTY_EVAL_ARRAY)
+      else if (!useSliceView(source, sourceLen, len)) copySlice(pos, source, first, step, len)
+      else new SliceArr(pos, source, first, step, len)
+    }
+
+    private def useSliceView(source: Arr, sourceLen: Int, sliceLen: Int): Boolean = {
+      if (sliceLen < LAZY_VIEW_THRESHOLD) false
+      else
+        source match {
+          case _: RangeArr | _: ByteArr | _: RepeatedArr | _: LazyViewArr | _: ReversedLazyViewArr |
+              _: SliceArr =>
+            true
+          case _ =>
+            // Plain flat/reversed/concat arrays may retain a large backing graph. Copy small
+            // sub-slices so a short-lived result does not pin much more memory than it exposes.
+            sliceLen.toLong * SLICE_VIEW_MIN_SOURCE_FRACTION_DEN >= sourceLen.toLong
+        }
+    }
+
+    private def firstSliceIndex(sourceLen: Int, start: Int, end: Int, step: Int): Int = {
+      if (step <= 0) throw new IllegalArgumentException("slice step must be positive")
+      if (start >= end || start >= sourceLen || start >= 0) start
+      else {
+        val skipped = ((-start.toLong) + step.toLong - 1L) / step.toLong
+        (start.toLong + skipped * step.toLong).toInt
+      }
+    }
+
+    private def sliceLength(sourceLen: Int, start: Int, end: Int, step: Int): Int = {
+      if (start >= end || start >= sourceLen) 0
+      else {
+        val safeEnd = math.min(end, sourceLen)
+        if (safeEnd <= start) 0
+        else (((safeEnd.toLong - start.toLong - 1L) / step.toLong) + 1L).toInt
+      }
+    }
+
+    private def copySlice(pos: Position, source: Arr, start: Int, step: Int, len: Int): Arr = {
+      val result = new Array[Eval](len)
+      var i = 0
+      while (i < len) {
+        result(i) = source.eval(start + i * step)
+        i += 1
+      }
+      Arr(pos, result)
+    }
+
     def mapped(pos: Position, source: Arr, func: Func, callPos: Position, ev: EvalScope): Arr =
       if (source.length == 0) Arr(pos, EMPTY_EVAL_ARRAY)
       else if (source.length < LAZY_VIEW_THRESHOLD) {
@@ -1299,7 +1396,7 @@ object Val {
     def range(pos: Position, from: Int, size: Int): Arr = new RangeArr(pos, from, size)
 
     /**
-     * Threshold for lazy concat. Arrays with left.length >= this value use a virtual ConcatView
+     * Threshold for lazy concat. Concats with total length >= this value use a virtual ConcatView
      * instead of eager arraycopy. Below this size, arraycopy is cheap enough that the indirection
      * overhead of virtual dispatch outweighs the copy savings.
      */
@@ -1312,6 +1409,8 @@ object Val {
      * or callers only force a small suffix/prefix.
      */
     val LAZY_VIEW_THRESHOLD = 4096
+
+    private val SLICE_VIEW_MIN_SOURCE_FRACTION_DEN = 4
 
     private[sjsonnet] val EMPTY_EVAL_ARRAY: Array[Eval] = Array.empty[Eval]
   }

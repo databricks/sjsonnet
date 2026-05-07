@@ -57,7 +57,16 @@ object Std0150FunctionsTests extends TestSuite {
     test("slice") {
       eval("std.slice([1, 2, 3, 4, 5, 6], 0, 4, 1)") ==> ujson.read("[ 1, 2, 3, 4 ]")
       eval("std.slice([1, 2, 3, 4, 5, 6], 1, 6, 2)") ==> ujson.read("[ 2, 4, 6 ]")
+      eval("std.slice(std.range(1, 6), -3, 99, 1)") ==> ujson.Arr(4, 5, 6)
+      eval("std.slice(std.range(1, 6), 1, 6, 2)") ==> ujson.Arr(2, 4, 6)
       eval("""std.slice("jsonnet", 0, 4, 1)""") ==> ujson.Str("json")
+    }
+
+    test("remove range arrays") {
+      eval("std.remove(std.range(1, 5), 3)") ==> ujson.Arr(1, 2, 4, 5)
+      eval("std.removeAt(std.range(1, 5), 0)") ==> ujson.Arr(2, 3, 4, 5)
+      eval("std.removeAt(std.range(1, 5), 2)") ==> ujson.Arr(1, 2, 4, 5)
+      eval("std.removeAt(std.range(1, 5), 4)") ==> ujson.Arr(1, 2, 3, 4)
     }
 
     test("splitLimit negative maxsplits") {

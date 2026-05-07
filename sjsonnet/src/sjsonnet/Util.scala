@@ -19,31 +19,6 @@ object Util {
     s"${line + 1}:${col + 1}"
   }
 
-  private def sliceArr(arr: Val.Arr, start: Int, end: Int, step: Int): Array[Eval] = {
-    if (start >= end || start >= arr.length) {
-      Array.empty[Eval]
-    } else
-      step match {
-        case 1 =>
-          val safeEnd = math.min(end, arr.length)
-          val result = new Array[Eval](safeEnd - start)
-          var i = start
-          while (i < safeEnd) {
-            result(i - start) = arr.eval(i)
-            i += 1
-          }
-          result
-        case _ =>
-          val builder = new scala.collection.mutable.ArrayBuilder.ofRef[Eval]
-          var i = start
-          while (i < end && i < arr.length) {
-            if (i >= 0) builder += arr.eval(i)
-            i += step
-          }
-          builder.result()
-      }
-  }
-
   def slice(
       pos: Position,
       ev: EvalScope,
@@ -77,7 +52,7 @@ object Util {
     }
     val res = indexable match {
       case Val.Str(_, s) => Val.Str(pos, Util.sliceStr(s, start, end, step))
-      case arr: Val.Arr  => Val.Arr(pos, Util.sliceArr(arr, start, end, step))
+      case arr: Val.Arr  => arr.sliced(pos, start, end, step)
       case _ => Error.fail("Can only slice array or string, not " + indexable.prettyName, pos)(ev)
     }
     res: Val

@@ -67,6 +67,18 @@ object ArrayModule extends AbstractFunctionModule {
     sum
   }
 
+  private def removeAtView(arr: Val.Arr, removeIdx: Int): Val.Arr = {
+    val len = arr.length
+    if (len == 1) Val.Arr(arr.pos, Val.Arr.EMPTY_EVAL_ARRAY)
+    else if (removeIdx == 0) arr.sliced(arr.pos, 1, len, 1)
+    else if (removeIdx == len - 1) arr.sliced(arr.pos, 0, removeIdx, 1)
+    else {
+      val left = arr.sliced(arr.pos, 0, removeIdx, 1)
+      val right = arr.sliced(arr.pos, removeIdx + 1, len, 1)
+      left.concat(arr.pos, right)
+    }
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-minArray std.minArray(arr, keyF, onEmpty)]].
    *
@@ -948,17 +960,7 @@ object ArrayModule extends AbstractFunctionModule {
       if (idx == -1) {
         arr
       } else {
-        val result = new Array[Eval](arr.length - 1)
-        var j = 0
-        while (j < idx) {
-          result(j) = arr.eval(j)
-          j += 1
-        }
-        while (j < result.length) {
-          result(j) = arr.eval(j + 1)
-          j += 1
-        }
-        Val.Arr(arr.pos, result)
+        removeAtView(arr, idx)
       }
     },
     /**
@@ -976,19 +978,7 @@ object ArrayModule extends AbstractFunctionModule {
         case _ => -1
       }
       if (removeIdx == -1) arr
-      else {
-        val result = new Array[Eval](arr.length - 1)
-        var i = 0
-        while (i < removeIdx) {
-          result(i) = arr.eval(i)
-          i += 1
-        }
-        while (i < result.length) {
-          result(i) = arr.eval(i + 1)
-          i += 1
-        }
-        Val.Arr(arr.pos, result)
-      }
+      else removeAtView(arr, removeIdx)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-sum std.sum(arr)]].
