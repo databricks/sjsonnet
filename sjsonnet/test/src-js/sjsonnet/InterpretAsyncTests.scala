@@ -70,6 +70,37 @@ object InterpretAsyncTests extends TestSuite {
       ).map(v => assert(v == ujson.Str("this is :: not :: jsonnet")))
     }
 
+    test("preloads imports referenced from extVars") {
+      // extVar value is a Jsonnet snippet that imports a file. interpretAsync must walk
+      // ext/tla var snippets too; otherwise the cache-only importer hits a miss at eval time.
+      val files = Map("lib.libsonnet" -> "{ n: 5 }")
+      val loader = makeAsyncLoader(files)
+      val resolver = makeResolver(files.keySet)
+      val extVars = js.Dictionary[js.Any]("cfg" -> "(import 'lib.libsonnet').n")
+      SjsonnetMain
+        .interpretAsync(
+          "std.extVar('cfg') + 1",
+          extVars,
+          js.Dictionary[js.Any](),
+          "/",
+          resolver,
+          loader
+        )
+        .toFuture
+        .map(v => ujson.WebJson.transform(v, ujson.Value))
+        .map(v => assert(v == ujson.Num(6)))
+    }
+
+    test("parse error in unforced branch does not fail evaluation") {
+      // Lazy semantics: `if false then import 'bad' else 1` should evaluate to 1, even though
+      // bad.libsonnet has a parse error. The preloader still loads the file (jsonnet imports
+      // are statically discoverable), but a parse failure on a discovered file must not abort.
+      runAsync(
+        "if false then import 'bad.libsonnet' else 1",
+        Map("bad.libsonnet" -> "this is :: not :: jsonnet")
+      ).map(v => assert(v == ujson.Num(1)))
+    }
+
     test("async loader rejection propagates through the returned Promise") {
       val resolver = makeResolver(Set("missing.libsonnet"))
       val loader: js.Function2[String, Boolean, js.Promise[Any]] =

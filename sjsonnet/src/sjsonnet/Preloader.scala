@@ -100,8 +100,12 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
           val traced = f.trace()
           Left(new ParseError(s"$path: ${traced.msg}", offset = traced.index))
         case Parsed.Success((expr, _), _) =>
+          // Match the synchronous evaluator's docBase: resolve relative to the importing file's
+          // parent directory, not the file path itself. See Importer.resolveAndReadOrFail, which
+          // calls resolve(pos.fileScope.currentFile.parent(), ...).
+          val docBase = path.parent()
           ImportFinder.collect(expr).foreach { found =>
-            parentImporter.resolve(path, found.value) match {
+            parentImporter.resolve(docBase, found.value) match {
               case Some(resolved) =>
                 if (seen.add((resolved, found.kind))) enqueue(resolved, found.kind)
               case None =>

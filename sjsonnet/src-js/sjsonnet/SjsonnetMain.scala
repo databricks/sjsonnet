@@ -187,6 +187,7 @@ object SjsonnetMain {
 
       val parentImporter = jsResolveImporter(importResolver)
       val preloader = new Preloader(parentImporter)
+      val wd = JsVirtualPath(wd0)
       val entryPath = JsVirtualPath("(memory)")
 
       preloader.add(entryPath, StaticResolvedFile(text), ImportFinder.Kind.Code) match {
@@ -194,16 +195,30 @@ object SjsonnetMain {
         case Right(_)  =>
       }
 
+      // ext/tla vars are parsed as Jsonnet code (Interpreter.parseVar) and may contain imports.
+      // Feed each value through the preloader using the same synthetic path layout so that
+      // discovered imports resolve against `wd`, matching the synchronous evaluator.
+      def discoverVarImports(prefix: String, vars: Map[String, String]): Unit =
+        vars.foreach { case (k, v) =>
+          val varPath = wd / Util.wrapInLessThanGreaterThan(s"$prefix-var $k")
+          // Ignore parse errors here: Interpreter.parseVar will surface them at evaluation time
+          // with a proper stack frame if the variable is actually referenced.
+          preloader.add(varPath, StaticResolvedFile(v), ImportFinder.Kind.Code)
+        }
+      discoverVarImports("ext", parsedExtVars)
+      discoverVarImports("tla", parsedTlaVars)
+
       def loadOne(p: Preloader.Pending): Future[Unit] = {
         val pathStr = p.path.asInstanceOf[JsVirtualPath].path
         val promise = importLoader(pathStr, p.binaryData)
         // implicit Thenable.Implicits converts Promise[Any] to Future[Any]
         (promise: Future[Any]).map { value =>
           val resolved = toResolvedFile(pathStr, value, p.binaryData)
-          preloader.add(p.path, resolved, p.kind) match {
-            case Left(err) => throw js.JavaScriptException(err.getMessage)
-            case Right(_)  => ()
-          }
+          // Ignore parse errors on discovered imports: Jsonnet evaluation is lazy, so a parse
+          // error in `if false then import 'bad' else 1` should not fail the whole evaluation.
+          // If the branch is forced at runtime, the interpreter surfaces the error there.
+          preloader.add(p.path, resolved, p.kind)
+          ()
         }
       }
 
