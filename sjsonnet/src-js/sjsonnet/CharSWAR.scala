@@ -23,6 +23,17 @@ object CharSWAR {
     false
   }
 
+  def isAsciiJsonSafe(s: String): Boolean = {
+    var i = 0
+    val len = s.length
+    while (i < len) {
+      val c = s.charAt(i)
+      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
+      i += 1
+    }
+    true
+  }
+
   /** Scalar scan for byte[] — used by ByteRenderer for UTF-8 encoded data. */
   def hasEscapeChar(arr: Array[Byte], from: Int, to: Int): Boolean = {
     var i = from

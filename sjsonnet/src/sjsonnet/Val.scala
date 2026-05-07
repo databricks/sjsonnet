@@ -623,6 +623,8 @@ object Val {
 
     private[sjsonnet] def rawBytes: Array[Byte] = null
 
+    private[sjsonnet] def constantEval: Eval = null
+
     /**
      * If both this and other are ConcatViews sharing the same left array, return the shared prefix
      * length. Otherwise return 0. Used by compare/equal to skip identical prefix elements entirely,
@@ -793,13 +795,13 @@ object Val {
     // Exceptions intentionally reset the slot to null rather than being cached. That matches the
     // existing LazyFunc/LazyExpr behavior and avoids changing observable std.trace/error behavior
     // on repeated failed evaluation.
-    private[this] var slots: Array[AnyRef] = null
+    private var slots: Array[AnyRef] = null
 
     protected def computeValue(i: Int): Val
 
     protected def errorScope: EvalErrorScope
 
-    private[this] def ensureSlots(): Array[AnyRef] = {
+    private def ensureSlots(): Array[AnyRef] = {
       val current = slots
       if (current != null) current
       else {
@@ -867,12 +869,46 @@ object Val {
     }
   }
 
-  private final class RepeatedArr(pos0: Position, private[this] val source: Arr, count: Int)
+  private final class ConstArr(pos0: Position, size: Int, private val elem: Eval)
+      extends Arr(pos0, null) {
+    _length = size
+
+    @inline private def checkIndex(i: Int): Unit =
+      if (i < 0 || i >= _length) throw new ArrayIndexOutOfBoundsException(i)
+
+    override def value(i: Int): Val = {
+      checkIndex(i)
+      elem.value
+    }
+
+    override def eval(i: Int): Eval = {
+      checkIndex(i)
+      elem
+    }
+
+    override private[sjsonnet] def constantEval: Eval = elem
+
+    override def asLazyArray: Array[Eval] = {
+      val materialized = arr
+      if (materialized != null) materialized.asInstanceOf[Array[Eval]]
+      else {
+        val result = new Array[Eval](_length)
+        java.util.Arrays.fill(result.asInstanceOf[Array[AnyRef]], elem.asInstanceOf[AnyRef])
+        arr = result
+        result
+      }
+    }
+
+    override def reversed(newPos: Position): Arr =
+      new ConstArr(newPos, _length, elem)
+  }
+
+  private final class RepeatedArr(pos0: Position, private val source: Arr, count: Int)
       extends Arr(pos0, null) {
     // Keep std.repeat(array, n) as an indexed view. The common consumers either index a subset or
     // materialize later anyway; eagerly copying here multiplies thunks and stresses young-gen GC.
-    private[this] val sourceLen = source.length
-    private[this] val totalLen = sourceLen.toLong * count.toLong
+    private val sourceLen = source.length
+    private val totalLen = sourceLen.toLong * count.toLong
     if (totalLen > Int.MaxValue) throw new IllegalArgumentException("array too large")
     _length = totalLen.toInt
 
@@ -881,6 +917,9 @@ object Val {
 
     override def eval(i: Int): Eval =
       source.eval(i % sourceLen)
+
+    override private[sjsonnet] def constantEval: Eval =
+      if (sourceLen == 1) source.eval(0) else source.constantEval
 
     override def asLazyArray: Array[Eval] = {
       val sourceArr = source.asLazyArray
@@ -923,14 +962,14 @@ object Val {
 
   private final class SliceArr(
       pos0: Position,
-      private[this] var source: Arr,
-      private[this] val start: Int,
-      private[this] val step: Int,
+      private var source: Arr,
+      private val start: Int,
+      private val step: Int,
       size: Int)
       extends Arr(pos0, null) {
     _length = size
 
-    @inline private[this] def sourceIndex(i: Int): Int = start + i * step
+    @inline private def sourceIndex(i: Int): Int = start + i * step
 
     override def value(i: Int): Val =
       if ((arr ne null) || isConcatView) super.value(i)
@@ -994,9 +1033,9 @@ object Val {
   private abstract class LazyViewArr(pos0: Position, size: Int) extends Arr(pos0, null) {
     _length = size
 
-    private[this] var values: Array[Val] = _
-    private[this] var evals: Array[Eval] = _
-    private[this] var computedCount: Int = 0
+    private var values: Array[Val] = _
+    private var evals: Array[Eval] = _
+    private var computedCount: Int = 0
 
     protected def computeAt(index: Int): Val
 
@@ -1011,7 +1050,7 @@ object Val {
       if (cache == null) null else cache(i)
     }
 
-    private[this] def valueCache: Array[Val] = {
+    private def valueCache: Array[Val] = {
       var cache = values
       if (cache == null) {
         cache = new Array[Val](_length)
@@ -1476,6 +1515,14 @@ object Val {
 
   object Arr {
     def apply(pos: Position, arr: Array[? <: Eval]): Arr = new Arr(pos, arr)
+
+    def constant(pos: Position, size: Int, elem: Eval): Arr =
+      if (size == 0) Arr(pos, EMPTY_EVAL_ARRAY)
+      else if (size < LAZY_VIEW_THRESHOLD) {
+        val result = new Array[Eval](size)
+        java.util.Arrays.fill(result.asInstanceOf[Array[AnyRef]], elem.asInstanceOf[AnyRef])
+        Arr(pos, result)
+      } else new ConstArr(pos, size, elem)
 
     def repeated(pos: Position, source: Arr, count: Int): Arr =
       if (count == 0 || source.length == 0) Arr(pos, EMPTY_EVAL_ARRAY)

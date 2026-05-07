@@ -27,7 +27,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     visitObject(length, index)
 
   protected val elemBuilder = new upickle.core.ByteBuilder
-  private[this] val unicodeCharBuilder = new upickle.core.CharBuilder
+  private val unicodeCharBuilder = new upickle.core.CharBuilder
 
   def flushByteBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 8192)
