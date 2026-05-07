@@ -49,7 +49,7 @@ class BaseGraalVMTestSuite(unittest.TestCase):
   def setUpClass(cls):
     """Set up the test class by building the GraalVM native binary."""
     if not hasattr(cls, '_binary_built'):      
-      subprocess.run(["./mill", "sjsonnet.graal.nativeImage"], check=True, cwd=".")
+      subprocess.run(["./mill", "-j1", "sjsonnet.graal.nativeImage"], check=True, cwd=".")
       BaseGraalVMTestSuite._binary_built = True
     cls.binary_path = os.path.join(root_dir, "out/sjsonnet/graal/nativeImage.dest/native-executable")
   
