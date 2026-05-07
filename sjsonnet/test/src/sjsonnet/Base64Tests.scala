@@ -275,6 +275,13 @@ object Base64Tests extends TestSuite {
       assert(r == ujson.True)
     }
 
+    test("makeArrayBytePattern") {
+      eval("""std.base64(std.makeArray(6, function(i) i % 256))""") ==>
+      ujson.Str("AAECAwQF")
+      eval("""std.base64(std.makeArray(6, function(i) (i * 7 + 13) % 256))""") ==>
+      ujson.Str("DRQbIikw")
+    }
+
     // ================================================================
     // Multiple encode/decode cycles (stability test)
     // ================================================================
