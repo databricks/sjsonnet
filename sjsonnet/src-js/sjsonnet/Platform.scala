@@ -35,6 +35,9 @@ object Platform {
     }
   }
 
+  def isAsciiJsonSafe(s: String): Boolean =
+    CharSWAR.isAsciiJsonSafe(s)
+
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {

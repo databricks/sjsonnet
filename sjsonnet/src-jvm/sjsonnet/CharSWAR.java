@@ -54,6 +54,12 @@ final class CharSWAR {
     /** Below this length, scalar charAt is faster than SWAR + byte[] conversion. */
     private static final int SWAR_THRESHOLD = 128;
 
+    private static final long U16_HOLE  = 0x7FFF_7FFF_7FFF_7FFFL;
+    private static final long U16_QUOTE = 0x0022_0022_0022_0022L;
+    private static final long U16_BSLAS = 0x005C_005C_005C_005CL;
+    private static final long U16_CTRL  = 0xFFE0_FFE0_FFE0_FFE0L;
+    private static final long U16_ASCII = 0xFF80_FF80_FF80_FF80L;
+
     /**
      * Check if any char in {@code str} needs JSON string escaping.
      * Scan-first API: call on the String before copying to the output buffer.
@@ -78,6 +84,34 @@ final class CharSWAR {
      */
     static boolean hasEscapeChar(byte[] arr, int from, int to) {
         return hasEscapeCharSWAR(arr, from, to);
+    }
+
+    /**
+     * Check if {@code str} can be emitted as JSON string content with no escaping and no UTF-8
+     * encoding step: all chars must be printable ASCII excluding {@code '"'} and {@code '\\'}.
+     */
+    static boolean isAsciiJsonSafe(String str) {
+        int len = str.length();
+        if (len < 8) {
+            return isAsciiJsonSafeScalar(str, len);
+        }
+        int i = 0;
+        int limit = len - 3; // 4 UTF-16 chars per word
+        while (i < limit) {
+            long word =
+                    ((long) str.charAt(i)) |
+                    ((long) str.charAt(i + 1) << 16) |
+                    ((long) str.charAt(i + 2) << 32) |
+                    ((long) str.charAt(i + 3) << 48);
+            if (swarHasUnsafeAsciiChar(word)) return false;
+            i += 4;
+        }
+        while (i < len) {
+            char c = str.charAt(i);
+            if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
+            i++;
+        }
+        return true;
     }
 
     /**
@@ -160,6 +194,19 @@ final class CharSWAR {
                 : Long.numberOfLeadingZeros(mask)) >>> 3;
     }
 
+    private static boolean swarHasUnsafeAsciiChar(long word) {
+        if ((word & U16_ASCII) != 0L) return true;
+
+        long qz = zero16(word ^ U16_QUOTE);
+        long bz = zero16(word ^ U16_BSLAS);
+        long cz = zero16(word & U16_CTRL);
+        return (qz | bz | cz) != 0L;
+    }
+
+    private static long zero16(long word) {
+        return ~((word & U16_HOLE) + U16_HOLE | word | U16_HOLE);
+    }
+
     /** Scalar scan for String (used for short strings). */
     private static boolean hasEscapeCharScalar(String s, int len) {
         for (int i = 0; i < len; i++) {
@@ -167,5 +214,13 @@ final class CharSWAR {
             if (c < 32 || c == '"' || c == '\\') return true;
         }
         return false;
+    }
+
+    private static boolean isAsciiJsonSafeScalar(String s, int len) {
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
+        }
+        return true;
     }
 }

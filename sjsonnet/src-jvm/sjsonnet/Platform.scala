@@ -30,6 +30,9 @@ object Platform {
   def copyAsciiStringToBytes(s: String, dst: Array[Byte], dstPos: Int): Unit =
     s.getBytes(0, s.length, dst, dstPos)
 
+  def isAsciiJsonSafe(s: String): Boolean =
+    CharSWAR.isAsciiJsonSafe(s)
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)

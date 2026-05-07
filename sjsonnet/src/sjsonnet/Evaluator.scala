@@ -34,8 +34,8 @@ class Evaluator(
   def trace(e: String): Unit = if (logger != null) logger(true, e)
   def warn(e: Error): Unit = if (logger != null) logger(false, Error.formatError(e))
 
-  private[this] var stackDepth: Int = 0
-  private[this] val maxStack: Int = settings.maxStack
+  private var stackDepth: Int = 0
+  private val maxStack: Int = settings.maxStack
   private[sjsonnet] var profiler: Profiler = _
 
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {

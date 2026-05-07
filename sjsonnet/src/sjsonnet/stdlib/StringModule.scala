@@ -418,20 +418,98 @@ object StringModule extends AbstractFunctionModule {
    * case the arrays are concatenated in the same way, to produce a single array.
    */
   private object Join extends Val.Builtin2("join", "sep", "arr") {
+    private def joinedRepeatedString(
+        pos: Position,
+        sep: String,
+        str: String,
+        count: Int): Val.Str = {
+      if (count == 0) Val.Str(pos, "")
+      else {
+        val resultLen = str.length.toLong * count + sep.length.toLong * (count - 1)
+        if (resultLen > Int.MaxValue) Error.fail("String is too large to join")
+        if (count == 1) {
+          if (Platform.isAsciiJsonSafe(str)) Val.Str.asciiSafe(pos, str) else Val.Str(pos, str)
+        } else {
+          val asciiSafe = Platform.isAsciiJsonSafe(str) && Platform.isAsciiJsonSafe(sep)
+
+          val b = new java.lang.StringBuilder(resultLen.toInt)
+          if (str.length + sep.length <= 64) {
+            val repeated = str + sep
+            var i = 1
+            while (i < count) {
+              b.append(repeated)
+              i += 1
+            }
+          } else {
+            var i = 1
+            while (i < count) {
+              b.append(str)
+              b.append(sep)
+              i += 1
+            }
+          }
+          b.append(str)
+
+          val result = b.toString
+          if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
+        }
+      }
+    }
+
+    private def joinRepeatedStringEval(
+        pos: Position,
+        sep: String,
+        elem: Eval,
+        len: Int): Val.Str = {
+      if (len == 0) return Val.Str(pos, "")
+
+      elem match {
+        case _: Val.Null => Val.Str(pos, "")
+        case s: Val.Str  => joinedRepeatedString(pos, sep, s.str, len)
+        case _: Val      => null
+        case _           => null
+      }
+    }
+
+    private def joinRepeatedDirectString(
+        pos: Position,
+        sep: String,
+        direct: Array[Eval],
+        len: Int): Val.Str = {
+      val firstEval = direct(0)
+      var i = 1
+      while (i < len && (direct(i) eq firstEval)) i += 1
+      if (i == len) joinRepeatedStringEval(pos, sep, firstEval, len)
+      else null
+    }
+
     def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
       sep.value match {
-        case Val.Str(_, s) =>
+        case sepStr: Val.Str =>
+          val s = sepStr.str
+          val len = arr.length
+          val repeatedConst = joinRepeatedStringEval(pos, s, arr.constantEval, len)
+          if (repeatedConst != null) return repeatedConst
+
+          if (len == 0) return Val.Str(pos, "")
+
+          val direct = arr.directBackingArray
+          if (direct != null) {
+            val repeated = joinRepeatedDirectString(pos, s, direct, len)
+            if (repeated != null) return repeated
+          }
+
           val b = new java.lang.StringBuilder()
           var i = 0
           var added = false
-          while (i < arr.length) {
+          while (i < len) {
             arr.value(i) match {
-              case _: Val.Null   =>
-              case Val.Str(_, x) =>
+              case _: Val.Null =>
+              case x: Val.Str  =>
                 if (added) b.append(s)
                 added = true
-                b.append(x)
+                b.append(x.str)
               case x => Error.fail("Cannot join " + x.prettyName)
             }
             i += 1
