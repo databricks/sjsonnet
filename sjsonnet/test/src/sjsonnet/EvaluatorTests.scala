@@ -65,6 +65,80 @@ object EvaluatorTests extends TestSuite {
       eval("{foo: (function() true)()}") ==> ujson.Obj {
         "foo" -> ujson.True
       }
+      eval(
+        """
+          |local f2(f) = function(x) f(f(x));
+          |local g = f2(error "should stay lazy");
+          |std.type(g)
+          |""".stripMargin
+      ) ==> ujson.Str("function")
+      assert(
+        evalErr(
+          """
+            |local f2(f) = function(x) f(f(x));
+            |local g = f2(error "call should force base");
+            |g(1)
+            |""".stripMargin
+        ).contains("call should force base")
+      )
+      assert(
+        evalErr(
+          """
+            |local f2(f) = function(x) f(f(x));
+            |f2(1)(1)
+            |""".stripMargin
+        ).contains("Expected function, found number")
+      )
+      assert(
+        evalErr(
+          """
+            |local f2(f) = function(x) f(f(x));
+            |f2(error "tailstrict should force") tailstrict
+            |""".stripMargin
+        ).contains("tailstrict should force")
+      )
+      eval(
+        """
+          |local f2(f) = function(x) f(f(x));
+          |f2(function(x) x + 1)(1)
+          |""".stripMargin
+      ) ==> ujson.Num(3)
+      eval(
+        """
+          |local f2(f) = function(x) f(f(x));
+          |local plus1(x) = x + 1;
+          |local chain = std.makeArray(5, function(i) if i == 0 then plus1 else f2(chain[i - 1]));
+          |chain[4](1)
+          |""".stripMargin,
+        maxStack = 100000
+      ) ==> ujson.Num(17)
+      eval(
+        """
+          |local f2(f) = function(x) f(f(x));
+          |local id(x) = x;
+          |local slowId = std.makeArray(20, function(i) if i == 0 then id else f2(slowId[i - 1]));
+          |slowId[15](42)
+          |""".stripMargin,
+        maxStack = 100000
+      ) ==> ujson.Num(42)
+      assert(
+        evalErr(
+          """
+            |local f2(f) = function(x) f(f(x));
+            |local rec = f2(rec);
+            |rec(1)
+            |""".stripMargin
+        ).contains("Max stack frames exceeded")
+      )
+      assert(
+        evalErr(
+          """
+            |local f2(f) = function(x) f(f(x));
+            |local o = { a: f2(self.b), b: f2(self.a) };
+            |o.a(1)
+            |""".stripMargin
+        ).contains("Max stack frames exceeded")
+      )
     }
     test("members") {
       eval("{local x = 1, x: x}['x']") ==> ujson.Num(1)

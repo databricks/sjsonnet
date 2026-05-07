@@ -2366,6 +2366,28 @@ object Val {
      */
     def bodyExpr: Expr = null
 
+    /**
+     * Static identity shape from [[StaticOptimizer]]. The optimizer pattern-matches `Function`
+     * literals and tags them so the runtime can decide identity equivalence in O(1) plus a chain
+     * walk on the captured value.
+     *
+     *   - 0 = unknown / not statically classified (default)
+     *   - 1 = direct identity body: `function(x) x`
+     *   - 2 = self-composition body: `function(x) g(g(...g(x)))` for a single captured `g`
+     *
+     * Stored as a plain `var` (set by `Evaluator.visitExpr`) rather than an overridable `def` so
+     * that all `Val.Func` instances created by the evaluator share a single anonymous subclass
+     * shape — this keeps `apply1`/`apply` call sites monomorphic for the JIT (avoids the bimorphic
+     * inlining cliff that occurred when an extra subclass was added per-Function-expr).
+     */
+    var staticIdentityShape: Byte = 0
+
+    /**
+     * When [[staticIdentityShape]] == 2, the absolute scope index of the captured `g` in
+     * [[defSiteValScope]]. Otherwise -1.
+     */
+    var staticIdentityCapturedIdx: Int = -1
+
     // Convenience wrapper: evaluates the function body and resolves any TailCall sentinel.
     // Use this instead of raw `evalRhs` at call sites that bypass `apply*` and consume
     // the result directly (e.g. stdlib scope-reuse fast paths).
@@ -2390,6 +2412,93 @@ object Val {
           case _ => false
         }
       }
+
+    /*
+     * Cached state for [[isEffectivelyIdentity]]. Mutually exclusive byte states (not flags).
+     * Encoded as a plain `var` because the predicate is idempotent, the cached values are
+     * stable Bytes (a single CPU word write), and the JIT can keep this on the hot path as a
+     * field load + constant comparison without any extra fences. Recursive cycles are guarded
+     * by the in-progress state.
+     */
+    private var _effectiveIdentityState: Byte = Func.EffIdUnknown
+
+    /**
+     * True when this function is semantically equivalent to identity (`x => x`). Used by [[apply1]]
+     * to elide the call entirely. Recognizes:
+     *   1. Direct identity (delegates to [[isIdentityFunction]]).
+     *   2. Self-composition over an effectively-identity captured function, classified by
+     *      [[StaticOptimizer]] via [[staticIdentityShape]]. The decision requires forcing the
+     *      captured value, so the result is cached after first evaluation.
+     *
+     * Recursive captures (`local rec = f2(rec)`) are broken via an in-progress marker that yields
+     * `false`, letting normal application/max-stack logic surface the user-visible error.
+     */
+    final private[sjsonnet] def isEffectivelyIdentity: Boolean = {
+      val s = _effectiveIdentityState
+      if (s == Func.EffIdYes) true
+      else if (s == Func.EffIdNo || s == Func.EffIdInProgress) false
+      else computeEffectiveIdentity()
+    }
+
+    private def computeEffectiveIdentity(): Boolean = {
+      if (isIdentityFunction) {
+        _effectiveIdentityState = Func.EffIdYes
+        return true
+      }
+      if (staticIdentityShape != 2) {
+        _effectiveIdentityState = Func.EffIdNo
+        return false
+      }
+      // Walk the static-composition chain iteratively. Each level marks itself InProgress,
+      // we record visited nodes so we can either propagate the final decision back up the
+      // chain or roll the marks back to Unknown if forcing a captured value throws.
+      // One small ArrayList allocation per cache miss; never executed on the hot path
+      // because subsequent `isEffectivelyIdentity` reads hit the cached Byte state.
+      val visited = new java.util.ArrayList[Func](4)
+      _effectiveIdentityState = Func.EffIdInProgress
+      visited.add(this)
+      var current: Func = this
+      var decided: Byte = 0
+      try {
+        while (decided == 0) {
+          val captured =
+            current.defSiteValScope.bindings(current.staticIdentityCapturedIdx).value
+          captured match {
+            case f: Func =>
+              f._effectiveIdentityState match {
+                case Func.EffIdYes        => decided = Func.EffIdYes
+                case Func.EffIdNo         => decided = Func.EffIdNo
+                case Func.EffIdInProgress => decided = Func.EffIdNo
+                case _ /* Unknown */      =>
+                  if (f.isIdentityFunction) decided = Func.EffIdYes
+                  else if (f.staticIdentityShape != 2) decided = Func.EffIdNo
+                  else {
+                    f._effectiveIdentityState = Func.EffIdInProgress
+                    visited.add(f)
+                    current = f
+                  }
+              }
+            case _ => decided = Func.EffIdNo
+          }
+        }
+        var i = 0
+        val n = visited.size
+        while (i < n) {
+          visited.get(i)._effectiveIdentityState = decided
+          i += 1
+        }
+        decided == Func.EffIdYes
+      } catch {
+        case NonFatal(e) =>
+          var i = 0
+          val n = visited.size
+          while (i < n) {
+            visited.get(i)._effectiveIdentityState = Func.EffIdUnknown
+            i += 1
+          }
+          throw e
+      }
+    }
 
     /** Override to provide a function name for error messages. Only called on error paths. */
     def functionName: String = null
@@ -2523,6 +2632,7 @@ object Val {
         ev: EvalScope,
         tailstrictMode: TailstrictMode): Val = {
       if (params.names.length != 1) apply(Array(argVal), null, outerPos)
+      else if (isEffectivelyIdentity) argVal.value
       else {
         val funDefFileScope: FileScope = pos match {
           case null => outerPos.fileScope
@@ -2575,6 +2685,14 @@ object Val {
         if (tailstrictMode == TailstrictModeDisabled) TailCall.resolve(result) else result
       }
     }
+  }
+
+  object Func {
+    // Mutually-exclusive byte states for the cached effective-identity probe; not flags.
+    private[Val] final val EffIdUnknown: Byte = 0
+    private[Val] final val EffIdYes: Byte = 1
+    private[Val] final val EffIdNo: Byte = 2
+    private[Val] final val EffIdInProgress: Byte = 3
   }
 
   /**
