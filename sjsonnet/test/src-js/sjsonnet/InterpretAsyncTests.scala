@@ -101,6 +101,61 @@ object InterpretAsyncTests extends TestSuite {
       ).map(v => assert(v == ujson.Num(1)))
     }
 
+    test("importstr and importbin for the same path return distinct values") {
+      // He-Pin's reproducer: `if true then importstr "x" else importbin "x"`. The cache must
+      // keep separate entries for text and bytes; otherwise async returns a binary file to
+      // importstr (rejecting with NotImplementedError) or vice versa.
+      val text = "the-text"
+      val bytes = Array[Byte](1, 2, 3)
+      val resolver = makeResolver(Set("same"))
+      val loader: js.Function2[String, Boolean, js.Promise[Any]] =
+        (_: String, binaryData: Boolean) =>
+          Future {
+            if (binaryData) bytes.toJSArray.asInstanceOf[Any]
+            else text.asInstanceOf[Any]
+          }.toJSPromise
+      SjsonnetMain
+        .interpretAsync(
+          "if true then importstr 'same' else importbin 'same'",
+          js.Dictionary[js.Any](),
+          js.Dictionary[js.Any](),
+          "/",
+          resolver,
+          loader
+        )
+        .toFuture
+        .map(v => ujson.WebJson.transform(v, ujson.Value))
+        .map(v => assert(v == ujson.Str(text)))
+    }
+
+    test("entry parse error matches synchronous interpret's error formatting") {
+      // The async path must route entry parse errors through interpret0 so the message shape
+      // and root frame match the synchronous interpret. Verify the error includes the
+      // "(memory)" location marker that interpret0 produces.
+      val resolver = makeResolver(Set.empty)
+      val loader: js.Function2[String, Boolean, js.Promise[Any]] =
+        (path: String, _: Boolean) => js.Promise.reject(s"unexpected load: $path")
+      val out = SjsonnetMain.interpretAsync(
+        "local x =", // syntactically invalid
+        js.Dictionary[js.Any](),
+        js.Dictionary[js.Any](),
+        "/",
+        resolver,
+        loader
+      )
+      out.toFuture.transform {
+        case scala.util.Success(v) =>
+          scala.util.Failure(new RuntimeException(s"expected parse failure, got $v"))
+        case scala.util.Failure(e) =>
+          val msg = e.getMessage
+          if (msg != null && msg.contains("(memory)")) scala.util.Success(())
+          else
+            scala.util.Failure(
+              new RuntimeException(s"expected formatted parse error mentioning (memory), got: $msg")
+            )
+      }
+    }
+
     test("async loader rejection propagates through the returned Promise") {
       val resolver = makeResolver(Set("missing.libsonnet"))
       val loader: js.Function2[String, Boolean, js.Promise[Any]] =

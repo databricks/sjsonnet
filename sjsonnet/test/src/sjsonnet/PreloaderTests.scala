@@ -29,7 +29,7 @@ object PreloaderTests extends TestSuite {
 
   private def runPreload(fs: FakeFs, entryPath: Path, entry: String): Preloader = {
     val preloader = new Preloader(fs.importer)
-    preloader.add(entryPath, StaticResolvedFile(entry), ImportFinder.Kind.Code) match {
+    preloader.add(entryPath, StaticResolvedFile(entry), ImportKind.Code) match {
       case Left(err) => throw err
       case Right(_)  =>
     }
@@ -60,7 +60,7 @@ object PreloaderTests extends TestSuite {
 
       val loaded = fs.readPaths.map(_._1).toSet
       assert(loaded == Set("a.libsonnet", "b.libsonnet"))
-      assert(preloader.loaded.size == 3) // entry + a + b
+      assert(preloader.loaded.size == 3) // entry + a + b, all keyed at (path, false)
     }
 
     test("dedupes identical imports") {
@@ -187,7 +187,7 @@ object PreloaderTests extends TestSuite {
       }
       val preloader = new Preloader(importer)
       val entryPath = DummyPath("dir", "a.libsonnet")
-      preloader.add(entryPath, StaticResolvedFile(files("dir/a.libsonnet")), ImportFinder.Kind.Code)
+      preloader.add(entryPath, StaticResolvedFile(files("dir/a.libsonnet")), ImportKind.Code)
       while (!preloader.isComplete) {
         val batch = preloader.takePendingImports()
         batch.foreach { p =>
@@ -197,7 +197,7 @@ object PreloaderTests extends TestSuite {
       }
       // Every docBase observed should be the parent dir, never the file path itself.
       assert(seenDocBases.forall(_ == "dir"))
-      assert(preloader.loaded.contains(DummyPath("dir", "b.libsonnet")))
+      assert(preloader.loaded.contains((DummyPath("dir", "b.libsonnet"), false)))
     }
 
     test("does not fail preload on parse errors in discovered files") {
@@ -209,7 +209,7 @@ object PreloaderTests extends TestSuite {
       preloader.add(
         DummyPath("entry"),
         StaticResolvedFile("if false then import 'bad.libsonnet' else 1"),
-        ImportFinder.Kind.Code
+        ImportKind.Code
       )
       while (!preloader.isComplete) {
         val batch = preloader.takePendingImports()
@@ -221,14 +221,30 @@ object PreloaderTests extends TestSuite {
       }
       // bad.libsonnet was loaded but its parse error did not fail preload.
       assert(fs.readPaths.map(_._1).contains("bad.libsonnet"))
-      assert(preloader.loaded.contains(DummyPath("bad.libsonnet")))
+      assert(preloader.loaded.contains((DummyPath("bad.libsonnet"), false)))
+    }
+
+    test("importstr and importbin for the same path keep separate cache entries") {
+      // He-Pin's reproducer: a single path referenced as both text and bytes must not collide
+      // in the cache. With a Path-only key, one read overwrote the other, breaking the
+      // synchronous evaluator's Importer.read(path, binaryData) contract.
+      val fs = new FakeFs(
+        Map("same" -> "the-text"),
+        binFiles = Map("same" -> Array[Byte](1, 2, 3))
+      )
+      val entry = "{ s: importstr 'same', b: importbin 'same' }"
+      val preloader = runPreload(fs, DummyPath("entry"), entry)
+      val sameTxt = preloader.importer.read(DummyPath("same"), binaryData = false)
+      val sameBin = preloader.importer.read(DummyPath("same"), binaryData = true)
+      assert(sameTxt.exists(_.readString() == "the-text"))
+      assert(sameBin.exists(_.readRawBytes().sameElements(Array[Byte](1, 2, 3))))
     }
 
     test("parse error in entry is reported") {
       val fs = new FakeFs(Map.empty)
       val preloader = new Preloader(fs.importer)
       val out =
-        preloader.add(DummyPath("entry"), StaticResolvedFile("local x ="), ImportFinder.Kind.Code)
+        preloader.add(DummyPath("entry"), StaticResolvedFile("local x ="), ImportKind.Code)
       assert(out.isLeft)
     }
   }

@@ -24,10 +24,15 @@ import scala.collection.mutable
  * [[PreParsedResolvedFile]] so the Interpreter does not re-run fastparse during evaluation; the
  * static optimizer still runs once on cache hit.
  *
+ * Cache keying: entries are keyed by `(Path, binaryData)` so that the same path referenced as both
+ * `importstr` (text) and `importbin` (bytes) keeps two distinct cache entries — matching the
+ * `Importer.read(path, binaryData)` contract. Without this, an `importstr "x" + importbin "x"`
+ * program would overwrite one entry and hand the wrong content to the evaluator.
+ *
  * Usage (pseudo-code):
  * {{{
  *   val preloader = new Preloader(parentImporter)
- *   preloader.add(entryPath, StaticResolvedFile(entryText), Preloader.EntryKind)
+ *   preloader.add(entryPath, StaticResolvedFile(entryText), ImportKind.Code)
  *   while (preloader.pendingImports.nonEmpty) {
  *     val batch = preloader.takePendingImports()
  *     for (p <- batch) {
@@ -53,8 +58,13 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
       java.lang.Boolean
     ]]
 
-  private val cache = mutable.LinkedHashMap.empty[Path, ResolvedFile]
-  private val seen = mutable.HashSet.empty[(Path, ImportFinder.Kind)]
+  // Keyed by (path, binaryData) so importstr and importbin for the same path don't collide.
+  private val cache = mutable.LinkedHashMap.empty[(Path, Boolean), ResolvedFile]
+
+  // Tracks the strongest kind enqueued/loaded for each (path, binaryData). Used both to dedupe
+  // loader calls and to upgrade a previously-Str pending entry to Code if a Code reference shows
+  // up later.
+  private val seen = mutable.HashMap.empty[(Path, Boolean), ImportKind]
   private val pending = mutable.ArrayBuffer.empty[Preloader.Pending]
 
   /** Resolve an import name relative to a base path, using the parent importer. */
@@ -71,8 +81,8 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
   def add(
       path: Path,
       content: ResolvedFile,
-      kind: ImportFinder.Kind = ImportFinder.Kind.Code): Either[Error, Unit] = {
-    cache.put(path, content)
+      kind: ImportKind = ImportKind.Code): Either[Error, Unit] = {
+    putContent(path, kind.binaryData, content)
     if (kind.isCode) discover(path, content) else Right(())
   }
 
@@ -97,11 +107,27 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
   def importer: Importer = new Importer {
     def resolve(docBase: Path, importName: String): Option[Path] =
       parentImporter.resolve(docBase, importName)
-    def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = cache.get(path)
+    def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
+      cache.get((path, binaryData))
   }
 
   /** Snapshot of the loaded cache, exposed so callers can inspect or persist it. */
-  def loaded: collection.Map[Path, ResolvedFile] = cache
+  def loaded: collection.Map[(Path, Boolean), ResolvedFile] = cache
+
+  /**
+   * Insert content into the cache without clobbering a richer (pre-parsed) entry. discover() puts a
+   * [[PreParsedResolvedFile]]; a later add() of the same physical content (e.g. via a separate
+   * `importstr` reference to the same path) must not downgrade it back to plain text.
+   */
+  private def putContent(path: Path, binaryData: Boolean, content: ResolvedFile): Unit = {
+    val key = (path, binaryData)
+    cache.get(key) match {
+      case Some(existing) if existing.preParsedAst.isDefined && content.preParsedAst.isEmpty =>
+      // keep the pre-parsed version
+      case _ =>
+        cache.put(key, content)
+    }
+  }
 
   private def discover(path: Path, content: ResolvedFile): Either[Error, Unit] = {
     val parser = new Parser(path, internedStrings, internedFieldSets, settings)
@@ -113,18 +139,14 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
         case Parsed.Success((expr, fs), _) =>
           // Stash the parsed AST on the cache entry so the Interpreter doesn't re-run fastparse.
           // The optimizer still runs once at evaluation time on cache hit.
-          cache.put(path, PreParsedResolvedFile(content, expr, fs))
+          cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
           // Match the synchronous evaluator's docBase: resolve relative to the importing file's
           // parent directory, not the file path itself. See Importer.resolveAndReadOrFail, which
           // calls resolve(pos.fileScope.currentFile.parent(), ...).
           val docBase = path.parent()
           ImportFinder.collect(expr).foreach { found =>
-            parentImporter.resolve(docBase, found.value) match {
-              case Some(resolved) =>
-                if (seen.add((resolved, found.kind))) enqueue(resolved, found.kind)
-              case None =>
-              // resolution failure is deferred until evaluation, where it will surface
-              // with a proper stack frame
+            parentImporter.resolve(docBase, found.value).foreach { resolved =>
+              record(resolved, found.kind)
             }
           }
           Right(())
@@ -134,16 +156,40 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
     }
   }
 
-  private def enqueue(path: Path, kind: ImportFinder.Kind): Unit = {
-    if (cache.contains(path)) return
-    pending += Preloader.Pending(path, kind)
+  /**
+   * Record that `path` was referenced with `kind`. Enqueues the load if new, upgrades a pending
+   * Str→Code if applicable, and lazily parses an already-loaded Str entry that needs Code analysis.
+   */
+  private def record(path: Path, kind: ImportKind): Unit = {
+    val key = (path, kind.binaryData)
+    cache.get(key) match {
+      case Some(content) =>
+        // Already loaded. If we now need Code analysis (e.g. an earlier `importstr` reference
+        // loaded the file as plain text and we just hit an `import` of the same path), parse it
+        // now and walk for sub-imports.
+        if (kind.isCode && content.preParsedAst.isEmpty) {
+          val _ = discover(path, content)
+        }
+      case None =>
+        seen.get(key) match {
+          case None =>
+            seen(key) = kind
+            pending += Preloader.Pending(path, kind)
+          case Some(existing) if !existing.isCode && kind.isCode =>
+            seen(key) = kind
+            val idx =
+              pending.indexWhere(p => p.path == path && p.kind.binaryData == kind.binaryData)
+            if (idx >= 0) pending(idx) = Preloader.Pending(path, kind)
+          case _ => // already pending with equal-or-stronger kind
+        }
+    }
   }
 }
 
 object Preloader {
 
   /** A path that needs to be loaded before evaluation can proceed. */
-  final case class Pending(path: Path, kind: ImportFinder.Kind) {
+  final case class Pending(path: Path, kind: ImportKind) {
     def binaryData: Boolean = kind.binaryData
     def isCode: Boolean = kind.isCode
   }

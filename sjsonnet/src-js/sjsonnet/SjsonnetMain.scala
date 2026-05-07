@@ -85,13 +85,26 @@ object SjsonnetMain {
         )
     }
 
+  /**
+   * Coerce a JS object whose values are strings into a `Map[String, String]`. Iterates the JS
+   * dictionary directly instead of round-tripping through `ujson` to avoid the intermediate ujson
+   * tree, the `.obj.toMap` copy, and the trailing `.map` on the immutable map.
+   */
   private def parseStringMap(label: String, value: js.Any): Map[String, String] =
     try {
-      ujson.WebJson.transform(value, ujson.Value).obj.toMap.map {
-        case (k, ujson.Str(v)) => (k, v)
-        case (k, _)            =>
-          throw js.JavaScriptException(s"$label '$k' must be a string value, got non-string")
+      val dict = value.asInstanceOf[js.Dictionary[js.Any]]
+      val out = Map.newBuilder[String, String]
+      out.sizeHint(dict.size)
+      val it = dict.iterator
+      while (it.hasNext) {
+        val (k, v) = it.next()
+        (v: Any) match {
+          case s: String => out += k -> s
+          case _         =>
+            throw js.JavaScriptException(s"$label '$k' must be a string value, got non-string")
+        }
       }
+      out.result()
     } catch {
       case e: js.JavaScriptException => throw e
       case e: Exception              =>
@@ -177,7 +190,8 @@ object SjsonnetMain {
    *   - Loader rejection (missing file, network error, etc.) fails the returned Promise.
    *   - A parse error on a discovered (non-entry) file is tolerated; it only surfaces if evaluation
    *     actually forces that branch.
-   *   - The entry source's own parse error fails immediately.
+   *   - The entry source's own parse error is reported through the normal `interpret0` formatting
+   *     path so the error shape and location info match synchronous `interpret`.
    *
    * Each discovered file is parsed once during preload and again referenced by the evaluator; the
    * parsed AST is shared so fastparse runs only once per file.
@@ -200,10 +214,11 @@ object SjsonnetMain {
       val wd = JsVirtualPath(wd0)
       val entryPath = JsVirtualPath("(memory)")
 
-      preloader.add(entryPath, StaticResolvedFile(text), ImportFinder.Kind.Code) match {
-        case Left(err) => return js.Promise.reject(err.getMessage)
-        case Right(_)  =>
-      }
+      // Don't propagate the entry's parse error here — let runInterpret surface it via
+      // interpret0 so the message goes through the same Error.formatError path as synchronous
+      // interpret (root frame, "(memory):line:col", etc.). If parsing the entry fails we still
+      // get an empty pending queue and a fast path to runInterpret, which fails identically.
+      preloader.add(entryPath, StaticResolvedFile(text), ImportKind.Code)
 
       // ext/tla vars are parsed as Jsonnet code (Interpreter.parseVar) and may contain imports.
       // Feed each value through the preloader using the same synthetic path layout so that
@@ -213,7 +228,7 @@ object SjsonnetMain {
           val varPath = wd / Util.wrapInLessThanGreaterThan(s"$prefix-var $k")
           // Ignore parse errors here: Interpreter.parseVar will surface them at evaluation time
           // with a proper stack frame if the variable is actually referenced.
-          preloader.add(varPath, StaticResolvedFile(v), ImportFinder.Kind.Code)
+          preloader.add(varPath, StaticResolvedFile(v), ImportKind.Code)
         }
       discoverVarImports("ext", parsedExtVars)
       discoverVarImports("tla", parsedTlaVars)
