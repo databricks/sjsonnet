@@ -33,4 +33,14 @@ object CharSWAR {
     }
     false
   }
+
+  def findFirstEscapeChar(arr: Array[Byte], from: Int, to: Int): Int = {
+    var i = from
+    while (i < to) {
+      val b = arr(i) & 0xff
+      if (b < 32 || b == '"' || b == '\\') return i
+      i += 1
+    }
+    -1
+  }
 }

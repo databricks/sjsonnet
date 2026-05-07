@@ -31,6 +31,7 @@ final class CharSWAR {
     //   MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder)
     private static final VarHandle LONG_VIEW =
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
+    private static final boolean LITTLE_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
 
     // --- 8-bit SWAR constants (Netty/Pekko pattern) ---
     //
@@ -90,12 +91,35 @@ final class CharSWAR {
         return false;
     }
 
+    /**
+     * Find the first byte in {@code arr[from..to)} that needs JSON string escaping, or {@code -1}
+     * when the range is clean.
+     */
+    static int findFirstEscapeChar(byte[] arr, int from, int to) {
+        int i = from;
+        int limit = to - 7;
+        while (i < limit) {
+            long word = (long) LONG_VIEW.get(arr, i);
+            long mask = swarMatchMask(word);
+            if (mask != 0L) {
+                return i + firstMatchedByte(mask);
+            }
+            i += 8;
+        }
+        while (i < to) {
+            int b = arr[i] & 0xFF;
+            if (b < 32 || b == '"' || b == '\\') return i;
+            i++;
+        }
+        return -1;
+    }
+
     private static boolean hasEscapeCharSWAR(byte[] arr, int from, int to) {
         int i = from;
         int limit = to - 7; // 8 bytes per VarHandle.get
         while (i < limit) {
             long word = (long) LONG_VIEW.get(arr, i);
-            if (swarHasMatch(word)) return true;
+            if (swarMatchMask(word) != 0L) return true;
             i += 8;
         }
         // Tail: remaining 0-7 bytes
@@ -114,7 +138,7 @@ final class CharSWAR {
      * <p>Uses Netty/Pekko pattern: XOR to produce zero lanes, then
      * Hacker's Delight formula to detect zero bytes.
      */
-    private static boolean swarHasMatch(long word) {
+    private static long swarMatchMask(long word) {
         // 1. Detect '"' via XOR + zero-detection (Netty SWARUtil.applyPattern)
         long q = word ^ QUOTE;
         long qz = ~((q & HOLE) + HOLE | q | HOLE);
@@ -127,7 +151,13 @@ final class CharSWAR {
         long c = word & CTRL;
         long cz = ~((c & HOLE) + HOLE | c | HOLE);
 
-        return (qz | bz | cz) != 0L;
+        return qz | bz | cz;
+    }
+
+    private static int firstMatchedByte(long mask) {
+        return (LITTLE_ENDIAN
+                ? Long.numberOfTrailingZeros(mask)
+                : Long.numberOfLeadingZeros(mask)) >>> 3;
     }
 
     /** Scalar scan for String (used for short strings). */
