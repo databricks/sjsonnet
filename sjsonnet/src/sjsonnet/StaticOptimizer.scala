@@ -150,7 +150,14 @@ class StaticOptimizer(
       case And(pos, _: Val.False, _)            => Val.False(pos)
       case Or(pos, _: Val.True, _)              => Val.True(pos)
       case Or(pos, _: Val.False, rhs: Val.Bool) => rhs.pos = pos; rhs
-      case e                                    => e
+
+      // Identity-equivalent function recognition. Cheap pattern match here keeps the runtime
+      // fast path (`Val.Func.isEffectivelyIdentity`) at single-field cost.
+      case f: Function =>
+        identifyStaticIdentity(f)
+        f
+
+      case e => e
     }
   }
 
@@ -210,6 +217,44 @@ class StaticOptimizer(
         case _ => Double.NaN
       }
     } catch { case _: Exception => Double.NaN }
+
+  /**
+   * Statically classify a unary function as identity-equivalent so the runtime fast path can elide
+   * the call entirely. We recognize:
+   *
+   *   - Direct identity: `function(x) x`.
+   *   - Self-composition: `function(x) g(g(...g(x)))` for some captured `g` (depth >= 1). The
+   *     runtime check then needs only to test whether `g` is itself effectively identity.
+   *
+   * The captured `g` index is the absolute scope index assigned by ScopedExprTransform; at the
+   * point we re-enter `transform` after `super.transform`, `scope.size` equals the index of the
+   * function's unique parameter (we've already exited `nestedNames` for the body).
+   */
+  private def identifyStaticIdentity(f: Function): Unit = {
+    val params = f.params
+    if (params.names.length != 1) return
+    if (params.defaultExprs(0) != null) return
+    val paramIdx = scope.size
+    f.body match {
+      case ValidId(_, _, idx) if idx == paramIdx =>
+        f.staticIdentityShape = 1
+      case Apply1(_, ValidId(_, _, gIdx), inner, tail, strict)
+          if !tail && strict && gIdx != paramIdx &&
+          isSelfCompositionChain(inner, gIdx, paramIdx) =>
+        f.staticIdentityShape = 2
+        f.staticIdentityCapturedIdx = gIdx
+      case _ =>
+    }
+  }
+
+  private def isSelfCompositionChain(body: Expr, expectedFuncIdx: Int, paramIdx: Int): Boolean =
+    body match {
+      case ValidId(_, _, idx) if idx == paramIdx => true
+      case Apply1(_, ValidId(_, _, fIdx), inner, tail, strict)
+          if !tail && strict && fIdx == expectedFuncIdx =>
+        isSelfCompositionChain(inner, expectedFuncIdx, paramIdx)
+      case _ => false
+    }
 
   private object ValidSuper {
     def unapply(s: Super): Option[(Position, Int)] =
