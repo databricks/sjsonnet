@@ -22,6 +22,16 @@ import sjsonnet.functions.AbstractFunctionModule
 object EncodingModule extends AbstractFunctionModule {
   def name = "encoding"
 
+  @inline private def isAsciiJsonSafe(bytes: Array[Byte]): Boolean = {
+    var i = 0
+    while (i < bytes.length) {
+      val b = bytes(i) & 0xff
+      if (b < 0x20 || b >= 0x80 || b == '"' || b == '\\') return false
+      i += 1
+    }
+    true
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-md5 std.md5(s)]].
    *
@@ -88,9 +98,12 @@ object EncodingModule extends AbstractFunctionModule {
      * Behaves like std.base64DecodeBytes() except returns a naively encoded string instead of an
      * array of bytes.
      */
-    builtin("base64Decode", "str") { (_, _, str: String) =>
+    builtin("base64Decode", "str") { (pos, _, str: String) =>
       try {
-        new String(PlatformBase64.decode(str), UTF_8)
+        val decoded = PlatformBase64.decode(str)
+        val value = new String(decoded, UTF_8)
+        (if (isAsciiJsonSafe(decoded)) Val.Str.asciiSafe(pos, value)
+         else Val.Str(pos, value)): Val
       } catch {
         case e: IllegalArgumentException =>
           Error.fail("Invalid base64 string: " + e.getMessage)
