@@ -13,6 +13,7 @@ import org.tukaani.xz.XZOutputStream
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
+import scala.annotation.nowarn
 import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -22,6 +23,12 @@ object Platform {
 
   def repeatString(s: String, count: Int): String =
     if (count <= 0) "" else s.repeat(count)
+
+  // Used only for strings already proven ASCII-safe; copies low bytes without allocation.
+  @inline
+  @nowarn("cat=deprecation")
+  def copyAsciiStringToBytes(s: String, dst: Array[Byte], dstPos: Int): Unit =
+    s.getBytes(0, s.length, dst, dstPos)
 
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)

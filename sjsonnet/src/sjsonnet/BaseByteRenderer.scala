@@ -253,12 +253,8 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     var pos = elemBuilder.length
     arr(pos) = '"'.toByte
     pos += 1
-    var i = 0
-    while (i < len) {
-      arr(pos) = str.charAt(i).toByte
-      pos += 1
-      i += 1
-    }
+    Platform.copyAsciiStringToBytes(str, arr, pos)
+    pos += len
     arr(pos) = '"'.toByte
     elemBuilder.length = pos + 1
   }
