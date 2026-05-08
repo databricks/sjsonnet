@@ -138,6 +138,21 @@ class Parser(
     true
   }
 
+  private def parseSimpleUnsignedInteger(s: String): Double = {
+    val length = s.length
+    if (length == 0 || length > 18) return Double.NaN
+
+    var value = 0L
+    var i = 0
+    while (i < length) {
+      val digit = s.charAt(i) - '0'
+      if (digit < 0 || digit > 9) return Double.NaN
+      value = value * 10L + digit
+      i += 1
+    }
+    value.toDouble
+  }
+
   def number[$: P]: P[Val.Num] = P(
     Pos ~~ (
       digitsWithSeparator ~~
@@ -160,8 +175,12 @@ class Parser(
       if (hasUnderscores && !isValidNumberWithSeparators(numStr)) {
         Fail.opaque("invalid underscore placement in number")
       } else {
-        val cleanStr = if (hasUnderscores) numStr.replace("_", "") else numStr
-        val v = cleanStr.toDouble
+        val v =
+          if (hasUnderscores) numStr.replace("_", "").toDouble
+          else {
+            val parsed = parseSimpleUnsignedInteger(numStr)
+            if (parsed.isNaN) numStr.toDouble else parsed
+          }
         if (v.isInfinite) {
           Fail.opaque("finite number required")
         } else {
