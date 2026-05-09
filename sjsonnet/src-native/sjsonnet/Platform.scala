@@ -6,6 +6,7 @@ import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
+import scala.annotation.nowarn
 import scala.collection.mutable
 import org.virtuslab.yaml.*
 
@@ -27,6 +28,12 @@ object Platform {
       builder.toString()
     }
   }
+
+  // Used only for strings already proven ASCII-safe; copies low bytes without allocation.
+  @inline
+  @nowarn("cat=deprecation")
+  def copyAsciiStringToBytes(s: String, dst: Array[Byte], dstPos: Int): Unit =
+    s.getBytes(0, s.length, dst, dstPos)
 
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)

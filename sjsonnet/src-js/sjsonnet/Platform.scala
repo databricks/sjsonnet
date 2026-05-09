@@ -23,6 +23,18 @@ object Platform {
     }
   }
 
+  // Used only for strings already proven ASCII-safe; copies low bytes without allocation.
+  @inline def copyAsciiStringToBytes(s: String, dst: Array[Byte], dstPos: Int): Unit = {
+    var i = 0
+    var pos = dstPos
+    val len = s.length
+    while (i < len) {
+      dst(pos) = s.charAt(i).toByte
+      i += 1
+      pos += 1
+    }
+  }
+
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {
