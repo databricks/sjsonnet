@@ -1213,6 +1213,14 @@ class Evaluator(
     }
   }
 
+  // DO NOT CHANGE: `self` MUST be passed explicitly to `sup.value(...)`.
+  // WHY: `Val.Obj.value`'s `self` parameter defaults to `this` (= the parent
+  // `sup`). Omitting `self` here would bind `$`/`self` of the retrieved field
+  // to the parent in the merge chain, hiding fields contributed by mixins
+  // applied *after* the parent — see issue #829 (grafana/mimir's
+  // `overrideSuperIfExists` pattern: `super[name] + override`). This must
+  // mirror `visitSelectSuper` (`super.name`) so static-key and computed-key
+  // super lookups agree, matching google/jsonnet, go-jsonnet, and jrsonnet.
   def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
     var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
