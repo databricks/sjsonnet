@@ -582,6 +582,45 @@ object Val {
       if (!isConcatView && !_reversed && (arr ne null)) arr.asInstanceOf[Array[Eval]]
       else null
 
+    private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if (isConcatView) {
+        _concatLeft.copyEvalTo(out)
+        _concatRight.copyEvalTo(out)
+      } else {
+        val direct = directBackingArray
+        if (direct != null) out ++= direct
+        else {
+          val len = length
+          var i = 0
+          while (i < len) {
+            out += eval(i)
+            i += 1
+          }
+        }
+      }
+    }
+
+    private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if (isConcatView) {
+        val next = _concatLeft.copyEvalTo(dest, offset)
+        _concatRight.copyEvalTo(dest, next)
+      } else {
+        val direct = directBackingArray
+        if (direct != null) {
+          System.arraycopy(direct, 0, dest, offset, direct.length)
+          offset + direct.length
+        } else {
+          val len = length
+          var i = 0
+          while (i < len) {
+            dest(offset + i) = eval(i)
+            i += 1
+          }
+          offset + len
+        }
+      }
+    }
+
     /**
      * If both this and other are ConcatViews sharing the same left array, return the shared prefix
      * length. Otherwise return 0. Used by compare/equal to skip identical prefix elements entirely,
@@ -630,15 +669,8 @@ object Val {
      * contents and the concat references are released for GC.
      */
     private def materialize(): Unit = {
-      val left = _concatLeft
-      val right = _concatRight
-      val lArr = left.asLazyArray
-      val rArr = right.asLazyArray
-      val lLen = lArr.length
-      val rLen = rArr.length
-      val result = new Array[Eval](lLen + rLen)
-      System.arraycopy(lArr, 0, result, 0, lLen)
-      System.arraycopy(rArr, 0, result, lLen, rLen)
+      val result = new Array[Eval](_length)
+      copyEvalTo(result, 0)
       arr = result
       _concatLeft = null
       _concatRight = null
@@ -671,11 +703,9 @@ object Val {
       } else {
         // Eager path: allocate + arraycopy (also used when either side is a concat view
         // to flatten and prevent deep nesting)
-        val lArr = this.asLazyArray
-        val rArr = rhs.asLazyArray
         val result = new Array[Eval](totalLen)
-        System.arraycopy(lArr, 0, result, 0, leftLen)
-        System.arraycopy(rArr, 0, result, leftLen, rhsLen)
+        this.copyEvalTo(result, 0)
+        rhs.copyEvalTo(result, leftLen)
         Arr(newPos, result)
       }
     }
@@ -863,6 +893,28 @@ object Val {
       result
     }
 
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      val sourceArr = source.asLazyArray
+      var i = 0
+      while (i < count) {
+        out ++= sourceArr
+        i += 1
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      val sourceArr = source.asLazyArray
+      val sourceLen = this.sourceLen
+      val len = _length
+      var current = offset
+      val end = offset + len
+      while (current < end) {
+        System.arraycopy(sourceArr, 0, dest, current, sourceLen)
+        current += sourceLen
+      }
+      end
+    }
+
     override def reversed(newPos: Position): Arr =
       new RepeatedArr(newPos, source.reversed(newPos), count)
   }
@@ -891,14 +943,35 @@ object Val {
       else {
         val len = _length
         val result = new Array[Eval](len)
-        var i = 0
-        while (i < len) {
-          result(i) = source.eval(sourceIndex(i))
-          i += 1
-        }
+        copyEvalTo(result, 0)
         arr = result
         source = null
         result
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(out)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          out += source.eval(sourceIndex(i))
+          i += 1
+        }
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(dest, offset)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          dest(offset + i) = source.eval(sourceIndex(i))
+          i += 1
+        }
+        offset + len
       }
     }
 
@@ -1046,13 +1119,33 @@ object Val {
       else {
         val len = _length
         val result = new Array[Eval](len)
-        var i = 0
-        while (i < len) {
-          result(i) = source.eval(len - 1 - i)
-          i += 1
-        }
+        copyEvalTo(result, 0)
         arr = result
         result
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(out)
+      else {
+        var i = _length - 1
+        while (i >= 0) {
+          out += source.eval(i)
+          i -= 1
+        }
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(dest, offset)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          dest(offset + i) = source.eval(len - 1 - i)
+          i += 1
+        }
+        offset + len
       }
     }
 
@@ -1181,6 +1274,31 @@ object Val {
       super.asLazyArray
     }
 
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if (isMaterialized || isConcatView) super.copyEvalTo(out)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          out += Val.cachedNum(pos, doubleAt(i))
+          i += 1
+        }
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if (isMaterialized || isConcatView) super.copyEvalTo(dest, offset)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          dest(offset + i) = Val.cachedNum(pos, doubleAt(i))
+          i += 1
+        }
+        offset + len
+      }
+    }
+
     override def reversed(newPos: Position): Arr = {
       if (isMaterialized || isConcatView) {
         super.reversed(newPos)
@@ -1200,15 +1318,8 @@ object Val {
     /** Materialize this range into a flat Val.Num array. */
     private def materializeRange(): Unit = {
       val len = _length
-      val from = rangeFrom
-      val rev = _reversed
-      val p = pos
       val result = new Array[Eval](len)
-      var i = 0
-      while (i < len) {
-        result(i) = Val.cachedNum(p, if (rev) from - i else from + i)
-        i += 1
-      }
+      copyEvalTo(result, 0)
       arr = result
       _reversed = false // materialized in correct order
     }
@@ -1250,6 +1361,35 @@ object Val {
       super.asLazyArray
     }
 
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if (isMaterialized || isConcatView) super.copyEvalTo(out)
+      else {
+        val bytes = byteData
+        val len = bytes.length
+        val p = pos
+        var i = 0
+        while (i < len) {
+          out += Val.cachedNum(p, (bytes(i) & 0xff).toDouble)
+          i += 1
+        }
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if (isMaterialized || isConcatView) super.copyEvalTo(dest, offset)
+      else {
+        val bytes = byteData
+        val len = bytes.length
+        val p = pos
+        var i = 0
+        while (i < len) {
+          dest(offset + i) = Val.cachedNum(p, (bytes(i) & 0xff).toDouble)
+          i += 1
+        }
+        offset + len
+      }
+    }
+
     // DO NOT CHANGE
     // WHY: reversed() materializes first instead of flipping a _reversed flag. This keeps
     // ByteArr simple — value()/eval()/rawBytes never need to handle reversed indexing.
@@ -1264,13 +1404,8 @@ object Val {
     private def materializeByteData(): Unit = {
       val bytes = byteData
       val len = bytes.length
-      val p = pos
       val result = new Array[Eval](len)
-      var i = 0
-      while (i < len) {
-        result(i) = Val.cachedNum(p, (bytes(i) & 0xff).toDouble)
-        i += 1
-      }
+      copyEvalTo(result, 0)
       arr = result
     }
   }
