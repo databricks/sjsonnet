@@ -1216,8 +1216,9 @@ class Evaluator(
   def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
     var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
-    if (sup == null) sup = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
-    sup.value(key.str, e.pos)
+    val self = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
+    if (sup == null) sup = self
+    sup.value(key.str, e.pos, self)
   }
 
   def visitImportStr(e: ImportStr): Val.Str = {
