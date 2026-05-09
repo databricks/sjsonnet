@@ -3,7 +3,11 @@ package sjsonnet
 import sjsonnet.stdlib.NativeRegex
 
 import scala.collection.mutable
+import scala.concurrent.Future
+import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 import scala.scalajs.js
+import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.Thenable.Implicits._
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array, Uint8Array}
 
@@ -49,6 +53,91 @@ object SjsonnetMain {
     case _ => None
   }
 
+  /** Convert the value returned by a JS import loader into a [[ResolvedFile]]. */
+  private def toResolvedFile(path: String, value: Any, binaryData: Boolean): ResolvedFile =
+    value match {
+      case s: String        => StaticResolvedFile(s)
+      case arr: Array[Byte] => StaticBinaryResolvedFile(arr)
+      case other            =>
+        toBytesFromJs(other) match {
+          case Some(bytes) => StaticBinaryResolvedFile(bytes)
+          case None        =>
+            val msg =
+              s"Import loader for '$path' must return a string or byte array, got: ${
+                  if (other == null) "null" else other.getClass.getName
+                }"
+            js.Dynamic.global.console.error(msg)
+            throw js.JavaScriptException(msg)
+        }
+    }
+
+  /** Build the parent importer used during preload (only its `resolve` is called). */
+  private def jsResolveImporter(importResolver: js.Function2[String, String, String]): Importer =
+    new Importer {
+      def resolve(docBase: Path, importName: String): Option[Path] =
+        importResolver(docBase.asInstanceOf[JsVirtualPath].path, importName) match {
+          case null => None
+          case s    => Some(JsVirtualPath(s))
+        }
+      def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
+        throw new RuntimeException(
+          s"Importer.read should not be called during async preload (path=$path)"
+        )
+    }
+
+  /**
+   * Coerce a JS object whose values are strings into a `Map[String, String]`. Iterates the JS
+   * dictionary directly instead of round-tripping through `ujson` to avoid the intermediate ujson
+   * tree, the `.obj.toMap` copy, and the trailing `.map` on the immutable map.
+   */
+  private def parseStringMap(label: String, value: js.Any): Map[String, String] =
+    try {
+      val dict = value.asInstanceOf[js.Dictionary[js.Any]]
+      val out = Map.newBuilder[String, String]
+      out.sizeHint(dict.size)
+      val it = dict.iterator
+      while (it.hasNext) {
+        val (k, v) = it.next()
+        (v: Any) match {
+          case s: String => out += k -> s
+          case _         =>
+            throw js.JavaScriptException(s"$label '$k' must be a string value, got non-string")
+        }
+      }
+      out.result()
+    } catch {
+      case e: js.JavaScriptException => throw e
+      case e: Exception              =>
+        val msg = s"Failed to parse ${label.toLowerCase}: ${e.getMessage}"
+        js.Dynamic.global.console.error(msg, e.asInstanceOf[js.Any])
+        throw js.JavaScriptException(msg)
+    }
+
+  private def runInterpret(
+      text: String,
+      parsedExtVars: Map[String, String],
+      parsedTlaVars: Map[String, String],
+      wd0: String,
+      importer: Importer,
+      preserveOrder: Boolean): js.Any = {
+    val interp = new Interpreter(
+      parsedExtVars,
+      parsedTlaVars,
+      JsVirtualPath(wd0),
+      importer,
+      parseCache = new DefaultParseCache,
+      settings = new Settings(preserveOrder = preserveOrder),
+      std =
+        new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map.from(NativeRegex.functions)).module
+    )
+    interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match {
+      case Left(msg) =>
+        js.Dynamic.global.console.error("Sjsonnet evaluation error:", msg)
+        throw js.JavaScriptException(msg)
+      case Right(v) => v
+    }
+  }
+
   @JSExport
   def interpret(
       text: String,
@@ -59,85 +148,128 @@ object SjsonnetMain {
       importLoader: js.Function2[String, Boolean, Any],
       preserveOrder: Boolean = false): js.Any = {
     try {
-      val parsedExtVars =
-        try {
-          ujson.WebJson.transform(extVars, ujson.Value).obj.toMap.map {
-            case (k, ujson.Str(v)) => (k, v)
-            case (k, _)            =>
-              throw js.JavaScriptException(
-                s"External variable '$k' must be a string value, got non-string"
-              )
-          }
-        } catch {
-          case e: js.JavaScriptException => throw e
-          case e: Exception              =>
-            val msg = s"Failed to parse external variables: ${e.getMessage}"
-            js.Dynamic.global.console.error(msg, e.asInstanceOf[js.Any])
-            throw js.JavaScriptException(msg)
-        }
+      val parsedExtVars = parseStringMap("External variable", extVars)
+      val parsedTlaVars = parseStringMap("Top-level argument", tlaVars)
 
-      val parsedTlaVars =
-        try {
-          ujson.WebJson.transform(tlaVars, ujson.Value).obj.toMap.map {
-            case (k, ujson.Str(v)) => (k, v)
-            case (k, _)            =>
-              throw js.JavaScriptException(
-                s"Top-level argument '$k' must be a string value, got non-string"
-              )
+      val importer = new Importer {
+        def resolve(docBase: Path, importName: String): Option[Path] =
+          importResolver(docBase.asInstanceOf[JsVirtualPath].path, importName) match {
+            case null => None
+            case s    => Some(JsVirtualPath(s))
           }
-        } catch {
-          case e: js.JavaScriptException => throw e
-          case e: Exception              =>
-            val msg = s"Failed to parse top-level arguments: ${e.getMessage}"
-            js.Dynamic.global.console.error(msg, e.asInstanceOf[js.Any])
-            throw js.JavaScriptException(msg)
-        }
-
-      val interp = new Interpreter(
-        parsedExtVars,
-        parsedTlaVars,
-        JsVirtualPath(wd0),
-        new Importer {
-          def resolve(docBase: Path, importName: String): Option[Path] =
-            importResolver(docBase.asInstanceOf[JsVirtualPath].path, importName) match {
-              case null => None
-              case s    => Some(JsVirtualPath(s))
-            }
-          def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
-            importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData) match {
-              case s: String        => Some(StaticResolvedFile(s))
-              case arr: Array[Byte] => Some(StaticBinaryResolvedFile(arr))
-              case other            =>
-                // Handle JS-native binary types: Uint8Array, ArrayBuffer, or plain JS number[]
-                toBytesFromJs(other) match {
-                  case Some(bytes) => Some(StaticBinaryResolvedFile(bytes))
-                  case None        =>
-                    val msg =
-                      s"Import loader for '${path}' must return a string or byte array, got: ${
-                          if (other == null) "null" else other.getClass.getName
-                        }"
-                    js.Dynamic.global.console.error(msg)
-                    throw js.JavaScriptException(msg)
-                }
-            }
-        },
-        parseCache = new DefaultParseCache,
-        settings = new Settings(preserveOrder = preserveOrder),
-        std =
-          new sjsonnet.stdlib.StdLibModule(nativeFunctions = Map.from(NativeRegex.functions)).module
-      )
-      interp.interpret0(text, JsVirtualPath("(memory)"), ujson.WebJson.Builder) match {
-        case Left(msg) =>
-          js.Dynamic.global.console.error("Sjsonnet evaluation error:", msg)
-          throw js.JavaScriptException(msg)
-        case Right(v) => v
+        def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
+          Some(
+            toResolvedFile(
+              path.asInstanceOf[JsVirtualPath].path,
+              importLoader(path.asInstanceOf[JsVirtualPath].path, binaryData),
+              binaryData
+            )
+          )
       }
+
+      runInterpret(text, parsedExtVars, parsedTlaVars, wd0, importer, preserveOrder)
     } catch {
       case e: js.JavaScriptException => throw e
       case e: Exception              =>
         val msg = s"Sjsonnet internal error: ${e.getClass.getName}: ${e.getMessage}"
         js.Dynamic.global.console.error(msg, e.asInstanceOf[js.Any])
         throw js.JavaScriptException(msg)
+    }
+  }
+
+  /**
+   * Async variant of [[interpret]]. Accepts an `importLoader` that returns a `Promise` of the file
+   * contents, and returns a `Promise` resolving to the rendered output.
+   *
+   * Imports are eagerly front-loaded: every `import`, `importstr`, and `importbin` reachable from
+   * the entry source (plus from any extVar/tlaVar code snippets) is statically discovered and
+   * loaded before evaluation begins. This includes imports inside branches the evaluator will never
+   * force, e.g. `if false then import 'x' else 1` will still ask the loader for `x`. The tradeoff
+   * is that all I/O happens up front, which is what lets evaluation run synchronously.
+   *
+   *   - Loader rejection (missing file, network error, etc.) fails the returned Promise.
+   *   - A parse error on a discovered (non-entry) file is tolerated; it only surfaces if evaluation
+   *     actually forces that branch.
+   *   - The entry source's own parse error is reported through the normal `interpret0` formatting
+   *     path so the error shape and location info match synchronous `interpret`.
+   *
+   * Each discovered file is parsed once during preload and again referenced by the evaluator; the
+   * parsed AST is shared so fastparse runs only once per file.
+   */
+  @JSExport
+  def interpretAsync(
+      text: String,
+      extVars: js.Any,
+      tlaVars: js.Any,
+      wd0: String,
+      importResolver: js.Function2[String, String, String],
+      importLoader: js.Function2[String, Boolean, js.Promise[Any]],
+      preserveOrder: Boolean = false): js.Promise[js.Any] = {
+    try {
+      val parsedExtVars = parseStringMap("External variable", extVars)
+      val parsedTlaVars = parseStringMap("Top-level argument", tlaVars)
+
+      val parentImporter = jsResolveImporter(importResolver)
+      val preloader = new Preloader(parentImporter)
+      val wd = JsVirtualPath(wd0)
+      val entryPath = JsVirtualPath("(memory)")
+
+      // Don't propagate the entry's parse error here — let runInterpret surface it via
+      // interpret0 so the message goes through the same Error.formatError path as synchronous
+      // interpret (root frame, "(memory):line:col", etc.). If parsing the entry fails we still
+      // get an empty pending queue and a fast path to runInterpret, which fails identically.
+      preloader.add(entryPath, StaticResolvedFile(text), ImportKind.Code)
+
+      // ext/tla vars are parsed as Jsonnet code (Interpreter.parseVar) and may contain imports.
+      // Feed each value through the preloader using the same synthetic path layout so that
+      // discovered imports resolve against `wd`, matching the synchronous evaluator.
+      def discoverVarImports(prefix: String, vars: Map[String, String]): Unit =
+        vars.foreach { case (k, v) =>
+          val varPath = wd / Util.wrapInLessThanGreaterThan(s"$prefix-var $k")
+          // Ignore parse errors here: Interpreter.parseVar will surface them at evaluation time
+          // with a proper stack frame if the variable is actually referenced.
+          preloader.add(varPath, StaticResolvedFile(v), ImportKind.Code)
+        }
+      discoverVarImports("ext", parsedExtVars)
+      discoverVarImports("tla", parsedTlaVars)
+
+      def loadOne(p: Preloader.Pending): Future[Unit] = {
+        val pathStr = p.path.asInstanceOf[JsVirtualPath].path
+        val promise = importLoader(pathStr, p.binaryData)
+        // implicit Thenable.Implicits converts Promise[Any] to Future[Any]
+        (promise: Future[Any]).map { value =>
+          val resolved = toResolvedFile(pathStr, value, p.binaryData)
+          // Ignore parse errors on discovered imports: Jsonnet evaluation is lazy, so a parse
+          // error in `if false then import 'bad' else 1` should not fail the whole evaluation.
+          // If the branch is forced at runtime, the interpreter surfaces the error there.
+          preloader.add(p.path, resolved, p.kind)
+          ()
+        }
+      }
+
+      def loop(): Future[Unit] = {
+        val batch = preloader.takePendingImports()
+        if (batch.isEmpty) Future.successful(())
+        else Future.sequence(batch.map(loadOne)).flatMap(_ => loop())
+      }
+
+      val result: Future[js.Any] = loop().map { _ =>
+        runInterpret(
+          text,
+          parsedExtVars,
+          parsedTlaVars,
+          wd0,
+          preloader.importer,
+          preserveOrder
+        )
+      }
+      result.toJSPromise
+    } catch {
+      case e: js.JavaScriptException => js.Promise.reject(e.exception)
+      case e: Exception              =>
+        val msg = s"Sjsonnet internal error: ${e.getClass.getName}: ${e.getMessage}"
+        js.Dynamic.global.console.error(msg, e.asInstanceOf[js.Any])
+        js.Promise.reject(msg)
     }
   }
 }
