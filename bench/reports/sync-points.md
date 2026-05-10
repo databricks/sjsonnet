@@ -30,8 +30,8 @@ only ideas that pass current semantic and benchmark gates.
 | `04b7ff60` `chore: reduce allocation of Num` | Skipped | Superseded by current master `Val.cachedNum` and related no-tuple/static-singleton work. Reapplying the old diff risks undoing newer allocation fixes. |
 | `6269dfe2` `refactor static optimizer dispatch` | Deferred | High-conflict historical refactor. Revisit only as a fresh, benchmark-backed `StaticOptimizer` micro-change, not as a full-file port. |
 | `068afa11` `add tailrec profiling checkpoint` | Deferred | Diagnostic-only idea. Keep out of production PRs unless converted into a report or benchmark harness improvement. |
-| `bfced4ec` `Optimize StaticOptimizer scope map construction` | Candidate | Re-evaluate against current `StaticOptimizer`; likely useful only if it still removes allocation without changing static semantics. |
-| `f5959f27` `Reuse StaticOptimizer binding scope shell` | Candidate | Same class as above; test together only after isolating a minimal current-master diff. |
+| `bfced4ec` `Optimize StaticOptimizer scope map construction` | Ported as current-master variant | Reimplemented the low-risk allocation part in `ScopedExprTransform`: replace `zipWithIndex.map`, tuple creation, and intermediate merge arrays with while-loop `HashMap.updated` construction. Kept `Scope` immutable instead of porting the mutable shell. |
+| `f5959f27` `Reuse StaticOptimizer binding scope shell` | Partially skipped | The mutable `Scope.mappings` shell was intentionally not ported after review; it saves only wrapper allocations and weakens the invariant. |
 | `f9337010` `Cache parsed dynamic percent formats` | Candidate / verify duplicate | Check current master and open PRs before porting; avoid duplicate `%` format caching. |
 | `1e84155c` `Cache sorted object key arrays lazily` | Candidate / verify duplicate | Check overlap with current renderer/materializer key-order work and semantic effects on object visibility. |
 | `e98cd1f8` `Optimize format chunk runtime` | Candidate / high scrutiny | Prior #776 format follow-up was not benchmark-positive on current master; only revisit with a materially different micro-benchmark signal. |
@@ -57,3 +57,12 @@ only ideas that pass current semantic and benchmark gates.
 4. Run focused JMH plus nearby guard benchmarks.
 5. Run the full test suite before pushing a PR branch.
 6. Update this ledger and the relevant PR body with current benchmark evidence.
+
+## Local results
+
+| Change | Evidence |
+| --- | --- |
+| `ScopedExprTransform` scope-map allocation trim | `OptimizerBenchmark.main`: master `0.432 +/- 0.004 ms/op`, branch `0.422 +/- 0.004 ms/op` (`-2.3%`). |
+| Guard benchmark | `MainBenchmark.main`: master `2.223 +/- 0.106 ms/op`, branch `2.204 +/- 0.031 ms/op` (neutral/slightly positive). |
+| Tests | `./mill --no-server -j 1 sjsonnet.jvm[3.3.7].test`: 493 passed, 0 failed. `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
+| Review | Independent `gpt-5.4` and `claude-sonnet-4.6` code-review agents reported no significant issues. |

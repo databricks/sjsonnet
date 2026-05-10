@@ -25,7 +25,7 @@ tests, focused benchmarks, and full-suite validation before it can become a PR.
 
 | Priority | Candidate | Why it remains interesting | Main risk |
 | ---: | --- | --- | --- |
-| 1 | Current-master `StaticOptimizer` scope allocation trim | Historical branch had multiple wins around scope construction and binding rewrites. | Static scope bugs are semantic bugs; needs strong parser/evaluator tests. |
+| 1 | Current-master `StaticOptimizer` scope allocation trim | Historical branch had multiple wins around scope construction and binding rewrites. | Implemented as immutable-scope, while-loop map construction in `ScopedExprTransform`; local JMH positive and full `__.test` passed. |
 | 2 | Apply specialization cleanup | The AST already has arity-specialized apply nodes; removing residual generic overhead may help without runtime semantics changes. | Duplicating existing specialization or weakening static checks. |
 | 3 | Parser number/string no-work fast paths | External gaps and old reports point to string/parser allocation pressure. | Jsonnet lexical edge cases around underscores, escapes, and Unicode. |
 | 4 | Dynamic `%` format cache audit | Old JIT branch records a large dynamic-format win. | May already be implemented; caching must not capture mutable evaluation state. |
