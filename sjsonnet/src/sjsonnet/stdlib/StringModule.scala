@@ -49,6 +49,7 @@ object StringModule extends AbstractFunctionModule {
   def name = "string"
 
   private val whiteSpaces = StripUtils.codePointsSet(" \t\n\f\r\u0085\u00A0")
+  private val PresizedCopyMaxParts = 1024
 
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-toString std.toString(a)]].
@@ -417,10 +418,6 @@ object StringModule extends AbstractFunctionModule {
    * case the arrays are concatenated in the same way, to produce a single array.
    */
   private object Join extends Val.Builtin2("join", "sep", "arr") {
-    private def appendArray(out: mutable.ArrayBuilder.ofRef[Eval], arr: Val.Arr): Unit = {
-      arr.copyEvalTo(out)
-    }
-
     def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
       sep.value match {
@@ -441,21 +438,54 @@ object StringModule extends AbstractFunctionModule {
           }
           Val.Str(pos, b.toString)
         case sep: Val.Arr =>
-          val out = new mutable.ArrayBuilder.ofRef[Eval]
-          // Set a reasonable size hint based on estimated result size
-          out.sizeHint(arr.length * 2)
-          var added = false
-          for (x <- arr) {
-            x match {
+          val len = arr.length
+          if (len > PresizedCopyMaxParts) {
+            val out = new mutable.ArrayBuilder.ofRef[Eval]
+            out.sizeHint(len * 2)
+            var added = false
+            var i = 0
+            while (i < len) {
+              arr.value(i) match {
+                case Val.Null(_) => // do nothing
+                case v: Val.Arr  =>
+                  if (added) sep.copyEvalTo(out)
+                  added = true
+                  v.copyEvalTo(out)
+                case x => Error.fail("Cannot join " + x.prettyName)
+              }
+              i += 1
+            }
+            return Val.Arr(pos, out.result())
+          }
+
+          val parts = new Array[Val.Arr](len)
+          val sepLen = sep.length
+          var partCount = 0
+          var totalLen = 0L
+          var i = 0
+          while (i < len) {
+            arr.value(i) match {
               case Val.Null(_) => // do nothing
               case v: Val.Arr  =>
-                if (added) appendArray(out, sep)
-                added = true
-                appendArray(out, v)
+                if (partCount > 0) totalLen += sepLen
+                totalLen += v.length
+                if (totalLen > Int.MaxValue) Error.fail("array too large", pos)(ev)
+                parts(partCount) = v
+                partCount += 1
               case x => Error.fail("Cannot join " + x.prettyName)
             }
+            i += 1
           }
-          Val.Arr(pos, out.result())
+
+          val result = new Array[Eval](totalLen.toInt)
+          var offset = 0
+          i = 0
+          while (i < partCount) {
+            if (i > 0 && sepLen != 0) offset = sep.copyEvalTo(result, offset)
+            offset = parts(i).copyEvalTo(result, offset)
+            i += 1
+          }
+          Val.Arr(pos, result)
         case x => Error.fail("Cannot join " + x.prettyName)
       }
     }

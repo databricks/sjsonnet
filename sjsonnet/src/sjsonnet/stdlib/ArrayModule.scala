@@ -41,6 +41,7 @@ object ArrayModule extends AbstractFunctionModule {
 
   private val DefaultKeyF = Val.Null(dummyPos)
   private val DefaultOnEmpty = Val.Null(dummyPos)
+  private val PresizedCopyMaxParts = 1024
 
   @inline private def isDefaultKeyF(v: Val): Boolean = v.asInstanceOf[AnyRef] eq DefaultKeyF
   @inline private def isDefaultOnEmpty(v: Val): Boolean =
@@ -381,18 +382,47 @@ object ArrayModule extends AbstractFunctionModule {
    */
   private object FlattenArrays extends Val.Builtin1("flattenArrays", "arrs") {
     def evalRhs(arrs: Eval, ev: EvalScope, pos: Position): Val = {
-      val out = new mutable.ArrayBuilder.ofRef[Eval]
       val arr = arrs.value.asArr
-      out.sizeHint(arr.length * 4) // Rough size hint
-      for (x <- arr) {
-        x.value match {
+      val len = arr.length
+      if (len > PresizedCopyMaxParts) {
+        val out = new mutable.ArrayBuilder.ofRef[Eval]
+        out.sizeHint(len * 4)
+        var i = 0
+        while (i < len) {
+          arr.value(i) match {
+            case v: Val.Arr =>
+              v.copyEvalTo(out)
+            case x =>
+              Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
+          }
+          i += 1
+        }
+        return Val.Arr(pos, out.result())
+      }
+
+      val parts = new Array[Val.Arr](len)
+      var totalLen = 0L
+      var i = 0
+      while (i < len) {
+        arr.value(i) match {
           case v: Val.Arr =>
-            v.copyEvalTo(out)
+            parts(i) = v
+            totalLen += v.length
+            if (totalLen > Int.MaxValue) Error.fail("array too large", pos)(ev)
           case x =>
             Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
         }
+        i += 1
       }
-      Val.Arr(pos, out.result())
+
+      val result = new Array[Eval](totalLen.toInt)
+      var offset = 0
+      i = 0
+      while (i < len) {
+        offset = parts(i).copyEvalTo(result, offset)
+        i += 1
+      }
+      Val.Arr(pos, result)
     }
   }
 
