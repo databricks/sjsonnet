@@ -134,3 +134,20 @@ confirmed local source-built gap in this recheck set is kube-prometheus at
 | realistic2 hyperfine | Outputs matched; sjsonnet Scala Native stack `83.932 +/- 1.629 ms`, source-built jrsonnet `144.282 +/- 2.369 ms`, so sjsonnet is faster. |
 | kube-prometheus hyperfine | Installed real-world vendor deps with `jsonnet-bundler` after `jrb install` failed locally with a reqwest/rustls provider panic. Outputs matched (`7,506,029` bytes); sjsonnet Scala Native stack `235.971 +/- 12.925 ms`, source-built jrsonnet `93.188 +/- 6.599 ms`, so sjsonnet is `2.53x` slower. |
 | Worktree | Clean after validation. |
+
+## Kube-prometheus optimization checkpoint
+
+First accepted kube-prometheus experiment: reuse the stateless
+`MaterializeJsonRenderer` array/object visitors used by `std.manifestJson*`.
+The real-world profile showed kube-prometheus spends visible time in
+`std.manifestJsonEx` while building Grafana dashboard ConfigMap strings, and
+the existing `ByteRenderer` already uses the same visitor-reuse shape for the
+fused output path.
+
+| Check | Result |
+| --- | --- |
+| JVM tests | `./mill --no-server -j 1 'sjsonnet.jvm[3.3.7]'.test`: 494 passed, 0 failed. |
+| Native output smoke | `cmp` matched source-built jrsonnet output for `entry-kube-prometheus.jsonnet` (`-J vendor`). |
+| kube-prometheus Native hyperfine | Before: `235.971 +/- 12.925 ms`; after: `224.975 +/- 11.550 ms`; delta `-4.66%`. Source-built jrsonnet in the same candidate run: `88.576 +/- 0.915 ms`, so the remaining gap is `2.54x`. |
+| Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.052 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: `40.068 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.137 ms/op`. |
+| Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` code-review agents reported no significant issues. |

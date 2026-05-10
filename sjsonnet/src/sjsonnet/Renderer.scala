@@ -206,19 +206,9 @@ final case class MaterializeJsonRenderer(
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
 
-  override def visitArray(
-      length: Int,
-      index: Int): upickle.core.ArrVisitor[java.io.StringWriter, java.io.StringWriter] {
+  private val reusableArrVisitor: ArrVisitor[StringWriter, StringWriter] {
     def subVisitor: sjsonnet.MaterializeJsonRenderer
   } = new ArrVisitor[StringWriter, StringWriter] {
-    flushBuffer()
-    elemBuilder.append('[')
-
-    depth += 1
-    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if (length == 0 && indent != -1)
-      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
-    else renderIndent()
     def subVisitor: sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
     def visitValue(v: StringWriter, index: Int): Unit = {
       flushBuffer()
@@ -234,19 +224,10 @@ final case class MaterializeJsonRenderer(
     }
   }
 
-  override def visitObject(
-      length: Int,
-      index: Int): upickle.core.ObjVisitor[java.io.StringWriter, java.io.StringWriter] {
+  private val reusableObjVisitor: ObjVisitor[StringWriter, StringWriter] {
     def subVisitor: sjsonnet.MaterializeJsonRenderer
     def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer
   } = new ObjVisitor[StringWriter, StringWriter] {
-    flushBuffer()
-    elemBuilder.append('{')
-    depth += 1
-    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
-    if (length == 0 && indent != -1)
-      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
-    else renderIndent()
     def subVisitor: sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
     def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer = MaterializeJsonRenderer.this
     def visitKeyValue(s: Any): Unit = {
@@ -263,6 +244,38 @@ final case class MaterializeJsonRenderer(
       flushCharBuilder()
       out
     }
+  }
+
+  override def visitArray(
+      length: Int,
+      index: Int): upickle.core.ArrVisitor[java.io.StringWriter, java.io.StringWriter] {
+    def subVisitor: sjsonnet.MaterializeJsonRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('[')
+
+    depth += 1
+    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+    if (length == 0 && indent != -1)
+      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
+    else renderIndent()
+    reusableArrVisitor
+  }
+
+  override def visitObject(
+      length: Int,
+      index: Int): upickle.core.ObjVisitor[java.io.StringWriter, java.io.StringWriter] {
+    def subVisitor: sjsonnet.MaterializeJsonRenderer
+    def visitKey(index: Int): sjsonnet.MaterializeJsonRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('{')
+    depth += 1
+    // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+    if (length == 0 && indent != -1)
+      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
+    else renderIndent()
+    reusableObjVisitor
   }
 }
 
