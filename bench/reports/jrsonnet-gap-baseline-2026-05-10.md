@@ -87,17 +87,21 @@ Method:
 | --- | ---: | ---: | ---: |
 | C++ benchmarks / foldl string concat | `5.293 +/- 0.589 ms` | `8.655 +/- 0.557 ms` | sjsonnet is `0.61x` jrsonnet time (`1.64x` faster). |
 | Go builtins / `std.foldl` | `4.900 +/- 0.378 ms` | `6.268 +/- 0.505 ms` | sjsonnet is `0.78x` jrsonnet time (`1.28x` faster). |
+| C++ perf_tests / large string template | `11.515 +/- 1.085 ms` | `6.190 +/- 0.975 ms` | sjsonnet is `1.86x` jrsonnet time. |
 
 Result: foldl/string concatenation is no longer a current gap on this local
-source-built comparison. The next gap target should move below foldl.
+source-built comparison. Large string template remains a current gap, but the
+measured gap is `1.86x`, not the stale documented `6.90x`.
 
 ## Immediate optimization priorities
 
 1. **Move past foldl/string concat.** Local source-built hyperfine shows the
    stacked sjsonnet Scala Native binary faster than latest source-built
    jrsonnet on both extracted foldl workloads.
-2. **Re-measure large string template on the stacked branch.** It is now the next
-   documented string-heavy gap that has not been invalidated by local data.
+2. **Optimize large string template if staying on string-heavy work.** Local
+   source-built hyperfine shows a remaining `1.86x` gap. Treat this as the next
+   string target and use `large_string_join`, `realistic2`, and `manifestJsonEx`
+   as guards.
 3. **Re-measure array comparison, big object, kube-prometheus, realistic2, and
    manifestJsonEx as guard/secondary targets.** These catch overfitted string or
    renderer changes that regress object-heavy real workloads.
@@ -111,4 +115,5 @@ source-built comparison. The next gap target should move below foldl.
 | `./mill --no-server -j 1 'sjsonnet.native[3.3.7]'.nativeLink` | Success; produced a 17M native binary. |
 | `cargo build --release -p jrsonnet` | Success; produced `jrsonnet 0.5.0-pre98`. |
 | foldl hyperfine | sjsonnet Scala Native stack is faster than source-built jrsonnet on both foldl workloads. |
+| large string template hyperfine | Outputs matched; sjsonnet Scala Native stack `11.515 +/- 1.085 ms`, source-built jrsonnet `6.190 +/- 0.975 ms`, so sjsonnet is `1.86x` slower. |
 | Worktree | Clean after validation. |
