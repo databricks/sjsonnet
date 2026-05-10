@@ -151,3 +151,30 @@ fused output path.
 | kube-prometheus Native hyperfine | Before: `235.971 +/- 12.925 ms`; after: `224.975 +/- 11.550 ms`; delta `-4.66%`. Source-built jrsonnet in the same candidate run: `88.576 +/- 0.915 ms`, so the remaining gap is `2.54x`. |
 | Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.052 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: `40.068 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.137 ms/op`. |
 | Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` code-review agents reported no significant issues. |
+
+Second accepted kube-prometheus experiment: parse strict `.json` imports directly
+into literal `Val` trees, falling back to the normal Jsonnet parser whenever the
+file is not strict JSON or the fast path would change observable semantics. This
+targets the very large Kubernetes CRD imports in the kube-prometheus vendor tree,
+where parse/import time dominated the remaining real-world gap.
+
+Semantic guardrails:
+
+- Only files whose resolved path ends in `.json` are attempted.
+- Invalid strict JSON, duplicate object keys, non-finite numbers, and parser-depth
+  overflow all fall back to the normal Jsonnet parser.
+- Large integer JSON numbers parse through Jsonnet's double number model rather
+  than `Long`, preserving existing accepted input.
+- The shared helper is used by both synchronous imports and Preloader/async
+  import discovery, avoiding sync-vs-async divergence.
+
+| Check | Result |
+| --- | --- |
+| Regression tests | Added `JsonImportFastPathTests` for strict JSON values, Jsonnet fallback, duplicate-key fallback, large integers, non-finite numbers, incomplete JSON, and recursion-depth fallback. Added a `PreloaderTests` case proving `.json` preload uses the fast path without fastparse. |
+| JVM tests | `./mill --no-server -j 1 'sjsonnet.jvm[3.3.7]'.test`: 502 passed, 0 failed. |
+| Full tests | `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
+| Native build | `./mill --no-server -j 1 'sjsonnet.native[3.3.7]'.nativeLink`: success. |
+| Native output smoke | `cmp` matched source-built jrsonnet output for `entry-kube-prometheus.jsonnet` (`-J vendor`), output size `7,506,029` bytes. |
+| kube-prometheus Native hyperfine | Before this experiment: `224.975 +/- 11.550 ms`; after: `139.242 +/- 1.204 ms`; delta `-38.11%`. Versus the original stacked baseline `235.971 +/- 12.925 ms`, total delta is `-40.99%`. Source-built jrsonnet in the same final run: `88.025 +/- 1.271 ms`, so the remaining gap is `1.58x`. |
+| Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.052 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: `41.259 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.129 ms/op`; `bench/resources/cpp_suite/gen_big_object.jsonnet`: `0.845 ms/op`. |
+| Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` code-review agents reported no significant issues after fixes for large-number parsing, incomplete JSON fallback, Preloader coverage, and parser-depth guard behavior. |

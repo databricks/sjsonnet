@@ -168,6 +168,39 @@ object PreloaderTests extends TestSuite {
       assert(parseCount(DummyPath("lib.libsonnet")) == 1)
     }
 
+    test("preloader uses json import fast path") {
+      val dataPath = DummyPath("data.json")
+      class JsonOnlyResolvedFile(content: String) extends ResolvedFile {
+        def getParserInput(): fastparse.ParserInput =
+          throw new RuntimeException("strict JSON should not be parsed with fastparse")
+        def readString(): String        = content
+        def contentHash(): String       = content
+        def readRawBytes(): Array[Byte] =
+          content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+      }
+      val importer = new Importer {
+        def resolve(docBase: Path, importName: String): Option[Path] =
+          if (importName == "data.json") Some(dataPath) else None
+        def read(path: Path, binaryData: Boolean): Option[ResolvedFile] =
+          throw new RuntimeException(s"unexpected read: $path")
+      }
+      val preloader = new Preloader(importer)
+
+      val out = preloader.add(dataPath, new JsonOnlyResolvedFile("""{"a":1}"""), ImportKind.Code)
+      assert(out == Right(()))
+      assert(preloader.loaded((dataPath, false)).preParsedAst.isDefined)
+
+      val interp = new Interpreter(
+        Map.empty[String, String],
+        Map.empty[String, String],
+        DummyPath(),
+        preloader.importer,
+        parseCache = new DefaultParseCache
+      )
+      val result = interp.interpret("""import "data.json"""", DummyPath("main.jsonnet"))
+      assert(result == Right(ujson.Obj("a" -> 1)))
+    }
+
     test("resolves imports relative to the importing file's parent directory") {
       // Resolver records what docBase it was called with, and only resolves names against the
       // expected `dir/` parent — proving the preloader passes parent(), not the file path itself.
