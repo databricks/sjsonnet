@@ -574,9 +574,13 @@ object Format {
     }
     val labels = parsed.labels
     val specBits = parsed.specBits
+    val singleSpecNoStatic = specBits.length == 1 && parsed.staticChars == 0
     // Pre-size StringBuilder based on static chars + estimated dynamic content
-    val output = new java.lang.StringBuilder(parsed.staticChars + specBits.length * 8)
-    appendLeading(output, parsed)
+    val output =
+      if (singleSpecNoStatic) null
+      else new java.lang.StringBuilder(parsed.staticChars + specBits.length * 8)
+    if (!singleSpecNoStatic) appendLeading(output, parsed)
+    var singleFormatted: String = null
     var i = 0
     var idx = 0
     // Use while-loop instead of for/zipWithIndex to avoid iterator allocation
@@ -731,8 +735,11 @@ object Format {
           i += 1
           formattedValue
       }
-      output.append(cooked0)
-      appendLiteral(output, parsed, idx)
+      if (singleSpecNoStatic) singleFormatted = cooked0
+      else {
+        output.append(cooked0)
+        appendLiteral(output, parsed, idx)
+      }
       idx += 1
     }
 
@@ -741,7 +748,7 @@ object Format {
         "Too many values to format: %d, expected %d".format(valuesArr.length, i)
       )
     }
-    output.toString()
+    if (singleSpecNoStatic) singleFormatted else output.toString()
   }
 
   /**
