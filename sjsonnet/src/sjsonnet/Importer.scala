@@ -352,8 +352,7 @@ object CachedResolver {
         def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
         def visitKeyValue(s: Any): Unit = key = intern(s.toString)
         def visitValue(v: Val, index: Int): Unit = {
-          if (allKeys.containsKey(key)) throw new DuplicateJsonKey
-          cache.put(key, v)
+          if (cache.put(key, v) != null) throw new DuplicateJsonKey
           allKeys.put(key, false)
           keys += key
         }
@@ -377,7 +376,13 @@ object CachedResolver {
         parseNumber(s)
       )
 
-    def visitString(s: CharSequence, index: Int): Val = Val.Str(pos(index), intern(s.toString))
+    def visitString(s: CharSequence, index: Int): Val = {
+      val str = s match {
+        case str: String => str
+        case _           => s.toString
+      }
+      Val.Str(pos(index), intern(str))
+    }
 
     private def pos(index: Int): Position =
       if (index >= 0) new Position(fileScope, index) else fileScope.noOffsetPos
