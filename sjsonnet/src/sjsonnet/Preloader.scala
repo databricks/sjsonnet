@@ -134,7 +134,6 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
       path,
       content,
       internedStrings,
-      internedFieldSets,
       settings
     ) match {
       case Some((expr, fs)) =>

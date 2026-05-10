@@ -234,7 +234,6 @@ class CachedResolver(
               path,
               content,
               internedStrings,
-              internedStaticFieldSets,
               settings
             ) match {
               case Some(parsedJson) => Right(parsedJson)
@@ -293,16 +292,12 @@ object CachedResolver {
       path: Path,
       content: ResolvedFile,
       internedStrings: mutable.HashMap[String, String],
-      internedStaticFieldSets: mutable.HashMap[
-        Val.StaticObjectFieldSet,
-        java.util.LinkedHashMap[String, java.lang.Boolean]
-      ],
       settings: Settings): Option[(Expr, FileScope)] = {
     if (!path.last.endsWith(".json")) return None
     val fileScope = new FileScope(path)
     try {
       val visitor =
-        new JsonImportVisitor(fileScope, internedStrings, internedStaticFieldSets, settings)
+        new JsonImportVisitor(fileScope, internedStrings, settings)
       Some((ujson.StringParser.transform(content.readString(), visitor), fileScope))
     } catch {
       case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
@@ -314,10 +309,6 @@ object CachedResolver {
   private final class JsonImportVisitor(
       fileScope: FileScope,
       internedStrings: mutable.HashMap[String, String],
-      internedStaticFieldSets: mutable.HashMap[
-        Val.StaticObjectFieldSet,
-        java.util.LinkedHashMap[String, java.lang.Boolean]
-      ],
       settings: Settings)
       extends ujson.JsVisitor[Val, Val] { self =>
 
@@ -343,25 +334,47 @@ object CachedResolver {
       enterContainer()
       val startPos = pos(index)
       new upickle.core.ObjVisitor[Val, Val] {
-        private val cache = new util.HashMap[Any, Val]()
-        private val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]()
+        private val seen = new util.HashSet[String]()
         private val keys = new mutable.ArrayBuilder.ofRef[String]
+        private val members = new mutable.ArrayBuilder.ofRef[Val.Obj.Member]
         if (length >= 0) keys.sizeHint(length)
+        if (length >= 0) members.sizeHint(length)
         private var key: String = _
         def subVisitor: upickle.core.Visitor[?, ?] = self
         def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
         def visitKeyValue(s: Any): Unit = key = intern(s.toString)
         def visitValue(v: Val, index: Int): Unit = {
-          if (cache.put(key, v) != null) throw new DuplicateJsonKey
-          allKeys.put(key, false)
+          if (!seen.add(key)) throw new DuplicateJsonKey
           keys += key
+          // Imported JSON literals can be shared through ParseCache/Preloader across evaluators.
+          // Keep their inline object members immutable by disabling Val.Obj's lazy field cache.
+          members += new Val.Obj.ConstMember(
+            false,
+            Expr.Member.Visibility.Normal,
+            v,
+            cached2 = false
+          )
         }
         def visitEnd(index: Int): Val = {
           val keyArray = keys.result()
-          val fieldSet = new Val.StaticObjectFieldSet(keyArray)
-          val sharedAllKeys = internedStaticFieldSets.getOrElseUpdate(fieldSet, allKeys)
+          val memberArray = members.result()
           leaveContainer()
-          new Val.Obj(startPos, null, static = true, null, null, cache, sharedAllKeys)
+          val obj = new Val.Obj(
+            startPos,
+            null,
+            static = false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            keyArray,
+            memberArray
+          )
+          obj._skipFieldCache = true
+          obj
         }
       }
     }
@@ -381,7 +394,8 @@ object CachedResolver {
         case str: String => str
         case _           => s.toString
       }
-      Val.Str(pos(index), intern(str))
+      val unique = intern(str)
+      Val.Str(pos(index), unique)
     }
 
     private def pos(index: Int): Position =

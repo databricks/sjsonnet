@@ -194,3 +194,31 @@ already provided a `String`.
 | Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.053 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: first combined run `44.130 ms/op`, rerun `40.195 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.129 ms/op`; `bench/resources/cpp_suite/gen_big_object.jsonnet`: `0.830 ms/op`. |
 | Rejected follow-ups | Static-object direct materialization and long ASCII string char-level escaping both failed the Native benchmark gate, so they were reverted and not included. |
 | Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` code-review agents reported no significant issues. |
+
+Fourth accepted kube-prometheus experiment: keep strict `.json` imports in an
+inline object layout so the fused renderer/materializer can iterate imported JSON
+objects directly. The first version used the normal inline-object field cache,
+but review found that parse-cached imported literals may be shared by concurrent
+interpreters. The final version disables field caching for JSON import members,
+sets `_skipFieldCache`, and uses the inline-array representation even for
+0/1-field objects so stdlib field introspection does not lazily populate
+`value0` on shared literals.
+
+Rejected variants in this step:
+
+- Marking imported JSON strings as ASCII-safe during parse was output-correct but
+  benchmark-negative/noisy (`141.317 +/- 1.729 ms` clean vs `141.837 +/- 1.503 ms`
+  candidate for `>=128` chars; the `>1024` variant was not stable on repeat).
+- `cached=false` without `_skipFieldCache` did not remove materializer cache
+  writes, so it was superseded by the final race-free version.
+
+| Check | Result |
+| --- | --- |
+| Regression tests | Added JVM-only `JsonImportFastPathJvmTests` that shares a strict-JSON import through a concurrent parse cache across interpreters, materializes the whole object, selects fields, and calls `std.objectFields` on a single-field nested object. |
+| JVM tests | `./mill --no-server -j 1 'sjsonnet.jvm[3.3.7]'.test`: 503 passed, 0 failed. |
+| Full tests | `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
+| Native build | `./mill --no-server -j 1 'sjsonnet.native[3.3.7]'.nativeLink`: success. |
+| Native output smoke | `cmp` matched source-built jrsonnet output for `entry-kube-prometheus.jsonnet` (`-J vendor`), output size `7,506,029` bytes. |
+| kube-prometheus Native A/B hyperfine | Same-run A/B with frozen clean `de5cd388` binary: clean `139.937 +/- 2.294 ms`; candidate `136.301 +/- 1.957 ms`; delta `-2.60%`. Source-built jrsonnet in the same run: `88.087 +/- 1.737 ms`, so the remaining same-run gap is `1.55x`. |
+| Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.053 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: `40.250 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.102 ms/op`; `bench/resources/cpp_suite/gen_big_object.jsonnet`: `0.826 ms/op`. |
+| Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` reviews first identified and then confirmed fixes for shared-literal cache races and the single-field `getValue0` mutation path; final review reported no significant issues. |
