@@ -109,6 +109,9 @@ Use `bench/reports/sync-points.md` as the migration ledger before porting or
 skipping performance commits. For JIT/performance exploration, start with
 `bench/reports/jit-exploration-status-2026-05-10.md` so historical `jit` branch
 ideas are treated as source material and not mechanically rebased wholesale.
+For gap-driven exploration on top of ready performance PRs, use
+`bench/reports/jrsonnet-gap-baseline-2026-05-10.md` and the stacked baseline
+branch named there before starting new optimization work.
 
 ## Architecture
 

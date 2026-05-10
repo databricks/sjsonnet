@@ -11,6 +11,8 @@ idea is not repeated without new evidence.
 | Upstream master | `0ae7b78a93c4e643f9bcfb6dd1d99d9fe7a522a9` | Latest `databricks/sjsonnet` master fetched for this branch. |
 | Historical JIT branch | `hepinssh/jit@9dc20016b0e2d1a061d1c0451ed555dcc46a0a33` | Source material only; do not mechanically rebase wholesale. |
 | Fresh exploration branch | `jit-explore-2026` | Clean branch from upstream master for benchmark-gated, atomic ports. |
+| Ready-PR stacked branch | `perf/stacked-ready-gap-explore` | Current gap exploration baseline: upstream master plus ready PRs #825/#826/#828/#833/#834 and the two accepted `jit-explore-2026` micro-optimizations. |
+| jrsonnet benchmark source | `jrsonnet origin/master:docs/benchmarks.adoc` | Use fetched `origin/master` contents, not the dirty/stale local jrsonnet checkout. Current gap triage is in `bench/reports/jrsonnet-gap-baseline-2026-05-10.md`. |
 
 ## Branch strategy decision
 
@@ -70,3 +72,5 @@ only ideas that pass current semantic and benchmark gates.
 | Guard benchmark | `MainBenchmark.main`: candidate `2.228 +/- 0.062 ms/op`, neutral versus prior branch `2.204 +/- 0.031` and master `2.223 +/- 0.106`. |
 | Tests | `./mill --no-server -j 1 sjsonnet.jvm[3.3.7].test`: 493 passed, 0 failed. `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
 | Review | Independent `gpt-5.4` and `claude-sonnet-4.6` code-review agents reported no significant issues. |
+| Ready-PR stacked gap baseline | Created `perf/stacked-ready-gap-explore` from upstream master, stacked #825/#826/#828/#833/#834 and accepted JIT micro-optimizations. Resolved the #825/#834 Native `CharSWAR` conflict by keeping the four-UTF-16-char ascii-safe SWAR scan and #834 propagation call sites. |
+| Stacked baseline validation | `./mill --no-server -j 1 __.reformat`: success. `./mill --no-server -j 1 sjsonnet.jvm[3.3.7].test`: 494 passed, 0 failed. Worktree clean after validation. |

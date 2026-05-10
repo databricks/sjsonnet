@@ -49,6 +49,9 @@ tests, focused benchmarks, and full-suite validation before it can become a PR.
 ## Execution policy
 
 - Work from `jit-explore-2026`, not the historical `jit` branch.
+- For gap-driven work that should avoid duplicating ready PRs, work from
+  `perf/stacked-ready-gap-explore` and consult
+  `bench/reports/jrsonnet-gap-baseline-2026-05-10.md` first.
 - Keep commits atomic and source-traceable.
 - Prefer reimplementation on current master over applying old patches.
 - Reject any idea that changes Jsonnet semantics, makes benchmark guards worse,
