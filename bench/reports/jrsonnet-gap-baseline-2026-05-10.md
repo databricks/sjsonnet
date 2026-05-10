@@ -75,9 +75,12 @@ The local `jrsonnet` checkout was reset and cleaned, then rebuilt from latest
 
 Method:
 
-- Inputs copied directly from latest `jrsonnet/docs/benchmarks.adoc`.
+- Foldl inputs were copied directly from latest
+  `jrsonnet/docs/benchmarks.adoc`; remaining workloads used the repository
+  benchmark files listed in the table.
 - Correctness smoke compared stdout with `cmp` before measuring.
-- `hyperfine --shell=none --warmup 5 --min-runs 20`.
+- Small/medium workloads used `hyperfine --shell=none --warmup 5 --min-runs
+  20`; larger real/object workloads used the exact commands listed below.
 - `jrsonnet --features mimalloc` was attempted but does not compile on the
   current aarch64 macOS toolchain because `mimalloc-sys` emits x86_64 `%gs`
   inline assembly for this target. The valid local jrsonnet comparison is the
@@ -88,23 +91,34 @@ Method:
 | C++ benchmarks / foldl string concat | `5.293 +/- 0.589 ms` | `8.655 +/- 0.557 ms` | sjsonnet is `0.61x` jrsonnet time (`1.64x` faster). |
 | Go builtins / `std.foldl` | `4.900 +/- 0.378 ms` | `6.268 +/- 0.505 ms` | sjsonnet is `0.78x` jrsonnet time (`1.28x` faster). |
 | C++ perf_tests / large string template | `11.515 +/- 1.085 ms` | `6.190 +/- 0.975 ms` | sjsonnet is `1.86x` jrsonnet time. |
+| C++ benchmarks / big object (`bench/resources/cpp_suite/gen_big_object.jsonnet`) | `9.057 +/- 0.666 ms` | `8.972 +/- 0.819 ms` | sjsonnet is `1.01x` jrsonnet time; effectively neutral. |
+| C++ perf_tests / realistic2 (`bench/resources/cpp_suite/realistic2.jsonnet`) | `83.932 +/- 1.629 ms` | `144.282 +/- 2.369 ms` | sjsonnet is `0.58x` jrsonnet time (`1.72x` faster). |
+| Real world / kube-prometheus manifests (`jrsonnet/tests/realworld/entry-kube-prometheus.jsonnet`, `-J vendor`) | `235.971 +/- 12.925 ms` | `93.188 +/- 6.599 ms` | sjsonnet is `2.53x` jrsonnet time. |
 
 Result: foldl/string concatenation is no longer a current gap on this local
 source-built comparison. Large string template remains a current gap, but the
-measured gap is `1.86x`, not the stale documented `6.90x`.
+measured gap is `1.86x`, not the stale documented `6.90x`. Big object is no
+longer a meaningful local gap and realistic2 is faster in sjsonnet. The largest
+confirmed local source-built gap in this recheck set is kube-prometheus at
+`2.53x`.
 
 ## Immediate optimization priorities
 
-1. **Move past foldl/string concat.** Local source-built hyperfine shows the
+1. **Prioritize kube-prometheus for end-to-end object/materializer/rendering
+   work.** Local source-built hyperfine shows a current `2.53x` real-world gap
+   after stacking ready PRs.
+2. **Keep large string template as the next string-heavy target.** Local
+   source-built hyperfine shows a remaining `1.86x` gap. Use
+   `large_string_join`, `realistic2`, and `manifestJsonEx` as guards.
+3. **Move past foldl/string concat.** Local source-built hyperfine shows the
    stacked sjsonnet Scala Native binary faster than latest source-built
    jrsonnet on both extracted foldl workloads.
-2. **Optimize large string template if staying on string-heavy work.** Local
-   source-built hyperfine shows a remaining `1.86x` gap. Treat this as the next
-   string target and use `large_string_join`, `realistic2`, and `manifestJsonEx`
-   as guards.
-3. **Re-measure array comparison, big object, kube-prometheus, realistic2, and
-   manifestJsonEx as guard/secondary targets.** These catch overfitted string or
-   renderer changes that regress object-heavy real workloads.
+4. **Use big object and realistic2 as guards, not primary targets for now.** Big
+   object is neutral and realistic2 is already faster than source-built
+   jrsonnet in the current stack.
+5. **Re-measure array comparison and manifestJsonEx as guard/secondary
+   targets.** These catch overfitted string or renderer changes that regress
+   object-heavy real workloads.
 
 ## Validation performed for stacked baseline
 
@@ -116,4 +130,7 @@ measured gap is `1.86x`, not the stale documented `6.90x`.
 | `cargo build --release -p jrsonnet` | Success; produced `jrsonnet 0.5.0-pre98`. |
 | foldl hyperfine | sjsonnet Scala Native stack is faster than source-built jrsonnet on both foldl workloads. |
 | large string template hyperfine | Outputs matched; sjsonnet Scala Native stack `11.515 +/- 1.085 ms`, source-built jrsonnet `6.190 +/- 0.975 ms`, so sjsonnet is `1.86x` slower. |
+| big object hyperfine | Outputs matched; sjsonnet Scala Native stack `9.057 +/- 0.666 ms`, source-built jrsonnet `8.972 +/- 0.819 ms`, so the result is effectively neutral. |
+| realistic2 hyperfine | Outputs matched; sjsonnet Scala Native stack `83.932 +/- 1.629 ms`, source-built jrsonnet `144.282 +/- 2.369 ms`, so sjsonnet is faster. |
+| kube-prometheus hyperfine | Installed real-world vendor deps with `jsonnet-bundler` after `jrb install` failed locally with a reqwest/rustls provider panic. Outputs matched (`7,506,029` bytes); sjsonnet Scala Native stack `235.971 +/- 12.925 ms`, source-built jrsonnet `93.188 +/- 6.599 ms`, so sjsonnet is `2.53x` slower. |
 | Worktree | Clean after validation. |
