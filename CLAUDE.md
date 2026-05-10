@@ -103,6 +103,13 @@ JMH benchmarks live in `bench/`. Benchmark suites in `bench/resources/`: `bug_su
 
 For ad-hoc benchmarking, `hyperfine` is available on the PATH.
 
+### Performance PR tracking
+
+Use `bench/reports/sync-points.md` as the migration ledger before porting or
+skipping performance commits. For JIT/performance exploration, start with
+`bench/reports/jit-exploration-status-2026-05-10.md` so historical `jit` branch
+ideas are treated as source material and not mechanically rebased wholesale.
+
 ## Architecture
 
 ### Pipeline
