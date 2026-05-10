@@ -579,7 +579,11 @@ object Format {
       if (valuesArr != null && valuesArr.length > 0) {
         Error.fail("Too many values to format: %d, expected %d".format(valuesArr.length, 0))
       }
-      return parsed.leading
+      val source = parsed.source
+      return if (source != null) {
+        if (parsed.leadingStart == 0 && parsed.leadingEnd == source.length) source
+        else source.substring(parsed.leadingStart, parsed.leadingEnd)
+      } else parsed.leading
     }
 
     val formattedValues = new Array[String](numSpecs)

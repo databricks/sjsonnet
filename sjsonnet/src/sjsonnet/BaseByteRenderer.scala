@@ -473,6 +473,10 @@ object BaseByteRenderer {
     'f'.toByte
   )
 
+  /** Hex digits used by char renderers for control-char unicode escapes. */
+  private[sjsonnet] val HEX_CHARS: Array[Char] =
+    Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
+
   /**
    * Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue). Not thread-safe,
    * but renderers are single-threaded.

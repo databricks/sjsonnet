@@ -174,40 +174,6 @@ public final class CharSWAR {
         return false;
     }
 
-    // =========================================================================
-    // findFirstEscapeChar — position-returning SWAR scan for chunked rendering
-    // =========================================================================
-
-    /**
-     * Find the index of the first byte in {@code arr[from..to)} that needs JSON
-     * string escaping. Returns {@code -1} if no escape char is found.
-     *
-     * <p>Uses SWAR to scan 8 bytes per iteration, then pinpoints the exact byte
-     * within a matched 8-byte word via scalar fallback.
-     */
-    public static int findFirstEscapeChar(byte[] arr, int from, int to) {
-        int i = from;
-        int limit = to - 7;
-        while (i < limit) {
-            long word = (long) LONG_VIEW.get(arr, i);
-            if (swarHasMatch(word)) {
-                // Pinpoint exact byte within the matched 8-byte word
-                for (int j = i; j < i + 8; j++) {
-                    int b = arr[j] & 0xFF;
-                    if (b < 32 || b == '"' || b == '\\') return j;
-                }
-            }
-            i += 8;
-        }
-        // Tail: remaining 0-7 bytes
-        while (i < to) {
-            int b = arr[i] & 0xFF;
-            if (b < 32 || b == '"' || b == '\\') return i;
-            i++;
-        }
-        return -1;
-    }
-
     /**
      * Find the index of the first char in {@code arr[from..to)} that needs JSON
      * string escaping. Returns {@code -1} if no escape char is found.
