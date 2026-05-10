@@ -312,8 +312,16 @@ class StaticOptimizer(
       f: Val.Builtin,
       args: Array[Expr],
       tailstrict: Boolean): Expr = {
-    if (f.staticSafe && args.forall(_.isInstanceOf[Val])) {
-      val vargs = args.map(_.asInstanceOf[Val])
+    if (f.staticSafe) {
+      val vargs = new Array[Val](args.length)
+      var i = 0
+      while (i < args.length) {
+        args(i) match {
+          case v: Val => vargs(i) = v
+          case _      => return null
+        }
+        i += 1
+      }
       val tailstrictMode = if (tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
       try f.apply(vargs, null, pos)(ev, tailstrictMode).asInstanceOf[Expr]
       catch { case _: Exception => null }

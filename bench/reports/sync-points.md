@@ -36,7 +36,7 @@ only ideas that pass current semantic and benchmark gates.
 | `1e84155c` `Cache sorted object key arrays lazily` | Candidate / verify duplicate | Check overlap with current renderer/materializer key-order work and semantic effects on object visibility. |
 | `e98cd1f8` `Optimize format chunk runtime` | Candidate / high scrutiny | Prior #776 format follow-up was not benchmark-positive on current master; only revisit with a materially different micro-benchmark signal. |
 | `8b87e03a` `Specialize static object layouts` | Candidate / high risk | Potentially high value but touches object semantics; requires strong regression tests and review. |
-| `6367df6d` `Optimize StaticOptimizer apply specialization` | Candidate | Port only focused specialization pieces that fit current arity-specialized AST nodes. |
+| `6367df6d` `Optimize StaticOptimizer apply specialization` | Partially ported | Retained only the stable `tryStaticApply` single-pass `Array[Val]` construction. Tested and rejected the direct `rebindApply` shortcut because repeated JMH was noisy/negative. |
 | `926a6d0f` `Optimize sort to use in-place Arrays.sort` | Candidate | Re-test with correctness coverage for Jsonnet ordering and stability expectations. |
 | `49a1d51b` `Optimize assertEqual to use structural equality` | Candidate | Requires exact compatibility checks for error messages and deep equality behavior. |
 | `ee740182` `Optimize boolean allocation with singleton Val.True/Val.False` | Verify duplicate | Current master already uses static boolean values; likely superseded. |
@@ -64,5 +64,9 @@ only ideas that pass current semantic and benchmark gates.
 | --- | --- |
 | `ScopedExprTransform` scope-map allocation trim | `OptimizerBenchmark.main`: master `0.432 +/- 0.004 ms/op`, branch `0.422 +/- 0.004 ms/op` (`-2.3%`). |
 | Guard benchmark | `MainBenchmark.main`: master `2.223 +/- 0.106 ms/op`, branch `2.204 +/- 0.031 ms/op` (neutral/slightly positive). |
+| Tests | `./mill --no-server -j 1 sjsonnet.jvm[3.3.7].test`: 493 passed, 0 failed. `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
+| Review | Independent `gpt-5.4` and `claude-sonnet-4.6` code-review agents reported no significant issues. |
+| `tryStaticApply` single-pass static value collection | `OptimizerBenchmark.main`: prior branch `0.422 +/- 0.004 ms/op`, candidate `0.414 +/- 0.005 ms/op` on the stable split run. Full historical `rebindApply` shortcut was rejected after repeat runs (`0.414 +/- 0.024`, then `0.430 +/- 0.014`). |
+| Guard benchmark | `MainBenchmark.main`: candidate `2.228 +/- 0.062 ms/op`, neutral versus prior branch `2.204 +/- 0.031` and master `2.223 +/- 0.106`. |
 | Tests | `./mill --no-server -j 1 sjsonnet.jvm[3.3.7].test`: 493 passed, 0 failed. `./mill --no-server -j 1 __.test`: success, 2066/2066 tasks. |
 | Review | Independent `gpt-5.4` and `claude-sonnet-4.6` code-review agents reported no significant issues. |
