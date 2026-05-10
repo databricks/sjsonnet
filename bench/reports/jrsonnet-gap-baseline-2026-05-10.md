@@ -7,9 +7,10 @@ exploration branch. The numbers below come from latest fetched
 `jrsonnet origin/master:docs/benchmarks.adoc`, not from the older local checked
 out `jrsonnet` worktree.
 
-Use this as direction-finding only. Before turning any idea into a PR, re-run
-local sjsonnet benchmarks on the stacked branch, compare against current master,
-and use source-built jrsonnet for the matching workload.
+The `jrsonnet/docs` rows are stale for at least foldl/string concatenation.
+Before turning any idea into a PR, re-run local sjsonnet benchmarks on the
+stacked branch, compare against current master, and use source-built jrsonnet for
+the matching workload.
 
 ## Stacked exploration baseline
 
@@ -35,6 +36,10 @@ definitions.
 
 ## Latest documented gaps vs jrsonnet
 
+These rows are copied from latest `jrsonnet origin/master:docs/benchmarks.adoc`
+and should be treated as a stale ranking until replaced by local source-built
+hyperfine data.
+
 | Rank | Workload | Scala target | Scala ms | Rust ms | Gap | Initial direction |
 | ---: | --- | --- | ---: | ---: | ---: | --- |
 | 1 | C++ benchmarks / foldl string concat | GraalVM | 420.9 | 3.7 | 113.76x | Re-test after rope/string work; investigate foldl string-builder/rope semantics only if still open. |
@@ -58,16 +63,42 @@ definitions.
 | 19 | Go builtins / `std.manifestJsonEx` | Native | 2443.6 | 748.5 | 3.26x | Renderer/materializer direct iteration; previous broad #776 split regressed guards. |
 | 20 | Go builtins / `std.substr` | Native | 2991.7 | 917.8 | 3.26x | Covered by #834; re-measure stacked branch before more substr work. |
 
+## Local source-built hyperfine results
+
+The local `jrsonnet` checkout was reset and cleaned, then rebuilt from latest
+`origin/master`:
+
+| Project | Ref / build | Binary |
+| --- | --- | --- |
+| sjsonnet | `perf/stacked-ready-gap-explore@2e5ef3ea`, `./mill --no-server -j 1 'sjsonnet.native[3.3.7]'.nativeLink` | `out/sjsonnet/native/3.3.7/nativeLink.dest/out` |
+| jrsonnet | `origin/master@5b43fa88`, `cargo build --release -p jrsonnet` | `target/release/jrsonnet` |
+
+Method:
+
+- Inputs copied directly from latest `jrsonnet/docs/benchmarks.adoc`.
+- Correctness smoke compared stdout with `cmp` before measuring.
+- `hyperfine --shell=none --warmup 5 --min-runs 20`.
+- `jrsonnet --features mimalloc` was attempted but does not compile on the
+  current aarch64 macOS toolchain because `mimalloc-sys` emits x86_64 `%gs`
+  inline assembly for this target. The valid local jrsonnet comparison is the
+  default release profile above.
+
+| Workload | sjsonnet Scala Native stack | jrsonnet source release | Ratio |
+| --- | ---: | ---: | ---: |
+| C++ benchmarks / foldl string concat | `5.293 +/- 0.589 ms` | `8.655 +/- 0.557 ms` | sjsonnet is `0.61x` jrsonnet time (`1.64x` faster). |
+| Go builtins / `std.foldl` | `4.900 +/- 0.378 ms` | `6.268 +/- 0.505 ms` | sjsonnet is `0.78x` jrsonnet time (`1.28x` faster). |
+
+Result: foldl/string concatenation is no longer a current gap on this local
+source-built comparison. The next gap target should move below foldl.
+
 ## Immediate optimization priorities
 
-1. **Re-measure foldl/string concat on the stacked branch.** This is the largest
-   documented gap, but existing rope/string work may already close much of it.
-2. **If foldl remains open, inspect `std.foldl` and string append semantics.**
-   Target function-call/lazy-scope allocation first; do not introduce eager
-   behavior that changes Jsonnet error timing.
-3. **Use large string template as the next string workload guard.** It is the
-   next largest unambiguously string-heavy gap after foldl.
-4. **Use array comparison, big object, kube-prometheus, realistic2, and
+1. **Move past foldl/string concat.** Local source-built hyperfine shows the
+   stacked sjsonnet Scala Native binary faster than latest source-built
+   jrsonnet on both extracted foldl workloads.
+2. **Re-measure large string template on the stacked branch.** It is now the next
+   documented string-heavy gap that has not been invalidated by local data.
+3. **Re-measure array comparison, big object, kube-prometheus, realistic2, and
    manifestJsonEx as guard/secondary targets.** These catch overfitted string or
    renderer changes that regress object-heavy real workloads.
 
@@ -77,5 +108,7 @@ definitions.
 | --- | --- |
 | `./mill --no-server -j 1 __.reformat` | Success. |
 | `./mill --no-server -j 1 'sjsonnet.jvm[3.3.7]'.test` | Success: 494 passed, 0 failed. |
+| `./mill --no-server -j 1 'sjsonnet.native[3.3.7]'.nativeLink` | Success; produced a 17M native binary. |
+| `cargo build --release -p jrsonnet` | Success; produced `jrsonnet 0.5.0-pre98`. |
+| foldl hyperfine | sjsonnet Scala Native stack is faster than source-built jrsonnet on both foldl workloads. |
 | Worktree | Clean after validation. |
-
