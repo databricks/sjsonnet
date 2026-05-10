@@ -82,11 +82,14 @@ object StringModule extends AbstractFunctionModule {
       Val.cachedNum(
         pos,
         (x.value match {
-          case Val.Str(_, s) => s.codePointCount(0, s.length)
-          case a: Val.Arr    => a.length
-          case o: Val.Obj    => o.visibleKeyNames.length
-          case o: Val.Func   => o.params.names.length
-          case x             => Error.fail("Cannot get length of " + x.prettyName)
+          case v: Val.Str =>
+            val s = v.str
+            if (v._asciiSafe) s.length
+            else s.codePointCount(0, s.length)
+          case a: Val.Arr  => a.length
+          case o: Val.Obj  => o.visibleKeyNames.length
+          case o: Val.Func => o.params.names.length
+          case x           => Error.fail("Cannot get length of " + x.prettyName)
         }).toDouble
       )
   }
@@ -126,7 +129,9 @@ object StringModule extends AbstractFunctionModule {
    */
   private object Substr extends Val.Builtin3("substr", "str", "from", "len") {
     def evalRhs(_s: Eval, from: Eval, len: Eval, ev: EvalScope, pos: Position): Val = {
-      val str = _s.value.asString
+      val srcVal = _s.value
+      val str = srcVal.asString
+      val srcAsciiSafe = srcVal.isInstanceOf[Val.Str] && srcVal.asInstanceOf[Val.Str]._asciiSafe
       val offset = from.value match {
         case v: Val.Num => v.asPositiveInt
         case _ => Error.fail("Expected a number for offset in substr, got " + from.value.prettyName)
@@ -138,6 +143,16 @@ object StringModule extends AbstractFunctionModule {
 
       if (length <= 0) {
         Val.Str(pos, "")
+      } else if (srcAsciiSafe) {
+        val strLen = str.length
+        val safeOffset = math.min(offset, strLen)
+        val safeLength = math.min(length, strLen - safeOffset)
+        if (safeLength <= 0) Val.Str(pos, "")
+        else {
+          val result = Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
+          result._asciiSafe = true
+          result
+        }
       } else {
         val requestedEnd = offset.toLong + length.toLong
         if (
