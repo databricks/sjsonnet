@@ -68,6 +68,81 @@ object ArrayModule extends AbstractFunctionModule {
     sum
   }
 
+  private final val NoBytePattern = Long.MinValue
+  private final val MaxExactDoubleInt = 9007199254740991L
+
+  @inline private def encodeBytePattern(multiplier: Int, addend: Int): Long =
+    (multiplier.toLong << 32) | (addend.toLong & 0xffffffffL)
+
+  @inline private def bytePatternMultiplier(pattern: Long): Int =
+    (pattern >>> 32).toInt
+
+  @inline private def bytePatternAddend(pattern: Long): Int =
+    pattern.toInt
+
+  private def literalNonNegativeInt(expr: Expr): Int = expr match {
+    case n: Val.Num =>
+      val d = n.rawDouble
+      if (d >= 0.0 && d.isWhole && d.isValidInt) d.toInt else -1
+    case _ => -1
+  }
+
+  private def scaleBytePattern(pattern: Long, factor: Int): Long = {
+    if (pattern == NoBytePattern || factor < 0) NoBytePattern
+    else {
+      val multiplier = bytePatternMultiplier(pattern).toLong * factor.toLong
+      val addend = bytePatternAddend(pattern).toLong * factor.toLong
+      if (multiplier <= Int.MaxValue && addend <= Int.MaxValue)
+        encodeBytePattern(multiplier.toInt, addend.toInt)
+      else NoBytePattern
+    }
+  }
+
+  private def addBytePattern(pattern: Long, addend: Int): Long = {
+    if (pattern == NoBytePattern || addend < 0) NoBytePattern
+    else {
+      val newAddend = bytePatternAddend(pattern).toLong + addend.toLong
+      if (newAddend <= Int.MaxValue)
+        encodeBytePattern(bytePatternMultiplier(pattern), newAddend.toInt)
+      else NoBytePattern
+    }
+  }
+
+  private def linearBytePattern(expr: Expr, paramIdx: Int): Long = expr match {
+    case id: Expr.ValidId if id.nameIdx == paramIdx =>
+      encodeBytePattern(1, 0)
+    case Expr.BinaryOp(_, lhs, Expr.BinaryOp.OP_*, rhs) =>
+      val factor = literalNonNegativeInt(rhs)
+      if (factor >= 0) scaleBytePattern(linearBytePattern(lhs, paramIdx), factor)
+      else {
+        val lhsFactor = literalNonNegativeInt(lhs)
+        if (lhsFactor >= 0) scaleBytePattern(linearBytePattern(rhs, paramIdx), lhsFactor)
+        else NoBytePattern
+      }
+    case Expr.BinaryOp(_, lhs, Expr.BinaryOp.OP_+, rhs) =>
+      val rhsAddend = literalNonNegativeInt(rhs)
+      if (rhsAddend >= 0) addBytePattern(linearBytePattern(lhs, paramIdx), rhsAddend)
+      else {
+        val lhsAddend = literalNonNegativeInt(lhs)
+        if (lhsAddend >= 0) addBytePattern(linearBytePattern(rhs, paramIdx), lhsAddend)
+        else NoBytePattern
+      }
+    case _ => NoBytePattern
+  }
+
+  private def linearMod256BytePattern(body: Expr, paramIdx: Int, size: Int): Long = body match {
+    case Expr.BinaryOp(_, lhs, Expr.BinaryOp.OP_%, rhs) if literalNonNegativeInt(rhs) == 256 =>
+      val pattern = linearBytePattern(lhs, paramIdx)
+      if (pattern == NoBytePattern) NoBytePattern
+      else {
+        val multiplier = bytePatternMultiplier(pattern).toLong
+        val addend = bytePatternAddend(pattern).toLong
+        val maxInput = if (size <= 0) addend else multiplier * (size.toLong - 1L) + addend
+        if (maxInput <= MaxExactDoubleInt) pattern else NoBytePattern
+      }
+    case _ => NoBytePattern
+  }
+
   private def removeAtView(arr: Val.Arr, removeIdx: Int): Val.Arr = {
     val len = arr.length
     if (len == 1) Val.Arr(arr.pos, Val.Arr.EMPTY_EVAL_ARRAY)
@@ -938,7 +1013,18 @@ object ArrayModule extends AbstractFunctionModule {
     builtin("makeArray", "sz", "func") { (pos, ev, size: Val, func: Val.Func) =>
       val sz = size.cast[Val.Num].asPositiveInt
       val body = func.bodyExpr
-      if (func.params.names.length == 1 && body != null && body.isInstanceOf[Val.Literal]) {
+      val bytePattern =
+        if (func.params.names.length == 1 && body != null)
+          linearMod256BytePattern(body, func.defSiteValScope.length, sz)
+        else NoBytePattern
+      if (bytePattern != NoBytePattern) {
+        Val.Arr.linearModBytes(
+          pos,
+          sz,
+          bytePatternMultiplier(bytePattern),
+          bytePatternAddend(bytePattern)
+        )
+      } else if (func.params.names.length == 1 && body != null && body.isInstanceOf[Val.Literal]) {
         // Function body is a constant (e.g. `function(_) 'x'`).
         // Keep the eager shared-value array: it is smaller and faster than a lazy view here.
         val a = new Array[Eval](sz)

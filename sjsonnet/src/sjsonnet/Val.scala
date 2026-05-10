@@ -621,6 +621,8 @@ object Val {
       }
     }
 
+    private[sjsonnet] def rawBytes: Array[Byte] = null
+
     /**
      * If both this and other are ConcatViews sharing the same left array, return the shared prefix
      * length. Otherwise return 0. Used by compare/equal to skip identical prefix elements entirely,
@@ -1344,7 +1346,7 @@ object Val {
     @inline private def isMaterialized: Boolean = arr ne null
 
     /** Raw byte backing data for zero-copy extraction (e.g. base64 encode). Always non-null. */
-    def rawBytes: Array[Byte] = byteData
+    override def rawBytes: Array[Byte] = byteData
 
     override def value(i: Int): Val = {
       if (isMaterialized || isConcatView) super.value(i)
@@ -1407,6 +1409,68 @@ object Val {
       val result = new Array[Eval](len)
       copyEvalTo(result, 0)
       arr = result
+    }
+  }
+
+  private final class LinearModByteArr(pos0: Position, size: Int, multiplier: Int, addend: Int)
+      extends Arr(pos0, null) {
+    _length = size
+    private var byteData: Array[Byte] = null
+
+    @inline private def checkIndex(i: Int): Unit =
+      if (i < 0 || i >= _length) throw new ArrayIndexOutOfBoundsException(i)
+
+    @inline private def byteAt(i: Int): Int =
+      ((i.toLong * multiplier.toLong + addend.toLong) & 0xffL).toInt
+
+    override def value(i: Int): Val = {
+      if ((arr ne null) || isConcatView) super.value(i)
+      else {
+        checkIndex(i)
+        Val.cachedNum(pos, byteAt(i).toDouble)
+      }
+    }
+
+    override def eval(i: Int): Eval = {
+      if ((arr ne null) || isConcatView) super.eval(i)
+      else {
+        checkIndex(i)
+        Val.cachedNum(pos, byteAt(i).toDouble)
+      }
+    }
+
+    override def rawBytes: Array[Byte] = {
+      val current = byteData
+      if (current != null) current
+      else {
+        val bytes = new Array[Byte](_length)
+        var i = 0
+        while (i < bytes.length) {
+          bytes(i) = byteAt(i).toByte
+          i += 1
+        }
+        byteData = bytes
+        bytes
+      }
+    }
+
+    override def asLazyArray: Array[Eval] = {
+      if ((arr eq null) && !isConcatView) {
+        val p = pos
+        val result = new Array[Eval](_length)
+        var i = 0
+        while (i < result.length) {
+          result(i) = Val.cachedNum(p, byteAt(i).toDouble)
+          i += 1
+        }
+        arr = result
+      }
+      super.asLazyArray
+    }
+
+    override def reversed(newPos: Position): Arr = {
+      asLazyArray
+      super.reversed(newPos)
     }
   }
 
@@ -1520,6 +1584,9 @@ object Val {
 
     /** Create a byte-backed array from raw bytes (e.g. base64DecodeBytes output). */
     def fromBytes(pos: Position, bytes: Array[Byte]): Arr = new ByteArr(pos, bytes)
+
+    def linearModBytes(pos: Position, size: Int, multiplier: Int, addend: Int): Arr =
+      new LinearModByteArr(pos, size, multiplier, addend)
 
     /**
      * Create a lazy range array representing the integer sequence [from, from+1, ..., from+size-1].

@@ -63,27 +63,31 @@ object EncodingModule extends AbstractFunctionModule {
         case ba: Val.ByteArr =>
           Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(ba.rawBytes))
         case arr: Val.Arr =>
-          val len = arr.length
-          val byteArr = new Array[Byte](len)
-          var i = 0
-          while (i < len) {
-            arr.value(i) match {
-              case v: Val.Num =>
-                val vInt = v.asInt
-                if (vInt < 0 || vInt > 255) {
+          val rawBytes = arr.rawBytes
+          if (rawBytes != null) Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(rawBytes))
+          else {
+            val len = arr.length
+            val byteArr = new Array[Byte](len)
+            var i = 0
+            while (i < len) {
+              arr.value(i) match {
+                case v: Val.Num =>
+                  val vInt = v.asInt
+                  if (vInt < 0 || vInt > 255) {
+                    Error.fail(
+                      f"Found an invalid codepoint value at position $i (must be 0 <= X <= 255), got $vInt"
+                    )
+                  }
+                  byteArr(i) = vInt.toByte
+                case v =>
                   Error.fail(
-                    f"Found an invalid codepoint value at position $i (must be 0 <= X <= 255), got $vInt"
+                    f"Expected an array of numbers, got a ${v.prettyName} at position $i"
                   )
-                }
-                byteArr(i) = vInt.toByte
-              case v =>
-                Error.fail(
-                  f"Expected an array of numbers, got a ${v.prettyName} at position $i"
-                )
+              }
+              i += 1
             }
-            i += 1
+            Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(byteArr))
           }
-          Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(byteArr))
         case x => Error.fail("Cannot base64 encode " + x.prettyName)
       }): Val
     },
