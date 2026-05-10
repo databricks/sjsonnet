@@ -749,6 +749,9 @@ object Format {
         "Too many values to format: %d, expected %d".format(valuesArr.length, i)
       )
     }
+    if (numSpecs == 1 && parsed.staticChars == 0) {
+      return formattedValues(0)
+    }
 
     var totalLen = parsed.staticChars
     idx = 0
