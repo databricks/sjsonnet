@@ -4,6 +4,7 @@ import fastparse.{IndexedParserInput, Parsed, ParserInput}
 
 import java.io.{BufferedInputStream, File, FileInputStream, RandomAccessFile}
 import java.nio.charset.StandardCharsets
+import java.util
 import scala.collection.mutable
 
 /** Resolve and read imported files */
@@ -229,28 +230,41 @@ class CachedResolver(
         val parsed: Either[Error, (Expr, FileScope)] = content.preParsedAst match {
           case Some(pre) => Right(pre)
           case None      =>
-            try {
-              fastparse.parse(
-                content.getParserInput(),
-                parser(path).document(_)
-              ) match {
-                case f @ Parsed.Failure(_, _, _) =>
-                  val traced = f.trace()
-                  val pos = new Position(new FileScope(path), traced.index)
-                  Left(new ParseError(traced.msg).addFrame(pos))
-                case Parsed.Success(r, _) => Right(r)
-              }
-            } catch {
-              case e: ParseError if e.offset >= 0 =>
-                val pos = new Position(new FileScope(path), e.offset)
-                Left(new ParseError(e.getMessage).addFrame(pos))
-              case e: ParseError =>
-                Left(e)
+            CachedResolver.parseJsonImport(
+              path,
+              content,
+              internedStrings,
+              settings
+            ) match {
+              case Some(parsedJson) => Right(parsedJson)
+              case None             => parseJsonnet(path, content)
             }
         }
         parsed.flatMap { case (e, fs) => process(e, fs) }
       }
     )
+  }
+
+  private def parseJsonnet(path: Path, content: ResolvedFile)(implicit
+      ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
+    try {
+      fastparse.parse(
+        content.getParserInput(),
+        parser(path).document(_)
+      ) match {
+        case f @ Parsed.Failure(_, _, _) =>
+          val traced = f.trace()
+          val pos = new Position(new FileScope(path), traced.index)
+          Left(new ParseError(traced.msg).addFrame(pos))
+        case Parsed.Success(r, _) => Right(r)
+      }
+    } catch {
+      case e: ParseError if e.offset >= 0 =>
+        val pos = new Position(new FileScope(path), e.offset)
+        Left(new ParseError(e.getMessage).addFrame(pos))
+      case e: ParseError =>
+        Left(e)
+    }
   }
 
   def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = Right((expr, fs))
@@ -266,5 +280,146 @@ class CachedResolver(
    */
   protected def parser(path: Path): Parser = {
     new Parser(path, internedStrings, internedStaticFieldSets, settings)
+  }
+}
+
+object CachedResolver {
+  private final class DuplicateJsonKey extends RuntimeException(null, null, false, false)
+  private final class InvalidJsonNumber extends RuntimeException(null, null, false, false)
+  private final class JsonParseDepthExceeded extends RuntimeException(null, null, false, false)
+
+  private[sjsonnet] def parseJsonImport(
+      path: Path,
+      content: ResolvedFile,
+      internedStrings: mutable.HashMap[String, String],
+      settings: Settings): Option[(Expr, FileScope)] = {
+    if (!path.last.endsWith(".json")) return None
+    val fileScope = new FileScope(path)
+    try {
+      val visitor =
+        new JsonImportVisitor(fileScope, internedStrings, settings)
+      Some((ujson.StringParser.transform(content.readString(), visitor), fileScope))
+    } catch {
+      case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
+          _: JsonParseDepthExceeded | _: NumberFormatException =>
+        None
+    }
+  }
+
+  private final class JsonImportVisitor(
+      fileScope: FileScope,
+      internedStrings: mutable.HashMap[String, String],
+      settings: Settings)
+      extends ujson.JsVisitor[Val, Val] { self =>
+    private val jsonPos = fileScope.noOffsetPos
+
+    override def visitJsonableObject(length: Int, index: Int): upickle.core.ObjVisitor[Val, Val] =
+      visitObject(length, index)
+
+    def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[Val, Val] = {
+      enterContainer()
+      val startPos = pos(index)
+      new upickle.core.ArrVisitor[Val, Val] {
+        private val values = new mutable.ArrayBuilder.ofRef[Eval]
+        if (length >= 0) values.sizeHint(length)
+        def subVisitor: upickle.core.Visitor[?, ?] = self
+        def visitValue(v: Val, index: Int): Unit = values += v
+        def visitEnd(index: Int): Val = {
+          leaveContainer()
+          Val.Arr(startPos, values.result())
+        }
+      }
+    }
+
+    def visitObject(length: Int, index: Int): upickle.core.ObjVisitor[Val, Val] = {
+      enterContainer()
+      val startPos = pos(index)
+      new upickle.core.ObjVisitor[Val, Val] {
+        private val seen = new util.HashSet[String]()
+        private val keys = new mutable.ArrayBuilder.ofRef[String]
+        private val members = new mutable.ArrayBuilder.ofRef[Val.Obj.Member]
+        if (length >= 0) keys.sizeHint(length)
+        if (length >= 0) members.sizeHint(length)
+        private var key: String = _
+        def subVisitor: upickle.core.Visitor[?, ?] = self
+        def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
+        def visitKeyValue(s: Any): Unit = key = intern(s.toString)
+        def visitValue(v: Val, index: Int): Unit = {
+          if (!seen.add(key)) throw new DuplicateJsonKey
+          keys += key
+          // Imported JSON literals can be shared through ParseCache/Preloader across evaluators.
+          // Keep their inline object members immutable by disabling Val.Obj's lazy field cache.
+          members += new Val.Obj.ConstMember(
+            false,
+            Expr.Member.Visibility.Normal,
+            v,
+            cached2 = false
+          )
+        }
+        def visitEnd(index: Int): Val = {
+          val keyArray = keys.result()
+          val memberArray = members.result()
+          leaveContainer()
+          val obj = new Val.Obj(
+            startPos,
+            null,
+            static = false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            keyArray,
+            memberArray
+          )
+          obj._skipFieldCache = true
+          obj
+        }
+      }
+    }
+
+    def visitNull(index: Int): Val = Val.Null(pos(index))
+    def visitFalse(index: Int): Val = Val.False(pos(index))
+    def visitTrue(index: Int): Val = Val.True(pos(index))
+
+    def visitFloat64StringParts(s: CharSequence, decIndex: Int, expIndex: Int, index: Int): Val =
+      Val.Num(
+        pos(index),
+        parseNumber(s)
+      )
+
+    def visitString(s: CharSequence, index: Int): Val = {
+      val str = s match {
+        case str: String => str
+        case _           => s.toString
+      }
+      val unique = intern(str)
+      Val.Str(pos(index), unique)
+    }
+
+    private def pos(index: Int): Position = jsonPos
+
+    private def intern(s: String): String =
+      if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
+
+    private def parseNumber(s: CharSequence): Double = {
+      val value = s.toString.toDouble
+      if (!java.lang.Double.isFinite(value)) throw new InvalidJsonNumber
+      value
+    }
+
+    private var containerDepth = 0
+
+    private def enterContainer(): Unit = {
+      containerDepth += 1
+      if (containerDepth > settings.maxParserRecursionDepth) {
+        throw new JsonParseDepthExceeded
+      }
+    }
+
+    private def leaveContainer(): Unit =
+      containerDepth -= 1
   }
 }
