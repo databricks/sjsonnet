@@ -311,6 +311,7 @@ object CachedResolver {
       internedStrings: mutable.HashMap[String, String],
       settings: Settings)
       extends ujson.JsVisitor[Val, Val] { self =>
+    private val jsonPos = fileScope.noOffsetPos
 
     override def visitJsonableObject(length: Int, index: Int): upickle.core.ObjVisitor[Val, Val] =
       visitObject(length, index)
@@ -398,8 +399,7 @@ object CachedResolver {
       Val.Str(pos(index), unique)
     }
 
-    private def pos(index: Int): Position =
-      if (index >= 0) new Position(fileScope, index) else fileScope.noOffsetPos
+    private def pos(index: Int): Position = jsonPos
 
     private def intern(s: String): String =
       if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
