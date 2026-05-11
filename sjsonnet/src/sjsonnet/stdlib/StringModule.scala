@@ -497,8 +497,8 @@ object StringModule extends AbstractFunctionModule {
    */
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsStr = chars.value.asString
       val strValue = str.value.asString
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
         StripUtils.strip(strValue, charsStr, left = true, right = true)
@@ -515,8 +515,8 @@ object StringModule extends AbstractFunctionModule {
    */
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsStr = chars.value.asString
       val strValue = str.value.asString
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
         StripUtils.strip(strValue, charsStr, left = true, right = false)
@@ -533,8 +533,8 @@ object StringModule extends AbstractFunctionModule {
    */
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      val charsStr = chars.value.asString
       val strValue = str.value.asString
+      val charsStr = chars.value.asString
       Val.Str(
         pos,
         StripUtils.strip(strValue, charsStr, left = false, right = true)
