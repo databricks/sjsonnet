@@ -222,3 +222,25 @@ Rejected variants in this step:
 | kube-prometheus Native A/B hyperfine | Same-run A/B with frozen clean `de5cd388` binary: clean `139.937 +/- 2.294 ms`; candidate `136.301 +/- 1.957 ms`; delta `-2.60%`. Source-built jrsonnet in the same run: `88.087 +/- 1.737 ms`, so the remaining same-run gap is `1.55x`. |
 | Focused JMH guards | `bench/resources/go_suite/manifestJsonEx.jsonnet`: `0.053 ms/op`; `bench/resources/cpp_suite/realistic2.jsonnet`: `40.250 ms/op`; `bench/resources/cpp_suite/large_string_template.jsonnet`: `1.102 ms/op`; `bench/resources/cpp_suite/gen_big_object.jsonnet`: `0.826 ms/op`. |
 | Review | Independent `gpt-5.4`, `claude-opus-4.7`, and `claude-sonnet-4.6` reviews first identified and then confirmed fixes for shared-literal cache races and the single-field `getValue0` mutation path; final review reported no significant issues. |
+
+---
+
+## Latest: JSON Position Reuse (2026-05-11)
+
+**Kube-prometheus Scala Native** (after inline JSON objects + JSON position reuse):
+- sjsonnet stack: `136.1 ± 1.6 ms` (two-run average, same-run latest `135.9 ± 1.2 ms`)
+- Source-built jrsonnet: `88.087 ± 1.737 ms`
+- Gap: `1.54x` (down from `1.55x` after inline JSON objects; delta `-0.6%`)
+- **Cumulative improvement from baseline** (after all kube-focused optimizations):
+  - Visitor reuse (-4.66%): `235.97 → 224.97 ms`
+  - Fast-path imports (-40.99%): `224.97 → 139.24 ms`
+  - Trim visitor work (-1.72%): `139.24 → 136.88 ms`
+  - Inline JSON objects (-2.60%): `136.88 → 133.40 ms` (local A/B)
+  - JSON position reuse (-0.58%): `136.7 → 135.9 ms`
+  - **Total reduction**: ~42% from starting point of `~235 ms` to current `~136 ms`.
+
+**Analysis**:
+- Materialize still dominates (155ms of 180ms total, per prior debug stats).
+- Next targets should focus on Materializer/ByteRenderer efficiency (string escaping, container iteration, direct-to-output paths).
+- Large string template remains second priority (1.86x gap).
+
