@@ -90,3 +90,33 @@ only ideas that pass current semantic and benchmark gates.
 | `.json` import fast path | Added shared sync/Preloader strict-JSON parse path with duplicate-key, malformed JSON, non-finite number, large-integer, and parser-depth regression coverage. Validation: `__.reformat`, `sjsonnet.jvm[3.3.7].test` (502/502), full `__.test` (2066/2066), Native link, kube-prometheus output equality, focused JMH guards, and three independent reviews. Kube-prometheus Native stack improved to `139.242 +/- 1.204 ms`; source-built jrsonnet in the same run was `88.025 +/- 1.271 ms`, leaving a `1.58x` gap. |
 | `.json` import visitor micro-optimization | Validation: `__.reformat`, `sjsonnet.jvm[3.3.7].test` (502/502), full `__.test` (2066/2066), Native link, kube-prometheus output equality, focused JMH guards, and three independent reviews. Same-run Native A/B against frozen clean `e4fed2e4`: clean `141.526 +/- 1.896 ms`; candidate `139.088 +/- 1.305 ms`; source-built jrsonnet `87.421 +/- 0.932 ms`, leaving a `1.59x` same-run gap. |
 | `.json` import inline object layout | Validation: `__.reformat`, focused JVM JSON/concurrency tests, `sjsonnet.jvm[3.3.7].test` (503/503), full `__.test` (2066/2066), Native link, kube-prometheus output equality, focused JMH guards, and three final reviews. Same-run Native A/B against frozen clean `de5cd388`: clean `139.937 +/- 2.294 ms`; candidate `136.301 +/- 1.957 ms`; source-built jrsonnet `88.087 +/- 1.737 ms`, leaving a `1.55x` same-run gap. |
+
+---
+
+## 2026-05-11: JSON Position Reuse Optimization (Commit 24762a56)
+
+**Status**: ✅ Accepted & Pushed
+
+**Idea**: Strict `.json` imports (syntactically correct JSON, no code execution) create a Position object for each JSON scalar/container during traversal. Since JSON is static, all positions can safely reuse `fileScope.noOffsetPos` (a singleton sentinel used for input-less imports).
+
+**Implementation**: 
+- Modified `JsonImportVisitor.pos()` to return cached `jsonPos = fileScope.noOffsetPos` instead of allocating `new Position(fileScope, index)` per element.
+- 2-line change in `Importer.scala`.
+
+**Reasoning**: 
+- Position objects are only used for error reporting (stack frames).
+- Strict JSON never executes code, so no Position construction is needed during evaluation.
+- Position is immutable; sharing the singleton is safe.
+- Imported JSON trees are shared via ParseCache; concurrency-safe (JSON reads are cached).
+
+**Results**:
+- Kube-prometheus Native: `136.7 ± 1.5 ms` → `135.9 ± 1.2 ms` (-0.58%, repeat `137.5 → 136.1`).
+- Gap: `1.55x` → `1.54x` (vs jrsonnet 88.087 ms).
+- No regression: all JMH guards stable (manifestJsonEx 0.053, realistic2 39.485, large_string_template 1.102, gen_big_object 0.801).
+
+**Validation**: 
+- Formatting ✓, focused tests 8/8 ✓, JVM tests 503/503 ✓, full cross-platform 2066/2066 ✓, Native link ✓.
+- Output equality with source-built jrsonnet verified.
+
+**Next**: Remaining `1.54x` gap is still Materializer-dominated (155ms of 180ms total per prior debug stats). Profile ByteRenderer/escaping hot paths for next candidate.
+
