@@ -413,11 +413,17 @@ class Parser(
           else if (pos + indentLen <= dataLen && data.regionMatches(pos, indent, 0, indentLen)) {
             val afterIndent = pos + indentLen
             // Find line end (next separator char)
-            var lineEnd = afterIndent
-            while (lineEnd < dataLen && sep.indexOf(data.charAt(lineEnd)) < 0) lineEnd += 1
+            val lineEnd =
+              if (sepLen == 1) data.indexOf(sep.charAt(0), afterIndent)
+              else {
+                var i = afterIndent
+                while (i < dataLen && sep.indexOf(data.charAt(i)) < 0) i += 1
+                i
+              }
             // Verify full separator at lineEnd
             if (
-              lineEnd + sepLen <= dataLen && data.charAt(lineEnd) == sep.charAt(0) &&
+              lineEnd >= 0 && lineEnd + sepLen <= dataLen &&
+              data.charAt(lineEnd) == sep.charAt(0) &&
               (sepLen == 1 || data.charAt(lineEnd + 1) == sep.charAt(1))
             ) {
               // Zero-copy bulk append: extra whitespace + content + separator (skipping indent)
