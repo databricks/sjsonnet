@@ -198,17 +198,21 @@ final case class StaticBinaryResolvedFile(content: Array[Byte]) extends Resolved
 }
 
 class CachedImporter(parent: Importer) extends Importer {
-  val cache: mutable.HashMap[Path, ResolvedFile] = mutable.HashMap.empty[Path, ResolvedFile]
+  val cache: mutable.HashMap[(Path, Boolean), ResolvedFile] =
+    mutable.HashMap.empty[(Path, Boolean), ResolvedFile]
 
   def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
 
-  def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = cache.get(path) match {
-    case s @ Some(x) =>
-      if (x == null) None else s
-    case None =>
-      val x = parent.read(path, binaryData)
-      cache.put(path, x.orNull)
-      x
+  def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
+    val key = (path, binaryData)
+    cache.get(key) match {
+      case s @ Some(x) =>
+        if (x == null) None else s
+      case None =>
+        val x = parent.read(path, binaryData)
+        cache.put(key, x.orNull)
+        x
+    }
   }
 }
 

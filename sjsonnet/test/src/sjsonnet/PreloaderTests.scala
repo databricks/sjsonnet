@@ -125,14 +125,14 @@ object PreloaderTests extends TestSuite {
           parseCount(path) = parseCount(path) + 1
           fastparse.IndexedParserInput(content)
         }
-        def readString(): String           = content
-        def contentHash(): String          = content
-        def readRawBytes(): Array[Byte]    =
+        def readString(): String = content
+        def contentHash(): String = content
+        def readRawBytes(): Array[Byte] =
           content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
       }
       val files = Map(
         "lib.libsonnet" -> "{ x: 1 }",
-        "entry"         -> "(import 'lib.libsonnet').x"
+        "entry" -> "(import 'lib.libsonnet').x"
       )
       val importer = new Importer {
         def resolve(docBase: Path, importName: String): Option[Path] =
@@ -173,8 +173,8 @@ object PreloaderTests extends TestSuite {
       class JsonOnlyResolvedFile(content: String) extends ResolvedFile {
         def getParserInput(): fastparse.ParserInput =
           throw new RuntimeException("strict JSON should not be parsed with fastparse")
-        def readString(): String        = content
-        def contentHash(): String       = content
+        def readString(): String = content
+        def contentHash(): String = content
         def readRawBytes(): Array[Byte] =
           content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
       }
@@ -205,7 +205,8 @@ object PreloaderTests extends TestSuite {
       // Resolver records what docBase it was called with, and only resolves names against the
       // expected `dir/` parent — proving the preloader passes parent(), not the file path itself.
       val seenDocBases = mutable.ArrayBuffer.empty[String]
-      val files = Map("dir/a.libsonnet" -> "import 'b.libsonnet'", "dir/b.libsonnet" -> "{ ok: true }")
+      val files =
+        Map("dir/a.libsonnet" -> "import 'b.libsonnet'", "dir/b.libsonnet" -> "{ ok: true }")
       val importer = new Importer {
         def resolve(docBase: Path, importName: String): Option[Path] = {
           seenDocBases += docBase.asInstanceOf[DummyPath].segments.mkString("/")
@@ -271,6 +272,31 @@ object PreloaderTests extends TestSuite {
       val sameBin = preloader.importer.read(DummyPath("same"), binaryData = true)
       assert(sameTxt.exists(_.readString() == "the-text"))
       assert(sameBin.exists(_.readRawBytes().sameElements(Array[Byte](1, 2, 3))))
+    }
+
+    test("interpreter keeps preloaded importstr and importbin for the same path separate") {
+      val fs = new FakeFs(
+        Map("same" -> "the-text"),
+        binFiles = Map("same" -> Array[Byte](1, 2, 3))
+      )
+      val entryPath = DummyPath("entry")
+      val forward = "[importstr 'same', importbin 'same']"
+      val preloader = runPreload(fs, entryPath, forward)
+      val interp = new Interpreter(
+        Map.empty[String, String],
+        Map.empty[String, String],
+        DummyPath(),
+        preloader.importer,
+        parseCache = new DefaultParseCache
+      )
+
+      assert(
+        interp.interpret(forward, entryPath) == Right(ujson.Arr("the-text", ujson.Arr(1, 2, 3)))
+      )
+      assert(
+        interp.interpret("[importbin 'same', importstr 'same']", entryPath) ==
+        Right(ujson.Arr(ujson.Arr(1, 2, 3), "the-text"))
+      )
     }
 
     test("parse error in entry is reported") {

@@ -219,7 +219,7 @@ class Interpreter(
 
   private def evaluateImpl(txt: String, path: Path): Either[Error, Val] = {
     val resolvedImport = StaticResolvedFile(txt)
-    resolver.cache(path) = resolvedImport
+    resolver.cache((path, false)) = resolvedImport
     resolver.parse(path, resolvedImport)(evaluator) flatMap { case (expr, _) =>
       lastTopLevelPos = expr.pos
       handleException {
