@@ -23,6 +23,11 @@ object CharSWAR {
   private final val CTRL = 0xe0e0e0e0e0e0e0e0L
   private final val LITTLE_ENDIAN =
     java.nio.ByteOrder.nativeOrder() == java.nio.ByteOrder.LITTLE_ENDIAN
+  private final val U16_HOLE = 0x7fff7fff7fff7fffL
+  private final val U16_QUOTE = 0x0022002200220022L
+  private final val U16_BSLAS = 0x005c005c005c005cL
+  private final val U16_CTRL = 0xffe0ffe0ffe0ffe0L
+  private final val U16_ASCII = 0xff80ff80ff80ff80L
 
   /**
    * SWAR: returns a mask for byte lanes in `word` containing '"' (0x22), '\\' (0x5C), or a control
@@ -66,6 +71,29 @@ object CharSWAR {
       i += 1
     }
     false
+  }
+
+  def isAsciiJsonSafe(s: String): Boolean = {
+    val len = s.length
+    if (len < 8) return isAsciiJsonSafeScalar(s, len)
+
+    var i = 0
+    val limit = len - 3
+    while (i < limit) {
+      val word =
+        (s.charAt(i).toLong) |
+        (s.charAt(i + 1).toLong << 16) |
+        (s.charAt(i + 2).toLong << 32) |
+        (s.charAt(i + 3).toLong << 48)
+      if (swarHasUnsafeAsciiChar(word)) return false
+      i += 4
+    }
+    while (i < len) {
+      val c = s.charAt(i)
+      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
+      i += 1
+    }
+    true
   }
 
   /**
@@ -125,6 +153,27 @@ object CharSWAR {
       i += 1
     }
     false
+  }
+
+  @inline private def swarHasUnsafeAsciiChar(word: Long): Boolean = {
+    if ((word & U16_ASCII) != 0L) return true
+    val qz = zero16(word ^ U16_QUOTE)
+    val bz = zero16(word ^ U16_BSLAS)
+    val cz = zero16(word & U16_CTRL)
+    (qz | bz | cz) != 0L
+  }
+
+  @inline private def zero16(word: Long): Long =
+    ~((word & U16_HOLE) + U16_HOLE | word | U16_HOLE)
+
+  @inline private def isAsciiJsonSafeScalar(s: String, len: Int): Boolean = {
+    var i = 0
+    while (i < len) {
+      val c = s.charAt(i)
+      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
+      i += 1
+    }
+    true
   }
 
   @inline private def hasEscapeCharScalarBytes(arr: Array[Byte], from: Int, to: Int): Boolean = {

@@ -269,11 +269,11 @@ object ObjectModule extends AbstractFunctionModule {
 
   private final class ObjectValuesArr(
       pos0: Position,
-      private[this] val source: Val.Obj,
-      private[this] val keys: Array[String],
-      private[this] val ev: EvalScope)
+      private val source: Val.Obj,
+      private val keys: Array[String],
+      private val ev: EvalScope)
       extends Val.LazyIndexedArr(pos0, keys.length) {
-    private[this] val fieldPos = pos0.noOffset
+    private val fieldPos = pos0.noOffset
 
     protected def computeValue(i: Int): Val =
       source.value(keys(i), fieldPos)(ev)
@@ -283,11 +283,11 @@ object ObjectModule extends AbstractFunctionModule {
 
   private final class ObjectKeysValuesArr(
       pos0: Position,
-      private[this] val source: Val.Obj,
-      private[this] val keys: Array[String],
-      private[this] val ev: EvalScope)
+      private val source: Val.Obj,
+      private val keys: Array[String],
+      private val ev: EvalScope)
       extends Val.LazyIndexedArr(pos0, keys.length) {
-    private[this] val fieldPos = pos0.fileScope.noOffsetPos
+    private val fieldPos = pos0.fileScope.noOffsetPos
 
     protected def computeValue(i: Int): Val = {
       val k = keys(i)
@@ -305,10 +305,10 @@ object ObjectModule extends AbstractFunctionModule {
   }
 
   private final class ObjectKeyValueMember(
-      private[this] val source: Val.Obj,
-      private[this] val key: String,
-      private[this] val pos: Position,
-      private[this] val ev: EvalScope)
+      private val source: Val.Obj,
+      private val key: String,
+      private val pos: Position,
+      private val ev: EvalScope)
       extends Val.Obj.Member(
         false,
         Visibility.Normal,

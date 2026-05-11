@@ -992,7 +992,9 @@ object ArrayModule extends AbstractFunctionModule {
       }
       val res: Val = what match {
         case Val.Str(_, str) =>
-          Val.Str(pos, Platform.repeatString(str, count))
+          val repeated = Platform.repeatString(str, count)
+          if (Platform.isAsciiJsonSafe(str)) Val.Str.asciiSafe(pos, repeated)
+          else Val.Str(pos, repeated)
         case a: Val.Arr =>
           if (a.length.toLong * count.toLong > Int.MaxValue)
             Error.fail("array too large", pos)(ev)
@@ -1026,10 +1028,7 @@ object ArrayModule extends AbstractFunctionModule {
         )
       } else if (func.params.names.length == 1 && body != null && body.isInstanceOf[Val.Literal]) {
         // Function body is a constant (e.g. `function(_) 'x'`).
-        // Keep the eager shared-value array: it is smaller and faster than a lazy view here.
-        val a = new Array[Eval](sz)
-        java.util.Arrays.fill(a.asInstanceOf[Array[AnyRef]], body.asInstanceOf[Val])
-        Val.Arr(pos, a)
+        Val.Arr.constant(pos, sz, body.asInstanceOf[Val])
       } else {
         Val.Arr.makeArray(pos, sz, func, pos, pos.noOffset, ev)
       }
