@@ -13,6 +13,7 @@ object UnicodeHandlingTests extends TestSuite {
     test("stringLength") {
       eval("std.length('🌍')") ==> ujson.Num(1)
       eval("std.length('Hello 🌍')") ==> ujson.Num(7)
+      eval("std.length('ASCII only')") ==> ujson.Num(10)
       // Jsonnet strings are defined over codepoints, not grapheme clusters, so the
       // following "family" emoji has a length of 7 (because it has 7 codepoints):
       eval("std.length('👨‍👩‍👧‍👦')") ==> ujson.Num(7)
@@ -53,8 +54,17 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.substr('A🌍B', 0, 1)") ==> ujson.Str("A")
       eval("std.substr('A🌍B', 1, 1)") ==> ujson.Str("🌍")
       eval("std.substr('A🌍B', 2, 1)") ==> ujson.Str("B")
+      eval("std.substr('ASCII only', 6, 4)") ==> ujson.Str("only")
       eval("std.substr('Hello 🌍 World', 6, 100)") ==> ujson.Str("🌍 World")
       eval("std.substr('🌍', 1, 5)") ==> ujson.Str("") // Beyond string length
+    }
+
+    test("longAsciiLengthAndSubstr") {
+      val longAscii = "a" * 1030
+      eval(s"std.length('$longAscii')") ==> ujson.Num(1030)
+      eval(s"std.substr('$longAscii', 1028, 20)") ==> ujson.Str("aa")
+      eval(s"std.substr('$longAscii', 1031, 20)") ==> ujson.Str("")
+      eval(s"std.substr('$longAscii' + '$longAscii', 2058, 10)") ==> ujson.Str("aa")
     }
 
     test("stringSlice") {
