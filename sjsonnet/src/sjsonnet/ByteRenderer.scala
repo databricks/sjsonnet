@@ -221,14 +221,14 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
         if (matDepth < ctx.recursiveDepthLimit)
           materializeDirectArr(xs, matDepth + 1, ctx)
         else
-          // Fall back to generic visitor path for extremely deep nesting
-          Materializer.apply0(v, this)(evaluator)
+          // Fall back to the generic stackless path while preserving cycle context.
+          Materializer.materializeStackless(v, this, ctx)(evaluator)
       case 6 => // TAG_OBJ
         val obj = v.asInstanceOf[Val.Obj]
         if (matDepth < ctx.recursiveDepthLimit)
           materializeDirectObj(obj, matDepth + 1, ctx)
         else
-          Materializer.apply0(v, this)(evaluator)
+          Materializer.materializeStackless(v, this, ctx)(evaluator)
       case 7 => // TAG_FUNC
         val s = v.asInstanceOf[Val.Func]
         Error.fail(

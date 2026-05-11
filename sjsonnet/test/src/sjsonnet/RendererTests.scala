@@ -1,8 +1,20 @@
 package sjsonnet
 
+import java.io.ByteArrayOutputStream
+
 import utest._
 
 object RendererTests extends TestSuite {
+  private def lowRecursiveMaterializeInterpreter(): Interpreter =
+    new Interpreter(
+      Map.empty[String, String],
+      Map.empty[String, String],
+      DummyPath(),
+      Importer.empty,
+      parseCache = new DefaultParseCache,
+      settings = Settings.default.copy(materializeRecursiveDepthLimit = 1)
+    )
+
   def tests: Tests = Tests {
     test("hello") {
       ujson.transform(ujson.Arr(ujson.Num(1), ujson.Num(2)), new Renderer()).toString ==>
@@ -50,7 +62,7 @@ object RendererTests extends TestSuite {
       ujson.transform(ujson.Num(1e15), new Renderer()).toString ==> "1000000000000000"
       ujson.transform(ujson.Num(9999999999.0), new Renderer()).toString ==> "9999999999"
       ujson.transform(ujson.Num(Long.MaxValue.toDouble), new Renderer()).toString ==>
-        Long.MaxValue.toDouble.toLong.toString
+      Long.MaxValue.toDouble.toLong.toString
     }
 
     test("indentZero") {
@@ -60,6 +72,33 @@ object RendererTests extends TestSuite {
           |1,
           |2
           |]""".stripMargin
+    }
+
+    test("manifestJsonDirectFallbackKeepsCycleContext") {
+      val result = lowRecursiveMaterializeInterpreter()
+        .interpret("std.manifestJson({ x: self })", DummyPath("(memory)"))
+      assert(
+        result.left.exists(
+          _.contains("Stackoverflow while materializing, possibly due to recursive value")
+        )
+      )
+    }
+
+    test("byteRendererDirectFallbackKeepsCycleContext") {
+      val interp = lowRecursiveMaterializeInterpreter()
+      val value = interp.evaluate("{ x: self }", DummyPath("(memory)")) match {
+        case Right(v)  => v
+        case Left(err) => throw err
+      }
+      val out = new ByteArrayOutputStream()
+      val result = interp.materialize(value, new ByteRenderer(out, indent = -1))
+      assert(
+        result.left.exists(
+          _.getMessage.contains(
+            "Stackoverflow while materializing, possibly due to recursive value"
+          )
+        )
+      )
     }
 
   }
