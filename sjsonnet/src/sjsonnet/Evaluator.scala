@@ -100,7 +100,15 @@ class Evaluator(
       case ExprTags.Lookup        => visitLookup(e.asInstanceOf[Lookup])
       case ExprTags.Function      =>
         val f = e.asInstanceOf[Function]
-        visitMethod(f.body, f.params, f.pos)
+        val func = visitMethod(f.body, f.params, f.pos)
+        // Forward StaticOptimizer-computed identity tags so apply1 can elide identity calls.
+        // Skip the writes when the optimizer didn't classify this Function (the common case),
+        // keeping zero overhead for non-identity lambdas.
+        if (f.staticIdentityShape != 0) {
+          func.staticIdentityShape = f.staticIdentityShape
+          func.staticIdentityCapturedIdx = f.staticIdentityCapturedIdx
+        }
+        func
       case ExprTags.LocalExpr            => visitLocalExpr(e.asInstanceOf[LocalExpr])
       case ExprTags.Apply                => visitApply(e.asInstanceOf[Apply])
       case ExprTags.Apply3               => visitApply3(e.asInstanceOf[Apply3])

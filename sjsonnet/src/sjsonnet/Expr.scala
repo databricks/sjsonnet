@@ -387,6 +387,15 @@ object Expr {
   }
   final case class Function(var pos: Position, params: Params, body: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.Function
+
+    // Set by StaticOptimizer; remains 0 unless the body is statically recognized.
+    //   1 = direct identity: body == ValidId(uniqueParam)
+    //   2 = self-composition: body == g(g(...g(x))) for the unique parameter `x` and a single
+    //       captured `g` (any depth >= 1). Effective identity is decided at runtime by checking
+    //       whether `g` is itself effectively identity.
+    var staticIdentityShape: Byte = 0
+    // When `staticIdentityShape == 2`, the absolute scope index of the captured `g`.
+    var staticIdentityCapturedIdx: Int = -1
   }
   final case class IfElse(var pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.IfElse
