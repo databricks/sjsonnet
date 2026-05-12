@@ -1,5 +1,6 @@
 package sjsonnet
 
+import java.io.ByteArrayOutputStream
 import utest._
 
 object RendererTests extends TestSuite {
@@ -63,6 +64,13 @@ object RendererTests extends TestSuite {
       ujson.transform(ujson.Num(42), new Renderer()).toString ==> "42"
       ujson.transform(ujson.Num(-1), new Renderer()).toString ==> "-1"
       ujson.transform(ujson.Num(1e15), new Renderer()).toString ==> "1000000000000000"
+    }
+
+    test("byteRendererLongEscapedString") {
+      val s = ("abc\n\"\\\t\u0001" * 40) + "tail"
+      val out = new ByteArrayOutputStream
+      ujson.transform(ujson.Str(s), new ByteRenderer(out))
+      out.toString("UTF-8") ==> ujson.transform(ujson.Str(s), new Renderer()).toString
     }
 
     test("indentZero") {

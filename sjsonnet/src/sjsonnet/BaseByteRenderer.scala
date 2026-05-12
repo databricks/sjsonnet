@@ -319,9 +319,8 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       arr(pos + 1 + bLen) = '"'.toByte
       elemBuilder.length = pos + bLen + 2
     } else {
-      val escapedLen = escapedStringLength(bytes, bLen, firstEscape)
-      elemBuilder.ensureLength(escapedLen)
-      val arr = elemBuilder.arr
+      elemBuilder.ensureLength(bLen + 2 + (bLen >>> 5))
+      var arr = elemBuilder.arr
       var outPos = elemBuilder.length
       arr(outPos) = '"'.toByte
       outPos += 1
@@ -330,40 +329,38 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       while (escPos >= 0) {
         if (escPos > from) {
           val chunkLen = escPos - from
+          elemBuilder.length = outPos
+          elemBuilder.ensureLength(chunkLen + 6)
+          arr = elemBuilder.arr
+          outPos = elemBuilder.length
           System.arraycopy(bytes, from, arr, outPos, chunkLen)
           outPos += chunkLen
         }
+        elemBuilder.length = outPos
+        elemBuilder.ensureLength(6)
+        arr = elemBuilder.arr
+        outPos = elemBuilder.length
         outPos = escapeByteInline(bytes(escPos) & 0xff, arr, outPos)
         from = escPos + 1
         escPos = if (from < bLen) CharSWAR.findFirstEscapeChar(bytes, from, bLen) else -1
       }
       if (from < bLen) {
         val tailLen = bLen - from
+        elemBuilder.length = outPos
+        elemBuilder.ensureLength(tailLen + 1)
+        arr = elemBuilder.arr
+        outPos = elemBuilder.length
         System.arraycopy(bytes, from, arr, outPos, tailLen)
         outPos += tailLen
       }
+      elemBuilder.length = outPos
+      elemBuilder.ensureLength(1)
+      arr = elemBuilder.arr
+      outPos = elemBuilder.length
       arr(outPos) = '"'.toByte
       elemBuilder.length = outPos + 1
     }
   }
-
-  private def escapedStringLength(bytes: Array[Byte], bLen: Int, firstEscape: Int): Int = {
-    var len = bLen + 2
-    var from = firstEscape
-    var escPos = firstEscape
-    while (escPos >= 0) {
-      len += escapeExtraLength(bytes(escPos) & 0xff)
-      from = escPos + 1
-      escPos = if (from < bLen) CharSWAR.findFirstEscapeChar(bytes, from, bLen) else -1
-    }
-    len
-  }
-
-  @inline private def escapeExtraLength(b: Int): Int =
-    (b: @scala.annotation.switch) match {
-      case '"' | '\\' | '\b' | '\f' | '\n' | '\r' | '\t' => 1
-      case _                                             => 5
-    }
 
   /** Inline JSON escape for one byte that is known to require escaping. */
   @inline private def escapeByteInline(b: Int, arr: Array[Byte], outPos0: Int): Int = {
