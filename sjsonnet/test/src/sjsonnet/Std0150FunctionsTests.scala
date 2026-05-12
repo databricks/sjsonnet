@@ -78,6 +78,20 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.splitLimitR("a,b,c", ",", 1.5)""") ==> ujson.Arr("a,b", "c")
     }
 
+    test("splitLimitR edge cases") {
+      val bulb = new String(Character.toChars(0x1f4a1))
+      eval("""std.splitLimitR("a" + std.char(128161) + "b" + std.char(128161) + "c", std.char(128161), 1)""") ==>
+      ujson.Arr("a" + bulb + "b", "c")
+      eval("""std.splitLimitR("abc", ",", 3)""") ==> ujson.Arr("abc")
+      eval("""std.splitLimitR("a,b,", ",", 1)""") ==> ujson.Arr("a,b", "")
+      eval("""std.splitLimitR("::a::", "::", 1)""") ==> ujson.Arr("::a", "")
+      eval("""std.splitLimitR("aaaa", "aa", 1)""") ==> ujson.Arr("aa", "")
+      eval("""std.splitLimitR("aaa", "aa", -1)""") ==> ujson.Arr("", "a")
+      eval("""std.splitLimitR("aaa", "aa", -2)""") ==> ujson.Arr("a", "")
+      eval("""std.splitLimit("a::b::c", "::", 1)""") ==> ujson.Arr("a", "b::c")
+      eval("""std.splitLimitR("a::b::c", "::", 1)""") ==> ujson.Arr("a::b", "c")
+    }
+
     test("manifestJsonMinified") {
       eval(
         """std.manifestJsonMinified( { x: [1, 2, 3, true, false, null, "string\nstring", []], y: { a: 1, b: 2, c: [1, 2], d: {} }, })"""
