@@ -1,5 +1,6 @@
 package sjsonnet
 
+import java.io.ByteArrayOutputStream
 import utest._
 
 object RendererTests extends TestSuite {
@@ -63,6 +64,36 @@ object RendererTests extends TestSuite {
       ujson.transform(ujson.Num(42), new Renderer()).toString ==> "42"
       ujson.transform(ujson.Num(-1), new Renderer()).toString ==> "-1"
       ujson.transform(ujson.Num(1e15), new Renderer()).toString ==> "1000000000000000"
+    }
+
+    test("byteRendererFallbackPreservesCycleContext") {
+      val interpreter = new Interpreter(
+        Map(),
+        Map(),
+        DummyPath(),
+        Importer.empty,
+        parseCache = new DefaultParseCache,
+        settings = Settings.default.copy(materializeRecursiveDepthLimit = 2, maxMaterializeDepth = 2)
+      )
+      val value = interpreter.evaluate(
+        """local o = {
+          |  a: std.repeat("x", 10000),
+          |  z: { b: o },
+          |};
+          |{ root: o }""".stripMargin,
+        DummyPath("(memory)")
+      ) match {
+        case Right(v)  => v
+        case Left(err) => throw new Exception(Error.formatError(err))
+      }
+      val out = new ByteArrayOutputStream
+      val e = interpreter.materialize(value, new ByteRenderer(out)) match {
+        case Left(err) => Error.formatError(err)
+        case Right(_)  => throw new Exception("Expected recursive value materialization error")
+      }
+      assert(e.contains("Stackoverflow while materializing, possibly due to recursive value"))
+      // Losing the outer materialization context re-renders `o.a` before detecting the cycle.
+      assert(out.size() < 15000)
     }
 
     test("indentZero") {
