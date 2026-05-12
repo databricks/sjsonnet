@@ -80,6 +80,8 @@ object StdLibModule {
       )
       rest.value
     }
+
+    override def staticSafe = false
   }
 
   /**

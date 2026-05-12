@@ -4,6 +4,23 @@ import utest._
 import TestUtils.{eval, evalErr}
 
 object EvaluatorTests extends TestSuite {
+  private def evalWithTraces(s: String): (ujson.Value, Vector[String]) = {
+    var traces = Vector.empty[String]
+    val interpreter = new Interpreter(
+      Map(),
+      Map(),
+      DummyPath(),
+      Importer.empty,
+      parseCache = new DefaultParseCache,
+      logger = (isTrace, msg) => if (isTrace) traces :+= msg
+    )
+    val result = interpreter.interpret(s, DummyPath("(memory)")) match {
+      case Right(value) => value
+      case Left(err)    => throw new Exception(err)
+    }
+    (result, traces)
+  }
+
   def tests: Tests = Tests {
     test("arithmetic") {
       eval("1 + 2 + 3") ==> ujson.Num(6)
@@ -568,6 +585,23 @@ object EvaluatorTests extends TestSuite {
       )
       eval("\"%()s %()s!\" % [\"Hello\", \"World\"]") ==> ujson
         .Str("Hello World!")
+    }
+    test("trace laziness") {
+      val (unusedObj, unusedObjTraces) = evalWithTraces(
+        """local x = {a: std.trace("unused object", "ok")}; 0"""
+      )
+      unusedObj ==> ujson.Num(0)
+      unusedObjTraces ==> Vector.empty
+
+      val (unusedFormat, unusedFormatTraces) = evalWithTraces(
+        """local x = "%% %(a)s %%" % {a: std.trace("unused format", "ok")}; 0"""
+      )
+      unusedFormat ==> ujson.Num(0)
+      unusedFormatTraces ==> Vector.empty
+
+      val (used, usedTraces) = evalWithTraces("""std.trace("used trace", 1)""")
+      used ==> ujson.Num(1)
+      usedTraces ==> Vector("TRACE: (memory) used trace")
     }
     test("binaryOps") {
       val ex = assertThrows[Exception](
