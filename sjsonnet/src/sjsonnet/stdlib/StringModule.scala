@@ -606,6 +606,106 @@ object StringModule extends AbstractFunctionModule {
     b.result()
   }
 
+  private final val SplitLimitRPreallocMaxSplits = 4096
+
+  @inline private def lastSplitIndex(str: String, cStr: String, cLen: Int, from: Int): Int = {
+    var i = if (from < str.length - cLen) from else str.length - cLen
+    if (cLen == 1) {
+      val ch = cStr.charAt(0)
+      while (i >= 0) {
+        if (str.charAt(i) == ch) return i
+        i -= 1
+      }
+    } else if (cLen == 2) {
+      val ch0 = cStr.charAt(0)
+      val ch1 = cStr.charAt(1)
+      while (i >= 0) {
+        if (str.charAt(i) == ch0 && str.charAt(i + 1) == ch1) return i
+        i -= 1
+      }
+    } else {
+      val ch0 = cStr.charAt(0)
+      while (i >= 0) {
+        if (str.charAt(i) == ch0) {
+          var j = 1
+          while (j < cLen && str.charAt(i + j) == cStr.charAt(j)) j += 1
+          if (j == cLen) return i
+        }
+        i -= 1
+      }
+    }
+    -1
+  }
+
+  private def splitLimitR(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Eval] = {
+    if (maxSplits == -1) {
+      return splitLimit(pos, str, cStr, maxSplits)
+    }
+
+    if (cStr.isEmpty) {
+      Error.fail("Cannot split by an empty string")
+    }
+
+    if (maxSplits >= 0 && maxSplits <= SplitLimitRPreallocMaxSplits) {
+      return splitLimitRBounded(pos, str, cStr, maxSplits)
+    }
+
+    val b = new mutable.ArrayBuilder.ofRef[Eval]
+    val cLen = cStr.length
+    var sz = 0
+    var end = str.length
+    var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
+
+    while (next >= 0 && (maxSplits < 0 || sz < maxSplits)) {
+      b += Val.Str(pos, str.substring(next + cLen, end))
+      end = next
+      sz += 1
+      next =
+        if (maxSplits >= 0 && sz >= maxSplits) -1
+        else lastSplitIndex(str, cStr, cLen, end - cLen)
+    }
+    b += Val.Str(pos, str.substring(0, end))
+
+    val result = b.result()
+    var left = 0
+    var right = result.length - 1
+    while (left < right) {
+      val tmp = result(left)
+      result(left) = result(right)
+      result(right) = tmp
+      left += 1
+      right -= 1
+    }
+    result
+  }
+
+  private def splitLimitRBounded(
+      pos: Position,
+      str: String,
+      cStr: String,
+      maxSplits: Int): Array[Eval] = {
+    val cLen = cStr.length
+    val result = new Array[Eval](maxSplits + 1)
+    var out = maxSplits
+    var sz = 0
+    var end = str.length
+    var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
+
+    while (next >= 0 && sz < maxSplits) {
+      result(out) = Val.Str(pos, str.substring(next + cLen, end))
+      out -= 1
+      end = next
+      sz += 1
+      next =
+        if (sz >= maxSplits) -1
+        else lastSplitIndex(str, cStr, cLen, end - cLen)
+    }
+    result(out) = Val.Str(pos, str.substring(0, end))
+
+    if (out == 0) result
+    else java.util.Arrays.copyOfRange(result, out, maxSplits + 1)
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-split std.split(str, c)]].
    *
@@ -646,12 +746,7 @@ object StringModule extends AbstractFunctionModule {
    */
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(
-        pos,
-        splitLimit(pos, str.value.asString.reverse, c.value.asString.reverse, maxSplits.value.asInt)
-          .map(s => Val.Str(pos, s.value.asString.reverse))
-          .reverse
-      )
+      Val.Arr(pos, splitLimitR(pos, str.value.asString, c.value.asString, maxSplits.value.asInt))
     }
   }
 
