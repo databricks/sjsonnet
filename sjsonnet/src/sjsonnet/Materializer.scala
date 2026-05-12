@@ -333,7 +333,7 @@ abstract class Materializer {
 
   // Iterative materialization for deep nesting. Used as a fallback when recursive depth exceeds
   // the recursive depth limit. Uses an explicit ArrayDeque stack to avoid StackOverflowError.
-  private def materializeStackless[T](
+  private[sjsonnet] def materializeStackless[T](
       v: Val,
       visitor: Visitor[T, T],
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
