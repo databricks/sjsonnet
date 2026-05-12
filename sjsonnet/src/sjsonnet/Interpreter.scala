@@ -75,6 +75,37 @@ class Interpreter(
       FormatCache.SharedDefault
     )
 
+  private[sjsonnet] def this(
+      queryExtVar: String => Option[ExternalVariable[?]],
+      queryTlaVar: String => Option[ExternalVariable[?]],
+      wd: Path,
+      importer: Importer,
+      parseCache: ParseCache,
+      settings: Settings,
+      storePos: Position => Unit,
+      logger: Evaluator.Logger,
+      stdProvider: () => Val.Obj,
+      variableResolver: String => Option[Expr],
+      debugStats: DebugStats,
+      formatCache: FormatCache) = {
+    this(
+      queryExtVar,
+      queryTlaVar,
+      wd,
+      importer,
+      parseCache,
+      settings,
+      storePos,
+      logger,
+      null.asInstanceOf[Val.Obj],
+      variableResolver,
+      debugStats,
+      formatCache
+    )
+    this.stdProvider = stdProvider
+    this.lazyStdProviderMode = true
+  }
+
   private val noOffsetPos = new Position(new FileScope(wd), -1)
 
   protected val internedStrings = new mutable.HashMap[String, String]
@@ -83,6 +114,14 @@ class Interpreter(
     Val.StaticObjectFieldSet,
     java.util.LinkedHashMap[String, java.lang.Boolean]
   ]
+
+  private var stdProvider: () => Val.Obj = () => std
+  private var lazyStdProviderMode: Boolean = false
+
+  private lazy val std0: Val.Obj = {
+    val explicitStd = stdProvider()
+    if (explicitStd == null) sjsonnet.stdlib.StdLibModule.Default.module else explicitStd
+  }
 
   val resolver: CachedResolver = createResolver(
     if (debugStats != null) new CountingParseCache(parseCache, debugStats) else parseCache
@@ -109,7 +148,11 @@ class Interpreter(
     override def process(expr: Expr, fs: FileScope): Either[Error, (Expr, FileScope)] = {
       handleException(
         (
-          createOptimizer(evaluator, std, internedStrings, internedStaticFieldSets).optimize(expr),
+          (
+            if (lazyStdProviderMode)
+              createOptimizer(evaluator, () => std0, internedStrings, internedStaticFieldSets)
+            else createOptimizer(evaluator, std0, internedStrings, internedStaticFieldSets)
+          ).optimize(expr),
           fs
         )
       )
@@ -125,6 +168,17 @@ class Interpreter(
         java.util.LinkedHashMap[String, java.lang.Boolean]
       ]): StaticOptimizer = {
     new StaticOptimizer(ev, variableResolver, std, internedStrings, internedStaticFieldSets)
+  }
+
+  protected def createOptimizer(
+      ev: EvalScope,
+      stdProvider: () => Val.Obj,
+      internedStrings: mutable.HashMap[String, String],
+      internedStaticFieldSets: mutable.HashMap[
+        Val.StaticObjectFieldSet,
+        java.util.LinkedHashMap[String, java.lang.Boolean]
+      ]): StaticOptimizer = {
+    new StaticOptimizer(ev, variableResolver, stdProvider, internedStrings, internedStaticFieldSets)
   }
 
   /**

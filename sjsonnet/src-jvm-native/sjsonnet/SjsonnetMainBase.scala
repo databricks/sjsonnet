@@ -134,6 +134,65 @@ object SjsonnetMainBase {
       importer: Option[Importer],
       std: Val.Obj,
       jsonnetPathEnv: Option[String],
+      rawOutputStream: OutputStream): Int =
+    main0Impl(
+      args,
+      parseCache,
+      stdout,
+      stderr,
+      wd,
+      allowedInputs,
+      importer,
+      std,
+      null,
+      lazyStdProvider = false,
+      jsonnetPathEnv,
+      rawOutputStream
+    )
+
+  /**
+   * Internal CLI entry point for platforms that provide augmented stdlib modules. `stdProvider` is
+   * called at most once, and only if the Jsonnet program references `std`.
+   */
+  private[sjsonnet] def main0WithStdProvider(
+      args: Array[String],
+      parseCache: ParseCache,
+      @unused stdin: InputStream,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      wd: os.Path,
+      allowedInputs: Option[Set[os.Path]],
+      importer: Option[Importer],
+      stdProvider: () => Val.Obj,
+      jsonnetPathEnv: Option[String],
+      rawOutputStream: OutputStream): Int =
+    main0Impl(
+      args,
+      parseCache,
+      stdout,
+      stderr,
+      wd,
+      allowedInputs,
+      importer,
+      null,
+      stdProvider,
+      lazyStdProvider = true,
+      jsonnetPathEnv,
+      rawOutputStream
+    )
+
+  private def main0Impl(
+      args: Array[String],
+      parseCache: ParseCache,
+      stdout: PrintStream,
+      stderr: PrintStream,
+      wd: os.Path,
+      allowedInputs: Option[Set[os.Path]],
+      importer: Option[Importer],
+      std: Val.Obj,
+      stdProvider: () => Val.Obj,
+      lazyStdProvider: Boolean,
+      jsonnetPathEnv: Option[String],
       rawOutputStream: OutputStream): Int = {
 
     var hasWarnings = false
@@ -180,32 +239,52 @@ object SjsonnetMainBase {
       debugStats =
         if (config.debugStats.value) { val s = new DebugStats; statsToReport = s; s }
         else null
-      outputStr <- mainConfigured(
-        file,
-        config,
-        new Settings(
-          preserveOrder = config.preserveOrder.value,
-          strict = config.strict.value,
-          throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
-          maxParserRecursionDepth = config.maxParserRecursionDepth,
-          brokenAssertionLogic = config.brokenAssertionLogic.value,
-          maxStack = config.maxStack
-        ),
-        parseCache,
-        wd,
-        importer.getOrElse {
-          new SimpleImporter(
-            config.getOrderedJpaths(jsonnetPathEnv).map(p => OsPath(os.Path(p, wd))),
-            allowedInputs,
-            debugImporter = config.debugImporter.value
-          )
-        },
-        warn,
-        std,
-        debugStats = debugStats,
-        profileOpt = config.profile,
-        stdoutStream = if (rawOutputStream != null) rawOutputStream else stdout
+      settings = new Settings(
+        preserveOrder = config.preserveOrder.value,
+        strict = config.strict.value,
+        throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
+        maxParserRecursionDepth = config.maxParserRecursionDepth,
+        brokenAssertionLogic = config.brokenAssertionLogic.value,
+        maxStack = config.maxStack
       )
+      resolvedImporter = importer.getOrElse {
+        new SimpleImporter(
+          config.getOrderedJpaths(jsonnetPathEnv).map(p => OsPath(os.Path(p, wd))),
+          allowedInputs,
+          debugImporter = config.debugImporter.value
+        )
+      }
+      stdoutTarget = if (rawOutputStream != null) rawOutputStream else stdout
+      outputStr <- {
+        if (lazyStdProvider)
+          mainConfiguredWithStdProvider(
+            file,
+            config,
+            settings,
+            parseCache,
+            wd,
+            resolvedImporter,
+            warn,
+            stdProvider,
+            debugStats = debugStats,
+            profileOpt = config.profile,
+            stdoutStream = stdoutTarget
+          )
+        else
+          mainConfigured(
+            file,
+            config,
+            settings,
+            parseCache,
+            wd,
+            resolvedImporter,
+            warn,
+            std,
+            debugStats = debugStats,
+            profileOpt = config.profile,
+            stdoutStream = stdoutTarget
+          )
+      }
       res <- {
         if (hasWarnings && config.fatalWarnings.value) Left("")
         else Right(outputStr)
@@ -393,7 +472,73 @@ object SjsonnetMainBase {
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
       profileOpt: Option[String] = None,
-      stdoutStream: OutputStream = null): Either[String, String] = {
+      stdoutStream: OutputStream = null): Either[String, String] =
+    mainConfiguredImpl(
+      file,
+      config,
+      settings,
+      parseCache,
+      wd,
+      importer,
+      warnLogger,
+      std,
+      null,
+      lazyStdProvider = false,
+      evaluatorOverride,
+      debugStats,
+      profileOpt,
+      stdoutStream
+    )
+
+  /**
+   * Internal configured entry point for platforms that provide augmented stdlib modules.
+   * `stdProvider` is called at most once, and only if the Jsonnet program references `std`.
+   */
+  private[sjsonnet] def mainConfiguredWithStdProvider(
+      file: String,
+      config: Config,
+      settings: Settings,
+      parseCache: ParseCache,
+      wd: os.Path,
+      importer: Importer,
+      warnLogger: Evaluator.Logger,
+      stdProvider: () => Val.Obj,
+      evaluatorOverride: Option[Evaluator] = None,
+      debugStats: DebugStats = null,
+      profileOpt: Option[String] = None,
+      stdoutStream: OutputStream = null): Either[String, String] =
+    mainConfiguredImpl(
+      file,
+      config,
+      settings,
+      parseCache,
+      wd,
+      importer,
+      warnLogger,
+      null,
+      stdProvider,
+      lazyStdProvider = true,
+      evaluatorOverride,
+      debugStats,
+      profileOpt,
+      stdoutStream
+    )
+
+  private def mainConfiguredImpl(
+      file: String,
+      config: Config,
+      settings: Settings,
+      parseCache: ParseCache,
+      wd: os.Path,
+      importer: Importer,
+      warnLogger: Evaluator.Logger,
+      std: Val.Obj,
+      stdProvider: () => Val.Obj,
+      lazyStdProvider: Boolean,
+      evaluatorOverride: Option[Evaluator],
+      debugStats: DebugStats,
+      profileOpt: Option[String],
+      stdoutStream: OutputStream): Either[String, String] = {
 
     val (jsonnetCode, path) =
       if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
@@ -435,35 +580,69 @@ object SjsonnetMainBase {
 
     var currentPos: Position = null
     var profilerInstance: Profiler = null
-    val interp = new Interpreter(
-      queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
-      queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
-      OsPath(wd),
-      importer = importer,
-      parseCache,
-      settings = settings,
-      storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
-      logger = warnLogger,
-      std = std,
-      variableResolver = _ => None,
-      debugStats = debugStats,
-      formatCache = FormatCache.SharedDefault
-    ) {
-      override def createEvaluator(
-          resolver: CachedResolver,
-          extVars: String => Option[Expr],
-          wd: Path,
-          settings: Settings): Evaluator = {
-        val ev = evaluatorOverride.getOrElse(
-          super.createEvaluator(resolver, extVars, wd, settings)
-        )
-        profileFormat.foreach { fmt =>
-          profilerInstance = new Profiler(fmt, wd)
-          ev.profiler = profilerInstance
+    val interp =
+      if (lazyStdProvider)
+        new Interpreter(
+          queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
+          queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
+          OsPath(wd),
+          importer = importer,
+          parseCache,
+          settings = settings,
+          storePos = (position: Position) =>
+            if (config.yamlDebug.value) currentPos = position else (),
+          logger = warnLogger,
+          stdProvider = stdProvider,
+          variableResolver = _ => None,
+          debugStats = debugStats,
+          formatCache = FormatCache.SharedDefault
+        ) {
+          override def createEvaluator(
+              resolver: CachedResolver,
+              extVars: String => Option[Expr],
+              wd: Path,
+              settings: Settings): Evaluator = {
+            val ev = evaluatorOverride.getOrElse(
+              super.createEvaluator(resolver, extVars, wd, settings)
+            )
+            profileFormat.foreach { fmt =>
+              profilerInstance = new Profiler(fmt, wd)
+              ev.profiler = profilerInstance
+            }
+            ev
+          }
         }
-        ev
-      }
-    }
+      else
+        new Interpreter(
+          queryExtVar = (key: String) => extBinding.get(key).map(ExternalVariable.code),
+          queryTlaVar = (key: String) => tlaBinding.get(key).map(ExternalVariable.code),
+          OsPath(wd),
+          importer = importer,
+          parseCache,
+          settings = settings,
+          storePos = (position: Position) =>
+            if (config.yamlDebug.value) currentPos = position else (),
+          logger = warnLogger,
+          std = std,
+          variableResolver = _ => None,
+          debugStats = debugStats,
+          formatCache = FormatCache.SharedDefault
+        ) {
+          override def createEvaluator(
+              resolver: CachedResolver,
+              extVars: String => Option[Expr],
+              wd: Path,
+              settings: Settings): Evaluator = {
+            val ev = evaluatorOverride.getOrElse(
+              super.createEvaluator(resolver, extVars, wd, settings)
+            )
+            profileFormat.foreach { fmt =>
+              profilerInstance = new Profiler(fmt, wd)
+              ev.profiler = profilerInstance
+            }
+            ev
+          }
+        }
 
     val result = (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>

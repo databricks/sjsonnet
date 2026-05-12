@@ -3,6 +3,8 @@ package sjsonnet
 import utest._
 import TestUtils.{eval, evalErr}
 
+import scala.collection.mutable
+
 object EvaluatorTests extends TestSuite {
   def tests: Tests = Tests {
     test("arithmetic") {
@@ -10,6 +12,38 @@ object EvaluatorTests extends TestSuite {
       eval("1 + 2 * 3") ==> ujson.Num(7)
       eval("-1 + 2 * 3") ==> ujson.Num(5)
       eval("6 - 3 + 2") ==> ujson.Num(5)
+    }
+    test("strictStdPreservesLegacyCreateOptimizerOverride") {
+      var optimizerCalls = 0
+      var stdCalls = 0
+      val interpreter = new Interpreter(
+        Map.empty[String, String],
+        Map.empty[String, String],
+        DummyPath(),
+        Importer.empty,
+        new DefaultParseCache,
+        std = {
+          stdCalls += 1
+          sjsonnet.stdlib.StdLibModule.Default.module
+        },
+        variableResolver = _ => None
+      ) {
+        override protected def createOptimizer(
+            ev: EvalScope,
+            std: Val.Obj,
+            internedStrings: mutable.HashMap[String, String],
+            internedStaticFieldSets: mutable.HashMap[
+              Val.StaticObjectFieldSet,
+              java.util.LinkedHashMap[String, java.lang.Boolean]
+            ]): StaticOptimizer = {
+          optimizerCalls += 1
+          super.createOptimizer(ev, std, internedStrings, internedStaticFieldSets)
+        }
+      }
+
+      interpreter.interpret("std.length([1])", DummyPath("(memory)")) ==> Right(ujson.Num(1))
+      assert(optimizerCalls == 1)
+      assert(stdCalls == 1)
     }
     test("objects") {
       eval("{x: 1}.x") ==> ujson.Num(1)

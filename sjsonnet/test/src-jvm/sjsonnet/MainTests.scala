@@ -54,6 +54,40 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("stdlibProviderIsLazy") {
+      var calls = 0
+      def run(source: String): (Int, String, Int) = {
+        val out = new ByteArrayOutputStream()
+        val pout = new PrintStream(out, true, "UTF-8")
+        val err = new ByteArrayOutputStream()
+        val perr = new PrintStream(err, true, "UTF-8")
+        val res = SjsonnetMainBase.main0WithStdProvider(
+          Array(source, "--exec"),
+          new DefaultParseCache,
+          System.in,
+          pout,
+          perr,
+          workspaceRoot,
+          None,
+          None,
+          () => {
+            calls += 1
+            sjsonnet.stdlib.StdLibModule.Default.module
+          },
+          None,
+          null
+        )
+        assert(err.toString("UTF-8").isEmpty)
+        (res, out.toString("UTF-8"), calls)
+      }
+
+      val noStd = run("1 + 1")
+      assert(noStd == ((0, s"2$eol", 0)))
+
+      val withStd = run("std.length([1, 2, 3])")
+      assert(withStd == ((0, s"3$eol", 1)))
+    }
+
     val streamedOut =
       """--- 1
         |--- 2

@@ -31,6 +31,24 @@ class StaticOptimizer(
       java.util.LinkedHashMap[String, java.lang.Boolean]
     ])
     extends ScopedExprTransform {
+
+  private var stdProvider: () => Val.Obj = () => std
+
+  private[sjsonnet] def this(
+      ev: EvalScope,
+      variableResolver: String => Option[Expr],
+      stdProvider: () => Val.Obj,
+      internedStrings: mutable.HashMap[String, String],
+      internedStaticFieldSets: mutable.HashMap[
+        Val.StaticObjectFieldSet,
+        java.util.LinkedHashMap[String, java.lang.Boolean]
+      ]) = {
+    this(ev, variableResolver, null.asInstanceOf[Val.Obj], internedStrings, internedStaticFieldSets)
+    this.stdProvider = stdProvider
+  }
+
+  private def std0: Val.Obj = stdProvider()
+
   def optimize(e: Expr): Expr = transform(e)
 
   override def transform(_e: Expr): Expr = {
@@ -76,8 +94,8 @@ class StaticOptimizer(
         scope.get(name) match {
           case ScopedVal(v: Val, _, _)  => v
           case ScopedVal(_, _, idx)     => ValidId(pos, name, idx)
-          case null if name == f"$$std" => std
-          case null if name == "std"    => std
+          case null if name == f"$$std" => std0
+          case null if name == "std"    => std0
           case null                     =>
             variableResolver(name) match {
               case Some(v) => v // additional variable resolution
