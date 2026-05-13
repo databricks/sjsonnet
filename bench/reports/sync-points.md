@@ -44,6 +44,7 @@ idea is not repeated without new evidence.
 | Lazy materialization-time cache for inline-object sorted order | Stored `computeSortedInlineOrder` results back on `Val.Obj` when absent. Output stayed identical, but real kube Native single-run A/B was neutral-to-negative, so the lazy write was removed. |
 | Native CLI path-only parse cache | Avoided `ResolvedFile.contentHash()` for the Native CLI to bypass SHA-256/OpenSSL provider work. It linked and preserved output, but Native wall-clock was neutral on `null` and negative/noisy on kube, so the default content-hash cache was restored. |
 | Native GC switch to Commix | Attempted to set `nativeGC` to Commix in Mill. Build script compilation failed because the GC API was not exposed on the current Mill build classpath, so the config experiment was reverted. |
+| Parser `_asciiSafe` hint for static format safety | Reused the parser's large-string ASCII-safe marker to avoid re-scanning static format literals. Debug stats improved, but Native whole-process `large_string_template` regressed in both command orders, so the hint path was removed. |
 
 ## Policy
 
