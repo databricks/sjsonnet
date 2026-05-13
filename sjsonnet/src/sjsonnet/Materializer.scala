@@ -619,20 +619,66 @@ object Materializer extends Materializer {
       }
       i += 1
     }
-    // Insertion sort by key name (optimal for 2-8 elements)
-    i = 1
-    while (i < visCount) {
+    sortInlineOrder(order, keys, visCount)
+    order
+  }
+
+  private def sortInlineOrder(order: Array[Int], keys: Array[String], len: Int): Unit = {
+    if (len <= 1) return
+    if (len <= 16) insertionSortInlineOrder(order, keys, 0, len - 1)
+    else quickSortInlineOrder(order, keys, 0, len - 1)
+  }
+
+  private def insertionSortInlineOrder(
+      order: Array[Int],
+      keys: Array[String],
+      left: Int,
+      right: Int): Unit = {
+    var i = left + 1
+    while (i <= right) {
       val pivotIdx = order(i)
       val pivotKey = keys(pivotIdx)
       var j = i - 1
-      while (j >= 0 && Util.compareStringsByCodepoint(keys(order(j)), pivotKey) > 0) {
+      while (j >= left && Util.compareStringsByCodepoint(keys(order(j)), pivotKey) > 0) {
         order(j + 1) = order(j)
         j -= 1
       }
       order(j + 1) = pivotIdx
       i += 1
     }
-    order
+  }
+
+  private def quickSortInlineOrder(
+      order: Array[Int],
+      keys: Array[String],
+      left0: Int,
+      right0: Int): Unit = {
+    var left = left0
+    var right = right0
+    while (right - left > 16) {
+      val pivotKey = keys(order((left + right) >>> 1))
+      var i = left
+      var j = right
+      while (i <= j) {
+        while (Util.compareStringsByCodepoint(keys(order(i)), pivotKey) < 0) i += 1
+        while (Util.compareStringsByCodepoint(keys(order(j)), pivotKey) > 0) j -= 1
+        if (i <= j) {
+          val tmp = order(i)
+          order(i) = order(j)
+          order(j) = tmp
+          i += 1
+          j -= 1
+        }
+      }
+      if (j - left < right - i) {
+        if (left < j) quickSortInlineOrder(order, keys, left, j)
+        left = i
+      } else {
+        if (i < right) quickSortInlineOrder(order, keys, i, right)
+        right = j
+      }
+    }
+    insertionSortInlineOrder(order, keys, left, right)
   }
 
   /**
