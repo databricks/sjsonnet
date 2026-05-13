@@ -5,6 +5,7 @@ import fastparse.ParserInput
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.security.MessageDigest
 
 /**
  * A class that encapsulates a resolved import. This is used to cache the result of resolving an
@@ -37,17 +38,13 @@ class CachedResolvedFile(
     s"Resolved import path $resolvedImportPath is too large: ${jFile.length()} bytes > $memoryLimitBytes bytes"
   )
 
-  private val resolvedImportContent: ResolvedFile = {
-    // TODO: Support caching binary data
-    if (jFile.length() > cacheThresholdBytes) {
-      // If the file is too large, then we will just read it from disk
-      null
-    } else if (binaryData) {
-      StaticBinaryResolvedFile(readRawBytes(jFile))
-    } else {
-      StaticResolvedFile(readString(jFile))
-    }
-  }
+  private val cachedBytes: Array[Byte] =
+    if (jFile.length() > cacheThresholdBytes) null
+    else readRawBytes(jFile)
+
+  private val cachedBinaryContent: ResolvedFile =
+    if (cachedBytes != null && binaryData) StaticBinaryResolvedFile(cachedBytes)
+    else null
 
   private def readString(jFile: File): String = {
     new String(Files.readAllBytes(jFile.toPath), StandardCharsets.UTF_8)
@@ -55,45 +52,72 @@ class CachedResolvedFile(
 
   private def readRawBytes(jFile: File): Array[Byte] = Files.readAllBytes(jFile.toPath)
 
+  private lazy val resolvedTextContent: ResolvedFile =
+    StaticResolvedFile(new String(cachedBytes, StandardCharsets.UTF_8))
+
+  private lazy val cachedBytesHash: String =
+    cachedBytes.length.toString + ":" + bytesToHex(
+      MessageDigest.getInstance("SHA-256").digest(cachedBytes)
+    )
+
+  private def bytesToHex(bytes: Array[Byte]): String = {
+    val hexChars = "0123456789abcdef"
+    val out = new Array[Char](bytes.length * 2)
+    var i = 0
+    var j = 0
+    while (i < bytes.length) {
+      val b = bytes(i) & 0xff
+      out(j) = hexChars.charAt(b >>> 4)
+      out(j + 1) = hexChars.charAt(b & 0x0f)
+      i += 1
+      j += 2
+    }
+    new String(out)
+  }
+
   /**
    * A method that will return a reader for the resolved import. If the import is too large, then
    * this will return a reader that will read the file from disk. Otherwise, it will return a reader
    * that reads from memory.
    */
   def getParserInput(): ParserInput = {
-    if (resolvedImportContent == null) {
+    if (cachedBytes == null) {
       FileParserInput(jFile)
+    } else if (binaryData) {
+      cachedBinaryContent.getParserInput()
     } else {
-      resolvedImportContent.getParserInput()
+      resolvedTextContent.getParserInput()
     }
   }
 
   override def readString(): String = {
-    if (resolvedImportContent == null) {
+    if (cachedBytes == null) {
       // If the file is too large, then we will just read it from disk
       readString(jFile)
+    } else if (binaryData) {
+      cachedBinaryContent.readString()
     } else {
       // Otherwise, we will read it from memory
-      resolvedImportContent.readString()
+      resolvedTextContent.readString()
     }
   }
 
   override def contentHash(): String = {
-    if (resolvedImportContent == null) {
+    if (cachedBytes == null) {
       // If the file is too large, then we will just read it from disk
       Platform.hashFile(jFile)
     } else {
-      resolvedImportContent.contentHash()
+      cachedBytesHash
     }
   }
 
   override def readRawBytes(): Array[Byte] = {
-    if (resolvedImportContent == null) {
+    if (cachedBytes == null) {
       // If the file is too large, then we will just read it from disk
       readRawBytes(jFile)
     } else {
       // Otherwise, we will read it from memory
-      resolvedImportContent.readRawBytes()
+      cachedBytes
     }
   }
 }

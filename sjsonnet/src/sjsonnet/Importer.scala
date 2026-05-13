@@ -302,7 +302,7 @@ object CachedResolver {
     try {
       val visitor =
         new JsonImportVisitor(fileScope, internedStrings, settings)
-      Some((ujson.StringParser.transform(content.readString(), visitor), fileScope))
+      Some((ujson.ByteArrayParser.transform(content.readRawBytes(), visitor), fileScope))
     } catch {
       case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
           _: JsonParseDepthExceeded | _: NumberFormatException =>
