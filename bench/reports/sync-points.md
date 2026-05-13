@@ -47,6 +47,7 @@ idea is not repeated without new evidence.
 | Parser `_asciiSafe` hint for static format safety | Reused the parser's large-string ASCII-safe marker to avoid re-scanning static format literals. Debug stats improved, but Native whole-process `large_string_template` regressed in both command orders, so the hint path was removed. |
 | Native manual ASCII-safe string-to-byte copy | Replaced `String.getBytes(0, len, dst, dstPos)` with a manual `charAt` loop for known ASCII-safe strings. Native `large_string_template` regressed heavily in both command orders, so the platform copy stays on `getBytes`. |
 | Single-character append in simple format loop | Branched the single-label simple format path to call `StringBuilder.append(Char)` when the dynamic value length is one. Native `large_string_template` regressed in both command orders, so the existing `append(String)` loop remains. |
+| ByteRenderer minified object comma path | Specialized direct/generic object rendering to manage comma/empty state locally for minified JSON. Output stayed identical and kube improved weakly, but `large_string_template` regressed/noised negative in both command orders, so the generic renderer path was restored. |
 
 ## Policy
 
