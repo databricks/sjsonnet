@@ -48,6 +48,7 @@ idea is not repeated without new evidence.
 | Native manual ASCII-safe string-to-byte copy | Replaced `String.getBytes(0, len, dst, dstPos)` with a manual `charAt` loop for known ASCII-safe strings. Native `large_string_template` regressed heavily in both command orders, so the platform copy stays on `getBytes`. |
 | Single-character append in simple format loop | Branched the single-label simple format path to call `StringBuilder.append(Char)` when the dynamic value length is one. Native `large_string_template` regressed in both command orders, so the existing `append(String)` loop remains. |
 | ByteRenderer minified object comma path | Specialized direct/generic object rendering to manage comma/empty state locally for minified JSON. Output stayed identical and kube improved weakly, but `large_string_template` regressed/noised negative in both command orders, so the generic renderer path was restored. |
+| Native-only long ASCII escaped string renderer | Gated a direct `charAt` long-string renderer to Scala Native to avoid UTF-8 byte-array allocation for escaped ASCII strings. Output stayed identical, but `large_string_template` regressed in both command orders, so the UTF-8 encode plus SWAR scan remains the best path. |
 
 ## Policy
 
