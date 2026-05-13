@@ -45,6 +45,7 @@ idea is not repeated without new evidence.
 | Native CLI path-only parse cache | Avoided `ResolvedFile.contentHash()` for the Native CLI to bypass SHA-256/OpenSSL provider work. It linked and preserved output, but Native wall-clock was neutral on `null` and negative/noisy on kube, so the default content-hash cache was restored. |
 | Native GC switch to Commix | Attempted to set `nativeGC` to Commix in Mill. Build script compilation failed because the GC API was not exposed on the current Mill build classpath, so the config experiment was reverted. |
 | Parser `_asciiSafe` hint for static format safety | Reused the parser's large-string ASCII-safe marker to avoid re-scanning static format literals. Debug stats improved, but Native whole-process `large_string_template` regressed in both command orders, so the hint path was removed. |
+| Native manual ASCII-safe string-to-byte copy | Replaced `String.getBytes(0, len, dst, dstPos)` with a manual `charAt` loop for known ASCII-safe strings. Native `large_string_template` regressed heavily in both command orders, so the platform copy stays on `getBytes`. |
 
 ## Policy
 
