@@ -41,6 +41,8 @@ object Format {
       val literalEnds: Array[Int],
       /** Non-null when all simple named specs use the same label. */
       val singleNamedLabel: String,
+      /** True when all literal text copied to the output is already JSON-string ASCII-safe. */
+      val staticAsciiSafe: Boolean,
       /**
        * True when ALL specs are simple `%(key)s` with a named label and no formatting flags. In
        * this case we can use a fast path that caches the object key lookup and avoids widenRaw
@@ -483,6 +485,7 @@ object Format {
       litStarts,
       litEnds,
       singleNamedLabel,
+      Platform.isAsciiJsonSafe(s),
       allSimpleNamed
     )
   }
@@ -497,6 +500,7 @@ object Format {
     val emptyStarts = new Array[Int](size)
     val emptyEnds = new Array[Int](size)
     var staticChars = leading.length
+    var staticAsciiSafe = Platform.isAsciiJsonSafe(leading)
     var hasAnyStar = false
     var allSimpleNamed = true
     var idx = 0
@@ -508,6 +512,7 @@ object Format {
       specs(idx) = formatted.bits
       literals(idx) = literal
       staticChars += literal.length
+      staticAsciiSafe &&= Platform.isAsciiJsonSafe(literal)
       hasAnyStar ||= formatted.widthStar || formatted.precisionStar
       allSimpleNamed = false
       idx += 1
@@ -526,6 +531,7 @@ object Format {
       emptyStarts,
       emptyEnds,
       null,
+      staticAsciiSafe,
       allSimpleNamed
     )
   }
@@ -556,7 +562,7 @@ object Format {
     // Super-fast path: all specs are simple %(key)s with an object value.
     // Avoids per-spec pattern matching, widenRaw, and uses offset-based literal appends.
     if (parsed.allSimpleNamedString && values0.isInstanceOf[Val.Obj]) {
-      return formatSimpleNamedString(parsed, values0.asInstanceOf[Val.Obj], pos)
+      return formatSimpleNamedStringValue(parsed, values0.asInstanceOf[Val.Obj], pos).str
     }
 
     val values = values0 match {
@@ -751,34 +757,47 @@ object Format {
     if (singleSpecNoStatic) singleFormatted else output.toString()
   }
 
+  private[sjsonnet] def formatValue(parsed: RuntimeFormat, values0: Val, pos: Position)(implicit
+      evaluator: EvalScope): Val.Str =
+    if (parsed.allSimpleNamedString && values0.isInstanceOf[Val.Obj]) {
+      formatSimpleNamedStringValue(parsed, values0.asInstanceOf[Val.Obj], pos)
+    } else {
+      Val.Str(pos, format(parsed, values0, pos))
+    }
+
   /**
    * Super-fast path for format strings where ALL specs are simple `%(key)s` with a `Val.Obj`. This
    * avoids per-spec pattern matching, widenRaw overhead, and caches repeated key lookups. For the
    * large_string_template benchmark (605KB, 256 `%(x)s` interpolations), this eliminates 256
    * redundant object lookups and the generic dispatch overhead.
    */
-  private def formatSimpleNamedString(parsed: RuntimeFormat, obj: Val.Obj, pos: Position)(implicit
-      evaluator: EvalScope): String = {
+  private def formatSimpleNamedStringValue(parsed: RuntimeFormat, obj: Val.Obj, pos: Position)(
+      implicit evaluator: EvalScope): Val.Str = {
     val output = new java.lang.StringBuilder(parsed.staticChars + parsed.specBits.length * 16)
+    var asciiSafe = parsed.staticAsciiSafe
 
     // Append leading literal using offsets if source is available, else use string
     appendLeading(output, parsed)
 
     val singleLabel = parsed.singleNamedLabel
     if (singleLabel != null) {
-      val str = simpleStringValue(obj.value(singleLabel, pos)(evaluator).value)
+      val rawVal = obj.value(singleLabel, pos)(evaluator).value
+      val str = simpleStringValue(rawVal)
+      asciiSafe &&= simpleStringValueAsciiSafe(rawVal)
       var idx = 0
       while (idx < parsed.specBits.length) {
         output.append(str)
         appendLiteral(output, parsed, idx)
         idx += 1
       }
-      return output.toString
+      val result = output.toString
+      return if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
     }
 
     // Cache for repeated key lookups: most format strings reuse the same key many times
     var cachedKey: String = null
     var cachedStr: String = null
+    var cachedAsciiSafe = false
 
     var idx = 0
     while (idx < parsed.specBits.length) {
@@ -787,12 +806,16 @@ object Format {
       // Look up and cache the string value for this key
       // String.equals already does identity check (eq) internally
       val str =
-        if (key == cachedKey) cachedStr
-        else {
+        if (key == cachedKey) {
+          asciiSafe &&= cachedAsciiSafe
+          cachedStr
+        } else {
           val rawVal = obj.value(key, pos)(evaluator).value
           val s = simpleStringValue(rawVal)
           cachedKey = key
           cachedStr = s
+          cachedAsciiSafe = simpleStringValueAsciiSafe(rawVal)
+          asciiSafe &&= cachedAsciiSafe
           s
         }
 
@@ -803,7 +826,8 @@ object Format {
 
       idx += 1
     }
-    output.toString
+    val result = output.toString
+    if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
   }
 
   private def simpleStringValue(rawVal: Val)(implicit evaluator: EvalScope): String =
@@ -824,6 +848,13 @@ object Format {
           case _          => Materializer(other)
         }
         value.toString
+    }
+
+  private def simpleStringValueAsciiSafe(rawVal: Val): Boolean =
+    rawVal match {
+      case vs: Val.Str                                           => vs._asciiSafe
+      case _: Val.Num | _: Val.True | _: Val.False | _: Val.Null => true
+      case _                                                     => false
     }
 
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
@@ -1013,6 +1044,6 @@ object Format {
     // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.
     private val parsed = scanFormat(fmt)
     def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, format(parsed, values0.value, pos)(ev))
+      formatValue(parsed, values0.value, pos)(ev)
   }
 }

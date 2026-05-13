@@ -18,7 +18,7 @@ released builds and must not be treated as current truth without local recheck.
 
 | priority | workload | sjsonnet Native | jrsonnet | gap | status | next direction |
 |---:|---|---:|---:|---:|---|---|
-| 1 | `bench/resources/cpp_suite/large_string_template.jsonnet` | `10.03 +/- 0.80 ms` | `2.87 +/- 0.13 ms` | jrsonnet `3.49x` faster | open | Need a materially new parser/format design; previous scanner/renderer micro-routes were rejected. |
+| 1 | `bench/resources/cpp_suite/large_string_template.jsonnet` | `8.01-8.17 ms` | `6.0 +/- 1.2 ms` | jrsonnet `~1.34x` faster | improved | ASCII-safe propagation for simple named formats closed the largest local slice; remaining gap is mostly startup plus format/render overhead. |
 | 2 | `jrsonnet/tests/realworld/entry-kube-prometheus.jsonnet -J vendor` | `132.09 +/- 2.33 ms` | `85.29 +/- 1.12 ms` | jrsonnet `1.55x` faster | improved | Strict JSON byte import parsing reduced sjsonnet Native time by about 5% locally; remaining gap is mostly materialization/rendering and startup. |
 
 ## Accepted in this session
@@ -27,6 +27,7 @@ released builds and must not be treated as current truth without local recheck.
 |---|---|---|
 | Parse strict `.json` imports from UTF-8 bytes and cache small resolved files as bytes until text is needed | Output equality against jrsonnet and previous sjsonnet on kube-prometheus; focused `PreloaderTests`; Native A/B forward+reverse; focused JMH guards; full `__.test` | kept: kube Native improved from clean `139.4 +/- 2.8 ms` to candidate `132.7 +/- 1.9 ms` forward, and clean `140.3 +/- 2.6 ms` to candidate `132.1 +/- 1.9 ms` reverse. Debug stats parse time improved from prior clean `~88.3ms` to `69.8ms` in the final run. |
 | Use in-place quicksort for inline object sorted order when field count is large | `sample` on repeated kube materialization; output equality on kube and `large_string_template`; Native A/B forward+reverse; focused renderer/json tests; `__.checkFormat`; full `__.test` | kept: `sample` reduced `computeSortedInlineOrder` top-stack samples from `164` to `63` and sort-specific samples from `164` to `75`; kube Native improved from `145.3 +/- 3.6 ms` to `140.0 +/- 3.2 ms` forward and from `151.6 +/- 10.2 ms` to `148.9 +/- 3.7 ms` reverse. |
+| Preserve ASCII-safe metadata for simple named `%s` format results | Regression tests for safe and unsafe dynamic values; output equality on `large_string_template` and kube-prometheus; JVM test suite; focused JMH guard; Native A/B forward+reverse; jrsonnet reference run | kept: `large_string_template` Native improved in both command orders (`8.64 -> 8.01 ms` forward, `8.65 -> 8.17 ms` reverse). JVM JMH stayed neutral-positive (`0.683 -> 0.677 ms/op`). Kube-prometheus was neutral/noisy, not a target regression. |
 
 ## Historical jrsonnet-doc gaps that are no longer primary local gaps
 
@@ -59,12 +60,12 @@ released builds and must not be treated as current truth without local recheck.
 
 ## Current hypothesis
 
-Large-template remains ratio-priority, but the known parser/format/renderer
-micro-routes are exhausted or noisy. Kube-prometheus improved through byte-based
-strict JSON imports, but source-built jrsonnet is still about `1.55x` faster.
-Next work should profile the remaining materialization/render/startup costs and
-target a larger structural cost rather than a single parameter or small cache
-tweak.
+Large-template remains ratio-priority after the simple-format ASCII-safe win, but
+the gap is now much smaller and includes whole-process startup. Kube-prometheus
+improved through byte-based strict JSON imports, but source-built jrsonnet is
+still about `1.55x` faster. Next work should profile the remaining
+materialization/render/startup costs and target a larger structural cost rather
+than a single parameter or small cache tweak.
 
 ## 2026-05-13 native-vs-jvm split
 

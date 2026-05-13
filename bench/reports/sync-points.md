@@ -14,7 +14,7 @@ idea is not repeated without new evidence.
 
 | workload | status | report |
 |---|---|---|
-| `large_string_template` | open; jrsonnet `3.49x` faster | `bench/reports/sjsonnet-vs-jrsonnet-gaps.md` |
+| `large_string_template` | improved by simple-format ASCII-safe propagation; jrsonnet still `~1.34x` faster | `bench/reports/sjsonnet-vs-jrsonnet-gaps.md` |
 | kube-prometheus realworld | improved by strict JSON byte import parsing; jrsonnet still `1.55x` faster | `bench/reports/sjsonnet-vs-jrsonnet-gaps.md` |
 
 ## Accepted ideas
@@ -23,6 +23,7 @@ idea is not repeated without new evidence.
 |---|---|---|
 | Strict JSON byte import parsing | implemented locally; not committed | `Importer.parseJsonImport` uses `ujson.ByteArrayParser`; `CachedResolvedFile` caches small files as bytes and lazily decodes text; kube Native A/B improved candidate to `132.7/132.1 ms` vs clean `139.4/140.3 ms`. |
 | Hybrid sort for inline object materialization | implemented locally; pending PR | `Materializer.computeSortedInlineOrder` keeps insertion sort for ≤16 visible fields and uses in-place quicksort for larger inline objects. Native kube A/B on top of strict JSON bytes improved forward `145.3 -> 140.0 ms` and reverse `151.6 -> 148.9 ms`; output equality and full `__.test` passed. |
+| Simple named format ASCII-safe propagation | implemented locally; pending PR | `Format.PartialApplyFmt` returns `Val.Str.asciiSafe` when all static format literals and simple named dynamic values are JSON-string ASCII-safe. Native `large_string_template` improved in both command orders (`8.64 -> 8.01 ms`, `8.65 -> 8.17 ms`); JVM JMH stayed neutral-positive (`0.683 -> 0.677 ms/op`). |
 
 ## Rejected ideas
 
