@@ -50,6 +50,7 @@ idea is not repeated without new evidence.
 | ByteRenderer minified object comma path | Specialized direct/generic object rendering to manage comma/empty state locally for minified JSON. Output stayed identical and kube improved weakly, but `large_string_template` regressed/noised negative in both command orders, so the generic renderer path was restored. |
 | Native-only long ASCII escaped string renderer | Gated a direct `charAt` long-string renderer to Scala Native to avoid UTF-8 byte-array allocation for escaped ASCII strings. Output stayed identical, but `large_string_template` regressed in both command orders, so the UTF-8 encode plus SWAR scan remains the best path. |
 | Inline small-stack cycle tracking | Replaced eager `IdentityHashMap` cycle tracking with four inline identity slots plus overflow map while preserving recursive error behavior. Kube was noise-level and `large_string_template` regressed in both command orders, so eager `IdentityHashMap` tracking was restored. |
+| ByteRenderer quoted key cache | Cached quoted object-key bytes per renderer using HashMap, direct-mapped, and capped variants. Output stayed identical, but kube reverse A/B was not stable-positive and some variants regressed, so direct key rendering was restored. |
 
 ## Policy
 
