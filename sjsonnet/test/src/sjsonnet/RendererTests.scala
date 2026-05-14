@@ -4,6 +4,12 @@ import java.io.ByteArrayOutputStream
 import utest._
 
 object RendererTests extends TestSuite {
+  private def renderBytes(v: ujson.Value): String = {
+    val out = new ByteArrayOutputStream
+    ujson.transform(v, new ByteRenderer(out))
+    out.toString("UTF-8")
+  }
+
   def tests: Tests = Tests {
     test("hello") {
       ujson.transform(ujson.Arr(ujson.Num(1), ujson.Num(2)), new Renderer()).toString ==>
@@ -94,6 +100,12 @@ object RendererTests extends TestSuite {
       assert(e.contains("Stackoverflow while materializing, possibly due to recursive value"))
       // Losing the outer materialization context re-renders `o.a` before detecting the cycle.
       assert(out.size() < 15000)
+    }
+
+    test("byteRendererCachesRepeatedLongEscapedStrings") {
+      val repeated = "Name of the referent.\nThis field contains \"quotes\" and \\slashes\\. " * 4
+      val value = ujson.Arr(repeated, repeated, ujson.Obj("description" -> repeated))
+      renderBytes(value) ==> ujson.transform(value, new Renderer()).toString
     }
 
     test("indentZero") {

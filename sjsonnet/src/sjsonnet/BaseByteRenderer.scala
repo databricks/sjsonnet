@@ -28,6 +28,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 
   protected val elemBuilder = new upickle.core.ByteBuilder
   private val unicodeCharBuilder = new upickle.core.CharBuilder
+  private var cachedLongStrings: java.util.HashMap[String, Array[Byte]] = null
 
   def flushByteBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 8192)
@@ -307,6 +308,42 @@ class BaseByteRenderer[T <: java.io.OutputStream](
    * chunks and escapes only the bytes that require it.
    */
   private def visitLongString(str: String): Unit = {
+    val charLen = str.length
+    if (charLen >= 128 && charLen <= BaseByteRenderer.LONG_STRING_CACHE_MAX_CHARS) {
+      val cache = cachedLongStrings
+      if (cache != null) {
+        val cached = cache.get(str)
+        if (cached != null) {
+          elemBuilder.ensureLength(cached.length)
+          System.arraycopy(cached, 0, elemBuilder.arr, elemBuilder.length, cached.length)
+          elemBuilder.length += cached.length
+          return
+        }
+      }
+
+      val start = elemBuilder.length
+      renderLongStringUncached(str)
+      val renderedLen = elemBuilder.length - start
+      if (renderedLen <= BaseByteRenderer.LONG_STRING_CACHE_MAX_BYTES) {
+        val c =
+          if (cache != null) cache
+          else {
+            val newCache = new java.util.HashMap[String, Array[Byte]]()
+            cachedLongStrings = newCache
+            newCache
+          }
+        if (c.size() < BaseByteRenderer.LONG_STRING_CACHE_MAX_ENTRIES) {
+          val rendered = new Array[Byte](renderedLen)
+          System.arraycopy(elemBuilder.arr, start, rendered, 0, renderedLen)
+          c.put(str, rendered)
+        }
+      }
+    } else {
+      renderLongStringUncached(str)
+    }
+  }
+
+  private def renderLongStringUncached(str: String): Unit = {
     val bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8)
     val bLen = bytes.length
     val firstEscape = CharSWAR.findFirstEscapeChar(bytes, 0, bLen)
@@ -445,6 +482,10 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 }
 
 object BaseByteRenderer {
+
+  private final val LONG_STRING_CACHE_MAX_CHARS = 4096
+  private final val LONG_STRING_CACHE_MAX_BYTES = 16384
+  private final val LONG_STRING_CACHE_MAX_ENTRIES = 2048
 
   /** Pre-allocated spaces buffer for bulk indentation. */
   private[sjsonnet] val SPACES: Array[Byte] = {
