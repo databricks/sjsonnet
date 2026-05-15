@@ -656,7 +656,7 @@ object Materializer extends Materializer {
     var left = left0
     var right = right0
     while (right - left > 16) {
-      val pivotKey = keys(order((left + right) >>> 1))
+      val pivotKey = medianOfThreeKey(order, keys, left, right)
       var i = left
       var j = right
       while (i <= j) {
@@ -679,6 +679,36 @@ object Materializer extends Materializer {
       }
     }
     insertionSortInlineOrder(order, keys, left, right)
+  }
+
+  /**
+   * Median-of-three pivot selection for [[quickSortInlineOrder]]. Returns the median key among
+   * `keys(order(left))`, `keys(order(mid))`, and `keys(order(right))` (where `mid = (left + right)
+   * >>> 1`). Compared to a fixed mid-element pivot, this reduces worst-case behaviour on inputs
+   * that are already sorted, reverse-sorted, or contain runs — patterns that occur frequently in
+   * Jsonnet object key sets.
+   */
+  private def medianOfThreeKey(
+      order: Array[Int],
+      keys: Array[String],
+      left: Int,
+      right: Int): String = {
+    val mid = (left + right) >>> 1
+    val a = keys(order(left))
+    val b = keys(order(mid))
+    val c = keys(order(right))
+    val ab = Util.compareStringsByCodepoint(a, b)
+    val ac = Util.compareStringsByCodepoint(a, c)
+    val bc = Util.compareStringsByCodepoint(b, c)
+    if (ab <= 0) {
+      if (bc <= 0) b // a <= b <= c
+      else if (ac <= 0) c // a <= c < b
+      else a // c < a <= b
+    } else {
+      if (ac <= 0) a // b < a <= c
+      else if (bc <= 0) c // b <= c < a
+      else b // c < b < a
+    }
   }
 
   /**
