@@ -476,10 +476,10 @@ object StringModule extends AbstractFunctionModule {
         sep: String,
         elem: Eval,
         len: Int): Val.Str = {
-      if (len == 0) return Val.Str(pos, "")
+      if (len == 0) return Val.Str.asciiSafe(pos, "")
 
       elem match {
-        case _: Val.Null => Val.Str(pos, "")
+        case _: Val.Null => Val.Str.asciiSafe(pos, "")
         case s: Val.Str  => joinedRepeatedString(pos, sep, s.str, len)
         case _: Val      => null
         case _           => null
@@ -498,38 +498,151 @@ object StringModule extends AbstractFunctionModule {
       else null
     }
 
+    private final val PresizedStringJoinMinParts = 16
+
+    private def joinPresizedStringArray(
+        pos: Position,
+        sep: Val.Str,
+        arr: Val.Arr,
+        len: Int): Val.Str = {
+      val sepStr = sep.str
+      val sepLen = sepStr.length
+      var totalLen = 0L
+      var added = false
+      var asciiSafe = true
+      var i = 0
+      while (i < len) {
+        arr.value(i) match {
+          case _: Val.Null =>
+          case x: Val.Str  =>
+            if (added) {
+              totalLen += sepLen
+              asciiSafe &&= sep._asciiSafe
+            }
+            val str = x.str
+            totalLen += str.length
+            if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+            asciiSafe &&= x._asciiSafe
+            added = true
+          case x => Error.fail("Cannot join " + x.prettyName)
+        }
+        i += 1
+      }
+
+      if (!added) return Val.Str.asciiSafe(pos, "")
+
+      val b = new java.lang.StringBuilder(totalLen.toInt)
+      i = 0
+      var needsSep = false
+      while (i < len) {
+        arr.value(i) match {
+          case _: Val.Null =>
+          case x: Val.Str  =>
+            if (needsSep) b.append(sepStr)
+            needsSep = true
+            b.append(x.str)
+          case _ =>
+        }
+        i += 1
+      }
+      val result = b.toString
+      if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
+    }
+
+    private def joinDirectStringArray(
+        pos: Position,
+        sep: Val.Str,
+        direct: Array[Eval],
+        len: Int): Val.Str = {
+      val sepStr = sep.str
+      val sepLen = sepStr.length
+      var totalLen = 0L
+      var added = false
+      var asciiSafe = true
+      val parts = new Array[String](len)
+      var i = 0
+      while (i < len) {
+        direct(i) match {
+          case _: Val.Null =>
+          case x: Val.Str  =>
+            if (added) {
+              totalLen += sepLen
+              asciiSafe &&= sep._asciiSafe
+            }
+            val str = x.str
+            parts(i) = str
+            totalLen += str.length
+            if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+            asciiSafe &&= x._asciiSafe
+            added = true
+          case _ => return null
+        }
+        i += 1
+      }
+
+      if (!added) return Val.Str.asciiSafe(pos, "")
+
+      val b = new java.lang.StringBuilder(totalLen.toInt)
+      i = 0
+      var needsSep = false
+      while (i < parts.length) {
+        val str = parts(i)
+        if (str != null) {
+          if (needsSep) b.append(sepStr)
+          needsSep = true
+          b.append(str)
+        }
+        i += 1
+      }
+      val result = b.toString
+      if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
+    }
+
     def evalRhs(sep: Eval, _arr: Eval, ev: EvalScope, pos: Position): Val = {
       val arr = implicitly[ReadWriter[Val.Arr]].apply(_arr.value)
       sep.value match {
         case sepStr: Val.Str =>
-          val s = sepStr.str
           val len = arr.length
+          val s = sepStr.str
           val repeatedConst = joinRepeatedStringEval(pos, s, arr.constantEval, len)
           if (repeatedConst != null) return repeatedConst
 
-          if (len == 0) return Val.Str(pos, "")
+          if (len == 0) return Val.Str.asciiSafe(pos, "")
 
           val direct = arr.directBackingArray
           if (direct != null) {
             val repeated = joinRepeatedDirectString(pos, s, direct, len)
             if (repeated != null) return repeated
+
+            val joined = joinDirectStringArray(pos, sepStr, direct, len)
+            if (joined != null) return joined
+          }
+
+          if (len >= PresizedStringJoinMinParts) {
+            return joinPresizedStringArray(pos, sepStr, arr, len)
           }
 
           val b = new java.lang.StringBuilder()
           var i = 0
           var added = false
+          var asciiSafe = true
           while (i < len) {
             arr.value(i) match {
               case _: Val.Null =>
               case x: Val.Str  =>
-                if (added) b.append(s)
+                if (added) {
+                  b.append(s)
+                  asciiSafe &&= sepStr._asciiSafe
+                }
                 added = true
                 b.append(x.str)
+                asciiSafe &&= x._asciiSafe
               case x => Error.fail("Cannot join " + x.prettyName)
             }
             i += 1
           }
-          Val.Str(pos, b.toString)
+          val result = b.toString
+          if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
         case sep: Val.Arr =>
           val len = arr.length
           if (len > PresizedCopyMaxParts) {
