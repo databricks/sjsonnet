@@ -140,6 +140,9 @@ object Platform {
 
   private val xxHashFactory = XXHashFactory.fastestInstance()
 
+  def hashBytes(bytes: Array[Byte]): String =
+    xxHashFactory.hash64().hash(bytes, 0, bytes.length, 0).toString
+
   def hashFile(file: File): String = {
     val buffer = new Array[Byte](8192)
     val hash: StreamingXXHash64 = xxHashFactory.newStreamingHash64(0)

@@ -197,6 +197,9 @@ object Platform {
   // Same as go-jsonnet https://github.com/google/go-jsonnet/blob/2b4d7535f540f128e38830492e509a550eb86d57/builtins.go#L959
   def sha3(s: String): String = computeHash("SHA3-512", s)
 
+  def hashBytes(bytes: Array[Byte]): String =
+    scala.util.hashing.MurmurHash3.bytesHash(bytes).toHexString
+
   def hashFile(file: File): String = {
     scala.util.hashing.MurmurHash3
       .orderedHash(

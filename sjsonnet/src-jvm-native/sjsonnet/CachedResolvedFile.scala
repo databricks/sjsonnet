@@ -5,7 +5,6 @@ import fastparse.ParserInput
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.security.MessageDigest
 
 /**
  * A class that encapsulates a resolved import. This is used to cache the result of resolving an
@@ -55,25 +54,7 @@ class CachedResolvedFile(
   private lazy val resolvedTextContent: ResolvedFile =
     StaticResolvedFile(new String(cachedBytes, StandardCharsets.UTF_8))
 
-  private lazy val cachedBytesHash: String =
-    cachedBytes.length.toString + ":" + bytesToHex(
-      MessageDigest.getInstance("SHA-256").digest(cachedBytes)
-    )
-
-  private def bytesToHex(bytes: Array[Byte]): String = {
-    val hexChars = "0123456789abcdef"
-    val out = new Array[Char](bytes.length * 2)
-    var i = 0
-    var j = 0
-    while (i < bytes.length) {
-      val b = bytes(i) & 0xff
-      out(j) = hexChars.charAt(b >>> 4)
-      out(j + 1) = hexChars.charAt(b & 0x0f)
-      i += 1
-      j += 2
-    }
-    new String(out)
-  }
+  private lazy val cachedBytesHash: String = Platform.hashBytes(cachedBytes)
 
   /**
    * A method that will return a reader for the resolved import. If the import is too large, then
