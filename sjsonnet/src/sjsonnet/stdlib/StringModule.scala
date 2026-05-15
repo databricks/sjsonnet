@@ -958,7 +958,7 @@ object StringModule extends AbstractFunctionModule {
    */
   private object Format_ extends Val.Builtin2("format", "str", "vals") {
     def evalRhs(str: Eval, vals: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Format.format(str.value.asString, vals.value, pos)(ev))
+      Format.format(str.value.asString, vals.value, pos)(ev)
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
         case Array(str, fmt: Val.Str) =>

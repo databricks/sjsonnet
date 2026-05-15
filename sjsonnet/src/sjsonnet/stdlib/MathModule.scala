@@ -255,7 +255,7 @@ object MathModule extends AbstractFunctionModule {
         def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val = {
           (a.value, b.value) match {
             case (x: Val.Num, y: Val.Num) => Val.cachedNum(pos, x.asDouble % y.asDouble)
-            case _ => Val.Str(pos, Format.format(a.value.asString, b.value, pos)(ev))
+            case _                        => Format.format(a.value.asString, b.value, pos)(ev)
           }
         }
       }
