@@ -435,21 +435,22 @@ object StringModule extends AbstractFunctionModule {
   private object Join extends Val.Builtin2("join", "sep", "arr") {
     private def joinedRepeatedString(
         pos: Position,
-        sep: String,
-        str: String,
+        sep: Val.Str,
+        str: Val.Str,
         count: Int): Val.Str = {
-      if (count == 0) Val.Str(pos, "")
+      if (count == 0) Val.Str.asciiSafe(pos, "")
       else {
-        val resultLen = str.length.toLong * count + sep.length.toLong * (count - 1)
+        val s = str.str
+        val sepStr = sep.str
+        val resultLen = s.length.toLong * count + sepStr.length.toLong * (count - 1)
         if (resultLen > Int.MaxValue) Error.fail("String is too large to join")
-        if (count == 1) {
-          if (Platform.isAsciiJsonSafe(str)) Val.Str.asciiSafe(pos, str) else Val.Str(pos, str)
-        } else {
-          val asciiSafe = Platform.isAsciiJsonSafe(str) && Platform.isAsciiJsonSafe(sep)
+        if (count == 1) str
+        else {
+          val asciiSafe = str._asciiSafe && sep._asciiSafe
 
           val b = new java.lang.StringBuilder(resultLen.toInt)
-          if (str.length + sep.length <= 64) {
-            val repeated = str + sep
+          if (s.length + sepStr.length <= 64) {
+            val repeated = s + sepStr
             var i = 1
             while (i < count) {
               b.append(repeated)
@@ -458,12 +459,12 @@ object StringModule extends AbstractFunctionModule {
           } else {
             var i = 1
             while (i < count) {
-              b.append(str)
-              b.append(sep)
+              b.append(s)
+              b.append(sepStr)
               i += 1
             }
           }
-          b.append(str)
+          b.append(s)
 
           val result = b.toString
           if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
@@ -473,14 +474,14 @@ object StringModule extends AbstractFunctionModule {
 
     private def joinRepeatedStringEval(
         pos: Position,
-        sep: String,
+        sep: Val.Str,
         elem: Eval,
         len: Int): Val.Str = {
       if (len == 0) return Val.Str.asciiSafe(pos, "")
 
       elem match {
         case _: Val.Null => Val.Str.asciiSafe(pos, "")
-        case s: Val.Str  => joinedRepeatedString(pos, sep, s.str, len)
+        case s: Val.Str  => joinedRepeatedString(pos, sep, s, len)
         case _: Val      => null
         case _           => null
       }
@@ -488,7 +489,7 @@ object StringModule extends AbstractFunctionModule {
 
     private def joinRepeatedDirectString(
         pos: Position,
-        sep: String,
+        sep: Val.Str,
         direct: Array[Eval],
         len: Int): Val.Str = {
       val firstEval = direct(0)
@@ -604,14 +605,14 @@ object StringModule extends AbstractFunctionModule {
         case sepStr: Val.Str =>
           val len = arr.length
           val s = sepStr.str
-          val repeatedConst = joinRepeatedStringEval(pos, s, arr.constantEval, len)
+          val repeatedConst = joinRepeatedStringEval(pos, sepStr, arr.constantEval, len)
           if (repeatedConst != null) return repeatedConst
 
           if (len == 0) return Val.Str.asciiSafe(pos, "")
 
           val direct = arr.directBackingArray
           if (direct != null) {
-            val repeated = joinRepeatedDirectString(pos, s, direct, len)
+            val repeated = joinRepeatedDirectString(pos, sepStr, direct, len)
             if (repeated != null) return repeated
 
             val joined = joinDirectStringArray(pos, sepStr, direct, len)
