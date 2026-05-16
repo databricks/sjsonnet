@@ -84,7 +84,7 @@ object StringModule extends AbstractFunctionModule {
         (x.value match {
           case v: Val.Str =>
             val s = v.str
-            if (v._asciiSafe) s.length
+            if (v.isInstanceOf[Val.AsciiSafeStr]) s.length
             else s.codePointCount(0, s.length)
           case a: Val.Arr  => a.length
           case o: Val.Obj  => o.visibleKeyNames.length
@@ -131,7 +131,7 @@ object StringModule extends AbstractFunctionModule {
     def evalRhs(_s: Eval, from: Eval, len: Eval, ev: EvalScope, pos: Position): Val = {
       val srcVal = _s.value
       val str = srcVal.asString
-      val srcAsciiSafe = srcVal.isInstanceOf[Val.Str] && srcVal.asInstanceOf[Val.Str]._asciiSafe
+      val srcAsciiSafe = srcVal.isInstanceOf[Val.AsciiSafeStr]
       val offset = from.value match {
         case v: Val.Num => v.asPositiveInt
         case _ => Error.fail("Expected a number for offset in substr, got " + from.value.prettyName)
@@ -148,11 +148,8 @@ object StringModule extends AbstractFunctionModule {
         val safeOffset = math.min(offset, strLen)
         val safeLength = math.min(length, strLen - safeOffset)
         if (safeLength <= 0) Val.Str(pos, "")
-        else {
-          val result = Val.Str(pos, str.substring(safeOffset, safeOffset + safeLength))
-          result._asciiSafe = true
-          result
-        }
+        else
+          Val.Str.asciiSafe(pos, str.substring(safeOffset, safeOffset + safeLength))
       } else {
         val requestedEnd = offset.toLong + length.toLong
         if (
@@ -242,8 +239,8 @@ object StringModule extends AbstractFunctionModule {
       val toVal = to.value
       val out = srcVal.asString.replace(fromForce, toVal.asString)
       // Result is asciiSafe iff both src and `to` are asciiSafe (`from` is removed).
-      val srcSafe = srcVal.isInstanceOf[Val.Str] && srcVal.asInstanceOf[Val.Str]._asciiSafe
-      val toSafe = toVal.isInstanceOf[Val.Str] && toVal.asInstanceOf[Val.Str]._asciiSafe
+      val srcSafe = srcVal.isInstanceOf[Val.AsciiSafeStr]
+      val toSafe = toVal.isInstanceOf[Val.AsciiSafeStr]
       if (srcSafe && toSafe) Val.Str.asciiSafe(pos, out) else Val.Str(pos, out)
     }
   }
@@ -386,8 +383,8 @@ object StringModule extends AbstractFunctionModule {
         right = true
       )
       v match {
-        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
-        case _                            => Val.Str(pos, out)
+        case _: Val.AsciiSafeStr => Val.Str.asciiSafe(pos, out)
+        case _                   => Val.Str(pos, out)
       }
     }
   }
@@ -409,8 +406,8 @@ object StringModule extends AbstractFunctionModule {
         right = false
       )
       v match {
-        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
-        case _                            => Val.Str(pos, out)
+        case _: Val.AsciiSafeStr => Val.Str.asciiSafe(pos, out)
+        case _                   => Val.Str(pos, out)
       }
     }
   }
@@ -432,8 +429,8 @@ object StringModule extends AbstractFunctionModule {
         right = true
       )
       v match {
-        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
-        case _                            => Val.Str(pos, out)
+        case _: Val.AsciiSafeStr => Val.Str.asciiSafe(pos, out)
+        case _                   => Val.Str(pos, out)
       }
     }
   }
@@ -461,7 +458,7 @@ object StringModule extends AbstractFunctionModule {
         if (resultLen > Int.MaxValue) Error.fail("String is too large to join")
         if (count == 1) str
         else {
-          val asciiSafe = str._asciiSafe && sep._asciiSafe
+          val asciiSafe = str.isInstanceOf[Val.AsciiSafeStr] && sep.isInstanceOf[Val.AsciiSafeStr]
 
           val b = new java.lang.StringBuilder(resultLen.toInt)
           if (s.length + sepStr.length <= 64) {
@@ -533,12 +530,12 @@ object StringModule extends AbstractFunctionModule {
           case x: Val.Str  =>
             if (added) {
               totalLen += sepLen
-              asciiSafe &&= sep._asciiSafe
+              asciiSafe &&= sep.isInstanceOf[Val.AsciiSafeStr]
             }
             val str = x.str
             totalLen += str.length
             if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
-            asciiSafe &&= x._asciiSafe
+            asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
             added = true
           case x => Error.fail("Cannot join " + x.prettyName)
         }
@@ -583,7 +580,7 @@ object StringModule extends AbstractFunctionModule {
           case x: Val.Str  =>
             totalLen += x.str.length
             if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
-            asciiSafe &&= x._asciiSafe
+            asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
             elemCount += 1
           case _ => return null
         }
@@ -593,7 +590,7 @@ object StringModule extends AbstractFunctionModule {
       if (elemCount > 1) {
         totalLen += sepLen.toLong * (elemCount - 1)
         if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
-        asciiSafe &&= sep._asciiSafe
+        asciiSafe &&= sep.isInstanceOf[Val.AsciiSafeStr]
       }
 
       val b = new java.lang.StringBuilder(totalLen.toInt)
@@ -648,11 +645,11 @@ object StringModule extends AbstractFunctionModule {
               case x: Val.Str  =>
                 if (added) {
                   b.append(s)
-                  asciiSafe &&= sepStr._asciiSafe
+                  asciiSafe &&= sepStr.isInstanceOf[Val.AsciiSafeStr]
                 }
                 added = true
                 b.append(x.str)
-                asciiSafe &&= x._asciiSafe
+                asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
               case x => Error.fail("Cannot join " + x.prettyName)
             }
             i += 1
@@ -864,7 +861,7 @@ object StringModule extends AbstractFunctionModule {
   private object Split extends Val.Builtin2("split", "str", "c") {
     def evalRhs(str: Eval, c: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
-      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      val safe = v.isInstanceOf[Val.AsciiSafeStr]
       Val.Arr(pos, splitLimit(pos, v.asString, c.value.asString, -1, safe))
     }
   }
@@ -882,7 +879,7 @@ object StringModule extends AbstractFunctionModule {
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
-      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      val safe = v.isInstanceOf[Val.AsciiSafeStr]
       Val.Arr(
         pos,
         splitLimit(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
@@ -900,7 +897,7 @@ object StringModule extends AbstractFunctionModule {
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
-      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      val safe = v.isInstanceOf[Val.AsciiSafeStr]
       Val.Arr(
         pos,
         splitLimitR(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
@@ -1051,8 +1048,8 @@ object StringModule extends AbstractFunctionModule {
       val s = v.asString
       val out = asciiUpper(s)
       v match {
-        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
-        case _                            => Val.Str(pos, out)
+        case _: Val.AsciiSafeStr => Val.Str.asciiSafe(pos, out)
+        case _                   => Val.Str(pos, out)
       }
     }
   }
@@ -1070,8 +1067,8 @@ object StringModule extends AbstractFunctionModule {
       val s = v.asString
       val out = asciiLower(s)
       v match {
-        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
-        case _                            => Val.Str(pos, out)
+        case _: Val.AsciiSafeStr => Val.Str.asciiSafe(pos, out)
+        case _                   => Val.Str(pos, out)
       }
     }
   }

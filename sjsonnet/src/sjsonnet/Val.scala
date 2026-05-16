@@ -328,9 +328,11 @@ object Val {
    * strings). Concat nodes have `_str == null` and non-null children; the flat string is lazily
    * computed on first `.str` access, then cached and children cleared for GC.
    *
-   * Single monomorphic class ensures optimal JIT inlining — no virtual dispatch on `.str`.
+   * Subclassing: only [[Val.AsciiSafeStr]] extends this class. The two-class hierarchy lets the JIT
+   * still devirtualize `.str` access through CHA (only one non-final implementation in the
+   * codebase) while saving 8 bytes per instance compared to a boolean field plus alignment padding.
    */
-  final class Str private[sjsonnet] (var pos: Position, private[sjsonnet] var _str: String)
+  class Str private[sjsonnet] (var pos: Position, private[sjsonnet] var _str: String)
       extends Literal {
 
     // DO NOT CHANGE to separate _left/_right fields.
@@ -339,11 +341,6 @@ object Val {
     // per leaf, and 99%+ of all Str instances are leaves. The array indirection only matters on the
     // cold flatten path, which is amortized O(1) per character.
     private[sjsonnet] var _children: Array[Str] = null
-
-    // Flag indicating this string is known to contain only printable ASCII (0x20-0x7E) with no
-    // characters requiring JSON escaping (no ", \, or control chars). When true, the renderer
-    // can skip SWAR escape scanning and UTF-8 encoding, writing bytes directly.
-    private[sjsonnet] var _asciiSafe: Boolean = false
 
     def prettyName = "string"
     private[sjsonnet] def valTag: Byte = TAG_STR
@@ -407,17 +404,23 @@ object Val {
     override def toString: String = s"Str($pos, $str)"
   }
 
+  /**
+   * String known to contain only printable ASCII (0x20-0x7E) with no characters requiring JSON
+   * escaping (no `"`, `\`, or control chars). [[ByteRenderer]] checks for this subclass to skip
+   * SWAR escape scanning and UTF-8 encoding, writing bytes directly.
+   *
+   * Marker subclass instead of a boolean field saves 8 bytes per instance (boolean + alignment
+   * padding) — significant for string-heavy workloads where Val.Str instances number in millions.
+   */
+  final class AsciiSafeStr private[sjsonnet] (pos0: Position, str0: String) extends Str(pos0, str0)
+
   object Str {
 
     /** Create a leaf string node — zero overhead vs the old case class. */
     def apply(pos: Position, s: String): Str = new Str(pos, s)
 
     /** Create a leaf string node marked as ASCII-safe (no JSON escaping needed). */
-    def asciiSafe(pos: Position, s: String): Str = {
-      val v = new Str(pos, s)
-      v._asciiSafe = true
-      v
-    }
+    def asciiSafe(pos: Position, s: String): Str = new AsciiSafeStr(pos, s)
 
     /** Backward-compatible extractor: `case Val.Str(pos, s) =>` still works. */
     def unapply(s: Str): Option[(Position, String)] = Some((s.pos, s.str))
@@ -432,16 +435,15 @@ object Val {
       // Empty string elimination
       if (ls != null && ls.isEmpty) return right
       if (rs != null && rs.isEmpty) return left
+      val bothSafe = left.isInstanceOf[AsciiSafeStr] && right.isInstanceOf[AsciiSafeStr]
       // Small string eagerness: both flat and combined length <= 128
       if (ls != null && rs != null && ls.length + rs.length <= 128) {
-        val result = new Str(pos, ls + rs)
-        if (left._asciiSafe && right._asciiSafe) result._asciiSafe = true
-        return result
+        val combined = ls + rs
+        return if (bothSafe) new AsciiSafeStr(pos, combined) else new Str(pos, combined)
       }
       // Rope node: O(1)
-      val node = new Str(pos, null)
+      val node = if (bothSafe) new AsciiSafeStr(pos, null) else new Str(pos, null)
       node._children = Array(left, right)
-      if (left._asciiSafe && right._asciiSafe) node._asciiSafe = true
       node
     }
   }
