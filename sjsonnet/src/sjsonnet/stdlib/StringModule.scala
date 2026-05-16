@@ -557,40 +557,40 @@ object StringModule extends AbstractFunctionModule {
       val sepStr = sep.str
       val sepLen = sepStr.length
       var totalLen = 0L
-      var added = false
+      var elemCount = 0
       var asciiSafe = true
-      val parts = new Array[String](len)
       var i = 0
+      // Pass 1: validate element types, accumulate total char length and asciiSafe.
       while (i < len) {
         direct(i) match {
           case _: Val.Null =>
           case x: Val.Str  =>
-            if (added) {
-              totalLen += sepLen
-              asciiSafe &&= sep._asciiSafe
-            }
-            val str = x.str
-            parts(i) = str
-            totalLen += str.length
+            totalLen += x.str.length
             if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
             asciiSafe &&= x._asciiSafe
-            added = true
+            elemCount += 1
           case _ => return null
         }
         i += 1
       }
-
-      if (!added) return Val.Str.asciiSafe(pos, "")
+      if (elemCount == 0) return Val.Str.asciiSafe(pos, "")
+      if (elemCount > 1) {
+        totalLen += sepLen.toLong * (elemCount - 1)
+        if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+        asciiSafe &&= sep._asciiSafe
+      }
 
       val b = new java.lang.StringBuilder(totalLen.toInt)
       i = 0
       var needsSep = false
-      while (i < parts.length) {
-        val str = parts(i)
-        if (str != null) {
+      // Pass 2: append. Pass 1 already validated all non-Null entries are Val.Str, so the
+      // unchecked cast below is safe and avoids a redundant pattern match dispatch.
+      while (i < len) {
+        val v = direct(i)
+        if (!v.isInstanceOf[Val.Null]) {
           if (needsSep) b.append(sepStr)
           needsSep = true
-          b.append(str)
+          b.append(v.asInstanceOf[Val.Str].str)
         }
         i += 1
       }
