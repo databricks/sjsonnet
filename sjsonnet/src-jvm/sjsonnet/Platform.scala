@@ -33,6 +33,9 @@ object Platform {
   def isAsciiJsonSafe(s: String): Boolean =
     CharSWAR.isAsciiJsonSafe(s)
 
+  def isAsciiJsonSafe(s: String, from: Int, to: Int): Boolean =
+    CharSWAR.isAsciiJsonSafe(s, from, to)
+
   def gzipBytes(b: Array[Byte]): String = {
     val outputStream: ByteArrayOutputStream = new ByteArrayOutputStream(b.length)
     val gzip: GZIPOutputStream = new GZIPOutputStream(outputStream)

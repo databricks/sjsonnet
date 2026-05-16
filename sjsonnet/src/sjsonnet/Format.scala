@@ -294,20 +294,13 @@ object Format {
   }
 
   /**
-   * Scalar ASCII-JSON-safe check over a substring window of `s`. Matches the predicate used by
+   * ASCII-JSON-safe check over a substring window of `s`. Matches the predicate used by
    * [[Platform.isAsciiJsonSafe]] (printable ASCII, no `"` or `\`). Used at format-parse time so the
    * result can be cached on [[RuntimeFormat]] and combined with per-value ASCII-safety at format
    * time.
    */
-  private def isAsciiJsonSafeRange(s: String, from: Int, to: Int): Boolean = {
-    var i = from
-    while (i < to) {
-      val c = s.charAt(i)
-      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
-      i += 1
-    }
-    true
-  }
+  private def isAsciiJsonSafeRange(s: String, from: Int, to: Int): Boolean =
+    Platform.isAsciiJsonSafe(s, from, to)
 
   /**
    * Hand-written format string scanner. Replaces the fastparse-based parser with direct
