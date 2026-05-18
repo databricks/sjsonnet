@@ -173,7 +173,8 @@ object PreloaderTests extends TestSuite {
       class JsonOnlyResolvedFile(content: String) extends ResolvedFile {
         def getParserInput(): fastparse.ParserInput =
           throw new RuntimeException("strict JSON should not be parsed with fastparse")
-        def readString(): String = content
+        def readString(): String =
+          throw new RuntimeException("strict JSON should not be decoded as text")
         def contentHash(): String = content
         def readRawBytes(): Array[Byte] =
           content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
