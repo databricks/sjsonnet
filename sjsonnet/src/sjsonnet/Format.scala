@@ -46,7 +46,13 @@ object Format {
        * this case we can use a fast path that caches the object key lookup and avoids widenRaw
        * entirely.
        */
-      val allSimpleNamedString: Boolean)
+      val allSimpleNamedString: Boolean,
+      /**
+       * True when every literal segment (leading + inter-spec literals) contains only printable
+       * ASCII with no `"` or `\`. Computed once at parse time; combined at format time with the
+       * ASCII-safety of each interpolated value to set the result's [[Val.Str._asciiSafe]] flag.
+       */
+      val literalsAsciiSafe: Boolean)
       extends CompiledFormat
 
   final class FormatSpec private (val bits: Long) extends AnyVal {
@@ -264,7 +270,7 @@ object Format {
     }
   }
 
-  def format(s: String, values0: Val, pos: Position)(implicit evaluator: EvalScope): String = {
+  def format(s: String, values0: Val, pos: Position)(implicit evaluator: EvalScope): Val.Str = {
     val parsed = parseFormatCached(s, evaluator.formatCache)
     format(parsed, values0, pos)
   }
@@ -288,6 +294,22 @@ object Format {
   }
 
   /**
+   * Scalar ASCII-JSON-safe check over a substring window of `s`. Matches the predicate used by
+   * [[Platform.isAsciiJsonSafe]] (printable ASCII, no `"` or `\`). Used at format-parse time so the
+   * result can be cached on [[RuntimeFormat]] and combined with per-value ASCII-safety at format
+   * time.
+   */
+  private def isAsciiJsonSafeRange(s: String, from: Int, to: Int): Boolean = {
+    var i = from
+    while (i < to) {
+      val c = s.charAt(i)
+      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
+      i += 1
+    }
+    true
+  }
+
+  /**
    * Hand-written format string scanner. Replaces the fastparse-based parser with direct
    * `String.indexOf('%')` scanning, which is a JVM intrinsic / native SIMD-optimized operation. For
    * large format strings (e.g. 605KB large_string_template with 256 interpolations), this avoids
@@ -306,12 +328,15 @@ object Format {
     var lastLabel: String = null
     var firstNamedLabel: String = null
     var allNamedLabelsSame = true
+    var allLiteralsAscii = true
 
     // Find the first '%' to extract the leading literal
     var pos = s.indexOf('%')
     val leadingStart = 0
     val leadingEnd = if (pos < 0) len else pos
     staticChars += leadingEnd - leadingStart
+    if (allLiteralsAscii && !isAsciiJsonSafeRange(s, leadingStart, leadingEnd))
+      allLiteralsAscii = false
 
     while (pos >= 0 && pos < len) {
       pos += 1 // skip the '%'
@@ -451,6 +476,8 @@ object Format {
       litStartsBuilder += litStart
       litEndsBuilder += litEnd
       staticChars += litEnd - litStart
+      if (allLiteralsAscii && !isAsciiJsonSafeRange(s, litStart, litEnd))
+        allLiteralsAscii = false
 
       pos = nextPct
     }
@@ -483,7 +510,8 @@ object Format {
       litStarts,
       litEnds,
       singleNamedLabel,
-      allSimpleNamed
+      allSimpleNamed,
+      allLiteralsAscii
     )
   }
 
@@ -499,6 +527,7 @@ object Format {
     var staticChars = leading.length
     var hasAnyStar = false
     var allSimpleNamed = true
+    var allLiteralsAscii = Platform.isAsciiJsonSafe(leading)
     var idx = 0
     while (idx < size) {
       val (formatted, literal) = chunks(idx)
@@ -510,6 +539,7 @@ object Format {
       staticChars += literal.length
       hasAnyStar ||= formatted.widthStar || formatted.precisionStar
       allSimpleNamed = false
+      if (allLiteralsAscii && !Platform.isAsciiJsonSafe(literal)) allLiteralsAscii = false
       idx += 1
     }
     // No source string available for fastparse path; offset arrays are unused
@@ -526,12 +556,13 @@ object Format {
       emptyStarts,
       emptyEnds,
       null,
-      allSimpleNamed
+      allSimpleNamed,
+      allLiteralsAscii
     )
   }
 
   def format(leading: String, chunks: scala.Seq[(FormatSpec, String)], values0: Val, pos: Position)(
-      implicit evaluator: EvalScope): String = {
+      implicit evaluator: EvalScope): Val.Str = {
     format(lowerParsedFormat((leading, chunks)), values0, pos)
   }
 
@@ -551,7 +582,7 @@ object Format {
   }
 
   private def format(parsed: RuntimeFormat, values0: Val, pos: Position)(implicit
-      evaluator: EvalScope): String = {
+      evaluator: EvalScope): Val.Str = {
 
     // Super-fast path: all specs are simple %(key)s with an object value.
     // Avoids per-spec pattern matching, widenRaw, and uses offset-based literal appends.
@@ -581,6 +612,9 @@ object Format {
       else new java.lang.StringBuilder(parsed.staticChars + specBits.length * 8)
     if (!singleSpecNoStatic) appendLeading(output, parsed)
     var singleFormatted: String = null
+    // Result ASCII-safety: starts from the format string's literal ASCII-safety, then ANDs with
+    // each spec's output ASCII-safety. Once false, stays false.
+    var resultAsciiSafe = parsed.literalsAsciiSafe
     var i = 0
     var idx = 0
     // Use while-loop instead of for/zipWithIndex to avoid iterator allocation
@@ -662,6 +696,8 @@ object Format {
           // This avoids the overhead of materializing to ujson.Value and then matching on it,
           // which is a significant cost for format-heavy workloads like large_string_template.
           val rawVal = raw.value
+          if (resultAsciiSafe && !specOutputAsciiSafe(rawVal, formatted.conversion))
+            resultAsciiSafe = false
           val formattedValue = rawVal match {
             case f: Val.Func => Error.fail("Cannot format function value", f)
             case vs: Val.Str =>
@@ -748,7 +784,8 @@ object Format {
         "Too many values to format: %d, expected %d".format(valuesArr.length, i)
       )
     }
-    if (singleSpecNoStatic) singleFormatted else output.toString()
+    val resultStr = if (singleSpecNoStatic) singleFormatted else output.toString()
+    if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
   }
 
   /**
@@ -758,27 +795,33 @@ object Format {
    * redundant object lookups and the generic dispatch overhead.
    */
   private def formatSimpleNamedString(parsed: RuntimeFormat, obj: Val.Obj, pos: Position)(implicit
-      evaluator: EvalScope): String = {
+      evaluator: EvalScope): Val.Str = {
     val output = new java.lang.StringBuilder(parsed.staticChars + parsed.specBits.length * 16)
 
     // Append leading literal using offsets if source is available, else use string
     appendLeading(output, parsed)
 
+    var resultAsciiSafe = parsed.literalsAsciiSafe
+
     val singleLabel = parsed.singleNamedLabel
     if (singleLabel != null) {
-      val str = simpleStringValue(obj.value(singleLabel, pos)(evaluator).value)
+      val rawVal = obj.value(singleLabel, pos)(evaluator).value
+      if (resultAsciiSafe && !simpleStringValueAsciiSafe(rawVal)) resultAsciiSafe = false
+      val str = simpleStringValue(rawVal)
       var idx = 0
       while (idx < parsed.specBits.length) {
         output.append(str)
         appendLiteral(output, parsed, idx)
         idx += 1
       }
-      return output.toString
+      val resultStr = output.toString
+      return if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
     }
 
     // Cache for repeated key lookups: most format strings reuse the same key many times
     var cachedKey: String = null
     var cachedStr: String = null
+    var cachedAsciiSafe: Boolean = true
 
     var idx = 0
     while (idx < parsed.specBits.length) {
@@ -791,11 +834,14 @@ object Format {
         else {
           val rawVal = obj.value(key, pos)(evaluator).value
           val s = simpleStringValue(rawVal)
+          val safe = simpleStringValueAsciiSafe(rawVal)
           cachedKey = key
           cachedStr = s
+          cachedAsciiSafe = safe
           s
         }
 
+      if (resultAsciiSafe && !cachedAsciiSafe) resultAsciiSafe = false
       output.append(str)
 
       // Append trailing literal using offsets if source is available
@@ -803,7 +849,8 @@ object Format {
 
       idx += 1
     }
-    output.toString
+    val resultStr = output.toString
+    if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
   }
 
   private def simpleStringValue(rawVal: Val)(implicit evaluator: EvalScope): String =
@@ -825,6 +872,41 @@ object Format {
         }
         value.toString
     }
+
+  /**
+   * ASCII-safety predicate matching the output of [[simpleStringValue]] (used by the simple
+   * `%(name)s` fast path). Numeric/boolean/null literals are always ASCII; strings forward their
+   * cached `_asciiSafe` flag; complex types route through Renderer which may emit non-ASCII.
+   */
+  @inline private def simpleStringValueAsciiSafe(rawVal: Val): Boolean = rawVal match {
+    case vs: Val.Str  => vs._asciiSafe
+    case _: Val.Num   => true
+    case _: Val.True  => true
+    case _: Val.False => true
+    case _: Val.Null  => true
+    case _            => false
+  }
+
+  /**
+   * ASCII-safety predicate for the output of a single format spec, used by the general [[format]]
+   * path. Mirrors the conversion logic below: strings forward their cached flag, numerics produce
+   * ASCII (except `%c` which depends on the codepoint), other scalars are always ASCII, and Arr/Obj
+   * go through Renderer (which preserves non-ASCII source bytes).
+   */
+  @inline private def specOutputAsciiSafe(rawVal: Val, conversion: Char): Boolean = rawVal match {
+    case vs: Val.Str => vs._asciiSafe
+    case vn: Val.Num =>
+      conversion match {
+        case 'c' =>
+          val ch = vn.asDouble.toInt
+          ch >= 32 && ch < 127 && ch != '"' && ch != '\\'
+        case _ => true
+      }
+    case _: Val.True  => true
+    case _: Val.False => true
+    case _: Val.Null  => true
+    case _            => false
+  }
 
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
     // Fast path: if the value fits in a Long (and isn't Long.MinValue where
@@ -1013,6 +1095,6 @@ object Format {
     // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.
     private val parsed = scanFormat(fmt)
     def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, format(parsed, values0.value, pos)(ev))
+      format(parsed, values0.value, pos)(ev)
   }
 }

@@ -1344,7 +1344,7 @@ class Evaluator(
               case Val.Num(_, rd) => Val.cachedNum(pos, ld % rd)
               case _              => failBinOp(l, e.op, r, pos)
             }
-          case ls: Val.Str => Val.Str(pos, Format.format(ls.str, r, pos))
+          case ls: Val.Str => Format.format(ls.str, r, pos)
           case _           => failBinOp(l, e.op, r, pos)
         }
 
