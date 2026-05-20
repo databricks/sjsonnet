@@ -23,10 +23,11 @@ object CharSWAR {
     false
   }
 
-  def isAsciiJsonSafe(s: String): Boolean = {
-    var i = 0
-    val len = s.length
-    while (i < len) {
+  def isAsciiJsonSafe(s: String): Boolean = isAsciiJsonSafe(s, 0, s.length)
+
+  def isAsciiJsonSafe(s: String, from: Int, to: Int): Boolean = {
+    var i = from
+    while (i < to) {
       val c = s.charAt(i)
       if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
       i += 1

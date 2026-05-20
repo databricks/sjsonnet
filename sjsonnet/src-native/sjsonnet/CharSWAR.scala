@@ -73,12 +73,14 @@ object CharSWAR {
     false
   }
 
-  def isAsciiJsonSafe(s: String): Boolean = {
-    val len = s.length
-    if (len < 8) return isAsciiJsonSafeScalar(s, len)
+  def isAsciiJsonSafe(s: String): Boolean = isAsciiJsonSafe(s, 0, s.length)
 
-    var i = 0
-    val limit = len - 3
+  def isAsciiJsonSafe(s: String, from: Int, to: Int): Boolean = {
+    val len = to - from
+    if (len < 8) return isAsciiJsonSafeScalar(s, from, to)
+
+    var i = from
+    val limit = to - 3
     while (i < limit) {
       val word =
         (s.charAt(i).toLong) |
@@ -88,7 +90,7 @@ object CharSWAR {
       if (swarHasUnsafeAsciiChar(word)) return false
       i += 4
     }
-    while (i < len) {
+    while (i < to) {
       val c = s.charAt(i)
       if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
       i += 1
@@ -166,9 +168,9 @@ object CharSWAR {
   @inline private def zero16(word: Long): Long =
     ~((word & U16_HOLE) + U16_HOLE | word | U16_HOLE)
 
-  @inline private def isAsciiJsonSafeScalar(s: String, len: Int): Boolean = {
-    var i = 0
-    while (i < len) {
+  @inline private def isAsciiJsonSafeScalar(s: String, from: Int, to: Int): Boolean = {
+    var i = from
+    while (i < to) {
       val c = s.charAt(i)
       if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
       i += 1

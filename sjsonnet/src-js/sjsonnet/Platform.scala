@@ -38,6 +38,9 @@ object Platform {
   def isAsciiJsonSafe(s: String): Boolean =
     CharSWAR.isAsciiJsonSafe(s)
 
+  def isAsciiJsonSafe(s: String, from: Int, to: Int): Boolean =
+    CharSWAR.isAsciiJsonSafe(s, from, to)
+
   private def nodeToJson(node: Node): ujson.Value = node match {
     case _: Node.ScalarNode =>
       YamlDecoder.forAny.construct(node).getOrElse("") match {

@@ -91,12 +91,20 @@ final class CharSWAR {
      * encoding step: all chars must be printable ASCII excluding {@code '"'} and {@code '\\'}.
      */
     static boolean isAsciiJsonSafe(String str) {
-        int len = str.length();
+        return isAsciiJsonSafe(str, 0, str.length());
+    }
+
+    /**
+     * Range variant of {@link #isAsciiJsonSafe(String)}. Used by the format parser to scan literal
+     * windows of a format string without allocating substrings.
+     */
+    static boolean isAsciiJsonSafe(String str, int from, int to) {
+        int len = to - from;
         if (len < 8) {
-            return isAsciiJsonSafeScalar(str, len);
+            return isAsciiJsonSafeScalar(str, from, to);
         }
-        int i = 0;
-        int limit = len - 3; // 4 UTF-16 chars per word
+        int i = from;
+        int limit = to - 3; // 4 UTF-16 chars per word
         while (i < limit) {
             long word =
                     ((long) str.charAt(i)) |
@@ -106,7 +114,7 @@ final class CharSWAR {
             if (swarHasUnsafeAsciiChar(word)) return false;
             i += 4;
         }
-        while (i < len) {
+        while (i < to) {
             char c = str.charAt(i);
             if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
             i++;
@@ -216,8 +224,8 @@ final class CharSWAR {
         return false;
     }
 
-    private static boolean isAsciiJsonSafeScalar(String s, int len) {
-        for (int i = 0; i < len; i++) {
+    private static boolean isAsciiJsonSafeScalar(String s, int from, int to) {
+        for (int i = from; i < to; i++) {
             char c = s.charAt(i);
             if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
         }

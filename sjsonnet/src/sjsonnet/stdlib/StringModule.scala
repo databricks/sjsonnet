@@ -217,7 +217,10 @@ object StringModule extends AbstractFunctionModule {
       if (!Character.isValidCodePoint(c)) {
         Error.fail(s"Invalid unicode code point, got " + c)
       }
-      Val.Str(pos, Character.toString(c))
+      val s = Character.toString(c)
+      // Single-codepoint result; ASCII printable except '"' and '\\' is JSON-safe.
+      if (c >= 0x20 && c < 0x7f && c != '"' && c != '\\') Val.Str.asciiSafe(pos, s)
+      else Val.Str(pos, s)
     }
   }
 
@@ -235,7 +238,13 @@ object StringModule extends AbstractFunctionModule {
       if (fromForce.isEmpty) {
         Error.fail("Cannot replace empty string in strReplace")
       }
-      Val.Str(pos, str.value.asString.replace(fromForce, to.value.asString))
+      val srcVal = str.value
+      val toVal = to.value
+      val out = srcVal.asString.replace(fromForce, toVal.asString)
+      // Result is asciiSafe iff both src and `to` are asciiSafe (`from` is removed).
+      val srcSafe = srcVal.isInstanceOf[Val.Str] && srcVal.asInstanceOf[Val.Str]._asciiSafe
+      val toSafe = toVal.isInstanceOf[Val.Str] && toVal.asInstanceOf[Val.Str]._asciiSafe
+      if (srcSafe && toSafe) Val.Str.asciiSafe(pos, out) else Val.Str(pos, out)
     }
   }
 
@@ -369,15 +378,17 @@ object StringModule extends AbstractFunctionModule {
    */
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Str(
-        pos,
-        StripUtils.strip(
-          str.value.asString,
-          chars.value.asString,
-          left = true,
-          right = true
-        )
+      val v = str.value
+      val out = StripUtils.strip(
+        v.asString,
+        chars.value.asString,
+        left = true,
+        right = true
       )
+      v match {
+        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
+        case _                            => Val.Str(pos, out)
+      }
     }
   }
 
@@ -390,15 +401,17 @@ object StringModule extends AbstractFunctionModule {
    */
   private object LStripChars extends Val.Builtin2("lstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Str(
-        pos,
-        StripUtils.strip(
-          str.value.asString,
-          chars.value.asString,
-          left = true,
-          right = false
-        )
+      val v = str.value
+      val out = StripUtils.strip(
+        v.asString,
+        chars.value.asString,
+        left = true,
+        right = false
       )
+      v match {
+        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
+        case _                            => Val.Str(pos, out)
+      }
     }
   }
 
@@ -411,15 +424,17 @@ object StringModule extends AbstractFunctionModule {
    */
   private object RStripChars extends Val.Builtin2("rstripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Str(
-        pos,
-        StripUtils.strip(
-          str.value.asString,
-          chars.value.asString,
-          left = false,
-          right = true
-        )
+      val v = str.value
+      val out = StripUtils.strip(
+        v.asString,
+        chars.value.asString,
+        left = false,
+        right = true
       )
+      v match {
+        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
+        case _                            => Val.Str(pos, out)
+      }
     }
   }
 
@@ -435,21 +450,22 @@ object StringModule extends AbstractFunctionModule {
   private object Join extends Val.Builtin2("join", "sep", "arr") {
     private def joinedRepeatedString(
         pos: Position,
-        sep: String,
-        str: String,
+        sep: Val.Str,
+        str: Val.Str,
         count: Int): Val.Str = {
-      if (count == 0) Val.Str(pos, "")
+      if (count == 0) Val.Str.asciiSafe(pos, "")
       else {
-        val resultLen = str.length.toLong * count + sep.length.toLong * (count - 1)
+        val s = str.str
+        val sepStr = sep.str
+        val resultLen = s.length.toLong * count + sepStr.length.toLong * (count - 1)
         if (resultLen > Int.MaxValue) Error.fail("String is too large to join")
-        if (count == 1) {
-          if (Platform.isAsciiJsonSafe(str)) Val.Str.asciiSafe(pos, str) else Val.Str(pos, str)
-        } else {
-          val asciiSafe = Platform.isAsciiJsonSafe(str) && Platform.isAsciiJsonSafe(sep)
+        if (count == 1) str
+        else {
+          val asciiSafe = str._asciiSafe && sep._asciiSafe
 
           val b = new java.lang.StringBuilder(resultLen.toInt)
-          if (str.length + sep.length <= 64) {
-            val repeated = str + sep
+          if (s.length + sepStr.length <= 64) {
+            val repeated = s + sepStr
             var i = 1
             while (i < count) {
               b.append(repeated)
@@ -458,12 +474,12 @@ object StringModule extends AbstractFunctionModule {
           } else {
             var i = 1
             while (i < count) {
-              b.append(str)
-              b.append(sep)
+              b.append(s)
+              b.append(sepStr)
               i += 1
             }
           }
-          b.append(str)
+          b.append(s)
 
           val result = b.toString
           if (asciiSafe) Val.Str.asciiSafe(pos, result) else Val.Str(pos, result)
@@ -473,14 +489,14 @@ object StringModule extends AbstractFunctionModule {
 
     private def joinRepeatedStringEval(
         pos: Position,
-        sep: String,
+        sep: Val.Str,
         elem: Eval,
         len: Int): Val.Str = {
       if (len == 0) return Val.Str.asciiSafe(pos, "")
 
       elem match {
         case _: Val.Null => Val.Str.asciiSafe(pos, "")
-        case s: Val.Str  => joinedRepeatedString(pos, sep, s.str, len)
+        case s: Val.Str  => joinedRepeatedString(pos, sep, s, len)
         case _: Val      => null
         case _           => null
       }
@@ -488,7 +504,7 @@ object StringModule extends AbstractFunctionModule {
 
     private def joinRepeatedDirectString(
         pos: Position,
-        sep: String,
+        sep: Val.Str,
         direct: Array[Eval],
         len: Int): Val.Str = {
       val firstEval = direct(0)
@@ -557,40 +573,40 @@ object StringModule extends AbstractFunctionModule {
       val sepStr = sep.str
       val sepLen = sepStr.length
       var totalLen = 0L
-      var added = false
+      var elemCount = 0
       var asciiSafe = true
-      val parts = new Array[String](len)
       var i = 0
+      // Pass 1: validate element types, accumulate total char length and asciiSafe.
       while (i < len) {
         direct(i) match {
           case _: Val.Null =>
           case x: Val.Str  =>
-            if (added) {
-              totalLen += sepLen
-              asciiSafe &&= sep._asciiSafe
-            }
-            val str = x.str
-            parts(i) = str
-            totalLen += str.length
+            totalLen += x.str.length
             if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
             asciiSafe &&= x._asciiSafe
-            added = true
+            elemCount += 1
           case _ => return null
         }
         i += 1
       }
-
-      if (!added) return Val.Str.asciiSafe(pos, "")
+      if (elemCount == 0) return Val.Str.asciiSafe(pos, "")
+      if (elemCount > 1) {
+        totalLen += sepLen.toLong * (elemCount - 1)
+        if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+        asciiSafe &&= sep._asciiSafe
+      }
 
       val b = new java.lang.StringBuilder(totalLen.toInt)
       i = 0
       var needsSep = false
-      while (i < parts.length) {
-        val str = parts(i)
-        if (str != null) {
+      // Pass 2: append. Pass 1 already validated all non-Null entries are Val.Str, so the
+      // unchecked cast below is safe and avoids a redundant pattern match dispatch.
+      while (i < len) {
+        val v = direct(i)
+        if (!v.isInstanceOf[Val.Null]) {
           if (needsSep) b.append(sepStr)
           needsSep = true
-          b.append(str)
+          b.append(v.asInstanceOf[Val.Str].str)
         }
         i += 1
       }
@@ -604,14 +620,14 @@ object StringModule extends AbstractFunctionModule {
         case sepStr: Val.Str =>
           val len = arr.length
           val s = sepStr.str
-          val repeatedConst = joinRepeatedStringEval(pos, s, arr.constantEval, len)
+          val repeatedConst = joinRepeatedStringEval(pos, sepStr, arr.constantEval, len)
           if (repeatedConst != null) return repeatedConst
 
           if (len == 0) return Val.Str.asciiSafe(pos, "")
 
           val direct = arr.directBackingArray
           if (direct != null) {
-            val repeated = joinRepeatedDirectString(pos, s, direct, len)
+            val repeated = joinRepeatedDirectString(pos, sepStr, direct, len)
             if (repeated != null) return repeated
 
             val joined = joinDirectStringArray(pos, sepStr, direct, len)
@@ -697,7 +713,12 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
-  private def splitLimit(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Eval] = {
+  private def splitLimit(
+      pos: Position,
+      str: String,
+      cStr: String,
+      maxSplits: Int,
+      asciiSafe: Boolean): Array[Eval] = {
     if (cStr.isEmpty) {
       Error.fail("Cannot split by an empty string")
     }
@@ -709,12 +730,14 @@ object StringModule extends AbstractFunctionModule {
     var next = if (maxSplits == 0) -1 else str.indexOf(cStr, start)
 
     while (next >= 0 && (maxSplits < 0 || sz < maxSplits)) {
-      b += Val.Str(pos, str.substring(start, next))
+      val piece = str.substring(start, next)
+      b += (if (asciiSafe) Val.Str.asciiSafe(pos, piece) else Val.Str(pos, piece))
       start = next + cStr.length
       sz += 1
       next = if (maxSplits >= 0 && sz >= maxSplits) -1 else str.indexOf(cStr, start)
     }
-    b += Val.Str(pos, str.substring(start))
+    val tail = str.substring(start)
+    b += (if (asciiSafe) Val.Str.asciiSafe(pos, tail) else Val.Str(pos, tail))
     sz += 1
     b.result()
   }
@@ -750,9 +773,14 @@ object StringModule extends AbstractFunctionModule {
     -1
   }
 
-  private def splitLimitR(pos: Position, str: String, cStr: String, maxSplits: Int): Array[Eval] = {
+  private def splitLimitR(
+      pos: Position,
+      str: String,
+      cStr: String,
+      maxSplits: Int,
+      asciiSafe: Boolean): Array[Eval] = {
     if (maxSplits == -1) {
-      return splitLimit(pos, str, cStr, maxSplits)
+      return splitLimit(pos, str, cStr, maxSplits, asciiSafe)
     }
 
     if (cStr.isEmpty) {
@@ -760,7 +788,7 @@ object StringModule extends AbstractFunctionModule {
     }
 
     if (maxSplits >= 0 && maxSplits <= SplitLimitRPreallocMaxSplits) {
-      return splitLimitRBounded(pos, str, cStr, maxSplits)
+      return splitLimitRBounded(pos, str, cStr, maxSplits, asciiSafe)
     }
 
     val b = new mutable.ArrayBuilder.ofRef[Eval]
@@ -770,14 +798,16 @@ object StringModule extends AbstractFunctionModule {
     var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
 
     while (next >= 0 && (maxSplits < 0 || sz < maxSplits)) {
-      b += Val.Str(pos, str.substring(next + cLen, end))
+      val piece = str.substring(next + cLen, end)
+      b += (if (asciiSafe) Val.Str.asciiSafe(pos, piece) else Val.Str(pos, piece))
       end = next
       sz += 1
       next =
         if (maxSplits >= 0 && sz >= maxSplits) -1
         else lastSplitIndex(str, cStr, cLen, end - cLen)
     }
-    b += Val.Str(pos, str.substring(0, end))
+    val head = str.substring(0, end)
+    b += (if (asciiSafe) Val.Str.asciiSafe(pos, head) else Val.Str(pos, head))
 
     val result = b.result()
     var left = 0
@@ -796,7 +826,8 @@ object StringModule extends AbstractFunctionModule {
       pos: Position,
       str: String,
       cStr: String,
-      maxSplits: Int): Array[Eval] = {
+      maxSplits: Int,
+      asciiSafe: Boolean): Array[Eval] = {
     val cLen = cStr.length
     val result = new Array[Eval](maxSplits + 1)
     var out = maxSplits
@@ -805,7 +836,8 @@ object StringModule extends AbstractFunctionModule {
     var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
 
     while (next >= 0 && sz < maxSplits) {
-      result(out) = Val.Str(pos, str.substring(next + cLen, end))
+      val piece = str.substring(next + cLen, end)
+      result(out) = if (asciiSafe) Val.Str.asciiSafe(pos, piece) else Val.Str(pos, piece)
       out -= 1
       end = next
       sz += 1
@@ -813,7 +845,8 @@ object StringModule extends AbstractFunctionModule {
         if (sz >= maxSplits) -1
         else lastSplitIndex(str, cStr, cLen, end - cLen)
     }
-    result(out) = Val.Str(pos, str.substring(0, end))
+    val head = str.substring(0, end)
+    result(out) = if (asciiSafe) Val.Str.asciiSafe(pos, head) else Val.Str(pos, head)
 
     if (out == 0) result
     else java.util.Arrays.copyOfRange(result, out, maxSplits + 1)
@@ -830,7 +863,9 @@ object StringModule extends AbstractFunctionModule {
    */
   private object Split extends Val.Builtin2("split", "str", "c") {
     def evalRhs(str: Eval, c: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, -1))
+      val v = str.value
+      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      Val.Arr(pos, splitLimit(pos, v.asString, c.value.asString, -1, safe))
     }
   }
 
@@ -846,7 +881,12 @@ object StringModule extends AbstractFunctionModule {
    */
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, splitLimit(pos, str.value.asString, c.value.asString, maxSplits.value.asInt))
+      val v = str.value
+      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      Val.Arr(
+        pos,
+        splitLimit(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
+      )
     }
   }
 
@@ -859,7 +899,12 @@ object StringModule extends AbstractFunctionModule {
    */
   private object SplitLimitR extends Val.Builtin3("splitLimitR", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
-      Val.Arr(pos, splitLimitR(pos, str.value.asString, c.value.asString, maxSplits.value.asInt))
+      val v = str.value
+      val safe = v.isInstanceOf[Val.Str] && v.asInstanceOf[Val.Str]._asciiSafe
+      Val.Arr(
+        pos,
+        splitLimitR(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
+      )
     }
   }
 
@@ -1001,8 +1046,15 @@ object StringModule extends AbstractFunctionModule {
    * Returns a copy of the string in which all ASCII letters are capitalized.
    */
   private object AsciiUpper extends Val.Builtin1("asciiUpper", "str") {
-    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, asciiUpper(str.value.asString))
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val v = str.value
+      val s = v.asString
+      val out = asciiUpper(s)
+      v match {
+        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
+        case _                            => Val.Str(pos, out)
+      }
+    }
   }
 
   /**
@@ -1013,8 +1065,15 @@ object StringModule extends AbstractFunctionModule {
    * Returns a copy of the string in which all ASCII letters are lower cased.
    */
   private object AsciiLower extends Val.Builtin1("asciiLower", "str") {
-    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, asciiLower(str.value.asString))
+    def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
+      val v = str.value
+      val s = v.asString
+      val out = asciiLower(s)
+      v match {
+        case vs: Val.Str if vs._asciiSafe => Val.Str.asciiSafe(pos, out)
+        case _                            => Val.Str(pos, out)
+      }
+    }
   }
 
   /**
