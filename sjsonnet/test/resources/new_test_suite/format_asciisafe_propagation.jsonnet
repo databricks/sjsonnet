@@ -1,5 +1,5 @@
 // Directional coverage for Format ASCII-safety propagation.
-// Ensures format strings preserve correct values across paths that set Val.Str._asciiSafe:
+// Ensures format strings preserve correct values across paths that produce Val.AsciiSafeStr:
 // - simple %(name)s fast path with ASCII / non-ASCII literals and values
 // - general format path with %s / %d / %c / %o / %x conversions
 // - mixed ASCII literals + non-ASCII string interpolations (output must be correct)

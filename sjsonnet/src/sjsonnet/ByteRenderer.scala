@@ -193,7 +193,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     (vt: @scala.annotation.switch) match {
       case 0 => // TAG_STR
         val s = v.asInstanceOf[Val.Str]
-        if (s._asciiSafe) renderAsciiSafeString(s.str)
+        if (s.isInstanceOf[Val.AsciiSafeStr]) renderAsciiSafeString(s.str)
         else renderQuotedString(s.str)
       case 1 => // TAG_NUM
         renderDouble(v.asDouble)
