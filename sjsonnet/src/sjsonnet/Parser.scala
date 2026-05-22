@@ -754,10 +754,10 @@ class Parser(
     // cost more than the potential memory savings for strings that are unlikely
     // to repeat (e.g., 600KB text block literals)
     val unique = if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
-    val result = Val.Str(pos, unique)
     if (unique.length > 1024 && CharSWAR.isAsciiJsonSafe(unique))
-      result._asciiSafe = true
-    result
+      Val.Str.asciiSafe(pos, unique)
+    else
+      Val.Str(pos, unique)
   }
 
   // Any `expr` that isn't naively left-recursive

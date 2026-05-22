@@ -50,7 +50,8 @@ object Format {
       /**
        * True when every literal segment (leading + inter-spec literals) contains only printable
        * ASCII with no `"` or `\`. Computed once at parse time; combined at format time with the
-       * ASCII-safety of each interpolated value to set the result's [[Val.Str._asciiSafe]] flag.
+       * ASCII-safety of each interpolated value to decide whether the result is a
+       * [[Val.AsciiSafeStr]].
        */
       val literalsAsciiSafe: Boolean)
       extends CompiledFormat
@@ -868,27 +869,30 @@ object Format {
 
   /**
    * ASCII-safety predicate matching the output of [[simpleStringValue]] (used by the simple
-   * `%(name)s` fast path). Numeric/boolean/null literals are always ASCII; strings forward their
-   * cached `_asciiSafe` flag; complex types route through Renderer which may emit non-ASCII.
+   * `%(name)s` fast path). Numeric/boolean/null literals are always ASCII; strings forward via
+   * subclass check ([[Val.AsciiSafeStr]]); complex types route through Renderer which may emit
+   * non-ASCII.
    */
   @inline private def simpleStringValueAsciiSafe(rawVal: Val): Boolean = rawVal match {
-    case vs: Val.Str  => vs._asciiSafe
-    case _: Val.Num   => true
-    case _: Val.True  => true
-    case _: Val.False => true
-    case _: Val.Null  => true
-    case _            => false
+    case _: Val.AsciiSafeStr => true
+    case _: Val.Str          => false
+    case _: Val.Num          => true
+    case _: Val.True         => true
+    case _: Val.False        => true
+    case _: Val.Null         => true
+    case _                   => false
   }
 
   /**
    * ASCII-safety predicate for the output of a single format spec, used by the general [[format]]
-   * path. Mirrors the conversion logic below: strings forward their cached flag, numerics produce
+   * path. Mirrors the conversion logic below: strings forward via subclass check, numerics produce
    * ASCII (except `%c` which depends on the codepoint), other scalars are always ASCII, and Arr/Obj
    * go through Renderer (which preserves non-ASCII source bytes).
    */
   @inline private def specOutputAsciiSafe(rawVal: Val, conversion: Char): Boolean = rawVal match {
-    case vs: Val.Str => vs._asciiSafe
-    case vn: Val.Num =>
+    case _: Val.AsciiSafeStr => true
+    case _: Val.Str          => false
+    case vn: Val.Num         =>
       conversion match {
         case 'c' =>
           val ch = vn.asDouble.toInt

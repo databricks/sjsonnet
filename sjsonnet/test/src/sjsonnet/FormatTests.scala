@@ -31,7 +31,7 @@ object FormatTests extends TestSuite {
       )
       val result = fmt.evalRhs(obj, scope, pos).asInstanceOf[Val.Str]
       result.str ==> "hello 3"
-      result._asciiSafe ==> true
+      result.isInstanceOf[Val.AsciiSafeStr] ==> true
     }
 
     test("simple named format does not mark unsafe string values ascii-safe") {
@@ -42,7 +42,7 @@ object FormatTests extends TestSuite {
       )
       val result = fmt.evalRhs(obj, scope, pos).asInstanceOf[Val.Str]
       result.str ==> "hello \""
-      result._asciiSafe ==> false
+      result.isInstanceOf[Val.AsciiSafeStr] ==> false
     }
 
     test("simple named format does not mark unsafe static literals ascii-safe") {
@@ -53,7 +53,7 @@ object FormatTests extends TestSuite {
       )
       val result = fmt.evalRhs(obj, scope, pos).asInstanceOf[Val.Str]
       result.str ==> "hello \"3"
-      result._asciiSafe ==> false
+      result.isInstanceOf[Val.AsciiSafeStr] ==> false
     }
 
     test("simple named format combines ascii-safety across multiple keys") {
@@ -67,7 +67,7 @@ object FormatTests extends TestSuite {
       )
       val result = fmt.evalRhs(obj, scope, pos).asInstanceOf[Val.Str]
       result.str ==> "safe \\ safe"
-      result._asciiSafe ==> false
+      result.isInstanceOf[Val.AsciiSafeStr] ==> false
     }
   }
 }
