@@ -29,6 +29,18 @@ path.write_text(text.replace(old, new))
 PY
 }
 
+add_curl_retries_in_mill() {
+  python3 - << 'PY'
+from pathlib import Path
+
+path = Path("mill")
+text = path.read_text()
+old = 'curl -f -L -o "${MILL_TEMP_DOWNLOAD_FILE}" "${MILL_DOWNLOAD_URL}"'
+new = 'curl --retry 5 --retry-delay 2 --retry-all-errors -f -L -o "${MILL_TEMP_DOWNLOAD_FILE}" "${MILL_DOWNLOAD_URL}"'
+path.write_text(text.replace(old, new))
+PY
+}
+
 mkdir -p ~/.sbt
 if [[ "${JFROG_ACCESS_TOKEN}" == "dummy" ]]; then
   # Fork PRs cannot mint the Databricks JFrog OIDC token. Use public Maven Central directly so new
@@ -39,8 +51,12 @@ if [[ "${JFROG_ACCESS_TOKEN}" == "dummy" ]]; then
   maven-central: ${MAVEN_CENTRAL_URL}
 EOF
   echo "COURSIER_REPOSITORIES=${MAVEN_CENTRAL_URL}" >> "$GITHUB_ENV"
+  mill_version="$(sed -n -E 's#^//\|[[:space:]]*mill-version:[[:space:]]*([^[:space:]]+).*#\1#p' build.mill | head -n 1)"
+  if [[ -z "${mill_version}" ]]; then mill_version="1.1.0"; fi
+  echo "MILL_VERSION=${mill_version%-jvm}-jvm" >> "$GITHUB_ENV"
   replace_repo1_in_mill "${MAVEN_CENTRAL_URL%/}"
   force_no_server_in_mill
+  add_curl_retries_in_mill
   {
     echo "-Djava.net.preferIPv4Stack=true"
     echo "-Djdk.tls.client.protocols=TLSv1.2"
