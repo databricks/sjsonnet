@@ -22,6 +22,7 @@ object SjsonnetMainBase {
    * Sentinel value returned when output was already written directly to stdout via byte pipeline.
    */
   private val ByteRenderedSentinel = "\u0000"
+  private final val OutputBufferSize = 256 * 1024
 
   class SimpleImporter(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
@@ -315,14 +316,14 @@ object SjsonnetMainBase {
     config.outputFile match {
       case Some(f) if !config.yamlOut.value && !config.expectString.value =>
         // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
-        // ByteBuilder handles buffering internally (8KB threshold), no BufferedOutputStream needed.
         handleWriteFile(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
         ).flatMap { out =>
           try {
-            val renderer = new ByteRenderer(out, indent = config.indent)
+            val buf = new BufferedOutputStream(out, SjsonnetMainBase.OutputBufferSize)
+            val renderer = new ByteRenderer(buf, indent = config.indent)
             val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
-            out.flush()
+            buf.flush()
             res.map(_ => "")
           } finally out.close()
         }
