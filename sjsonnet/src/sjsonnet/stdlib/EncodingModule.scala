@@ -59,8 +59,8 @@ object EncodingModule extends AbstractFunctionModule {
     builtin("base64", "input") { (pos, _, input: Val) =>
       (input match {
         case s: Val.Str =>
-          // For [[Val.AsciiSafeStr]] inputs every char fits in 0x00-0x7F (see
-          // Parser.constructString + CharSWAR.isAsciiJsonSafe), so the byte representation
+          // For [[Val.AsciiSafeStr]] inputs every char fits in 0x20-0x7F, excluding quote and
+          // backslash (see Parser.constructString + CharSWAR.isAsciiJsonSafe), so the byte representation
           // under ISO-8859-1, US-ASCII and UTF-8 is identical. Skipping `getBytes(UTF_8)` lets
           // the Native fast path build the encoder input directly with a single char-to-byte
           // loop into the zone-allocated buffer (avoiding both the UTF-8 pre-count scan and the

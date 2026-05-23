@@ -110,10 +110,11 @@ object PlatformBase64 {
    * SIMD encoder even sees it.
    *
    * The `asciiSafe` flag is a hot-path contract: when `true` the caller (e.g. `std.base64` for a
-   * [[sjsonnet.Val.AsciiSafeStr]] input) has already proven every char is 0x00–0x7F. We then write
-   * the input straight into the zone-allocated source buffer with a single tight `char.toByte`
-   * loop, skipping both the UTF-8 codec and the heap `Array[Byte]`. When `false`, we keep the
-   * original `getBytes(UTF_8)` slow path for correctness on non-ASCII strings.
+   * [[sjsonnet.Val.AsciiSafeStr]] input) has already proven every char is in 0x20-0x7F, excluding
+   * quote and backslash. We then write the input straight into the zone-allocated source buffer
+   * with a single tight `char.toByte` loop, skipping both the UTF-8 codec and the heap
+   * `Array[Byte]`. When `false`, we keep the original `getBytes(UTF_8)` slow path for correctness
+   * on non-ASCII strings.
    */
   def encodeStringToString(input: String, asciiSafe: Boolean): String = {
     if (input.isEmpty) return ""

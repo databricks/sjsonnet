@@ -405,9 +405,9 @@ object Val {
   }
 
   /**
-   * String known to contain only printable ASCII (0x20-0x7E) with no characters requiring JSON
-   * escaping (no `"`, `\`, or control chars). [[ByteRenderer]] checks for this subclass to skip
-   * SWAR escape scanning and UTF-8 encoding, writing bytes directly.
+   * String known to contain only single-byte ASCII chars in the JSON-safe range 0x20-0x7F,
+   * excluding characters requiring JSON escaping (`"` and `\`). [[ByteRenderer]] checks for this
+   * subclass to skip SWAR escape scanning and UTF-8 encoding, writing bytes directly.
    *
    * Marker subclass instead of a boolean field saves 8 bytes per instance (boolean + alignment
    * padding) — significant for string-heavy workloads where Val.Str instances number in millions.
