@@ -4,6 +4,7 @@ import java.io.{ByteArrayOutputStream, File}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util
 import java.util.Base64
+import java.util.HexFormat
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
 import scala.annotation.nowarn
@@ -11,7 +12,7 @@ import scala.collection.mutable
 import org.virtuslab.yaml.*
 
 object Platform {
-  private val hexChars = "0123456789abcdef".toCharArray
+  private val hexFormat = HexFormat.of()
 
   private def repeatCapacity(s: String, count: Int): Int =
     if (count > 0 && s.length <= Int.MaxValue / count) s.length * count else 0
@@ -172,22 +173,10 @@ object Platform {
     result.mkString("\n")
   }
 
-  private def bytesToHex(bytes: Array[Byte]): String = {
-    val out = new Array[Char](bytes.length * 2)
-    var i = 0
-    var j = 0
-    while (i < bytes.length) {
-      val b = bytes(i) & 0xff
-      out(j) = hexChars(b >>> 4)
-      out(j + 1) = hexChars(b & 0x0f)
-      i += 1
-      j += 2
-    }
-    new String(out)
-  }
-
   private def computeHash(algorithm: String, s: String): String =
-    bytesToHex(java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8)))
+    hexFormat.formatHex(
+      java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8))
+    )
 
   def md5(s: String): String = computeHash("MD5", s)
 
