@@ -172,7 +172,7 @@ object BaseRenderer {
     while (i < len) {
       val c = str.charAt(i)
       // Inlined classification, mirroring escapeChars below; `<` on a signed char is fine since
-      // chars are unsigned 16-bit and 0x20 / 0x7E are well below the sign boundary.
+      // chars are unsigned 16-bit; 0x20 / 0x7E comparisons are valid for all values.
       if (c == '"' || c == '\\' || c < 0x20 || (unicode && c > 0x7e)) {
         if (i > start) sb.write(str, start, i - start)
         (c: @switch) match {
