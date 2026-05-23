@@ -5,7 +5,7 @@ JFROG_HOSTNAME="databricks.jfrog.io"
 JFROG_REALM="Artifactory Realm"
 JFROG_USERNAME="gha-service-account"
 JFROG_URL="https://${JFROG_HOSTNAME}/artifactory/db-maven/"
-MAVEN_CENTRAL_URL="https://maven-central.storage-download.googleapis.com/maven2/"
+MAVEN_CENTRAL_URL="https://repo.maven.apache.org/maven2/"
 
 replace_repo1_in_mill() {
   python3 - "$1" << 'PY'
@@ -36,12 +36,9 @@ if [[ "${JFROG_ACCESS_TOKEN}" == "dummy" ]]; then
   cat > ~/.sbt/repositories << EOF
 [repositories]
   local
-  google-maven-central: ${MAVEN_CENTRAL_URL}
+  maven-central: ${MAVEN_CENTRAL_URL}
 EOF
   echo "COURSIER_REPOSITORIES=${MAVEN_CENTRAL_URL}" >> "$GITHUB_ENV"
-  mill_version="$(sed -n -E 's#^//\|[[:space:]]*mill-version:[[:space:]]*([^[:space:]]+).*#\1#p' build.mill | head -n 1)"
-  if [[ -z "${mill_version}" ]]; then mill_version="1.1.0"; fi
-  echo "MILL_VERSION=${mill_version%-jvm}-jvm" >> "$GITHUB_ENV"
   replace_repo1_in_mill "${MAVEN_CENTRAL_URL%/}"
   force_no_server_in_mill
   {
