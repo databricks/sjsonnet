@@ -378,6 +378,8 @@ object CachedResolver {
             keyArray,
             memberArray
           )
+          if (keyArray.length > 1)
+            obj._sortedInlineOrder = Materializer.computeSortedInlineOrder(keyArray, memberArray)
           obj._skipFieldCache = true
           obj
         }
