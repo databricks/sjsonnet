@@ -58,8 +58,16 @@ object EncodingModule extends AbstractFunctionModule {
      */
     builtin("base64", "input") { (pos, _, input: Val) =>
       (input match {
-        case Val.Str(_, value) =>
-          Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(value.getBytes(UTF_8)))
+        case s: Val.Str =>
+          // For [[Val.AsciiSafeStr]] inputs every char fits in 0x00-0x7F (see
+          // Parser.constructString + CharSWAR.isAsciiJsonSafe), so the byte representation
+          // under ISO-8859-1, US-ASCII and UTF-8 is identical. Skipping `getBytes(UTF_8)` lets
+          // the Native fast path build the encoder input directly with a single char-to-byte
+          // loop into the zone-allocated buffer (avoiding both the UTF-8 pre-count scan and the
+          // intermediate heap Array[Byte]); on the JVM/JS side we still allocate the byte array
+          // but skip the encoder's pre-count branch. See docs/perf-gap-vs-jrsonnet.md.
+          val asciiSafe = s.isInstanceOf[Val.AsciiSafeStr]
+          Val.Str.asciiSafe(pos, PlatformBase64.encodeStringToString(s.str, asciiSafe))
         case ba: Val.ByteArr =>
           Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(ba.rawBytes))
         case arr: Val.Arr =>

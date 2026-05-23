@@ -546,5 +546,48 @@ object Base64Tests extends TestSuite {
         assert(err.contains("Invalid base64"))
       }
     }
+
+    // ================================================================
+    // AsciiSafeStr fast path — large ASCII string literals are tagged
+    // by the parser as Val.AsciiSafeStr (see Parser.constructString),
+    // which triggers the platform fast path that skips getBytes(UTF_8).
+    // These tests pin the behaviour: the fast path must produce bytes
+    // identical to the slow path for any ASCII input, and large unicode
+    // inputs must continue to take the slow path correctly.
+    // ================================================================
+    test("asciiSafeFastPath") {
+      test("largeAsciiLiteralRoundtrips") {
+        // 2 KB ASCII literal — well past the 1024-byte threshold in the
+        // parser, so it gets tagged as AsciiSafeStr at parse time.
+        val src = "Lorem ipsum dolor sit amet. " * 80
+        assert(src.length > 1024)
+        val r = eval(s"""local s = "$src"; std.base64Decode(std.base64(s)) == s""")
+        assert(r == ujson.True)
+      }
+      test("largeAsciiMatchesByteArrayPath") {
+        // Encoding the string and encoding its byte array must give the
+        // same result — proves the ASCII fast path is byte-identical.
+        val src = ("abcdef0123!@#$%^&*()" * 60)
+        assert(src.length > 1024)
+        val r = eval(
+          s"""local s = "$src";
+             |std.base64(s) == std.base64(std.encodeUTF8(s))
+             |""".stripMargin
+        )
+        assert(r == ujson.True)
+      }
+      test("largeUnicodeStillCorrect") {
+        // 1500+ char unicode string — must NOT take the ASCII fast path
+        // (AsciiSafeStr is only tagged for pure-ASCII literals), and the
+        // result must equal what we get going via the byte array.
+        val src = "日本語テスト" * 250
+        val r = eval(
+          s"""local s = "$src";
+             |std.base64(s) == std.base64(std.encodeUTF8(s))
+             |""".stripMargin
+        )
+        assert(r == ujson.True)
+      }
+    }
   }
 }
