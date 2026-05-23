@@ -448,8 +448,8 @@ object PrettyYamlRenderer {
    * `Parsed$Failure.msg` consuming ~27% of total CPU. This hand-rolled scanner reproduces the
    * original grammar exactly while avoiding any allocation or backtracking overhead.
    *
-   * The reference FastParse implementation is preserved as [[stringNeedsToBeQuotedReference]] for
-   * exhaustive equivalence testing.
+   * The original FastParse implementation is preserved in the commit message / PR description; the
+   * regression tests exercise the same inputs against the expected values generated from it.
    */
   def stringNeedsToBeQuoted(str: String): Boolean = {
     val len = str.length
