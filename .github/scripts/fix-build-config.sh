@@ -5,7 +5,7 @@ JFROG_HOSTNAME="databricks.jfrog.io"
 JFROG_REALM="Artifactory Realm"
 JFROG_USERNAME="gha-service-account"
 JFROG_URL="https://${JFROG_HOSTNAME}/artifactory/db-maven/"
-MAVEN_CENTRAL_URL="https://repo.maven.apache.org/maven2/"
+MAVEN_CENTRAL_URL="https://maven-central.storage.googleapis.com/maven2/"
 
 replace_repo1_in_mill() {
   python3 - "$1" << 'PY'
