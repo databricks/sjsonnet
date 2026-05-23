@@ -132,7 +132,7 @@ object RendererTests extends TestSuite {
       escape("a\rb", unicode = true) ==> "\"a\\rb\""
       escape("a\tb", unicode = true) ==> "\"a\\tb\""
 
-      // Control chars that fall through to \uXXXX.
+      // Control chars that fall through to unicode escapes.
       escape("\u0000", unicode = true) ==> "\"\\u0000\""
       escape("\u0001", unicode = true) ==> "\"\\u0001\""
       escape("\u001f", unicode = true) ==> "\"\\u001f\""
