@@ -24,6 +24,34 @@ object SetModule extends AbstractFunctionModule {
   def name = "set"
 
   private val DefaultKeyF = Val.Null(dummyPos)
+  private[this] final val SortKindOther = 0
+  private[this] final val SortKindString = 1
+  private[this] final val SortKindNumber = 2
+  private[this] final val SortKindArray = 3
+  private[this] final val SortKindBoolean = 4
+  private[this] final val SortKindObject = 5
+  private[this] final val SortKindNull = 6
+  private[this] final val SortKindFunction = 7
+
+  @inline private[this] def sortKind(v: Val): Int = v match {
+    case _: Val.Str  => SortKindString
+    case _: Val.Num  => SortKindNumber
+    case _: Val.Arr  => SortKindArray
+    case _: Val.Bool => SortKindBoolean
+    case _: Val.Obj  => SortKindObject
+    case _: Val.Null => SortKindNull
+    case _: Val.Func => SortKindFunction
+    case _           => SortKindOther
+  }
+
+  @inline private[this] def allSameSortKind(values: Array[Val], kind: Int): Boolean = {
+    var i = 1
+    while (i < values.length) {
+      if (sortKind(values(i)) != kind) return false
+      i += 1
+    }
+    true
+  }
 
   @inline private def isDefaultKeyF(v: Val): Boolean = v.asInstanceOf[AnyRef] eq DefaultKeyF
 
@@ -326,19 +354,19 @@ object SetModule extends AbstractFunctionModule {
             keys(i) = keyFFunc(argBuf, null, pos.noOffset)(ev, TailstrictModeDisabled).value
             i += 1
           }
-          val keyType = keys(0).getClass
-          if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          val keyType = sortKind(keys(0))
+          if (keyType == SortKindBoolean) {
             Error.fail("Cannot sort with key values that are booleans")
           }
-          if (!keys.forall(_.getClass == keyType)) {
+          if (!allSameSortKind(keys, keyType)) {
             Error.fail("Cannot sort with key values that are not all the same type")
           }
 
           val indices = Array.range(0, vs.length)
 
-          val sortedIndices = if (keyType == classOf[Val.Str]) {
+          val sortedIndices = if (keyType == SortKindString) {
             indices.sortBy(i => keys(i).cast[Val.Str].asString)(Util.CodepointStringOrdering)
-          } else if (keyType == classOf[Val.Num]) {
+          } else if (keyType == SortKindNumber) {
             // Extract doubles into primitive array for unboxed comparison,
             // avoiding repeated Val.Num cast + Double boxing per comparison.
             val dkeys = new Array[Double](keys.length)
@@ -347,7 +375,7 @@ object SetModule extends AbstractFunctionModule {
               dkeys(di) = keys(di).asInstanceOf[Val.Num].asDouble; di += 1
             }
             indices.sortWith((a, b) => dkeys(a) < dkeys(b))
-          } else if (keyType == classOf[Val.Arr]) {
+          } else if (keyType == SortKindArray) {
             indices.sortBy(i => keys(i).cast[Val.Arr])(ev.compare(_, _))
           } else {
             Error.fail("Cannot sort with key values that are " + keys(0).prettyName + "s")
@@ -369,15 +397,15 @@ object SetModule extends AbstractFunctionModule {
             strict(i) = vs(i).value
             i += 1
           }
-          val keyType = strict(0).getClass
-          if (classOf[Val.Bool].isAssignableFrom(keyType)) {
+          val keyType = sortKind(strict(0))
+          if (keyType == SortKindBoolean) {
             Error.fail("Cannot sort with values that are booleans")
           }
-          if (!strict.forall(_.getClass == keyType))
+          if (!allSameSortKind(strict, keyType))
             Error.fail("Cannot sort with values that are not all the same type")
 
           // Sort in-place to avoid intermediate array allocations
-          if (keyType == classOf[Val.Str]) {
+          if (keyType == SortKindString) {
             java.util.Arrays.sort(
               strict.asInstanceOf[Array[AnyRef]],
               (a: AnyRef, b: AnyRef) =>
@@ -386,7 +414,7 @@ object SetModule extends AbstractFunctionModule {
                   b.asInstanceOf[Val.Str].asString
                 )
             )
-          } else if (keyType == classOf[Val.Num]) {
+          } else if (keyType == SortKindNumber) {
             // Primitive double sort: extract doubles, sort primitively (DualPivotQuicksort),
             // then reconstruct Val.Num array. Avoids Comparator virtual dispatch + boxing.
             val n = strict.length
@@ -400,12 +428,12 @@ object SetModule extends AbstractFunctionModule {
             while (di < n) {
               strict(di) = Val.cachedNum(pos, doubles(di)); di += 1
             }
-          } else if (keyType == classOf[Val.Arr]) {
+          } else if (keyType == SortKindArray) {
             java.util.Arrays.sort(
               strict.asInstanceOf[Array[AnyRef]],
               (a: AnyRef, b: AnyRef) => ev.compare(a.asInstanceOf[Val.Arr], b.asInstanceOf[Val.Arr])
             )
-          } else if (keyType == classOf[Val.Obj]) {
+          } else if (keyType == SortKindObject) {
             Error.fail("Unable to sort array of objects without key function")
           } else {
             Error.fail("Cannot sort array of " + strict(0).prettyName)
