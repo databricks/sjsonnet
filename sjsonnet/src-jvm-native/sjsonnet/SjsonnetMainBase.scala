@@ -50,7 +50,7 @@ object SjsonnetMainBase {
           }
           allowed
         })
-        .find(f => os.exists(f) && !os.isDir(f))
+        .find(os.isFile(_))
         .orElse({
           if (debugImporter) {
             System.err.println(s"[import $importName] none of the candidates exist")
@@ -553,7 +553,7 @@ object SjsonnetMainBase {
       binaryData: Boolean,
       debugImporter: Boolean): Option[ResolvedFile] = {
     val osPath = path.asInstanceOf[OsPath].p
-    if (os.exists(osPath) && !os.isDir(osPath)) {
+    if (os.isFile(osPath)) {
       Some(
         new CachedResolvedFile(
           path.asInstanceOf[OsPath],
