@@ -102,6 +102,49 @@ object PlatformBase64 {
     }
   }
 
+  /**
+   * Encode a `String` directly to base64 without materialising an intermediate `Array[Byte]` for
+   * the input side. On Scala Native, `String.getBytes(UTF_8)` for an ASCII-only input still has to
+   * walk every char checking for non-ASCII codepoints and then allocate a `Array[Byte]` of equal
+   * length; for a 3.5 KB Lorem-ipsum-style input that's two full passes over the data before the
+   * SIMD encoder even sees it.
+   *
+   * The `asciiSafe` flag is a hot-path contract: when `true` the caller (e.g. `std.base64` for a
+   * [[sjsonnet.Val.AsciiSafeStr]] input) has already proven every char is in 0x20-0x7F, excluding
+   * quote and backslash. We then write the input straight into the zone-allocated source buffer
+   * with a single tight `char.toByte` loop, skipping both the UTF-8 codec and the heap
+   * `Array[Byte]`. When `false`, we keep the original `getBytes(UTF_8)` slow path for correctness
+   * on non-ASCII strings.
+   */
+  def encodeStringToString(input: String, asciiSafe: Boolean): String = {
+    if (input.isEmpty) return ""
+    if (!asciiSafe) return encodeToString(input.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+
+    val len = input.length
+    val maxOutLen = ((len.toLong + 2) / 3) * 4
+    if (maxOutLen > Int.MaxValue)
+      throw new IllegalArgumentException("Input too large for base64 encoding")
+    val outSize = maxOutLen.toInt
+    Zone.acquire { implicit z =>
+      val srcPtr = alloc[Byte](len.toUSize)
+      // Narrow ASCII chars directly into the zone buffer. The AsciiSafeStr contract guarantees
+      // every char fits in 0x20..0x7F (minus quote/backslash) per Parser.constructString +
+      // CharSWAR.isAsciiJsonSafe, so the high byte of each Char is zero and `.toByte` is lossless.
+      var i = 0
+      while (i < len) {
+        !(srcPtr + i.toUSize) = input.charAt(i).toByte
+        i += 1
+      }
+      val outPtr = alloc[Byte]((outSize + 1).toUSize)
+      val outLenPtr = alloc[CSize](1.toUSize)
+      libbase64.base64_encode(srcPtr, len.toUSize, outPtr, outLenPtr, 0)
+      val actualLen = (!outLenPtr).toInt
+      val result = new Array[Byte](actualLen)
+      memcpy(result.at(0), outPtr, actualLen.toUSize)
+      new String(result, "US-ASCII")
+    }
+  }
+
   def decode(input: String): Array[Byte] = {
     if (input.isEmpty) return Array.emptyByteArray
     val srcBytes = input.getBytes("US-ASCII")
