@@ -13,6 +13,8 @@ import scala.scalanative.unsigned._
  * Uses stdio.fwrite which has internal C library buffering, avoiding per-call syscall overhead.
  */
 class NativeOutputStream(file: Ptr[FILE]) extends OutputStream {
+  stdio.setvbuf(file, null, stdio._IOFBF, NativeOutputStream.BufferSize.toUSize)
+
   override def write(b: Int): Unit =
     stdio.fputc(b, file)
 
@@ -26,4 +28,8 @@ class NativeOutputStream(file: Ptr[FILE]) extends OutputStream {
 
   override def close(): Unit =
     flush()
+}
+
+object NativeOutputStream {
+  private final val BufferSize = 256 * 1024
 }
