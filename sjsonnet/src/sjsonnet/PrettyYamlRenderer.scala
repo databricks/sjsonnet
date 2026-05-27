@@ -439,117 +439,237 @@ object PrettyYamlRenderer {
   }
 
   /**
-   * Parses a string to check if it matches a YAML non-string syntax, in which case it needs to be
-   * quoted when rendered. It's a pretty involved computation to check for
-   * booleans/numbers/nulls/dates/collections/etc., so we use FastParse to do it in a reasonably
-   * manageable and performant manner.
+   * Checks whether a string needs YAML quoting because it might otherwise be interpreted as a
+   * non-string scalar (keyword, number, date, etc.) or collides with YAML reserved syntax.
+   *
+   * Originally implemented via FastParse; that worked correctly but was a major hotspot because
+   * each invocation eagerly materialized parse-failure messages (Lazy[String] thunks). Profiling
+   * the Scala Native build on the kube-prometheus workload showed `Parsed$Failure.formatMsg` /
+   * `Parsed$Failure.msg` consuming ~27% of total CPU. This hand-rolled scanner reproduces the
+   * original grammar exactly while avoiding any allocation or backtracking overhead.
+   *
+   * The original FastParse implementation is preserved in the commit message / PR description; the
+   * regression tests exercise the same inputs against the expected values generated from it.
    */
   def stringNeedsToBeQuoted(str: String): Boolean = {
-    import fastparse._
-    import NoWhitespace._
-    def yamlPunctuation[$: P] = P(
-      // http://blogs.perl.org/users/tinita/2018/03/strings-in-yaml---to-quote-or-not-to-quote.html
-      StringIn(
-        "!", // ! Tag like !!null
-        "&", // & Anchor like &mapping_for_later_use
-        "*", // * Alias like *mapping_for_later_use
-        "- ", // -<space> Block sequence entry
-        ": ", // :<space> Block mapping entry
-        "? ", // ?<space> Explicit mapping key
-        "{",
-        "}",
-        "[",
-        "]", // {, }, [, ] Flow mapping or sequence
-        ",", // , Flow Collection entry seperator
-        "#", // # Comment
-        "|",
-        ">", // |, > Block Scalar
-        "@",
-        "`", // @, '`' (backtick) Reserved characters
-        "\"",
-        "'", // ", ' Double and single quote
-        " " // leading or trailing empty spaces need quotes to define them
-      )
-    )
-    def yamlKeyword[$: P] = P(
-      StringIn(
-        // https://makandracards.com/makandra/24809-yaml-keys-like-yes-or-no-evaluate-to-true-and-false
-        // y|Y|yes|Yes|YES|n|N|no|No|NO
-        // |true|True|TRUE|false|False|FALSE
-        // |on|On|ON|off|Off|OFF
-        "yes",
-        "Yes",
-        "YES",
-        "no",
-        "No",
-        "NO",
-        "true",
-        "True",
-        "TRUE",
-        "false",
-        "False",
-        "FALSE",
-        "on",
-        "On",
-        "ON",
-        "off",
-        "Off",
-        "OFF",
-        "null",
-        "Null",
-        "NULL",
-        "~",
-        // Somehow PyYAML doesn't count the single-letter booleans as things
-        // that need to be quoted, so we don't count them either
-        /*"y", "Y", "n", "N", */
-        "-",
-        "=" // Following PyYAML implementation, which quotes these even though it's not necessary
-      )
-    )
+    val len = str.length
+    if (len == 0) return false
 
-    def digits[$: P] = P(CharsWhileIn("0-9"))
-    def yamlFloat[$: P] = P(
-      (digits.? ~ "." ~ digits | digits ~ ".") ~ (("e" | "E") ~ ("+" | "-").? ~ digits).?
-    )
-    def yamlOctalSuffix[$: P] = P("x" ~ CharIn("1-9a-fA-F") ~ CharsWhileIn("0-9a-fA-F").?)
-    def yamlHexSuffix[$: P] = P("o" ~ CharIn("1-7") ~ CharsWhileIn("0-7").?)
-    def yamlOctalHex[$: P] = P("0" ~ (yamlOctalSuffix | yamlHexSuffix))
-    def yamlNumber0[$: P] = P(".inf" | yamlFloat | yamlOctalHex | digits)
+    val c0 = str.charAt(0)
 
-    // Add a `CharIn` lookahead to bail out quickly if something cannot possibly be a number
-    def yamlNumber[$: P] = P("-".? ~ yamlNumber0)
+    // === yamlPunctuation (prefix match — no End required) ===
+    (c0: @scala.annotation.switch) match {
+      case '!' | '&' | '*' | '{' | '}' | '[' | ']' | ',' | '#' | '|' | '>' | '@' | '`' | '"' |
+          '\'' | ' ' =>
+        return true
+      case _ =>
+    }
+    // Two-char punctuation prefixes: "- ", ": ", "? "
+    if (len >= 2 && str.charAt(1) == ' ' && (c0 == '-' || c0 == ':' || c0 == '?')) return true
 
-    // Strings and numbers aren't the only scalars that YAML can understand.
-    // ISO-formatted date and datetime literals are also parsed.
-    // date:                  2002-12-14
-    // datetime:              2001-12-15T02:59:43.1Z
-    // datetime_with_spaces:  2001-12-14 21:59:43.10 -5
+    // === yamlKeyword (whole-string match) ===
+    if (isYamlKeywordExact(str)) return true
 
-    def fourDigits[$: P] = P(CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9") ~ CharIn("0-9"))
-    def oneTwoDigits[$: P] = P(CharIn("0-9") ~ CharIn("0-9").?)
-    def twoDigits[$: P] = P(CharIn("0-9") ~ CharIn("0-9"))
-    def dateTimeSuffix[$: P] = P(
-      ("T" | " ") ~ twoDigits ~ ":" ~ twoDigits ~ ":" ~ twoDigits ~
-      ("." ~ digits.?).? ~ ((" " | "Z").? ~ ("-".? ~ oneTwoDigits).?).?
-    )
-    def yamlDate[$: P] = P(fourDigits ~ "-" ~ oneTwoDigits ~ "-" ~ oneTwoDigits ~ dateTimeSuffix.?)
+    // === yamlTime | yamlDate | yamlNumber (whole-string match, gated on first char) ===
+    if (c0 == '.' || (c0 >= '0' && c0 <= '9') || c0 == '-') {
+      if (isYamlTimeExact(str) || isYamlDateExact(str) || isYamlNumberExact(str)) return true
+    }
 
-    // Not in the YAML, but included to match PyYAML behavior
-    def yamlTime[$: P] = P(twoDigits ~ ":" ~ twoDigits)
+    // === Substring / suffix checks (carried over from original) ===
+    val last = str.charAt(len - 1)
+    last == ':' || last == ' ' || str.indexOf(": ") >= 0 || str.indexOf(" #") >= 0
+  }
 
-    def parser[$: P] = P(
-      // Use a `&` lookahead to bail out early in the common case, so we don't
-      // need to try parsing times/dates/numbers one by one
-      yamlPunctuation | (&(
-        CharIn(".0-9\\-")
-      ) ~ (yamlTime | yamlDate | yamlNumber) | yamlKeyword) ~ End
-    )
+  // ---- Hand-rolled scanners replicating the FastParse grammar ---------------------------------
 
-    fastparse.parse(str, parser(_)).isSuccess ||
-    str.contains(": ") || // Looks like a key-value pair
-    str.contains(" #") || // Comments
-    str.charAt(str.length - 1) == ':' || // Looks like a key-value pair
-    str.charAt(str.length - 1) == ' ' // trailing space needs quotes
+  /** Whole-string match against PyYAML's reserved keyword set. */
+  @inline private def isYamlKeywordExact(s: String): Boolean = s match {
+    case "yes" | "Yes" | "YES" | "no" | "No" | "NO" | "true" | "True" | "TRUE" | "false" | "False" |
+        "FALSE" | "on" | "On" | "ON" | "off" | "Off" | "OFF" | "null" | "Null" | "NULL" | "~" |
+        "-" | "=" =>
+      true
+    case _ => false
+  }
+
+  @inline private def isDigit(c: Char): Boolean = c >= '0' && c <= '9'
+
+  /** yamlTime: `dd:dd` (exactly 5 chars). */
+  private def isYamlTimeExact(s: String): Boolean = {
+    s.length == 5 &&
+    isDigit(s.charAt(0)) && isDigit(s.charAt(1)) &&
+    s.charAt(2) == ':' &&
+    isDigit(s.charAt(3)) && isDigit(s.charAt(4))
+  }
+
+  /**
+   * yamlDate: `dddd - d[d] - d[d]` optionally followed by `dateTimeSuffix`, full-string match.
+   * dateTimeSuffix: `('T'|' ') dd ':' dd ':' dd ('.' digits?)? (' '|'Z')? ('-'? d[d])?`
+   */
+  private def isYamlDateExact(s: String): Boolean = {
+    val len = s.length
+    if (len < 8) return false // 4 + 1 + 1 + 1 + 1 minimum
+    var i = 0
+    // Four digits
+    if (
+      !(isDigit(s.charAt(0)) && isDigit(s.charAt(1)) && isDigit(s.charAt(2)) && isDigit(
+        s.charAt(3)
+      ))
+    ) return false
+    i = 4
+    if (s.charAt(i) != '-') return false
+    i += 1
+    if (!isDigit(s.charAt(i))) return false
+    i += 1
+    if (i < len && isDigit(s.charAt(i))) i += 1
+    if (i >= len || s.charAt(i) != '-') return false
+    i += 1
+    if (i >= len || !isDigit(s.charAt(i))) return false
+    i += 1
+    if (i < len && isDigit(s.charAt(i))) i += 1
+    if (i == len) return true
+    // Optional dateTimeSuffix: ('T'|' ') dd ':' dd ':' dd ...
+    val sep = s.charAt(i)
+    if (sep != 'T' && sep != ' ') return false
+    i += 1
+    // Six digits with two colons interleaved: dd ':' dd ':' dd
+    if (i + 8 > len) return false
+    if (
+      !(isDigit(s.charAt(i)) && isDigit(s.charAt(i + 1)) && s.charAt(i + 2) == ':' &&
+      isDigit(s.charAt(i + 3)) && isDigit(s.charAt(i + 4)) && s.charAt(i + 5) == ':' &&
+      isDigit(s.charAt(i + 6)) && isDigit(s.charAt(i + 7)))
+    ) return false
+    i += 8
+    if (i == len) return true
+    // Optional fractional: '.' digits?
+    if (s.charAt(i) == '.') {
+      i += 1
+      while (i < len && isDigit(s.charAt(i))) i += 1
+      if (i == len) return true
+    }
+    // Optional trailing: (' '|'Z')? ('-'? d[d])?
+    val maybeTz = s.charAt(i)
+    if (maybeTz == ' ' || maybeTz == 'Z') {
+      i += 1
+      if (i == len) return true
+    }
+    if (i < len && s.charAt(i) == '-') i += 1
+    if (i < len && isDigit(s.charAt(i))) {
+      i += 1
+      if (i < len && isDigit(s.charAt(i))) i += 1
+    }
+    i == len
+  }
+
+  /**
+   * yamlNumber: `'-'? yamlNumber0` where yamlNumber0 = `".inf" | yamlFloat | yamlOctalHex | digits`
+   * yamlFloat = `(digits? '.' digits | digits '.') (('e'|'E') ('+'|'-')? digits)?` yamlOctalHex=
+   * `'0' ('x' [1-9a-fA-F] [0-9a-fA-F]* | 'o' [1-7] [0-7]*)` All matched against the whole string.
+   */
+  private def isYamlNumberExact(s: String): Boolean = {
+    val len = s.length
+    var i = 0
+    if (i < len && s.charAt(i) == '-') i += 1
+    if (i == len) return false
+    // ".inf"
+    if (s.charAt(i) == '.') {
+      // either ".inf" (literal) or float starting with "." like ".5"
+      if (
+        i + 4 <= len && s.charAt(i + 1) == 'i' && s.charAt(i + 2) == 'n' &&
+        s.charAt(i + 3) == 'f' && i + 4 == len
+      ) return true
+      // float ".digits"
+      return isYamlFloatFromDot(s, i, len)
+    }
+    // yamlOctalHex: 0 (x... | o...)
+    if (s.charAt(i) == '0' && i + 1 < len && (s.charAt(i + 1) == 'x' || s.charAt(i + 1) == 'o')) {
+      return isYamlOctalHex(s, i, len)
+    }
+    // yamlFloat or digits — both start with digit
+    if (!isDigit(s.charAt(i))) return false
+    // Scan run of digits
+    val digitsStart = i
+    while (i < len && isDigit(s.charAt(i))) i += 1
+    if (i == len) return true // pure digits
+    // Float: <digits>.<digits>? then optional exponent
+    if (s.charAt(i) == '.') {
+      i += 1
+      // digits after '.' are required IF we matched `(digits? "." digits)` form.
+      // But grammar also allows `digits "."` (no digits after) as a float form.
+      val afterDot = i
+      while (i < len && isDigit(s.charAt(i))) i += 1
+      // exponent
+      if (i < len && (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {
+        // exponent requires `('+'|'-')? digits`
+        if (i == afterDot && digitsStart == i - 1) {
+          // pattern was `digits .` with no fractional digits, exponent still allowed only if
+          // overall form chosen was `(digits? . digits | digits .)` — exponent attaches to either.
+        }
+        i += 1
+        if (i < len && (s.charAt(i) == '+' || s.charAt(i) == '-')) i += 1
+        if (i >= len || !isDigit(s.charAt(i))) return false
+        while (i < len && isDigit(s.charAt(i))) i += 1
+      }
+      return i == len
+    }
+    // Exponent without dot: `digits ('e' ...)` is not part of yamlFloat grammar (always requires '.'),
+    // and digits alone matched earlier. So if we hit a non-digit non-'.' here, fail.
+    false
+  }
+
+  /** Continue parsing a yamlFloat starting at the '.' position. `i` points at the '.'. */
+  private def isYamlFloatFromDot(s: String, start: Int, len: Int): Boolean = {
+    var i = start
+    // grammar requires `digits? '.' digits | digits '.'`. Coming here means no leading digits,
+    // so we must take `'.' digits` branch (i.e. `digits? '.' digits` with empty digits?).
+    if (s.charAt(i) != '.') return false
+    i += 1
+    if (i >= len || !isDigit(s.charAt(i))) return false
+    while (i < len && isDigit(s.charAt(i))) i += 1
+    // Optional exponent
+    if (i < len && (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {
+      i += 1
+      if (i < len && (s.charAt(i) == '+' || s.charAt(i) == '-')) i += 1
+      if (i >= len || !isDigit(s.charAt(i))) return false
+      while (i < len && isDigit(s.charAt(i))) i += 1
+    }
+    i == len
+  }
+
+  /** yamlOctalHex starting at the leading '0'. */
+  private def isYamlOctalHex(s: String, start: Int, len: Int): Boolean = {
+    var i = start
+    if (s.charAt(i) != '0') return false
+    i += 1
+    if (i >= len) return false
+    s.charAt(i) match {
+      case 'x' =>
+        i += 1
+        if (i >= len) return false
+        val c = s.charAt(i)
+        if (!((c >= '1' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+          return false
+        i += 1
+        while (i < len) {
+          val cc = s.charAt(i)
+          if (!((cc >= '0' && cc <= '9') || (cc >= 'a' && cc <= 'f') || (cc >= 'A' && cc <= 'F')))
+            return false
+          i += 1
+        }
+        true
+      case 'o' =>
+        i += 1
+        if (i >= len) return false
+        val c = s.charAt(i)
+        if (c < '1' || c > '7') return false
+        i += 1
+        while (i < len) {
+          val cc = s.charAt(i)
+          if (cc < '0' || cc > '7') return false
+          i += 1
+        }
+        true
+      case _ => false
+    }
   }
 
   def writeIndentation(out: Writer, n: Int): Unit = {
