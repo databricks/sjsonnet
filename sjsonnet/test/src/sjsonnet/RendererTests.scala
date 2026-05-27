@@ -105,6 +105,78 @@ object RendererTests extends TestSuite {
           |]""".stripMargin
     }
 
+    test("escapeBulkFastPath") {
+      // Verifies the BaseRenderer.escape bulk-write chunked path: when a String has no chars
+      // requiring escaping, output is byte-identical to the slow per-char path. Mirrors
+      // the conditions used by TomlRenderer/YamlRenderer/escapeStringJson.
+      def escape(s: CharSequence, unicode: Boolean): String = {
+        val w = new java.io.StringWriter()
+        BaseRenderer.escape(w, s, unicode)
+        w.toString
+      }
+
+      // ASCII-safe inputs hit the bulk path; outputs must be `"<input>"` verbatim.
+      escape("", unicode = true) ==> "\"\""
+      escape("hello", unicode = true) ==> "\"hello\""
+      escape("Plain ASCII 0-9 ~!@#$%^&*()", unicode = true) ==> "\"Plain ASCII 0-9 ~!@#$%^&*()\""
+      // A long string ensures we actually exercise the bulk-write path.
+      val long = "x" * 4096
+      escape(long, unicode = true) ==> "\"" + long + "\""
+
+      // All named escape mappings.
+      escape("a\"b", unicode = true) ==> "\"a\\\"b\""
+      escape("a\\b", unicode = true) ==> "\"a\\\\b\""
+      escape("a\bb", unicode = true) ==> "\"a\\bb\""
+      escape("a\fb", unicode = true) ==> "\"a\\fb\""
+      escape("a\nb", unicode = true) ==> "\"a\\nb\""
+      escape("a\rb", unicode = true) ==> "\"a\\rb\""
+      escape("a\tb", unicode = true) ==> "\"a\\tb\""
+
+      // Control chars that fall through to unicode escapes.
+      escape("\u0000", unicode = true) ==> "\"\\u0000\""
+      escape("\u0001", unicode = true) ==> "\"\\u0001\""
+      escape("\u001f", unicode = true) ==> "\"\\u001f\""
+
+      // 0x20 (space) is the lowest safe char; 0x7E (~) is the highest ASCII safe char.
+      escape(" ", unicode = true) ==> "\" \""
+      escape("~", unicode = true) ==> "\"~\""
+
+      // 0x7F (DEL): escaped under unicode=true, but passes through under unicode=false.
+      escape("\u007f", unicode = true) ==> "\"\\u007f\""
+      escape("\u007f", unicode = false) ==> "\"\u007f\""
+
+      // Higher BMP: \u00ff escaped under unicode=true, passes through under unicode=false.
+      escape("\u00ff", unicode = true) ==> "\"\\u00ff\""
+      escape("\u00ff", unicode = false) ==> "\"\u00ff\""
+
+      // U+2028 / U+2029 (JS-specific line separators) — pinned to current behaviour: escaped
+      // only when unicode=true. Old per-char path behaved the same way.
+      escape("\u2028", unicode = false) ==> "\"\u2028\""
+      escape("\u2028", unicode = true) ==> "\"\\u2028\""
+      escape("\u2029", unicode = true) ==> "\"\\u2029\""
+
+      // Surrogate pair (emoji 😀 = U+1F600) → \ud83d\ude00 when unicode=true; pass-through
+      // bytes preserved when unicode=false.
+      escape("\uD83D\uDE00", unicode = true) ==> "\"\\ud83d\\ude00\""
+      escape("\uD83D\uDE00", unicode = false) ==> "\"\uD83D\uDE00\""
+
+      // Consecutive unsafe chars exercise the `if (i > start)` zero-length guard.
+      escape("\"\\", unicode = true) ==> "\"\\\"\\\\\""
+      escape("\n\t", unicode = true) ==> "\"\\n\\t\""
+
+      // Unsafe char at start and end exercise leading/trailing chunk boundaries.
+      escape("\nabc", unicode = true) ==> "\"\\nabc\""
+      escape("abc\n", unicode = true) ==> "\"abc\\n\""
+
+      // Mixed alternating safe/unsafe runs.
+      escape("abc\nDEF\u00ffghi", unicode = true) ==> "\"abc\\nDEF\\u00ffghi\""
+
+      // Non-String CharSequence routes to the `escapeChars` per-char path; output must match.
+      val sb = new java.lang.StringBuilder("a\nb")
+      escape(sb, unicode = true) ==> "\"a\\nb\""
+      escape(new java.lang.StringBuilder("plain"), unicode = true) ==> "\"plain\""
+    }
+
   }
 
 }
