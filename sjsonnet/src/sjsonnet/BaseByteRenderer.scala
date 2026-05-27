@@ -305,8 +305,18 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   /**
    * SWAR-accelerated path for long strings. Converts to UTF-8 bytes once, then bulk-copies clean
    * chunks and escapes only the bytes that require it.
+   *
+   * Probes the string with a SWAR ASCII-safe scan first. When the string is clean printable ASCII
+   * (no escape chars, no non-ASCII), the entire UTF-8 encode pass (HeapCharBuffer.wrap +
+   * CharsetEncoder.loop + output byte[] allocation) is skipped — bytes are written directly from
+   * the chars via Platform.copyAsciiStringToBytes. This is the dominant case for K8s/JSON output
+   * where long values (descriptions, paths, base64 blobs) are pure ASCII.
    */
   private def visitLongString(str: String): Unit = {
+    if (Platform.isAsciiJsonSafe(str)) {
+      renderAsciiSafeString(str)
+      return
+    }
     val bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8)
     val bLen = bytes.length
     val firstEscape = CharSWAR.findFirstEscapeChar(bytes, 0, bLen)
