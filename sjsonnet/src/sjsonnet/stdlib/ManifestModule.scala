@@ -39,7 +39,7 @@ object ManifestModule extends AbstractFunctionModule {
    */
   private object ManifestJson extends Val.Builtin1("manifestJson", "v") {
     def evalRhs(v: Eval, ev: EvalScope, pos: Position): Val =
-      Val.Str(pos, Materializer.apply0(v.value, MaterializeJsonRenderer())(ev).toString)
+      Val.Str(pos, Materializer.apply0(v.value, new FastMaterializeJsonRenderer())(ev).toString)
   }
 
   /**
@@ -57,7 +57,7 @@ object ManifestModule extends AbstractFunctionModule {
         Materializer
           .apply0(
             v.value,
-            MaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
+            new FastMaterializeJsonRenderer(indent = -1, newline = "", keyValueSeparator = ":")
           )(ev)
           .toString
       )
@@ -94,7 +94,7 @@ object ManifestModule extends AbstractFunctionModule {
         Materializer
           .apply0(
             v.value,
-            MaterializeJsonRenderer(
+            new FastMaterializeJsonRenderer(
               indent = i.value.asString.length,
               newline = newline.value.asString,
               keyValueSeparator = keyValSep.value.asString

@@ -1822,7 +1822,8 @@ object Val {
     private[sjsonnet] def sortedVisibleKeyNames: Array[String] = {
       var r = _sortedVisibleKeyNames
       if (r == null) {
-        r = visibleKeyNames.sorted(Util.CodepointStringOrdering)
+        r = visibleKeyNames.clone()
+        Util.sortStringsByCodepointInPlace(r)
         _sortedVisibleKeyNames = r
       }
       r

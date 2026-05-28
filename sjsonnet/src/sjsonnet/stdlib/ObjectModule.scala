@@ -258,7 +258,12 @@ object ObjectModule extends AbstractFunctionModule {
     maybeSortKeys(ev, v1.allKeyNames)
 
   @inline private def maybeSortKeys(ev: EvalScope, keys: Array[String]): Array[String] =
-    if (ev.settings.preserveOrder) keys else keys.sorted(Util.CodepointStringOrdering)
+    if (ev.settings.preserveOrder) keys
+    else {
+      val sorted = keys.clone()
+      Util.sortStringsByCodepointInPlace(sorted)
+      sorted
+    }
 
   def getObjValuesFromKeys(
       pos: Position,

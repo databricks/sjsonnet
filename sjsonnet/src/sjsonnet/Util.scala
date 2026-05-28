@@ -128,10 +128,10 @@ object Util {
     while (i1 < n1 && i2 < n2) {
       val c1 = s1.charAt(i1)
       val c2 = s2.charAt(i2)
-      // Fast path: equal chars can be skipped without surrogate checks.
-      // Even for surrogate pairs, equal high surrogates at position i lead to
-      // comparing low surrogates at i+1, producing the correct codepoint ordering.
-      if (c1 == c2) {
+      // Fast path: equal non-surrogates can be skipped without codepoint checks.
+      // Equal surrogates still need codepoint decoding because a raw surrogate and
+      // a valid surrogate pair can share the same leading UTF-16 code unit.
+      if (c1 == c2 && !Character.isSurrogate(c1)) {
         i1 += 1
         i2 += 1
       } else if (!Character.isSurrogate(c1) && !Character.isSurrogate(c2)) {
@@ -155,6 +155,10 @@ object Util {
    */
   val CodepointStringOrdering: Ordering[String] = new Ordering[String] {
     override def compare(x: String, y: String): Int = compareStringsByCodepoint(x, y)
+  }
+
+  def sortStringsByCodepointInPlace(xs: Array[String]): Unit = {
+    java.util.Arrays.sort(xs, CodepointStringOrdering)
   }
 
   def compareJsonnetStd(v1: Val, v2: Val, ev: EvalScope): Int = {

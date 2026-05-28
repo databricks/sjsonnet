@@ -109,14 +109,67 @@ object UnicodeHandlingTests extends TestSuite {
       val codepointSorted = testStrings.sorted(sjsonnet.Util.CodepointStringOrdering).toList
       codepointSorted ==> List("\uFFFF", "\uD800\uDC00")
 
+      val inPlaceSorted = testStrings.clone()
+      sjsonnet.Util.sortStringsByCodepointInPlace(inPlaceSorted)
+      inPlaceSorted.toList ==> codepointSorted
+
       // These produce different results, demonstrating the bug that was fixed
       assert(utf16Sorted != codepointSorted)
+    }
+
+    test("codepointInPlaceSortMatchesReferenceOrdering") {
+      val samples = Array(
+        "",
+        "a",
+        "b",
+        "aa",
+        "\u0000",
+        "\uD800\uDC00", // U+10000
+        "\uFFFF",
+        "😀",
+        "🌍",
+        "🚀",
+        "é",
+        "Ω",
+        "中"
+      )
+
+      val cases = Seq(
+        Array.empty[String],
+        Array("a"),
+        Array("b", "a"),
+        Array.fill(20)("same"),
+        samples,
+        samples.reverse,
+        Array.tabulate(64)(i => samples((i * 7 + 3) % samples.length))
+      )
+
+      for (c <- cases) {
+        val actual = c.clone()
+        sjsonnet.Util.sortStringsByCodepointInPlace(actual)
+        actual.toList ==> c.sorted(sjsonnet.Util.CodepointStringOrdering).toList
+      }
     }
 
     test("codepointOrderingInJsonnet") {
       // Verify that Jsonnet operations use Unicode codepoint ordering
       eval("'\\uFFFF' < '\\uD800\\uDC00'") ==> ujson.Bool(true)
       eval("std.sort(['\\uD800\\uDC00', '\\uFFFF'])") ==> ujson.Arr("\uFFFF", "\uD800\uDC00")
+    }
+
+    test("rawSurrogatePrefixOrdering") {
+      val rawSurrogatePrefix = "\uD800\uFFFF" // codepoints [0xD800, 0xFFFF]
+      val validSurrogatePair = "\uD800\uDC00" // codepoint [0x10000]
+
+      assert(sjsonnet.Util.compareStringsByCodepoint(rawSurrogatePrefix, validSurrogatePair) < 0)
+      assert(sjsonnet.Util.compareStringsByCodepoint(validSurrogatePair, rawSurrogatePrefix) > 0)
+
+      eval("(std.char(55296) + std.char(65535)) < (std.char(55296) + std.char(56320))") ==>
+      ujson.Bool(true)
+
+      eval(
+        "std.sort([std.char(55296) + std.char(56320), std.char(55296) + std.char(65535)])"
+      ) ==> ujson.Arr(rawSurrogatePrefix, validSurrogatePair)
     }
 
     // Unpaired surrogate handling - sjsonnet-specific behavior
