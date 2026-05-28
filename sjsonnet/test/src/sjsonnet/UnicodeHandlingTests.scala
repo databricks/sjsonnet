@@ -119,6 +119,21 @@ object UnicodeHandlingTests extends TestSuite {
       eval("std.sort(['\\uD800\\uDC00', '\\uFFFF'])") ==> ujson.Arr("\uFFFF", "\uD800\uDC00")
     }
 
+    test("rawSurrogatePrefixOrdering") {
+      val rawSurrogatePrefix = "\uD800\uFFFF" // codepoints [0xD800, 0xFFFF]
+      val validSurrogatePair = "\uD800\uDC00" // codepoint [0x10000]
+
+      assert(sjsonnet.Util.compareStringsByCodepoint(rawSurrogatePrefix, validSurrogatePair) < 0)
+      assert(sjsonnet.Util.compareStringsByCodepoint(validSurrogatePair, rawSurrogatePrefix) > 0)
+
+      eval("(std.char(55296) + std.char(65535)) < (std.char(55296) + std.char(56320))") ==>
+      ujson.Bool(true)
+
+      eval(
+        "std.sort([std.char(55296) + std.char(56320), std.char(55296) + std.char(65535)])"
+      ) ==> ujson.Arr(rawSurrogatePrefix, validSurrogatePair)
+    }
+
     // Unpaired surrogate handling - sjsonnet-specific behavior
     //
     // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
