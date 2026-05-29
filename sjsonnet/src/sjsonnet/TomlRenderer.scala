@@ -2,22 +2,24 @@ package sjsonnet
 
 import upickle.core.{ArrVisitor, ObjVisitor, SimpleVisitor, Visitor}
 
-import java.io.StringWriter
-
+// Uses the unsynchronized [[StringBuilderWriter]] rather than java.io.StringWriter: the latter is
+// backed by a synchronized StringBuffer, paying a monitor enter/exit on every write/flush on the
+// hot manifestTomlEx path. Output is byte-identical. Same swap as the JSON renderer in #874.
 class TomlRenderer(
-    out: StringWriter = new java.io.StringWriter(),
+    out: StringBuilderWriter = new StringBuilderWriter(),
     cumulatedIndent: String,
     indent: String)
-    extends SimpleVisitor[StringWriter, StringWriter] {
+    extends SimpleVisitor[StringBuilderWriter, StringBuilderWriter] {
   override def expectedMsg: String = "unimplemented type in Materializer"
-  private object objectKeyRenderer extends upickle.core.SimpleVisitor[StringWriter, StringWriter] {
+  private object objectKeyRenderer
+      extends upickle.core.SimpleVisitor[StringBuilderWriter, StringBuilderWriter] {
     override def expectedMsg = "expected string"
 
-    override def visitNull(index: Int): StringWriter = {
+    override def visitNull(index: Int): StringBuilderWriter = {
       TomlRenderer.this.visitNull(index)
     }
 
-    override def visitString(s: CharSequence, index: Int): StringWriter = {
+    override def visitString(s: CharSequence, index: Int): StringBuilderWriter = {
       if (s == null) visitNull(index)
       else {
         TomlRenderer.writeEscapedKey(out, s)
@@ -33,19 +35,19 @@ class TomlRenderer(
     out
   }
 
-  override def visitNull(index: Int): StringWriter = Error.fail("Tried to manifest \"null\"")
+  override def visitNull(index: Int): StringBuilderWriter = Error.fail("Tried to manifest \"null\"")
 
-  override def visitTrue(index: Int): StringWriter = {
+  override def visitTrue(index: Int): StringBuilderWriter = {
     out.write("true")
     flush
   }
 
-  override def visitFalse(index: Int): StringWriter = {
+  override def visitFalse(index: Int): StringBuilderWriter = {
     out.write("false")
     flush
   }
 
-  override def visitString(s: CharSequence, index: Int): StringWriter = {
+  override def visitString(s: CharSequence, index: Int): StringBuilderWriter = {
     if (s == null) {
       visitNull(index)
     } else {
@@ -54,7 +56,7 @@ class TomlRenderer(
     }
   }
 
-  override def visitFloat64(d: Double, index: Int): StringWriter = {
+  override def visitFloat64(d: Double, index: Int): StringBuilderWriter = {
     d match {
       case Double.PositiveInfinity          => out.write("inf")
       case Double.NegativeInfinity          => out.write("-inf")
@@ -65,8 +67,10 @@ class TomlRenderer(
     flush
   }
 
-  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] =
-    new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(
+      length: Int,
+      index: Int): ArrVisitor[StringBuilderWriter, StringBuilderWriter] =
+    new ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
       private val isInLine = length == 0 || depth > 0
       private val newElementIndent = if (isInLine) "" else cumulatedIndent + indent
       private val separator =
@@ -76,7 +80,7 @@ class TomlRenderer(
       depth += 1
       out.write('[')
       out.write(separator)
-      def subVisitor: Visitor[StringWriter, StringWriter] = {
+      def subVisitor: Visitor[StringBuilderWriter, StringBuilderWriter] = {
         if (addComma) {
           out.write(',')
           out.write(separator)
@@ -84,10 +88,10 @@ class TomlRenderer(
         out.write(newElementIndent)
         TomlRenderer.this
       }
-      def visitValue(v: StringWriter, index: Int): Unit = {
+      def visitValue(v: StringBuilderWriter, index: Int): Unit = {
         addComma = true
       }
-      def visitEnd(index: Int): StringWriter = {
+      def visitEnd(index: Int): StringBuilderWriter = {
         addComma = false
         depth -= 1
         out.write(separator)
@@ -100,23 +104,23 @@ class TomlRenderer(
   override def visitObject(
       length: Int,
       jsonableKeys: Boolean,
-      index: Int): ObjVisitor[StringWriter, StringWriter] =
-    new ObjVisitor[StringWriter, StringWriter] {
+      index: Int): ObjVisitor[StringBuilderWriter, StringBuilderWriter] =
+    new ObjVisitor[StringBuilderWriter, StringBuilderWriter] {
       private var addComma = false
       depth += 1
       out.write("{ ")
-      def subVisitor: Visitor[StringWriter, StringWriter] = TomlRenderer.this
-      def visitKey(index: Int): Visitor[StringWriter, StringWriter] = {
+      def subVisitor: Visitor[StringBuilderWriter, StringBuilderWriter] = TomlRenderer.this
+      def visitKey(index: Int): Visitor[StringBuilderWriter, StringBuilderWriter] = {
         if (addComma) out.write(", ")
         objectKeyRenderer
       }
       def visitKeyValue(s: Any): Unit = {
         out.write(" = ")
       }
-      def visitValue(v: StringWriter, index: Int): Unit = {
+      def visitValue(v: StringBuilderWriter, index: Int): Unit = {
         addComma = true
       }
-      def visitEnd(index: Int): StringWriter = {
+      def visitEnd(index: Int): StringBuilderWriter = {
         addComma = false
         depth -= 1
         out.write(" }")
@@ -146,14 +150,14 @@ object TomlRenderer {
     }
   }
 
-  def writeEscapedKey(out: StringWriter, key: CharSequence): Unit = {
+  def writeEscapedKey(out: StringBuilderWriter, key: CharSequence): Unit = {
     if (isBareKey(key)) out.write(key.toString)
     else BaseRenderer.escape(out, key, unicode = true)
   }
 
   def escapeKey(key: String): String = if (isBareKey(key)) key
   else {
-    val out = new StringWriter()
+    val out = new StringBuilderWriter()
     writeEscapedKey(out, key)
     out.toString
   }

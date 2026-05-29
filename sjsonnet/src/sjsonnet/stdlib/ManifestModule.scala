@@ -184,11 +184,11 @@ object ManifestModule extends AbstractFunctionModule {
     }
 
     private def renderTableInternal(
-        out: StringWriter,
+        out: StringBuilderWriter,
         v: Val.Obj,
         cumulatedIndent: String,
         indent: String,
-        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): StringWriter = {
+        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): StringBuilderWriter = {
       val keys = v.sortedVisibleKeyNames
       if (keys.length == 0) {
         out.write('\n')
@@ -263,7 +263,7 @@ object ManifestModule extends AbstractFunctionModule {
       out
     }
 
-    private def renderTableHeader(out: StringWriter, path: mutable.ArrayBuffer[String]) = {
+    private def renderTableHeader(out: StringBuilderWriter, path: mutable.ArrayBuffer[String]) = {
       out.write('[')
       var i = 0
       while (i < path.length) {
@@ -275,7 +275,9 @@ object ManifestModule extends AbstractFunctionModule {
       out
     }
 
-    private def renderTableArrayHeader(out: StringWriter, path: mutable.ArrayBuffer[String]) = {
+    private def renderTableArrayHeader(
+        out: StringBuilderWriter,
+        path: mutable.ArrayBuffer[String]) = {
       out.write('[')
       renderTableHeader(out, path)
       out.write(']')
@@ -283,7 +285,7 @@ object ManifestModule extends AbstractFunctionModule {
     }
 
     def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = {
-      val out = new StringWriter
+      val out = new StringBuilderWriter
       renderTableInternal(
         out,
         v.value.asObj,
