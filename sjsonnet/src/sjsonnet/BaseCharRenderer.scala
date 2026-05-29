@@ -285,6 +285,27 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     out
   }
 
+  /**
+   * Fast path for [[Val.AsciiSafeStr]]: the string is statically known to contain only chars in
+   * 0x20-0x7E, excluding `"` and `\`. That means no JSON escaping is ever required — not even under
+   * `escapeUnicode`, since every char is <= 0x7E. Emit `"` + raw chars + `"` with a single bulk
+   * `getChars`, skipping the per-call `CharSWAR.hasEscapeChar` scan that [[visitNonNullString]]
+   * would otherwise perform. Mirrors the no-escape ASCII fast path, minus the scan.
+   */
+  def visitAsciiSafeString(s: String, index: Int): T = {
+    flushBuffer()
+    val len = s.length
+    elemBuilder.ensureLength(len + 2)
+    elemBuilder.appendUnsafe('"')
+    val cbArr = elemBuilder.arr
+    val pos = elemBuilder.getLength
+    s.getChars(0, len, cbArr, pos)
+    elemBuilder.length = pos + len
+    elemBuilder.appendUnsafe('"')
+    flushCharBuilder()
+    out
+  }
+
   final def renderIndent(): Unit = {
     if (indent == -1) ()
     else if (indentCache != null && depth < BaseCharRenderer.MaxCachedDepth) {
