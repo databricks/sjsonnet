@@ -43,10 +43,24 @@ abstract class Materializer {
    * JIT-friendly) and automatically switches to an explicit stack-based iterative loop when the
    * recursion depth exceeds [[Settings.materializeRecursiveDepthLimit]].
    */
+  /**
+   * Visit a string value, routing [[Val.AsciiSafeStr]] through the renderer's escape-free fast path
+   * when the visitor is a char renderer. Falls back to plain `visitString` for the ujson.Value AST
+   * path and for strings that may require escaping.
+   */
+  @inline private def visitStr[T](s: Val.Str, visitor: Visitor[T, T]): T = {
+    storePos(s.pos)
+    visitor match {
+      case cr: BaseCharRenderer[T @unchecked] if s.isInstanceOf[Val.AsciiSafeStr] =>
+        cr.visitAsciiSafeString(s.str, -1)
+      case _ => visitor.visitString(s.str, -1)
+    }
+  }
+
   def apply0[T](v: Val, visitor: Visitor[T, T])(implicit evaluator: EvalScope): T = try {
     v match {
-      case Val.Str(pos, s) => storePos(pos); visitor.visitString(s, -1)
-      case obj: Val.Obj    =>
+      case s: Val.Str   => visitStr(s, visitor)
+      case obj: Val.Obj =>
         materializeRecursiveObj(obj, visitor, 0, Materializer.MaterializeContext(evaluator))
       case Val.Num(pos, _) => storePos(pos); visitor.visitFloat64(v.asDouble, -1)
       case xs: Val.Arr     =>
@@ -285,7 +299,7 @@ abstract class Materializer {
     (vt: @scala.annotation.switch) match {
       case 0 => // TAG_STR
         val s = childVal.asInstanceOf[Val.Str]
-        storePos(s.pos); childVisitor.visitString(s.str, -1)
+        visitStr(s, childVisitor)
       case 1 => // TAG_NUM
         storePos(childVal.pos); childVisitor.visitFloat64(childVal.asDouble, -1)
       case 2 => // TAG_TRUE
@@ -436,8 +450,8 @@ abstract class Materializer {
       stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     childVal match {
-      case Val.Str(pos, s) =>
-        storePos(pos); parentVisitor.visitValue(childVisitor.visitString(s, -1), -1)
+      case s: Val.Str =>
+        parentVisitor.visitValue(visitStr(s, childVisitor), -1)
       case obj: Val.Obj =>
         pushObjFrame(obj, childVisitor, stack, ctx)
       case Val.Num(pos, _) =>
