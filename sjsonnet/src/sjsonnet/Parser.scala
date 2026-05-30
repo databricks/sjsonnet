@@ -654,32 +654,37 @@ class Parser(
   def exprSuffix2[$: P]: P[Expr => Expr] = exprSuffix2(0)
 
   def exprSuffix2[$: P](currentDepth: Int): P[Expr => Expr] = {
+    // Match the suffix char FIRST, then allocate the Position only when a suffix actually matches.
+    // The previous `Pos.flatMapX { i => CharIn(...) }` allocated a Position on every attempt —
+    // including the failing attempt that terminates `exprSuffix2.rep` after each expression, which
+    // is the common case (most subexpressions have no suffix). Capturing the offset as
+    // `ctx.index - 1` after the single-char match defers the allocation to the matching branch and
+    // also drops the `.map(_(0))` step.
     P(
-      Pos.flatMapX { i =>
-        CharIn(".[({")./.!.map(_(0)).flatMapX { c =>
-          (c: @switch) match {
-            case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
-            case '[' =>
-              Pass ~ (expr(currentDepth + 1).? ~ (":" ~ expr(currentDepth + 1).?).rep ~ "]").map {
-                case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
-                case (start, ins)        =>
-                  Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
-              }
-            case '(' =>
-              Pass ~ (args(currentDepth + 1) ~ ")" ~ "tailstrict".!.?).map {
-                case (args, namedNames, tailstrict) =>
-                  Expr.Apply(
-                    i,
-                    _: Expr,
-                    args,
-                    if (namedNames.length == 0) null else namedNames,
-                    tailstrict.nonEmpty
-                  )
-              }
-            case '{' =>
-              Pass ~ (objinside(i, currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
-            case _ => Fail
-          }
+      CharIn(".[({")./.!.flatMapX { s =>
+        val i = new Position(fileScope, implicitly[P[$]].index - 1)
+        (s.charAt(0): @switch) match {
+          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
+          case '[' =>
+            Pass ~ (expr(currentDepth + 1).? ~ (":" ~ expr(currentDepth + 1).?).rep ~ "]").map {
+              case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
+              case (start, ins)        =>
+                Expr.Slice(i, _: Expr, start, ins.headOption.flatten, ins.lift(1).flatten)
+            }
+          case '(' =>
+            Pass ~ (args(currentDepth + 1) ~ ")" ~ "tailstrict".!.?).map {
+              case (args, namedNames, tailstrict) =>
+                Expr.Apply(
+                  i,
+                  _: Expr,
+                  args,
+                  if (namedNames.length == 0) null else namedNames,
+                  tailstrict.nonEmpty
+                )
+            }
+          case '{' =>
+            Pass ~ (objinside(i, currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
+          case _ => Fail
         }
       }
     )
