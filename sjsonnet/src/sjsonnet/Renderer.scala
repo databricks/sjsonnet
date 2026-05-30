@@ -4,7 +4,7 @@ import java.io.{StringWriter, Writer}
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
-final class StringBuilderWriter(initialCapacity: Int = 16) extends Writer {
+private[sjsonnet] final class StringBuilderWriter(initialCapacity: Int = 4096) extends Writer {
   private[this] val builder = new java.lang.StringBuilder(initialCapacity)
 
   override def write(c: Int): Unit =
@@ -328,6 +328,12 @@ private[sjsonnet] final class FastMaterializeJsonRenderer(
     ) {
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
+
+  // For in-memory rendering, mid-tree flushes only add buffer-to-buffer copies. Accumulate
+  // everything in elemBuilder and emit once when the root value finishes (depth == 0).
+  override def flushCharBuilder(): Unit = {
+    if (depth == 0) elemBuilder.writeOutToIfLongerThan(outWriter, 0)
+  }
 
   private val reusableArrVisitor: ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
     def subVisitor: sjsonnet.FastMaterializeJsonRenderer
