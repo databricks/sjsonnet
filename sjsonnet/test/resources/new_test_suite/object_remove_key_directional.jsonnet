@@ -32,4 +32,19 @@ std.assertEqual(
 std.assertEqual(
   ({ a:: 1 } + std.objectRemoveKey({ a: 2 }, 'a')).a,
   1
+) &&
+std.assertEqual(
+  local removed = std.objectRemoveKey({ a: super.a + 1, b:: super.a + 2 }, 'a');
+  local merged = { a: 10 } + removed + { a+: 5 };
+  [merged.a, merged.b, std.objectHas(merged, 'b'), std.objectHasAll(merged, 'b')],
+  [15, 12, false, true]
+) &&
+std.assertEqual(
+  local mixin = {
+    assert self.a == 2 : 'inline addSuper assert should see final self',
+    a+: 1,
+    b: super.a + self.a,
+  };
+  ({ a: 1 } + mixin).b,
+  3
 )
