@@ -603,6 +603,26 @@ object EvaluatorTests extends TestSuite {
       used ==> ujson.Num(1)
       usedTraces ==> Vector("TRACE: (memory) used trace")
     }
+    test("identityFunctionTraces") {
+      // Issue #815: the identity-elision fast paths must force the argument exactly as a normal
+      // call would — no dropped or duplicated side effects (traces).
+      // Direct identity elision: the traced argument is forced exactly once.
+      val (idVal, idTraces) = evalWithTraces("""(function(x) x)(std.trace("idtrace", 5))""")
+      idVal ==> ujson.Num(5)
+      idTraces ==> Vector("TRACE: (memory) idtrace")
+
+      // Self-composition identity (g = id): still forced exactly once.
+      val (compVal, compTraces) =
+        evalWithTraces("""local g = function(x) x; local f = function(x) g(g(x)); f(std.trace("comp", 9))""")
+      compVal ==> ujson.Num(9)
+      compTraces ==> Vector("TRACE: (memory) comp")
+
+      // Laziness preserved: identity map stays lazy, so std.length does not force the element.
+      val (lazyVal, lazyTraces) =
+        evalWithTraces("""std.length(std.map(function(x) x, [std.trace("lz", 1), 2]))""")
+      lazyVal ==> ujson.Num(2)
+      lazyTraces ==> Vector.empty
+    }
     test("binaryOps") {
       val ex = assertThrows[Exception](
         eval("1 && 2")
