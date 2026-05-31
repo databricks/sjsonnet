@@ -486,17 +486,22 @@ object ManifestModule extends AbstractFunctionModule {
           case (k, v)             => Seq(k + " = " + render(v))
         }
       }
-      val lines = materialized.obj
+      val mainLines = materialized.obj
         .get("main")
-        .fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj])) ++
-        materialized.obj
-          .get("sections")
-          .fold(Iterable[String]())(x =>
-            // TODO remove the `toSeq` once this is fixed in scala3
-            x.obj.toSeq.flatMap { case (k, v) =>
-              Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])
-            }
-          )
+        .fold(Iterable[String]())(x => sect(x.asInstanceOf[ujson.Obj]))
+      // Official std.jsonnet accesses `ini.sections` directly, so a missing `sections`
+      // field is an error rather than being silently treated as empty (issue #799).
+      // `main` stays optional, matching `std.objectHas(ini, 'main')` in the upstream impl.
+      val sectionLines = materialized.obj.get("sections") match {
+        case Some(x) =>
+          // TODO remove the `toSeq` once this is fixed in scala3
+          x.obj.toSeq.flatMap { case (k, v) =>
+            Seq("[" + k + "]") ++ sect(v.asInstanceOf[ujson.Obj])
+          }
+        case None =>
+          Error.fail("Field does not exist: sections", pos)(ev)
+      }
+      val lines = mainLines ++ sectionLines
       lines.flatMap(Seq(_, "\n")).mkString
     },
     /**
