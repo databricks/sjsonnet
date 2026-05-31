@@ -23,26 +23,36 @@ object Util {
       pos: Position,
       ev: EvalScope,
       indexable: Val,
-      index: Option[Int],
-      _end: Option[Int],
-      _step: Option[Int]): Val = {
+      index: Option[Double],
+      _end: Option[Double],
+      _step: Option[Double]): Val = {
     def length0(e: Val): Int = e match {
       case Val.Str(_, s) => s.codePointCount(0, s.length)
       case a: Val.Arr    => a.length
       case x             => Error.fail("Cannot get length of " + x.prettyName, e.pos)(ev)
     }
+    // Slice indices and step must be integers. Official Jsonnet rejects fractional array
+    // indices at manifestation; sjsonnet applies the same strict rule to both array and
+    // string slicing (issue #797) instead of silently truncating fractional values.
+    def asSliceInt(d: Double, name: String): Int = {
+      if (d.isNaN || d.isInfinite || Math.floor(d) != d) {
+        Error.fail(s"slice $name must be an integer, got: $d", pos)(ev)
+      }
+      d.toInt
+    }
     val length = length0(indexable)
     val start = index match {
       case None    => 0
-      case Some(i) => if (i < 0) Math.max(0, length + i) else i
+      case Some(d) => val i = asSliceInt(d, "index"); if (i < 0) Math.max(0, length + i) else i
     }
     val end = _end match {
       case None    => length
-      case Some(e) => if (e < 0) length + e else e
+      case Some(d) => val e = asSliceInt(d, "end"); if (e < 0) length + e else e
     }
     val step = _step match {
       case None    => 1
-      case Some(s) =>
+      case Some(d) =>
+        val s = asSliceInt(d, "step")
         if (s < 0) {
           Error.fail(s"got [$start:$end:$s] but negative steps are not supported", pos)(ev)
         } else if (s == 0) {
