@@ -260,7 +260,7 @@ object StringModule extends AbstractFunctionModule {
     }
   }
 
-  private object StripUtils {
+  private[sjsonnet] object StripUtils {
     def codePointsSet(str: String): collection.Set[Int] = {
       val chars = Set.newBuilder[Int]
       chars.sizeHint(str.codePointCount(0, str.length))
@@ -286,12 +286,57 @@ object StringModule extends AbstractFunctionModule {
         return stripSingleChar(str, single.toChar, left, right)
       }
 
+      // Common case: an all-ASCII strip set (whitespace/punctuation). Build a 128-bit membership
+      // mask in two `long`s — no allocation (vs a per-call java.util.BitSet) and no array bounds
+      // check per lookup, keeping the strip loop tight and GC-friendly (issue #851).
+      var lo = 0L
+      var hi = 0L
+      var allAscii = true
+      var i = 0
+      while (allAscii && i < chars.length) {
+        val ch = chars.charAt(i)
+        if (ch < 64) lo |= 1L << ch
+        else if (ch < 128) hi |= 1L << (ch - 64)
+        else allAscii = false
+        i += 1
+      }
+      if (allAscii) {
+        return stripAsciiMask(str, lo, hi, left, right)
+      }
+
       val bmpSet = bmpNonSurrogateSet(chars)
       if (bmpSet != null) {
         return stripBmp(str, bmpSet, left, right)
       }
 
       unspecializedStrip(str, codePointsSet(chars), left, right)
+    }
+
+    /** Membership test for the inline 128-bit ASCII mask built in [[strip]]. */
+    @inline private def inAsciiMask(lo: Long, hi: Long, c: Char): Boolean =
+      if (c < 64) (lo & (1L << c)) != 0L
+      else if (c < 128) (hi & (1L << (c - 64))) != 0L
+      else false
+
+    /**
+     * Fast path for an all-ASCII strip set, using the inline two-`long` mask. Non-ASCII chars in
+     * `str` (including surrogate halves) are never members, so surrogate pairs are left intact.
+     */
+    private def stripAsciiMask(
+        str: String,
+        lo: Long,
+        hi: Long,
+        left: Boolean,
+        right: Boolean): String = {
+      var start = 0
+      var end = str.length
+      if (left) {
+        while (start < end && inAsciiMask(lo, hi, str.charAt(start))) start += 1
+      }
+      if (right) {
+        while (end > start && inAsciiMask(lo, hi, str.charAt(end - 1))) end -= 1
+      }
+      str.substring(start, end)
     }
 
     def unspecializedStrip(
