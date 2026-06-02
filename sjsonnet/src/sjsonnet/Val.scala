@@ -357,6 +357,11 @@ object Val {
 
     override def asString: String = str
 
+    // Product-extractor accessors backing `case Val.Str(pos, s)` (see Str.unapply). Reading these
+    // off the scrutinee avoids the per-match Some+Tuple2 allocation the old extractor incurred.
+    private[sjsonnet] def _1: Position = pos
+    private[sjsonnet] def _2: String = str
+
     /**
      * Iterative rope flattening — stack-safe for arbitrarily deep trees. For a left-leaning rope of
      * depth N (typical from repeated foldl concat), the ArrayDeque holds at most 2 elements.
@@ -422,8 +427,23 @@ object Val {
     /** Create a leaf string node marked as ASCII-safe (no JSON escaping needed). */
     def asciiSafe(pos: Position, s: String): Str = new AsciiSafeStr(pos, s)
 
-    /** Backward-compatible extractor: `case Val.Str(pos, s) =>` still works. */
-    def unapply(s: Str): Option[(Position, String)] = Some((s.pos, s.str))
+    /**
+     * Backward-compatible extractor: `case Val.Str(pos, s) =>` still works, now allocation-free.
+     *
+     * The result is a value class ([[StrExtract]]) implementing the name-based extractor protocol
+     * (`isEmpty`/`get`). Because it is an `AnyVal`, the match desugaring consumes it without
+     * allocating — replacing the `Some` + `Tuple2` the old `Option[(Position, String)]` extractor
+     * allocated on every match. These matches are extremely hot across the evaluator, stdlib, and
+     * materializer. The `Str` type test before extraction keeps the match refutable, so
+     * `AsciiSafeStr` (the only subclass) is matched exactly as before.
+     */
+    private[sjsonnet] def unapply(s: Str): StrExtract = new StrExtract(s)
+
+    /** Allocation-free extractor result for [[Str.unapply]]; `get` exposes `_1`/`_2`. */
+    private[sjsonnet] final class StrExtract(val self: Str) extends AnyVal {
+      def isEmpty: Boolean = self == null
+      def get: Str = self
+    }
 
     /**
      * O(1) rope concatenation. Falls back to eager concat for small flat strings to avoid rope node
