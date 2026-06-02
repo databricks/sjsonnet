@@ -201,7 +201,16 @@ class CachedImporter(parent: Importer) extends Importer {
   val cache: mutable.HashMap[(Path, Boolean), ResolvedFile] =
     mutable.HashMap.empty[(Path, Boolean), ResolvedFile]
 
-  def resolve(docBase: Path, importName: String): Option[Path] = parent.resolve(docBase, importName)
+  // Memoize path resolution by (docBase, importName). resolve() runs on every visitImport — before
+  // the evaluator's by-path Val cache is consulted — and each call stats candidate paths
+  // (docBase + every jpath) via os.isFile. Resolution is deterministic within a run, so caching it
+  // turns repeated imports (and re-evaluated import exprs) into a HashMap lookup, eliminating
+  // redundant filesystem stats. Mirrors the existing read cache.
+  private val resolveCache: mutable.HashMap[(Path, String), Option[Path]] =
+    mutable.HashMap.empty[(Path, String), Option[Path]]
+
+  def resolve(docBase: Path, importName: String): Option[Path] =
+    resolveCache.getOrElseUpdate((docBase, importName), parent.resolve(docBase, importName))
 
   def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
     val key = (path, binaryData)
