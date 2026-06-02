@@ -261,7 +261,7 @@ object sjsonnet extends VersionFileModule {
       with SjsonnetPublishModule
       with SjsonnetJvmNative {
     def moduleDir = super.moduleDir / os.up
-    def scalaNativeVersion = "0.5.11"
+    def scalaNativeVersion = "0.5.12"
     val sourceDirs = Seq(
       "src",
       "src-native",
