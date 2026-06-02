@@ -471,7 +471,13 @@ object SetModule extends AbstractFunctionModule {
      * arr[0:4:1] instead of std.slice(arr, 0, 4, 1)).
      */
     builtin("slice", "indexable", "index", "end", "step") {
-      (pos, ev, indexable: Val, index: Option[Int], _end: Option[Int], _step: Option[Int]) =>
+      (
+          pos,
+          ev,
+          indexable: Val,
+          index: Option[Double],
+          _end: Option[Double],
+          _step: Option[Double]) =>
         Util.slice(pos, ev, indexable, index, _end, _step)
     },
     /**

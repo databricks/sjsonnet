@@ -1157,10 +1157,11 @@ class Evaluator(
   }
 
   protected def visitSlice(e: Slice)(implicit scope: ValScope): Val = {
-    def extractParam(e: Option[Expr]): Option[Int] = e.flatMap(visitExpr(_) match {
+    // Pass raw doubles through; Util.slice enforces that indices/step are integers (issue #797).
+    def extractParam(e: Option[Expr]): Option[Double] = e.flatMap(visitExpr(_) match {
       case _: Val.Null => None
-      case v: Val.Num  => Some(v.asInt)
-      case v: Val      => Some(v.cast[Val.Num].asInt)
+      case v: Val.Num  => Some(v.rawDouble)
+      case v: Val      => Some(v.cast[Val.Num].rawDouble)
     })
 
     val indexable = visitExpr(e.value) match {

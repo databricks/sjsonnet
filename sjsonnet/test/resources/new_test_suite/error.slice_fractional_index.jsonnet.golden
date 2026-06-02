@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.slice] slice index must be an integer, got: 0.9
+    at [<root>].(error.slice_fractional_index.jsonnet:1:10)
