@@ -96,7 +96,16 @@ class Parser(
     throw new ParseError(msg, offset = offset)
   }
 
-  def Pos[$: P]: P[Position] = Index.map(offset => new Position(fileScope, offset))
+  // Capture the current parse offset as a Position directly, rather than `Index.map(...)`.
+  // `Index` stores the offset as an `Int` in fastparse's `successValue: Any`, boxing it, and the
+  // `.map` then unboxes it and allocates a closure — both per AST node (Pos is called for nearly
+  // every node). Writing the Position straight into successValue (a reference) skips the box/unbox
+  // and the lambda. boxToInteger via SharedPackageDefs.Index was a top self-frame in the parse
+  // flamegraph on kube-prometheus.
+  def Pos[$: P]: P[Position] = {
+    val ctx = implicitly[P[$]]
+    ctx.freshSuccess(new Position(fileScope, ctx.index))
+  }
 
   def id[$: P]: P[String] = P(
     CharIn("_a-zA-Z") ~~
