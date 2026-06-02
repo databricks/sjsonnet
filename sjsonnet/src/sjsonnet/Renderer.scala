@@ -4,6 +4,41 @@ import java.io.{StringWriter, Writer}
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
+final class StringBuilderWriter(initialCapacity: Int = 16) extends Writer {
+  private[this] val builder = new java.lang.StringBuilder(initialCapacity)
+
+  override def write(c: Int): Unit =
+    builder.append(c.toChar)
+
+  override def write(cbuf: Array[Char], off: Int, len: Int): Unit =
+    builder.append(cbuf, off, len)
+
+  override def write(str: String): Unit =
+    builder.append(str)
+
+  override def write(str: String, off: Int, len: Int): Unit =
+    builder.append(str, off, off + len)
+
+  override def append(c: Char): Writer = {
+    builder.append(c)
+    this
+  }
+
+  override def append(csq: CharSequence): Writer = {
+    builder.append(if (csq == null) "null" else csq)
+    this
+  }
+
+  override def append(csq: CharSequence, start: Int, end: Int): Writer = {
+    builder.append(if (csq == null) "null" else csq, start, end)
+    this
+  }
+
+  override def flush(): Unit = ()
+  override def close(): Unit = ()
+  override def toString: String = builder.toString
+}
+
 /**
  * Custom JSON renderer to try and match the behavior of google/jsonnet's render:
  *
@@ -272,6 +307,93 @@ final case class MaterializeJsonRenderer(
     elemBuilder.append('{')
     depth += 1
     // account for rendering differences of whitespaces in ujson and jsonnet manifestJson
+    if (length == 0 && indent != -1)
+      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
+    else renderIndent()
+    reusableObjVisitor
+  }
+}
+
+private[sjsonnet] final class FastMaterializeJsonRenderer(
+    indent: Int = 4,
+    escapeUnicode: Boolean = false,
+    newline: String = "\n",
+    keyValueSeparator: String = ": ",
+    private val outWriter: StringBuilderWriter = new StringBuilderWriter())
+    extends BaseCharRenderer(
+      outWriter,
+      indent,
+      escapeUnicode,
+      newline.toCharArray
+    ) {
+  private val newLineCharArray = newline.toCharArray
+  private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
+
+  private val reusableArrVisitor: ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer
+  } = new ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer = FastMaterializeJsonRenderer.this
+    def visitValue(v: StringBuilderWriter, index: Int): Unit = {
+      flushBuffer()
+      commaBuffered = true
+    }
+    def visitEnd(index: Int): StringBuilderWriter = {
+      commaBuffered = false
+      depth -= 1
+      renderIndent()
+      elemBuilder.append(']')
+      flushCharBuilder()
+      outWriter
+    }
+  }
+
+  private val reusableObjVisitor: ObjVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer
+    def visitKey(index: Int): sjsonnet.FastMaterializeJsonRenderer
+  } = new ObjVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer = FastMaterializeJsonRenderer.this
+    def visitKey(index: Int): sjsonnet.FastMaterializeJsonRenderer =
+      FastMaterializeJsonRenderer.this
+    def visitKeyValue(s: Any): Unit = {
+      elemBuilder.appendAll(keyValueSeparatorCharArray, keyValueSeparatorCharArray.length)
+    }
+    def visitValue(v: StringBuilderWriter, index: Int): Unit = {
+      commaBuffered = true
+    }
+    def visitEnd(index: Int): StringBuilderWriter = {
+      commaBuffered = false
+      depth -= 1
+      renderIndent()
+      elemBuilder.append('}')
+      flushCharBuilder()
+      outWriter
+    }
+  }
+
+  override def visitArray(
+      length: Int,
+      index: Int): upickle.core.ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('[')
+
+    depth += 1
+    if (length == 0 && indent != -1)
+      elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
+    else renderIndent()
+    reusableArrVisitor
+  }
+
+  override def visitObject(
+      length: Int,
+      index: Int): upickle.core.ObjVisitor[StringBuilderWriter, StringBuilderWriter] {
+    def subVisitor: sjsonnet.FastMaterializeJsonRenderer
+    def visitKey(index: Int): sjsonnet.FastMaterializeJsonRenderer
+  } = {
+    flushBuffer()
+    elemBuilder.append('{')
+    depth += 1
     if (length == 0 && indent != -1)
       elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
     else renderIndent()
