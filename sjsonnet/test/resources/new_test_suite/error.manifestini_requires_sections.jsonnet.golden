@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.manifestIni] Field does not exist: sections
+    at [<root>].(error.manifestini_requires_sections.jsonnet:1:16)
