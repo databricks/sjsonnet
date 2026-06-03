@@ -332,7 +332,10 @@ object ManifestModule extends AbstractFunctionModule {
    */
   private object DeepJoin extends Val.Builtin1("deepJoin", "arr") {
     def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
-      val out = new StringWriter()
+      // Use the unsynchronized StringBuilderWriter: each Val.Str chunk triggers
+      // out.write(...) in a tight loop, and StringWriter's backing StringBuffer
+      // pays a monitor enter/exit per call. Same swap pattern as TomlRenderer (#875).
+      val out = new StringBuilderWriter()
       val q = new java.util.ArrayDeque[Eval]()
       q.add(value)
       while (!q.isEmpty) {
