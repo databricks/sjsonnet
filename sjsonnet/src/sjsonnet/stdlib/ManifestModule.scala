@@ -170,19 +170,6 @@ object ManifestModule extends AbstractFunctionModule {
 
     private def isSection(v: Val) = v.isInstanceOf[Val.Obj] || isTableArray(v)
 
-    private def sortedKeyIndex(keys: Array[String], key: String): Int = {
-      var low = 0
-      var high = keys.length - 1
-      while (low <= high) {
-        val mid = (low + high) >>> 1
-        val comparison = Util.CodepointStringOrdering.compare(keys(mid), key)
-        if (comparison < 0) low = mid + 1
-        else if (comparison > 0) high = mid - 1
-        else return mid
-      }
-      -1
-    }
-
     private def renderTableInternal(
         out: StringBuilderWriter,
         v: Val.Obj,
@@ -195,36 +182,40 @@ object ManifestModule extends AbstractFunctionModule {
         return out
       }
 
+      // Resolve each field once and cache the result: the value is needed twice
+      // (to classify scalars vs sections, then to render). Iterating `keys` directly
+      // also skips the binary search that mapped `visibleKeyNames` back into `keys`.
+      val resolved = new Array[Val](keys.length)
       val sectionFlags = new Array[Boolean](keys.length)
-      val visibleKeys = v.visibleKeyNames
-      var visibleKeyIdx = 0
-      while (visibleKeyIdx < visibleKeys.length) {
-        val k = visibleKeys(visibleKeyIdx)
-        val sortedIdx = sortedKeyIndex(keys, k)
-        sectionFlags(sortedIdx) = isSection(v.value(k, v.pos)(ev))
-        visibleKeyIdx += 1
+      var keyIdx = 0
+      while (keyIdx < keys.length) {
+        val r = v.value(keys(keyIdx), v.pos)(ev)
+        resolved(keyIdx) = r
+        sectionFlags(keyIdx) = isSection(r)
+        keyIdx += 1
       }
 
       val renderer = new TomlRenderer(out, cumulatedIndent, indent)
-      var keyIdx = 0
+      keyIdx = 0
       while (keyIdx < keys.length) {
         if (!sectionFlags(keyIdx)) {
-          val k = keys(keyIdx)
           out.write(cumulatedIndent)
-          TomlRenderer.writeEscapedKey(out, k)
+          TomlRenderer.writeEscapedKey(out, keys(keyIdx))
           out.write(" = ")
-          Materializer.apply0(v.value(k, v.pos)(ev), renderer)(ev)
+          Materializer.apply0(resolved(keyIdx), renderer)(ev)
         }
         keyIdx += 1
       }
       out.write('\n')
 
+      // childIndent depends only on cumulatedIndent + indent, so compute it once
+      // instead of per section iteration.
+      val childIndent = cumulatedIndent + indent
       keyIdx = 0
       while (keyIdx < keys.length) {
         if (sectionFlags(keyIdx)) {
           val k = keys(keyIdx)
-          val v0 = v.value(k, v.pos, v)(ev)
-          val childIndent = cumulatedIndent + indent
+          val v0 = resolved(keyIdx)
           path += k
           v0 match {
             case arr: Val.Arr =>
@@ -285,7 +276,9 @@ object ManifestModule extends AbstractFunctionModule {
     }
 
     def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = {
-      val out = new StringBuilderWriter
+      // Pre-size at 1 KiB to skip the first ~6 doublings (16→1024) for typical TOML
+      // outputs without overcommitting memory on small ones.
+      val out = new StringBuilderWriter(1024)
       renderTableInternal(
         out,
         v.value.asObj,
