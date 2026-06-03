@@ -3,7 +3,6 @@ package sjsonnet.stdlib
 import sjsonnet._
 import sjsonnet.functions.AbstractFunctionModule
 
-import java.io.StringWriter
 import scala.collection.mutable
 
 /**
