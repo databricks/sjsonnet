@@ -5,7 +5,7 @@ import org.openjdk.jmh.infra.*
 import sjsonnet.*
 import ujson.JsVisitor
 
-import java.io.{StringWriter, Writer}
+import java.io.Writer
 import java.util.concurrent.TimeUnit
 
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -59,8 +59,8 @@ class MaterializerBenchmark {
     new PrettyYamlRenderer(_, indent = 3, getCurrentPosition = () => null)
   )
 
-  private def renderWith[T <: Writer](r: StringWriter => JsVisitor[T, T]): String = {
-    val writer = new StringWriter
+  private def renderWith[T <: Writer](r: StringBuilderWriter => JsVisitor[T, T]): String = {
+    val writer = new StringBuilderWriter
     val renderer = r(writer)
     interp.materialize(value, renderer)
     writer.toString

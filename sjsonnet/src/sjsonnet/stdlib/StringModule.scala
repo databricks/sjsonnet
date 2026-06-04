@@ -1355,7 +1355,7 @@ object StringModule extends AbstractFunctionModule {
      */
     builtin("escapeStringXML", "str") { (_, ev, str: Val) =>
       val string = stdToString(str)(ev)
-      val out = new java.io.StringWriter()
+      val out = new StringBuilderWriter(string.length + 16)
       var i = 0
       while (i < string.length) {
         string.charAt(i) match {
