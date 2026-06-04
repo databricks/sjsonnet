@@ -1320,12 +1320,16 @@ object StringModule extends AbstractFunctionModule {
      * quotes, escapes backslashes, and escapes unprintable characters.
      */
     builtin("escapeStringJson", "str_") { (pos, ev, str: Val) =>
-      if (str.value.isInstanceOf[Val.Str]) {
-        Materializer.stringify(str)(ev)
-      } else {
-        val out = new java.io.StringWriter()
-        BaseRenderer.escape(out, Materializer.stringify(str)(ev), unicode = true)
-        out.toString
+      val v = str.value
+      v match {
+        case s: Val.Str =>
+          val out = new StringBuilderWriter(s.str.length + 16)
+          BaseRenderer.escape(out, s.str, unicode = true)
+          out.toString
+        case _ =>
+          val out = new StringBuilderWriter(64)
+          BaseRenderer.escape(out, Materializer.stringify(v)(ev), unicode = true)
+          out.toString
       }
     },
     /**
@@ -1336,8 +1340,9 @@ object StringModule extends AbstractFunctionModule {
      * Convert str to allow it to be embedded in Python. This is an alias for std.escapeStringJson.
      */
     builtin("escapeStringPython", "str") { (pos, ev, str: Val) =>
-      val out = new java.io.StringWriter()
-      BaseRenderer.escape(out, stdToString(str)(ev), unicode = true)
+      val s = stdToString(str)(ev)
+      val out = new StringBuilderWriter(s.length + 16)
+      BaseRenderer.escape(out, s, unicode = true)
       out.toString
     },
     /**
