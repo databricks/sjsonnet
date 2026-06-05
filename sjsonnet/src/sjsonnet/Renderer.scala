@@ -7,6 +7,13 @@ import upickle.core.{ArrVisitor, ObjVisitor}
 final class StringBuilderWriter(initialCapacity: Int = 16) extends Writer {
   private[this] val builder = new java.lang.StringBuilder(initialCapacity)
 
+  /**
+   * Exposes the underlying [[java.lang.StringBuilder]] for callers that need direct
+   * length/charAt/setLength operations (e.g. [[YamlRenderer]] trims trailing spaces).
+   * Single-threaded use only; the writer is not thread-safe.
+   */
+  def getBuilder: java.lang.StringBuilder = builder
+
   override def write(c: Int): Unit =
     builder.append(c.toChar)
 
@@ -45,7 +52,7 @@ final class StringBuilderWriter(initialCapacity: Int = 16) extends Writer {
  *   - Custom printing of Doubles
  *   - Custom printing of empty dictionaries and arrays
  */
-class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
+class Renderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
@@ -153,7 +160,7 @@ class Renderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
   }
 }
 
-class PythonRenderer(out: Writer = new java.io.StringWriter(), indent: Int = -1)
+class PythonRenderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
 
   override def visitNull(index: Int): Writer = {

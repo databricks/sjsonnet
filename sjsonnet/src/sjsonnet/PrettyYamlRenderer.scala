@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.{StringWriter, Writer}
+import java.io.Writer
 
 import upickle.core.{ArrVisitor, ObjVisitor}
 
@@ -12,7 +12,7 @@ import scala.collection.mutable
  * writes to a generic `Writer`.
  */
 class PrettyYamlRenderer(
-    out: Writer = new java.io.StringWriter(),
+    out: Writer = new StringBuilderWriter(),
     indentArrayInObject: Boolean = false,
     indent: Int,
     idealWidth: Int = 80,
@@ -78,8 +78,6 @@ class PrettyYamlRenderer(
     // Strings which look like booleans/nulls/numbers/dates/etc.,
     // or have leading/trailing spaces, are rendered single-quoted
     else if (PrettyYamlRenderer.stringNeedsToBeQuoted(str)) {
-      val strWriter = new StringWriter
-      BaseRenderer.escape(strWriter, s, unicode = true)
       val quotedStr = "'" + str.replace("'", "''") + "'"
       PrettyYamlRenderer.writeWrappedString(
         quotedStr,

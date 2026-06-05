@@ -1,10 +1,9 @@
 package sjsonnet
 
-import java.io.StringWriter
 import upickle.core.{ArrVisitor, ObjVisitor, SimpleVisitor, Visitor}
 
 class YamlRenderer(
-    _out: StringWriter = new java.io.StringWriter(),
+    _out: StringBuilderWriter = new StringBuilderWriter(),
     indentArrayInObject: Boolean = false,
     quoteKeys: Boolean = true,
     indent: Int = 2)
@@ -13,11 +12,11 @@ class YamlRenderer(
   var dashBuffered = false
   var afterKey = false
   private var topLevel = true
-  private val outBuffer = _out.getBuffer
+  private val outBuffer = _out.getBuilder
 
-  private val yamlKeyVisitor = new SimpleVisitor[StringWriter, StringWriter]() {
+  private val yamlKeyVisitor = new SimpleVisitor[StringBuilderWriter, StringBuilderWriter]() {
     override def expectedMsg = "Expected a string key"
-    override def visitString(s: CharSequence, index: Int): StringWriter = {
+    override def visitString(s: CharSequence, index: Int): StringBuilderWriter = {
       YamlRenderer.this.flushBuffer()
       if (quoteKeys || !YamlRenderer.isSafeBareKey(s.toString)) {
         upickle.core.RenderUtils.escapeChar(
@@ -39,7 +38,7 @@ class YamlRenderer(
     elemBuilder.writeOutToIfLongerThan(_out, if (depth <= 0 || topLevel) 0 else 1000)
   }
 
-  override def visitString(s: CharSequence, index: Int): StringWriter = {
+  override def visitString(s: CharSequence, index: Int): StringBuilderWriter = {
     flushBuffer()
     val len = s.length()
     if (len == 0) {
@@ -69,7 +68,7 @@ class YamlRenderer(
     _out
   }
 
-  override def visitFloat64(d: Double, index: Int): StringWriter = {
+  override def visitFloat64(d: Double, index: Int): StringBuilderWriter = {
     flushBuffer()
     appendString(RenderUtils.renderDouble(d))
     flushCharBuilder()
@@ -99,8 +98,10 @@ class YamlRenderer(
     dashBuffered = false
   }
 
-  override def visitArray(length: Int, index: Int): ArrVisitor[StringWriter, StringWriter] =
-    new ArrVisitor[StringWriter, StringWriter] {
+  override def visitArray(
+      length: Int,
+      index: Int): ArrVisitor[StringBuilderWriter, StringBuilderWriter] =
+    new ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
       var empty = true
       flushBuffer()
 
@@ -115,14 +116,14 @@ class YamlRenderer(
       if (dedentInObject) depth -= 1
       dashBuffered = true
 
-      def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
-      def visitValue(v: StringWriter, index: Int): Unit = {
+      def subVisitor: Visitor[StringBuilderWriter, StringBuilderWriter] = YamlRenderer.this
+      def visitValue(v: StringBuilderWriter, index: Int): Unit = {
         empty = false
         flushBuffer()
         newlineBuffered = true
         dashBuffered = true
       }
-      def visitEnd(index: Int): StringWriter = {
+      def visitEnd(index: Int): StringBuilderWriter = {
         if (!dedentInObject) depth -= 1
         if (empty) {
           elemBuilder.ensureLength(2)
@@ -136,8 +137,10 @@ class YamlRenderer(
       }
     }
 
-  override def visitObject(length: Int, index: Int): ObjVisitor[StringWriter, StringWriter] =
-    new ObjVisitor[StringWriter, StringWriter] {
+  override def visitObject(
+      length: Int,
+      index: Int): ObjVisitor[StringBuilderWriter, StringBuilderWriter] =
+    new ObjVisitor[StringBuilderWriter, StringBuilderWriter] {
       var empty = true
       flushBuffer()
       if (!topLevel) depth += 1
@@ -145,9 +148,9 @@ class YamlRenderer(
 
       if (afterKey) newlineBuffered = true
 
-      def subVisitor: Visitor[StringWriter, StringWriter] = YamlRenderer.this
+      def subVisitor: Visitor[StringBuilderWriter, StringBuilderWriter] = YamlRenderer.this
 
-      def visitKey(index: Int): Visitor[StringWriter, StringWriter] = yamlKeyVisitor
+      def visitKey(index: Int): Visitor[StringBuilderWriter, StringBuilderWriter] = yamlKeyVisitor
 
       def visitKeyValue(s: Any): Unit = {
         empty = false
@@ -160,12 +163,12 @@ class YamlRenderer(
         newlineBuffered = false
       }
 
-      def visitValue(v: StringWriter, index: Int): Unit = {
+      def visitValue(v: StringBuilderWriter, index: Int): Unit = {
         newlineBuffered = true
         afterKey = false
       }
 
-      def visitEnd(index: Int): StringWriter = {
+      def visitEnd(index: Int): StringBuilderWriter = {
         if (empty) {
           elemBuilder.ensureLength(2)
           elemBuilder.append('{')
