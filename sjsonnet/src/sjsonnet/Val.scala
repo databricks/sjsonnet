@@ -1232,7 +1232,7 @@ object Val {
       pos0: Position,
       private[Val] var source: Arr,
       private[Val] var func: Func,
-      private var callPos: Position,
+      private[Val] var callPos: Position,
       private var ev: EvalScope)
       extends LazyViewArr(pos0, source.length) {
 
@@ -1256,20 +1256,22 @@ object Val {
       private var source: Arr,
       private var outerFunc: Func,
       private var innerFunc: Func,
-      private var callPos: Position,
+      private var outerCallPos: Position,
+      private var innerCallPos: Position,
       private var ev: EvalScope)
       extends LazyViewArr(pos0, source.length) {
 
     protected def computeAt(index: Int): Val = {
-      val inner = innerFunc.apply1(source.eval(index), callPos)(ev, TailstrictModeDisabled)
-      outerFunc.apply1(inner, callPos)(ev, TailstrictModeDisabled)
+      val inner = innerFunc.apply1(source.eval(index), innerCallPos)(ev, TailstrictModeDisabled)
+      outerFunc.apply1(inner, outerCallPos)(ev, TailstrictModeDisabled)
     }
 
     override protected def releaseCapturedState(): Unit = {
       source = null
       outerFunc = null
       innerFunc = null
-      callPos = null
+      outerCallPos = null
+      innerCallPos = null
       ev = null
     }
   }
@@ -1646,7 +1648,15 @@ object Val {
       } else
         source match {
           case inner: MappedArr if inner.source != null =>
-            new ComposedMappedArr(pos, inner.source, func, inner.func, callPos, ev)
+            new ComposedMappedArr(
+              pos,
+              inner.source,
+              func,
+              inner.func,
+              callPos,
+              inner.callPos,
+              ev
+            )
           case _ => new MappedArr(pos, source, func, callPos, ev)
         }
 
