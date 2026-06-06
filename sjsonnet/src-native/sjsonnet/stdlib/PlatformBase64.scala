@@ -1,5 +1,6 @@
 package sjsonnet.stdlib
 
+import scala.annotation.nowarn
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 import scala.scalanative.libc.string.memcpy
@@ -125,16 +126,17 @@ object PlatformBase64 {
     if (maxOutLen > Int.MaxValue)
       throw new IllegalArgumentException("Input too large for base64 encoding")
     val outSize = maxOutLen.toInt
+
+    // Pre-allocate byte array for source data
+    val srcBytes = new Array[Byte](len)
+    // Use getBytes for faster ASCII char narrowing (single system call vs per-char loop)
+    @nowarn("cat=deprecation")
+    def copyBytes(): Unit = input.getBytes(0, len, srcBytes, 0)
+    copyBytes()
+
     Zone.acquire { implicit z =>
       val srcPtr = alloc[Byte](len.toUSize)
-      // Narrow ASCII chars directly into the zone buffer. The AsciiSafeStr contract guarantees
-      // every char fits in 0x20..0x7F (minus quote/backslash) per Parser.constructString +
-      // CharSWAR.isAsciiJsonSafe, so the high byte of each Char is zero and `.toByte` is lossless.
-      var i = 0
-      while (i < len) {
-        !(srcPtr + i.toUSize) = input.charAt(i).toByte
-        i += 1
-      }
+      memcpy(srcPtr, srcBytes.at(0), len.toUSize)
       val outPtr = alloc[Byte]((outSize + 1).toUSize)
       val outLenPtr = alloc[CSize](1.toUSize)
       libbase64.base64_encode(srcPtr, len.toUSize, outPtr, outLenPtr, 0)
