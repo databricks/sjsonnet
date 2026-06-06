@@ -336,6 +336,19 @@ private[sjsonnet] final class FastMaterializeJsonRenderer(
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray
 
+  // Hot-path overrides with direct implementation (no super delegation).
+  // @inline is safe here because this class is final and uses `outWriter` directly.
+  @inline override def flushCharBuilder(): Unit =
+    elemBuilder.writeOutToIfLongerThan(outWriter, if (depth == 0) 0 else 1000)
+
+  @inline override def flushBuffer(): Unit = {
+    if (commaBuffered) {
+      commaBuffered = false
+      elemBuilder.append(',')
+      renderIndent()
+    }
+  }
+
   private val reusableArrVisitor: ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
     def subVisitor: sjsonnet.FastMaterializeJsonRenderer
   } = new ArrVisitor[StringBuilderWriter, StringBuilderWriter] {
