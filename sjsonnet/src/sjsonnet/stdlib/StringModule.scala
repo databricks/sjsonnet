@@ -1029,9 +1029,34 @@ object StringModule extends AbstractFunctionModule {
   private def parseDigitNat(str: String, start: Int, base: Int, baseName: String): Double = {
     var acc = 0.0
     var i = start
-    while (i < str.length) {
-      // Decimal and octal only accept ASCII digits; charAt keeps the hot path branch-light and
-      // avoids the codePointAt/charCount work that always leads to an error for non-ASCII input.
+    val len = str.length
+    // Fast path for base 10: process 4 digits at a time.
+    // Inspired by jsoniter-scala's SWAR digit parsing technique.
+    if (base == 10 && len - start >= 4) {
+      val limit = len - 3
+      while (i < limit) {
+        val c0 = str.charAt(i).toInt - '0'
+        val c1 = str.charAt(i + 1).toInt - '0'
+        val c2 = str.charAt(i + 2).toInt - '0'
+        val c3 = str.charAt(i + 3).toInt - '0'
+        if (c0 < 0 || c0 > 9 || c1 < 0 || c1 > 9 || c2 < 0 || c2 > 9 || c3 < 0 || c3 > 9) {
+          // Non-digit found, fall through to scalar loop for error reporting
+          while (i < len) {
+            val digit = str.charAt(i) - '0'
+            if (digit < 0 || digit >= base) {
+              Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
+            }
+            acc = base * acc + digit
+            i += 1
+          }
+          return acc
+        }
+        acc = acc * 10000 + c0 * 1000 + c1 * 100 + c2 * 10 + c3
+        i += 4
+      }
+    }
+    // Scalar tail: process remaining digits one at a time
+    while (i < len) {
       val digit = str.charAt(i) - '0'
       if (digit < 0 || digit >= base) {
         Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
