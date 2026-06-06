@@ -50,10 +50,14 @@ abstract class Materializer {
    */
   @inline private def visitStr[T](s: Val.Str, visitor: Visitor[T, T]): T = {
     storePos(s.pos)
-    visitor match {
-      case cr: BaseCharRenderer[T @unchecked] if s.isInstanceOf[Val.AsciiSafeStr] =>
-        cr.visitAsciiSafeString(s.str, -1)
-      case _ => visitor.visitString(s.str, -1)
+    if (s.isInstanceOf[Val.AsciiSafeStr]) {
+      visitor match {
+        case cr: BaseCharRenderer[T @unchecked] => cr.visitAsciiSafeString(s.str, -1)
+        case br: BaseByteRenderer[T @unchecked] => br.visitAsciiSafeString(s.str, -1)
+        case _                                  => visitor.visitString(s.str, -1)
+      }
+    } else {
+      visitor.visitString(s.str, -1)
     }
   }
 
