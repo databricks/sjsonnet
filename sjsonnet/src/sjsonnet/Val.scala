@@ -1230,8 +1230,8 @@ object Val {
    */
   private final class MappedArr(
       pos0: Position,
-      private var source: Arr,
-      private var func: Func,
+      private[Val] var source: Arr,
+      private[Val] var func: Func,
       private var callPos: Position,
       private var ev: EvalScope)
       extends LazyViewArr(pos0, source.length) {
@@ -1242,6 +1242,33 @@ object Val {
     override protected def releaseCapturedState(): Unit = {
       source = null
       func = null
+      callPos = null
+      ev = null
+    }
+  }
+
+  /**
+   * Fused view for std.map(f, std.map(g, arr)). Applies both functions in sequence without an
+   * intermediate MappedArr cache layer, eliminating one allocation + indirection per element.
+   */
+  private final class ComposedMappedArr(
+      pos0: Position,
+      private var source: Arr,
+      private var outerFunc: Func,
+      private var innerFunc: Func,
+      private var callPos: Position,
+      private var ev: EvalScope)
+      extends LazyViewArr(pos0, source.length) {
+
+    protected def computeAt(index: Int): Val = {
+      val inner = innerFunc.apply1(source.eval(index), callPos)(ev, TailstrictModeDisabled)
+      outerFunc.apply1(inner, callPos)(ev, TailstrictModeDisabled)
+    }
+
+    override protected def releaseCapturedState(): Unit = {
+      source = null
+      outerFunc = null
+      innerFunc = null
       callPos = null
       ev = null
     }
@@ -1616,7 +1643,12 @@ object Val {
           i += 1
         }
         Arr(pos, result)
-      } else new MappedArr(pos, source, func, callPos, ev)
+      } else
+        source match {
+          case inner: MappedArr if inner.source != null =>
+            new ComposedMappedArr(pos, inner.source, func, inner.func, callPos, ev)
+          case _ => new MappedArr(pos, source, func, callPos, ev)
+        }
 
     def mappedWithIndex(
         pos: Position,
