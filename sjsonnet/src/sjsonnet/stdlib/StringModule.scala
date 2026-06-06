@@ -286,16 +286,15 @@ object StringModule extends AbstractFunctionModule {
         return stripSingleChar(str, single.toChar, left, right)
       }
 
-      // Common case: an all-ASCII strip set (whitespace/punctuation). Build a 256-byte lookup
-      // table — a single array load per char replaces the two conditional branches in the bitmask
-      // approach, keeping the strip loop branch-free and cache-friendly.
-      var allAscii = true
+      // Common case: strip set fits in a byte (chars < 256). Build a 256-byte lookup table —
+      // a single array load per char replaces the two conditional branches in the bitmask approach.
+      var allByte = true
       var i = 0
-      while (allAscii && i < chars.length) {
-        if (chars.charAt(i) >= 256) allAscii = false
+      while (allByte && i < chars.length) {
+        if (chars.charAt(i) >= 256) allByte = false
         i += 1
       }
-      if (allAscii) {
+      if (allByte) {
         val table = new Array[Byte](256)
         i = 0
         while (i < chars.length) {
@@ -314,9 +313,8 @@ object StringModule extends AbstractFunctionModule {
     }
 
     /**
-     * Fast path for an all-ASCII strip set using a 256-byte lookup table. A single array load per
-     * char replaces the two conditional branches in the bitmask approach, keeping the strip loop
-     * branch-free and cache-friendly.
+     * Fast path for strip sets where all chars fit in a byte (< 256). A single array load per char
+     * replaces the two conditional branches in the bitmask approach.
      */
     private def stripLookup(
         str: String,
