@@ -47,7 +47,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     visitObject(length, index)
 
   protected val elemBuilder = new upickle.core.CharBuilder
-  def flushCharBuilder(): Unit = {
+  @inline def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
 
@@ -79,7 +79,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       arr
     }
 
-  def flushBuffer(): Unit = {
+  @inline def flushBuffer(): Unit = {
     if (commaBuffered) {
       commaBuffered = false
       elemBuilder.append(',')
@@ -255,7 +255,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     else visitNonNullString(s, index)
   }
 
-  private def visitNonNullString(s: CharSequence, index: Int) = {
+  @inline private def visitNonNullString(s: CharSequence, index: Int) = {
     flushBuffer()
     s match {
       case str: String if !escapeUnicode =>
@@ -322,7 +322,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     }
   }
 
-  protected def appendString(s: String): Unit = {
+  @inline protected def appendString(s: String): Unit = {
     val len = s.length
     elemBuilder.ensureLength(len)
     val cbArr = elemBuilder.arr
