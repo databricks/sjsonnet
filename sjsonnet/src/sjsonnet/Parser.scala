@@ -522,6 +522,92 @@ class Parser(
     P(&("]").map(_ => Val.Arr(pos, emptyLazyArray)) | arrBody(pos, currentDepth + 1))
   }
 
+  @inline private def isJsonWhitespace(c: Char): Boolean =
+    c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+  @inline private def skipJsonWhitespace(data: String, from: Int, len: Int): Int = {
+    var i = from
+    while (i < len && isJsonWhitespace(data.charAt(i))) i += 1
+    i
+  }
+
+  @inline private def isIdentStart(c: Char): Boolean =
+    c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+
+  /**
+   * Try to parse the array body as a bulk sequence of number literals. On success, advances the
+   * parser position and returns a Val.Arr. On failure, returns null without advancing.
+   */
+  private def tryBulkNumericArray[$: P](pos: Position): Val.Arr = {
+    val ctx = P.current
+    ctx.input match {
+      case indexed: IndexedParserInput =>
+        val data = indexed.data
+        val dataLen = data.length
+        var i = skipJsonWhitespace(data, ctx.index, dataLen)
+        if (i >= dataLen) return null
+        // Quick probe: first char must be digit or '-'
+        val probe = data.charAt(i)
+        if (probe != '-' && (probe < '0' || probe > '9')) return null
+
+        val elements = new scala.collection.mutable.ArrayBuilder.ofRef[Eval]()
+        var count = 0
+
+        while (i < dataLen) {
+          // Parse one number: optional '-', digits, optional '.digits', optional 'e/E[+-]digits'
+          val numStart = i
+          var ch = data.charAt(i)
+          if (ch == '-') { i += 1; if (i >= dataLen) return null; ch = data.charAt(i) }
+          if (ch < '0' || ch > '9') return null
+          i += 1
+          while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+          if (i < dataLen && ch == '.') {
+            i += 1
+            if (i >= dataLen) return null
+            ch = data.charAt(i)
+            if (ch < '0' || ch > '9') return null
+            i += 1
+            while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+          }
+          if (i < dataLen && (ch == 'e' || ch == 'E')) {
+            i += 1
+            if (i >= dataLen) return null
+            ch = data.charAt(i)
+            if (ch == '+' || ch == '-') {
+              i += 1; if (i >= dataLen) return null; ch = data.charAt(i)
+            }
+            if (ch < '0' || ch > '9') return null
+            i += 1
+            while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+          }
+          if (i < dataLen && isIdentStart(data.charAt(i))) return null
+
+          elements += Val.Num(pos, java.lang.Double.parseDouble(data.substring(numStart, i)))
+          count += 1
+
+          // After number: expect whitespace then ',' or ']'
+          i = skipJsonWhitespace(data, i, dataLen)
+          if (i >= dataLen) return null
+          ch = data.charAt(i)
+          if (ch == ']') {
+            ctx.freshSuccess((), i)
+            return Val.Arr(pos, elements.result())
+          }
+          if (ch != ',') return null
+          i += 1
+          // After comma: skip whitespace, check for trailing comma
+          i = skipJsonWhitespace(data, i, dataLen)
+          if (i >= dataLen) return null
+          if (data.charAt(i) == ']') {
+            ctx.freshSuccess((), i)
+            return Val.Arr(pos, elements.result())
+          }
+        }
+        null
+      case _ => null
+    }
+  }
+
   def compSuffix[$: P]: P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = compSuffix(0)
 
   def compSuffix[$: P](currentDepth: Int): P[Left[(Expr.ForSpec, Seq[Expr.CompSpec]), Nothing]] = {
@@ -531,6 +617,8 @@ class Parser(
   def arrBody[$: P](pos: Position): P[Expr] = arrBody(pos, 0)
 
   def arrBody[$: P](offset: Position, currentDepth: Int): P[Expr] = {
+    val bulk = tryBulkNumericArray(offset)
+    if (bulk != null) return P(Pass(bulk))
     P(
       expr(currentDepth + 1) ~
       (compSuffix(currentDepth + 1) | "," ~ (compSuffix(currentDepth + 1) | (expr(currentDepth + 1)
