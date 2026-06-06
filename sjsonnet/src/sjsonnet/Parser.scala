@@ -554,35 +554,63 @@ class Parser(
         var count = 0
 
         while (i < dataLen) {
-          // Parse one number: optional '-', digits, optional '.digits', optional 'e/E[+-]digits'
           val numStart = i
           var ch = data.charAt(i)
-          if (ch == '-') { i += 1; if (i >= dataLen) return null; ch = data.charAt(i) }
+          val negative = ch == '-'
+          if (negative) { i += 1; if (i >= dataLen) return null; ch = data.charAt(i) }
           if (ch < '0' || ch > '9') return null
+
+          // Fast path: parse integer directly, 4 digits at a time (SWAR-inspired)
+          var acc = (ch - '0').toDouble
           i += 1
-          while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
-          if (i < dataLen && ch == '.') {
-            i += 1
-            if (i >= dataLen) return null
-            ch = data.charAt(i)
-            if (ch < '0' || ch > '9') return null
-            i += 1
-            while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
-          }
-          if (i < dataLen && (ch == 'e' || ch == 'E')) {
-            i += 1
-            if (i >= dataLen) return null
-            ch = data.charAt(i)
-            if (ch == '+' || ch == '-') {
-              i += 1; if (i >= dataLen) return null; ch = data.charAt(i)
+          var isSimpleInt = true
+          while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) {
+            // 4-digits-at-a-time when possible
+            if (i + 3 < dataLen) {
+              val c1 = data.charAt(i + 1).toInt - '0'
+              val c2 = data.charAt(i + 2).toInt - '0'
+              val c3 = data.charAt(i + 3).toInt - '0'
+              if (c1 >= 0 && c1 <= 9 && c2 >= 0 && c2 <= 9 && c3 >= 0 && c3 <= 9) {
+                acc = acc * 10000 + (ch - '0') * 1000 + c1 * 100 + c2 * 10 + c3
+                i += 4
+              } else {
+                acc = acc * 10 + (ch - '0')
+                i += 1
+              }
+            } else {
+              acc = acc * 10 + (ch - '0')
+              i += 1
             }
-            if (ch < '0' || ch > '9') return null
-            i += 1
-            while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+          }
+          // Check for decimal or exponent — fall back to Double.parseDouble
+          if (i < dataLen && (ch == '.' || ch == 'e' || ch == 'E')) {
+            isSimpleInt = false
+            if (ch == '.') {
+              i += 1
+              if (i >= dataLen) return null
+              ch = data.charAt(i)
+              if (ch < '0' || ch > '9') return null
+              i += 1
+              while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+            }
+            if (i < dataLen && { ch = data.charAt(i); ch == 'e' || ch == 'E' }) {
+              i += 1
+              if (i >= dataLen) return null
+              ch = data.charAt(i)
+              if (ch == '+' || ch == '-') {
+                i += 1; if (i >= dataLen) return null; ch = data.charAt(i)
+              }
+              if (ch < '0' || ch > '9') return null
+              i += 1
+              while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) i += 1
+            }
           }
           if (i < dataLen && isIdentStart(data.charAt(i))) return null
 
-          elements += Val.Num(pos, java.lang.Double.parseDouble(data.substring(numStart, i)))
+          val d =
+            if (isSimpleInt) { if (negative) -acc else acc }
+            else java.lang.Double.parseDouble(data.substring(numStart, i))
+          elements += Val.cachedNum(pos, d)
           count += 1
 
           // After number: expect whitespace then ',' or ']'
