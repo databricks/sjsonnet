@@ -571,13 +571,29 @@ object ArrayModule extends AbstractFunctionModule {
             }
             str.str.contains(secondArg)
           case a: Val.Arr =>
-            var i = 0
-            var found = false
-            while (i < a.length && !found) {
-              if (ev.equal(a.value(i), x.value)) found = true
-              i += 1
+            val xVal = x.value
+            xVal match {
+              case xNum: Val.Num =>
+                val target = xNum.asDouble
+                var i = 0
+                var found = false
+                while (i < a.length && !found) {
+                  a.value(i) match {
+                    case n: Val.Num => if (n.asDouble == target) found = true
+                    case _          =>
+                  }
+                  i += 1
+                }
+                found
+              case _ =>
+                var i = 0
+                var found = false
+                while (i < a.length && !found) {
+                  if (ev.equal(a.value(i), xVal)) found = true
+                  i += 1
+                }
+                found
             }
-            found
           case arr =>
             Error.fail(
               "std.member first argument must be an array or a string, got " + arr.prettyName
