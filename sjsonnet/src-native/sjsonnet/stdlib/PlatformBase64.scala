@@ -91,11 +91,9 @@ object PlatformBase64 {
       throw new IllegalArgumentException("Input too large for base64 encoding")
     val outSize = maxOutLen.toInt
     Zone.acquire { implicit z =>
-      val srcPtr = alloc[Byte](input.length.toUSize)
-      memcpy(srcPtr, input.at(0), input.length.toUSize)
       val outPtr = alloc[Byte]((outSize + 1).toUSize)
       val outLenPtr = alloc[CSize](1.toUSize)
-      libbase64.base64_encode(srcPtr, input.length.toUSize, outPtr, outLenPtr, 0)
+      libbase64.base64_encode(input.at(0), input.length.toUSize, outPtr, outLenPtr, 0)
       val actualLen = (!outLenPtr).toInt
       val result = new Array[Byte](actualLen)
       memcpy(result.at(0), outPtr, actualLen.toUSize)
@@ -127,19 +125,18 @@ object PlatformBase64 {
       throw new IllegalArgumentException("Input too large for base64 encoding")
     val outSize = maxOutLen.toInt
 
-    // Pre-allocate byte array for source data
+    // Use getBytes for faster ASCII char narrowing (single bulk copy vs per-char loop).
+    // Pass the GC array pointer directly to the C encoder — no intermediate zone copy needed
+    // since Scala Native's GC does not move objects during a foreign call.
     val srcBytes = new Array[Byte](len)
-    // Use getBytes for faster ASCII char narrowing (single system call vs per-char loop)
     @nowarn("cat=deprecation")
     def copyBytes(): Unit = input.getBytes(0, len, srcBytes, 0)
     copyBytes()
 
     Zone.acquire { implicit z =>
-      val srcPtr = alloc[Byte](len.toUSize)
-      memcpy(srcPtr, srcBytes.at(0), len.toUSize)
       val outPtr = alloc[Byte]((outSize + 1).toUSize)
       val outLenPtr = alloc[CSize](1.toUSize)
-      libbase64.base64_encode(srcPtr, len.toUSize, outPtr, outLenPtr, 0)
+      libbase64.base64_encode(srcBytes.at(0), len.toUSize, outPtr, outLenPtr, 0)
       val actualLen = (!outLenPtr).toInt
       val result = new Array[Byte](actualLen)
       memcpy(result.at(0), outPtr, actualLen.toUSize)
@@ -155,12 +152,10 @@ object PlatformBase64 {
       throw new IllegalArgumentException("Input too large for base64 decoding")
     val outSize = maxOutLen.toInt
     Zone.acquire { implicit z =>
-      val srcPtr = alloc[Byte](srcBytes.length.toUSize)
-      memcpy(srcPtr, srcBytes.at(0), srcBytes.length.toUSize)
       val outPtr = alloc[Byte]((outSize + 1).toUSize)
       val outLenPtr = alloc[CSize](1.toUSize)
       val ret =
-        libbase64.base64_decode(srcPtr, srcBytes.length.toUSize, outPtr, outLenPtr, 0)
+        libbase64.base64_decode(srcBytes.at(0), srcBytes.length.toUSize, outPtr, outLenPtr, 0)
       if (ret != 1) {
         throwDecodeError(srcBytes)
       }
