@@ -286,22 +286,22 @@ object StringModule extends AbstractFunctionModule {
         return stripSingleChar(str, single.toChar, left, right)
       }
 
-      // Common case: an all-ASCII strip set (whitespace/punctuation). Build a 128-bit membership
-      // mask in two `long`s — no allocation (vs a per-call java.util.BitSet) and no array bounds
-      // check per lookup, keeping the strip loop tight and GC-friendly (issue #851).
-      var lo = 0L
-      var hi = 0L
-      var allAscii = true
+      // Common case: strip set fits in a byte (chars < 256). Build a 256-byte lookup table —
+      // a single array load per char replaces the two conditional branches in the bitmask approach.
+      var allByte = true
       var i = 0
-      while (allAscii && i < chars.length) {
-        val ch = chars.charAt(i)
-        if (ch < 64) lo |= 1L << ch
-        else if (ch < 128) hi |= 1L << (ch - 64)
-        else allAscii = false
+      while (allByte && i < chars.length) {
+        if (chars.charAt(i) >= 256) allByte = false
         i += 1
       }
-      if (allAscii) {
-        return stripAsciiMask(str, lo, hi, left, right)
+      if (allByte) {
+        val table = new Array[Byte](256)
+        i = 0
+        while (i < chars.length) {
+          table(chars.charAt(i).toInt) = 1
+          i += 1
+        }
+        return stripLookup(str, table, left, right)
       }
 
       val bmpSet = bmpNonSurrogateSet(chars)
@@ -312,29 +312,38 @@ object StringModule extends AbstractFunctionModule {
       unspecializedStrip(str, codePointsSet(chars), left, right)
     }
 
-    /** Membership test for the inline 128-bit ASCII mask built in [[strip]]. */
-    @inline private def inAsciiMask(lo: Long, hi: Long, c: Char): Boolean =
-      if (c < 64) (lo & (1L << c)) != 0L
-      else if (c < 128) (hi & (1L << (c - 64))) != 0L
-      else false
-
     /**
-     * Fast path for an all-ASCII strip set, using the inline two-`long` mask. Non-ASCII chars in
-     * `str` (including surrogate halves) are never members, so surrogate pairs are left intact.
+     * Fast path for strip sets where all chars fit in a byte (< 256). A single array load per char
+     * replaces the two conditional branches in the bitmask approach.
      */
-    private def stripAsciiMask(
+    private def stripLookup(
         str: String,
-        lo: Long,
-        hi: Long,
+        table: Array[Byte],
         left: Boolean,
         right: Boolean): String = {
       var start = 0
       var end = str.length
       if (left) {
-        while (start < end && inAsciiMask(lo, hi, str.charAt(start))) start += 1
+        var continue = true
+        while (start < end && continue) {
+          val c = str.charAt(start).toInt
+          if (c >= 256 || table(c) == 0) {
+            continue = false
+          } else {
+            start += 1
+          }
+        }
       }
       if (right) {
-        while (end > start && inAsciiMask(lo, hi, str.charAt(end - 1))) end -= 1
+        var continue = true
+        while (end > start && continue) {
+          val c = str.charAt(end - 1).toInt
+          if (c >= 256 || table(c) == 0) {
+            continue = false
+          } else {
+            end -= 1
+          }
+        }
       }
       str.substring(start, end)
     }
