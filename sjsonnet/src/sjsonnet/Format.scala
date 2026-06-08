@@ -790,10 +790,6 @@ object Format {
    */
   private def formatSimpleNamedString(parsed: RuntimeFormat, obj: Val.Obj, pos: Position)(implicit
       evaluator: EvalScope): Val.Str = {
-    val output = new java.lang.StringBuilder(parsed.staticChars + parsed.specBits.length * 16)
-
-    // Append leading literal using offsets if source is available, else use string
-    appendLeading(output, parsed)
 
     var resultAsciiSafe = parsed.literalsAsciiSafe
 
@@ -802,15 +798,12 @@ object Format {
       val rawVal = obj.value(singleLabel, pos)(evaluator).value
       if (resultAsciiSafe && !simpleStringValueAsciiSafe(rawVal)) resultAsciiSafe = false
       val str = simpleStringValue(rawVal)
-      var idx = 0
-      while (idx < parsed.specBits.length) {
-        output.append(str)
-        appendLiteral(output, parsed, idx)
-        idx += 1
-      }
-      val resultStr = output.toString
+      val resultStr = formatSingleLabelDirect(parsed, str)
       return if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
     }
+
+    val output = new java.lang.StringBuilder(parsed.staticChars + parsed.specBits.length * 16)
+    appendLeading(output, parsed)
 
     // Cache for repeated key lookups: most format strings reuse the same key many times
     var cachedKey: String = null
@@ -821,8 +814,6 @@ object Format {
     while (idx < parsed.specBits.length) {
       val key = parsed.labels(idx)
 
-      // Look up and cache the string value for this key
-      // String.equals already does identity check (eq) internally
       val str =
         if (key == cachedKey) cachedStr
         else {
@@ -837,14 +828,61 @@ object Format {
 
       if (resultAsciiSafe && !cachedAsciiSafe) resultAsciiSafe = false
       output.append(str)
-
-      // Append trailing literal using offsets if source is available
       appendLiteral(output, parsed, idx)
 
       idx += 1
     }
     val resultStr = output.toString
     if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
+  }
+
+  /**
+   * Direct char-array construction for single-label format strings. Avoids StringBuilder entirely
+   * by pre-computing the exact output length and copying regions via String.getChars. Eliminates
+   * the StringBuilder.toString() buffer copy which is significant for large templates (~600KB).
+   */
+  private def formatSingleLabelDirect(parsed: RuntimeFormat, valueStr: String): String = {
+    val specCount = parsed.specBits.length
+    val valueLen = valueStr.length
+    val totalLen = parsed.staticChars + specCount * valueLen
+    val buf = new Array[Char](totalLen)
+    var offset = 0
+
+    // Copy leading literal
+    val source = parsed.source
+    if (source != null) {
+      val len = parsed.leadingEnd - parsed.leadingStart
+      source.getChars(parsed.leadingStart, parsed.leadingEnd, buf, offset)
+      offset += len
+    } else {
+      val leading = parsed.leading
+      val len = leading.length
+      leading.getChars(0, len, buf, offset)
+      offset += len
+    }
+
+    // Copy value + literal for each spec
+    var idx = 0
+    while (idx < specCount) {
+      valueStr.getChars(0, valueLen, buf, offset)
+      offset += valueLen
+
+      if (source != null) {
+        val litStart = parsed.literalStarts(idx)
+        val litEnd = parsed.literalEnds(idx)
+        val litLen = litEnd - litStart
+        source.getChars(litStart, litEnd, buf, offset)
+        offset += litLen
+      } else {
+        val lit = parsed.literals(idx)
+        val litLen = lit.length
+        lit.getChars(0, litLen, buf, offset)
+        offset += litLen
+      }
+      idx += 1
+    }
+
+    new String(buf, 0, totalLen)
   }
 
   private def simpleStringValue(rawVal: Val)(implicit evaluator: EvalScope): String =
