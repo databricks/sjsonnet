@@ -44,11 +44,12 @@ object DecimalFormat {
       number: Double): String = {
     expLengthOpt match {
       case Some(expLength) =>
-        val roundLog10 = if (number == 0.0) 1L else Math.ceil(Math.log10(math.abs(number))).toLong
-        val expNum = roundLog10 - 1
+        val expNum =
+          if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
         val scaled = number / math.pow(10, expNum.toDouble)
         val prefix = scaled.toLong.toString
-        val expFrag = leftPad(expNum, expLength)
+        val expSign = if (expNum >= 0) "+" else ""
+        val expFrag = expSign + leftPad(expNum, expLength)
         val precision = zeroes + hashes
 
         (precision, alternate) match {

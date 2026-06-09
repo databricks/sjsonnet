@@ -975,8 +975,7 @@ object Format {
           formatted.alternate,
           None,
           math.abs(s)
-        )
-        .replace("E", "E+"),
+        ),
       numeric = true,
       signedConversion = s > 0
     )
@@ -1072,8 +1071,7 @@ object Format {
             formatted.alternate,
             Some(2),
             math.abs(s)
-          )
-          .replace("E", "E+"),
+          ),
         numeric = true,
         signedConversion = s > 0
       )
@@ -1090,8 +1088,7 @@ object Format {
             formatted.alternate,
             None,
             math.abs(s)
-          )
-          .replace("E", "E+"),
+          ),
         numeric = true,
         signedConversion = s > 0
       )
@@ -1111,8 +1108,7 @@ object Format {
           formatted.alternate,
           Some(2),
           math.abs(s)
-        )
-        .replace("E", "E+"),
+        ),
       numeric = true,
       signedConversion = s > 0
     )
