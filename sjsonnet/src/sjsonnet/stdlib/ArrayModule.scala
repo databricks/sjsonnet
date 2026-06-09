@@ -988,7 +988,7 @@ object ArrayModule extends AbstractFunctionModule {
      */
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
       if (count < 0) {
-        Error.fail("makeArray requires size >= 0, got " + count)
+        Error.fail("repeat requires count >= 0, got " + count)
       }
       val res: Val = what match {
         case Val.Str(_, str) =>
