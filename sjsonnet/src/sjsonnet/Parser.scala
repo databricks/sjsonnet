@@ -560,25 +560,37 @@ class Parser(
           if (negative) { i += 1; if (i >= dataLen) return null; ch = data.charAt(i) }
           if (ch < '0' || ch > '9') return null
 
-          // Fast path: parse integer directly, 4 digits at a time (SWAR-inspired)
-          var acc = (ch - '0').toDouble
+          // Fast path: parse integer with Long accumulator, 4 digits at a time (SWAR-inspired).
+          // Long has 63 bits of precision vs Double's 53, so we avoid rounding errors for
+          // integers up to Long.MaxValue. If overflow is detected, we fall back to parseDouble.
+          var acc = (ch - '0').toLong
           i += 1
           var isSimpleInt = true
           while (i < dataLen && { ch = data.charAt(i); ch >= '0' && ch <= '9' }) {
-            // 4-digits-at-a-time when possible
-            if (i + 3 < dataLen) {
-              val c1 = data.charAt(i + 1).toInt - '0'
-              val c2 = data.charAt(i + 2).toInt - '0'
-              val c3 = data.charAt(i + 3).toInt - '0'
-              if (c1 >= 0 && c1 <= 9 && c2 >= 0 && c2 <= 9 && c3 >= 0 && c3 <= 9) {
-                acc = acc * 10000 + (ch - '0') * 1000 + c1 * 100 + c2 * 10 + c3
-                i += 4
+            if (isSimpleInt) {
+              // 4-digits-at-a-time when possible
+              if (i + 3 < dataLen) {
+                val c1 = data.charAt(i + 1).toInt - '0'
+                val c2 = data.charAt(i + 2).toInt - '0'
+                val c3 = data.charAt(i + 3).toInt - '0'
+                if (c1 >= 0 && c1 <= 9 && c2 >= 0 && c2 <= 9 && c3 >= 0 && c3 <= 9) {
+                  if (acc > Long.MaxValue / 10000) {
+                    isSimpleInt = false
+                  } else {
+                    acc = acc * 10000 + (ch - '0') * 1000 + c1 * 100 + c2 * 10 + c3
+                  }
+                  i += 4
+                } else {
+                  if (acc > Long.MaxValue / 10) isSimpleInt = false
+                  else acc = acc * 10 + (ch - '0')
+                  i += 1
+                }
               } else {
-                acc = acc * 10 + (ch - '0')
+                if (acc > Long.MaxValue / 10) isSimpleInt = false
+                else acc = acc * 10 + (ch - '0')
                 i += 1
               }
             } else {
-              acc = acc * 10 + (ch - '0')
               i += 1
             }
           }
@@ -607,8 +619,8 @@ class Parser(
           }
           if (i < dataLen && isIdentStart(data.charAt(i))) return null
 
-          val d =
-            if (isSimpleInt) { if (negative) -acc else acc }
+          val d: Double =
+            if (isSimpleInt) { val v = acc.toDouble; if (negative) -v else v }
             else java.lang.Double.parseDouble(data.substring(numStart, i))
           elements += Val.cachedNum(pos, d)
           count += 1
