@@ -448,8 +448,8 @@ object MathModule extends AbstractFunctionModule {
      *
      * The official docs list std.atan2(y, x) as a mathematical function.
      */
-    builtin("atan2", "x", "y") { (pos, ev, x: Double, y: Double) =>
-      math.atan2(x, y)
+    builtin("atan2", "y", "x") { (pos, ev, y: Double, x: Double) =>
+      math.atan2(y, x)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.hypot(a, b)]].
