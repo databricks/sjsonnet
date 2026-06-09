@@ -22,7 +22,7 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
     }
 
     test("repeat reports official negative count error") {
-      assert(evalErr("""std.repeat("a", -1)""").contains("makeArray requires size >= 0, got -1"))
+      assert(evalErr("""std.repeat("a", -1)""").contains("repeat requires count >= 0, got -1"))
     }
 
     test("removeAt filters by exact index equality") {
