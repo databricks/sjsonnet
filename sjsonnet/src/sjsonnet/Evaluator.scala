@@ -1720,7 +1720,7 @@ class Evaluator(
             case null => Error.fail("Assertion failed", a.value.pos)
             case msg  =>
               Error.fail(
-                "Assertion failed: " + visitExpr(msg)(newScope).cast[Val.Str].str,
+                "Assertion failed: " + materializeError(visitExpr(msg)(newScope)),
                 a.value.pos
               )
           }
