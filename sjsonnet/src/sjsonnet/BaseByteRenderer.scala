@@ -243,6 +243,18 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
+   * Visit a string known to be ASCII-safe at the Val level, skipping the redundant
+   * Platform.isAsciiJsonSafe scan in visitLongString. Called from Materializer.visitStr for
+   * Val.AsciiSafeStr values.
+   */
+  def visitAsciiSafeString(str: String, index: Int): T = {
+    flushBuffer()
+    renderAsciiSafeString(str)
+    flushByteBuilder()
+    out
+  }
+
+  /**
    * Fast path for strings known to be ASCII-safe (no escaping needed, all chars 0x20-0x7E). Skips
    * SWAR scanning and UTF-8 encoding — writes bytes directly from chars.
    */
