@@ -243,9 +243,10 @@ class Evaluator(
         val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         if (rd == 0) null
-        else { val r = ld / rd; if (r.isInfinite) null else Val.cachedNum(pos, r) }
+        else { val r = ld / rd; if (r.isNaN || r.isInfinite) null else Val.cachedNum(pos, r) }
       case Expr.BinaryOp.OP_% =>
-        Val.cachedNum(pos, ld % rd)
+        if (rd == 0) null
+        else { val r = ld % rd; if (r.isNaN) null else Val.cachedNum(pos, r) }
       case Expr.BinaryOp.OP_+ =>
         val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
@@ -1333,6 +1334,7 @@ class Evaluator(
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("division by zero", pos)
         val result = l / r
+        if (result.isNaN) Error.fail("Not a number", pos)
         if (result.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, result)
       // Polymorphic ops: nested match avoids Tuple2 allocation; Num checked first (most common)
@@ -1342,7 +1344,11 @@ class Evaluator(
         l match {
           case Val.Num(_, ld) =>
             r match {
-              case Val.Num(_, rd) => Val.cachedNum(pos, ld % rd)
+              case Val.Num(_, rd) =>
+                if (rd == 0) Error.fail("Division by zero.", pos)
+                val result = ld % rd
+                if (result.isNaN) Error.fail("Not a number", pos)
+                Val.cachedNum(pos, result)
               case _              => failBinOp(l, e.op, r, pos)
             }
           case ls: Val.Str => Format.format(ls.str, r, pos)
