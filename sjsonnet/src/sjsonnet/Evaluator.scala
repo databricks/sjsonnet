@@ -1231,10 +1231,10 @@ class Evaluator(
   // mirror `visitSelectSuper` (`super.name`) so static-key and computed-key
   // super lookups agree, matching google/jsonnet, go-jsonnet, and jrsonnet.
   def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
-    var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
+    val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
     val self = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
-    if (sup == null) sup = self
+    if (sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
     sup.value(key.str, e.pos, self)
   }
 
