@@ -245,7 +245,7 @@ class Evaluator(
         if (rd == 0) null
         else { val r = ld / rd; if (r.isInfinite) null else Val.cachedNum(pos, r) }
       case Expr.BinaryOp.OP_% =>
-        Val.cachedNum(pos, ld % rd)
+        if (rd == 0) null else Val.cachedNum(pos, ld % rd)
       case Expr.BinaryOp.OP_+ =>
         val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
@@ -719,7 +719,9 @@ class Evaluator(
         val r = ld / rd
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
-      case Expr.BinaryOp.OP_% => Val.cachedNum(pos, ld % rd)
+      case Expr.BinaryOp.OP_% =>
+        if (rd == 0) Error.fail("Division by zero.", pos)
+        Val.cachedNum(pos, ld % rd)
       // Use position-free static singletons for boolean results — this method is only called
       // from comprehension fast paths where position info on boolean results is unnecessary.
       // Avoids 1 object allocation per comparison in inner loops (significant for 1M+ iterations).
@@ -862,7 +864,10 @@ class Evaluator(
         val result = l / r
         if (result.isInfinite) Error.fail("overflow", pos); result
       case Expr.BinaryOp.OP_% =>
-        visitExprAsDouble(e.lhs) % visitExprAsDouble(e.rhs)
+        val l = visitExprAsDouble(e.lhs)
+        val r = visitExprAsDouble(e.rhs)
+        if (r == 0) Error.fail("Division by zero.", pos)
+        l % r
       case Expr.BinaryOp.OP_+ =>
         val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
         if (r.isInfinite) Error.fail("overflow", pos); r
@@ -1231,10 +1236,10 @@ class Evaluator(
   // mirror `visitSelectSuper` (`super.name`) so static-key and computed-key
   // super lookups agree, matching google/jsonnet, go-jsonnet, and jrsonnet.
   def visitLookupSuper(e: LookupSuper)(implicit scope: ValScope): Val = {
-    var sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
+    val sup = scope.bindings(e.selfIdx + 1).asInstanceOf[Val.Obj]
     val key = visitExpr(e.index).cast[Val.Str]
     val self = scope.bindings(e.selfIdx).asInstanceOf[Val.Obj]
-    if (sup == null) sup = self
+    if (sup == null) Error.fail("Attempt to use `super` when there is no super class", e.pos)
     sup.value(key.str, e.pos, self)
   }
 
@@ -1342,8 +1347,10 @@ class Evaluator(
         l match {
           case Val.Num(_, ld) =>
             r match {
-              case Val.Num(_, rd) => Val.cachedNum(pos, ld % rd)
-              case _              => failBinOp(l, e.op, r, pos)
+              case Val.Num(_, rd) =>
+                if (rd == 0) Error.fail("Division by zero.", pos)
+                Val.cachedNum(pos, ld % rd)
+              case _ => failBinOp(l, e.op, r, pos)
             }
           case ls: Val.Str => Format.format(ls.str, r, pos)
           case _           => failBinOp(l, e.op, r, pos)
