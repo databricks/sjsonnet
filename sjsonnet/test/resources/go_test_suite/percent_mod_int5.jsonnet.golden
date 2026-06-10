@@ -1,3 +1,3 @@
-sjsonnet.Error: not a number
+sjsonnet.Error: Division by zero.
     at [<root>].(percent_mod_int5.jsonnet:1:4)
 
