@@ -254,8 +254,10 @@ object MathModule extends AbstractFunctionModule {
       new Val.Builtin2("mod", "a", "b") {
         def evalRhs(a: Eval, b: Eval, ev: EvalScope, pos: Position): Val = {
           (a.value, b.value) match {
-            case (x: Val.Num, y: Val.Num) => Val.cachedNum(pos, x.asDouble % y.asDouble)
-            case _                        => Format.format(a.value.asString, b.value, pos)(ev)
+            case (x: Val.Num, y: Val.Num) =>
+              if (y.asDouble == 0) Error.fail("Division by zero.", pos)(ev)
+              Val.cachedNum(pos, x.asDouble % y.asDouble)
+            case _ => Format.format(a.value.asString, b.value, pos)(ev)
           }
         }
       }
@@ -268,6 +270,7 @@ object MathModule extends AbstractFunctionModule {
      * Performs modulo arithmetic for numeric values.
      */
     builtin("modulo", "a", "b") { (pos, ev, a: Double, b: Double) =>
+      if (b == 0) Error.fail("Division by zero.", pos)(ev)
       a % b
     },
     /**

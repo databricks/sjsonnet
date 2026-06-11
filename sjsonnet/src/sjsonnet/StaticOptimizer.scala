@@ -187,7 +187,7 @@ class StaticOptimizer(
             case BinaryOp.OP_/ =>
               if (r == 0) return Double.NaN
               val res = l / r; if (res.isInfinite) return Double.NaN; res
-            case BinaryOp.OP_%  => l % r
+            case BinaryOp.OP_%  => if (r == 0) return Double.NaN; l % r
             case BinaryOp.OP_<< =>
               val ll = l.toSafeLong(pos)(ev); val rr = r.toSafeLong(pos)(ev)
               if (rr < 0) return Double.NaN
@@ -480,8 +480,8 @@ class StaticOptimizer(
           }
         case BinaryOp.OP_% =>
           (lhs, rhs) match {
-            case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l % r)
-            case _                              => fallback
+            case (Val.Num(_, l), Val.Num(_, r)) if r != 0 => Val.Num(pos, l % r)
+            case _                                        => fallback
           }
         case BinaryOp.OP_< =>
           tryFoldComparison(pos, lhs, BinaryOp.OP_<, rhs, fallback)
