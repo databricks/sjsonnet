@@ -179,8 +179,8 @@ object TypeModule extends AbstractFunctionModule {
         false
       } else {
         (x, y) match {
-          case (_: Val.Num, _: Val.Num) =>
-            ev.compare(x, y) == 0
+          case (x: Val.Num, y: Val.Num) =>
+            x.rawDouble == y.rawDouble
           case (_: Val.Str, _: Val.Str) =>
             ev.compare(x, y) == 0
           case (_: Val.Bool, _: Val.Bool) =>
