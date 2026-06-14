@@ -24,13 +24,14 @@ import ScopedExprTransform.*
 class StaticOptimizer(
     ev: EvalScope,
     variableResolver: String => Option[Expr],
-    std: Val.Obj,
+    stdParam: => Val.Obj,
     internedStrings: mutable.HashMap[String, String],
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
       java.util.LinkedHashMap[String, java.lang.Boolean]
     ])
     extends ScopedExprTransform {
+  lazy val std: Val.Obj = stdParam
   def optimize(e: Expr): Expr = transform(e)
 
   override def transform(_e: Expr): Expr = {
@@ -59,16 +60,17 @@ class StaticOptimizer(
         InSuper(pos, lhs, selfIdx)
       case b2 @ BinaryOp(pos, lhs: Val.Str, BinaryOp.OP_%, rhs) =>
         try {
+          val asciiSafe = lhs.isInstanceOf[Val.AsciiSafeStr]
           rhs match {
             case r: Val =>
-              val partial = new Format.PartialApplyFmt(lhs.str)
+              val partial = new Format.PartialApplyFmt(lhs.str, asciiSafe)
               try partial.evalRhs(r, ev, pos).asInstanceOf[Expr]
               catch {
                 case _: Exception =>
                   ApplyBuiltin1(pos, partial, rhs, tailstrict = false)
               }
             case _ =>
-              ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str), rhs, tailstrict = false)
+              ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str, asciiSafe), rhs, tailstrict = false)
           }
         } catch { case _: Exception => b2 }
 

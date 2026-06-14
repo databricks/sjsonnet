@@ -85,7 +85,7 @@ object SjsonnetMainBase {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]],
       importer: Option[Importer],
-      std: Val.Obj): Int =
+      std: => Val.Obj): Int =
     main0(
       args,
       parseCache,
@@ -108,7 +108,7 @@ object SjsonnetMainBase {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]] = None,
       importer: Option[Importer] = None,
-      std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
+      std: => Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
       jsonnetPathEnv: Option[String] = None): Int =
     main0(
       args,
@@ -133,7 +133,7 @@ object SjsonnetMainBase {
       wd: os.Path,
       allowedInputs: Option[Set[os.Path]],
       importer: Option[Importer],
-      std: Val.Obj,
+      std: => Val.Obj,
       jsonnetPathEnv: Option[String],
       rawOutputStream: OutputStream): Int = {
 
@@ -390,7 +390,7 @@ object SjsonnetMainBase {
       wd: os.Path,
       importer: Importer,
       warnLogger: Evaluator.Logger,
-      std: Val.Obj,
+      std: => Val.Obj,
       evaluatorOverride: Option[Evaluator] = None,
       debugStats: DebugStats = null,
       profileOpt: Option[String] = None,
@@ -445,7 +445,7 @@ object SjsonnetMainBase {
       settings = settings,
       storePos = (position: Position) => if (config.yamlDebug.value) currentPos = position else (),
       logger = warnLogger,
-      std = std,
+      stdParam = std,
       variableResolver = _ => None,
       debugStats = debugStats,
       formatCache = FormatCache.SharedDefault

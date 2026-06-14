@@ -309,7 +309,7 @@ object Format {
    * large format strings (e.g. 605KB large_string_template with 256 interpolations), this avoids
    * the overhead of running parser combinators over hundreds of KB of literal text.
    */
-  private def scanFormat(s: String): RuntimeFormat = {
+  private def scanFormat(s: String, sourceAsciiSafe: Boolean = false): RuntimeFormat = {
     val len = s.length
     val specsBuilder = new scala.collection.mutable.ArrayBuilder.ofLong
     var labelsBuilder: java.util.ArrayList[String] = null
@@ -329,7 +329,7 @@ object Format {
     val leadingStart = 0
     val leadingEnd = if (pos < 0) len else pos
     staticChars += leadingEnd - leadingStart
-    if (allLiteralsAscii && !isAsciiJsonSafeRange(s, leadingStart, leadingEnd))
+    if (!sourceAsciiSafe && allLiteralsAscii && !isAsciiJsonSafeRange(s, leadingStart, leadingEnd))
       allLiteralsAscii = false
 
     while (pos >= 0 && pos < len) {
@@ -470,7 +470,7 @@ object Format {
       litStartsBuilder += litStart
       litEndsBuilder += litEnd
       staticChars += litEnd - litStart
-      if (allLiteralsAscii && !isAsciiJsonSafeRange(s, litStart, litEnd))
+      if (!sourceAsciiSafe && allLiteralsAscii && !isAsciiJsonSafeRange(s, litStart, litEnd))
         allLiteralsAscii = false
 
       pos = nextPct
@@ -1120,11 +1120,11 @@ object Format {
    * instance, bypassing [[FormatCache]] since each literal format string is unique and already
    * cached within the AST.
    */
-  class PartialApplyFmt(fmt: String) extends Val.Builtin1("format", "values") {
+  class PartialApplyFmt(fmt: String, sourceAsciiSafe: Boolean = false) extends Val.Builtin1("format", "values") {
     // Pre-parse the format string at construction time (during static optimization).
     // Uses the hand-written scanner instead of fastparse for faster parsing of large format strings.
     // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.
-    private val parsed = scanFormat(fmt)
+    private val parsed = scanFormat(fmt, sourceAsciiSafe)
     def evalRhs(values0: Eval, ev: EvalScope, pos: Position): Val =
       format(parsed, values0.value, pos)(ev)
   }

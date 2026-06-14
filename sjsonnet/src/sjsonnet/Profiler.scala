@@ -311,9 +311,12 @@ object ProfilePrinter {
     val totalNs = math.max(1, totalTimeNs)
     var sum = 0L
 
-    aggregated.toSeq
-      .sortBy(-_.selfTimeNs)
+    val sorted = aggregated.toArray
+    util.Arrays.sort(sorted, (a: Stats, b: Stats) =>
+      java.lang.Long.compare(b.selfTimeNs, a.selfTimeNs))
+    sorted
       .take(top)
+      .iterator
       .map { stats =>
         sum = sum + stats.selfTimeNs
         formatRow(
@@ -324,7 +327,7 @@ object ProfilePrinter {
           sumPerc = f"${sum * 100.0 / totalNs}%.1f",
           name = stats.name()
         )
-      }
+      }.toSeq
   }
 
   private def estimateSystemNanoTimeOverhead: Long = {
@@ -333,7 +336,8 @@ object ProfilePrinter {
       val start = System.nanoTime()
       samples(i) = System.nanoTime() - start
     }
-    samples.sorted.apply(samples.length / 2)
+    util.Arrays.sort(samples)
+    samples(samples.length / 2)
   }
 
   private def formatRow(

@@ -1345,11 +1345,14 @@ class Evaluator(
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         l match {
-          case Val.Num(_, ld) =>
+          case ln: Val.Num =>
             r match {
-              case Val.Num(_, rd) =>
+              case rn: Val.Num =>
+                val rd = rn.rawDouble
                 if (rd == 0) Error.fail("Division by zero.", pos)
-                Val.cachedNum(pos, ld % rd)
+                val result = ln.rawDouble % rd
+                if (result.isNaN) Error.fail("not a number", pos)
+                Val.cachedNum(pos, result)
               case _ => failBinOp(l, e.op, r, pos)
             }
           case ls: Val.Str => Format.format(ls.str, r, pos)
@@ -1359,20 +1362,43 @@ class Evaluator(
       case Expr.BinaryOp.OP_+ =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l + r)
-          case (l: Val.Str, r: Val.Str)       => Val.Str.concat(pos, l, r)
-          case (n: Val.Num, r: Val.Str)       =>
-            Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)), r)
-          case (l: Val.Str, n: Val.Num) =>
-            Val.Str.concat(pos, l, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)))
-          case (l: Val.Str, r) =>
-            Val.Str.concat(pos, l, Val.Str(pos, Materializer.stringify(r)))
-          case (l, r: Val.Str) =>
-            Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(l)), r)
-          case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
-          case (l: Val.Arr, r: Val.Arr) => l.concat(pos, r)
-          case _                        => failBinOp(l, e.op, r, pos)
+        l match {
+          case ln: Val.Num =>
+            r match {
+              case rn: Val.Num => Val.cachedNum(pos, ln.rawDouble + rn.rawDouble)
+              case rs: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(ln.asDouble)), rs)
+              case _: Val.True | _: Val.False | _: Val.Null | _: Val.Arr | _: Val.Obj =>
+                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(ln)), Val.Str(pos, Materializer.stringify(r)))
+              case _ => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.Str.concat(pos, ls, rs)
+              case rn: Val.Num =>
+                Val.Str.concat(pos, ls, Val.Str(pos, RenderUtils.renderDouble(rn.asDouble)))
+              case _ => Val.Str.concat(pos, ls, Val.Str(pos, Materializer.stringify(r)))
+            }
+          case lo: Val.Obj =>
+            r match {
+              case ro: Val.Obj => ro.addSuper(pos, lo)
+              case rs: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(lo)), rs)
+              case _ => failBinOp(l, e.op, r, pos)
+            }
+          case la: Val.Arr =>
+            r match {
+              case ra: Val.Arr => la.concat(pos, ra)
+              case rs: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(la)), rs)
+              case _ => failBinOp(l, e.op, r, pos)
+            }
+          case _ =>
+            r match {
+              case rs: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(l)), rs)
+              case _ => failBinOp(l, e.op, r, pos)
+            }
         }
 
       // Shift ops: pure numeric with safe-integer range check
@@ -1391,49 +1417,93 @@ class Evaluator(
         if (rr < 0) Error.fail("shift by negative exponent", pos)
         Val.cachedNum(pos, (ll >> rr).toDouble)
 
-      // Comparison ops: polymorphic (Num/Str/Arr)
+      // Comparison ops: polymorphic (Num/Str/Arr), nested match avoids Tuple2 allocation
       case Expr.BinaryOp.OP_< =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(Util.compareStringsByCodepoint(l, r) < 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l < r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) < 0)
-          case _                              => failBinOp(l, e.op, r, pos)
+        l match {
+          case ln: Val.Num =>
+            r match {
+              case rn: Val.Num => Val.bool(ln.rawDouble < rn.rawDouble)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.bool(Util.compareStringsByCodepoint(ls.str, rs.str) < 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case la: Val.Arr =>
+            r match {
+              case ra: Val.Arr => Val.bool(compare(la, ra) < 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case _ => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_> =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(Util.compareStringsByCodepoint(l, r) > 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l > r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) > 0)
-          case _                              => failBinOp(l, e.op, r, pos)
+        l match {
+          case ln: Val.Num =>
+            r match {
+              case rn: Val.Num => Val.bool(ln.rawDouble > rn.rawDouble)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.bool(Util.compareStringsByCodepoint(ls.str, rs.str) > 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case la: Val.Arr =>
+            r match {
+              case ra: Val.Arr => Val.bool(compare(la, ra) > 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case _ => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_<= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(Util.compareStringsByCodepoint(l, r) <= 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l <= r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) <= 0)
-          case _                              => failBinOp(l, e.op, r, pos)
+        l match {
+          case ln: Val.Num =>
+            r match {
+              case rn: Val.Num => Val.bool(ln.rawDouble <= rn.rawDouble)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.bool(Util.compareStringsByCodepoint(ls.str, rs.str) <= 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case la: Val.Arr =>
+            r match {
+              case ra: Val.Arr => Val.bool(compare(la, ra) <= 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case _ => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_>= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Str(_, l), Val.Str(_, r)) =>
-            Val.bool(Util.compareStringsByCodepoint(l, r) >= 0)
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.bool(l >= r)
-          case (x: Val.Arr, y: Val.Arr)       => Val.bool(compare(x, y) >= 0)
-          case _                              => failBinOp(l, e.op, r, pos)
+        l match {
+          case ln: Val.Num =>
+            r match {
+              case rn: Val.Num => Val.bool(ln.rawDouble >= rn.rawDouble)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.bool(Util.compareStringsByCodepoint(ls.str, rs.str) >= 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case la: Val.Arr =>
+            r match {
+              case ra: Val.Arr => Val.bool(compare(la, ra) >= 0)
+              case _           => failBinOp(l, e.op, r, pos)
+            }
+          case _ => failBinOp(l, e.op, r, pos)
         }
 
       case Expr.BinaryOp.OP_in =>

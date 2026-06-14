@@ -43,11 +43,13 @@ class Interpreter(
     settings: Settings,
     storePos: Position => Unit,
     logger: Evaluator.Logger,
-    std: Val.Obj,
+    stdParam: => Val.Obj,
     variableResolver: String => Option[Expr],
     val debugStats: DebugStats,
     formatCache: FormatCache
 ) { self =>
+
+  lazy val std: Val.Obj = stdParam
 
   def this(
       extVars: Map[String, String],
@@ -58,7 +60,7 @@ class Interpreter(
       settings: Settings = Settings.default,
       storePos: Position => Unit = null,
       logger: (Boolean, String) => Unit = null,
-      std: Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
+      std: => Val.Obj = sjsonnet.stdlib.StdLibModule.Default.module,
       variableResolver: String => Option[Expr] = _ => None) =
     this(
       key => extVars.get(key).map(ExternalVariable.code),
