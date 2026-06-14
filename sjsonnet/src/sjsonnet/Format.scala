@@ -1120,7 +1120,8 @@ object Format {
    * instance, bypassing [[FormatCache]] since each literal format string is unique and already
    * cached within the AST.
    */
-  class PartialApplyFmt(fmt: String, sourceAsciiSafe: Boolean = false) extends Val.Builtin1("format", "values") {
+  class PartialApplyFmt(fmt: String, sourceAsciiSafe: Boolean = false)
+      extends Val.Builtin1("format", "values") {
     // Pre-parse the format string at construction time (during static optimization).
     // Uses the hand-written scanner instead of fastparse for faster parsing of large format strings.
     // Each PartialApplyFmt instance caches its own parsed format, so no external cache needed.

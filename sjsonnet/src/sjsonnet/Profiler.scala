@@ -312,8 +312,10 @@ object ProfilePrinter {
     var sum = 0L
 
     val sorted = aggregated.toArray
-    util.Arrays.sort(sorted, (a: Stats, b: Stats) =>
-      java.lang.Long.compare(b.selfTimeNs, a.selfTimeNs))
+    util.Arrays.sort(
+      sorted,
+      (a: Stats, b: Stats) => java.lang.Long.compare(b.selfTimeNs, a.selfTimeNs)
+    )
     sorted
       .take(top)
       .iterator
@@ -327,7 +329,8 @@ object ProfilePrinter {
           sumPerc = f"${sum * 100.0 / totalNs}%.1f",
           name = stats.name()
         )
-      }.toSeq
+      }
+      .toSeq
   }
 
   private def estimateSystemNanoTimeOverhead: Long = {

@@ -70,7 +70,12 @@ class StaticOptimizer(
                   ApplyBuiltin1(pos, partial, rhs, tailstrict = false)
               }
             case _ =>
-              ApplyBuiltin1(pos, new Format.PartialApplyFmt(lhs.str, asciiSafe), rhs, tailstrict = false)
+              ApplyBuiltin1(
+                pos,
+                new Format.PartialApplyFmt(lhs.str, asciiSafe),
+                rhs,
+                tailstrict = false
+              )
           }
         } catch { case _: Exception => b2 }
 

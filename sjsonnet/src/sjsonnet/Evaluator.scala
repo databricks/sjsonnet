@@ -1369,7 +1369,11 @@ class Evaluator(
               case rs: Val.Str =>
                 Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(ln.asDouble)), rs)
               case _: Val.True | _: Val.False | _: Val.Null | _: Val.Arr | _: Val.Obj =>
-                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(ln)), Val.Str(pos, Materializer.stringify(r)))
+                Val.Str.concat(
+                  pos,
+                  Val.Str(pos, Materializer.stringify(ln)),
+                  Val.Str(pos, Materializer.stringify(r))
+                )
               case _ => failBinOp(l, e.op, r, pos)
             }
           case ls: Val.Str =>

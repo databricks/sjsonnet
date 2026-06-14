@@ -203,22 +203,28 @@ object Platform {
 
   private lazy val cryptoHandle: CVoidPtr = {
     def tryOpen(names: List[String])(implicit z: Zone): CVoidPtr = names match {
-      case Nil => null
+      case Nil          => null
       case name :: rest =>
         val h = dlopen(toCString(name), RTLD_LAZY | RTLD_LOCAL)
         if (h != null) h else tryOpen(rest)
     }
     Zone.acquire { implicit z =>
-      tryOpen(List(
-        "/opt/homebrew/lib/libcrypto.dylib",
-        "/opt/homebrew/lib/libcrypto.3.dylib",
-        "/usr/local/lib/libcrypto.dylib",
-        "/usr/local/lib/libcrypto.3.dylib",
-        "libcrypto.dylib", "libcrypto.3.dylib", "libcrypto.1.1.dylib",
-        "/usr/lib/x86_64-linux-gnu/libcrypto.so",
-        "/usr/lib/aarch64-linux-gnu/libcrypto.so",
-        "libcrypto.so", "libcrypto.so.3", "libcrypto.so.1.1"
-      ))
+      tryOpen(
+        List(
+          "/opt/homebrew/lib/libcrypto.dylib",
+          "/opt/homebrew/lib/libcrypto.3.dylib",
+          "/usr/local/lib/libcrypto.dylib",
+          "/usr/local/lib/libcrypto.3.dylib",
+          "libcrypto.dylib",
+          "libcrypto.3.dylib",
+          "libcrypto.1.1.dylib",
+          "/usr/lib/x86_64-linux-gnu/libcrypto.so",
+          "/usr/lib/aarch64-linux-gnu/libcrypto.so",
+          "libcrypto.so",
+          "libcrypto.so.3",
+          "libcrypto.so.1.1"
+        )
+      )
     }
   }
 
@@ -227,18 +233,14 @@ object Platform {
       throw new RuntimeException(s"libcrypto not found; install OpenSSL to use $algorithm")
 
     Zone.acquire { implicit z =>
-      val evpGetDigest = CFuncPtr.fromPtr[EVP_get_digestbyname_t](
-        dlsym(cryptoHandle, c"EVP_get_digestbyname"))
-      val ctxNew = CFuncPtr.fromPtr[EVP_MD_CTX_new_t](
-        dlsym(cryptoHandle, c"EVP_MD_CTX_new"))
-      val ctxFree = CFuncPtr.fromPtr[EVP_MD_CTX_free_t](
-        dlsym(cryptoHandle, c"EVP_MD_CTX_free"))
-      val digestInit = CFuncPtr.fromPtr[EVP_DigestInit_t](
-        dlsym(cryptoHandle, c"EVP_DigestInit"))
-      val digestUpdate = CFuncPtr.fromPtr[EVP_DigestUpdate_t](
-        dlsym(cryptoHandle, c"EVP_DigestUpdate"))
-      val digestFinal = CFuncPtr.fromPtr[EVP_DigestFinal_t](
-        dlsym(cryptoHandle, c"EVP_DigestFinal"))
+      val evpGetDigest =
+        CFuncPtr.fromPtr[EVP_get_digestbyname_t](dlsym(cryptoHandle, c"EVP_get_digestbyname"))
+      val ctxNew = CFuncPtr.fromPtr[EVP_MD_CTX_new_t](dlsym(cryptoHandle, c"EVP_MD_CTX_new"))
+      val ctxFree = CFuncPtr.fromPtr[EVP_MD_CTX_free_t](dlsym(cryptoHandle, c"EVP_MD_CTX_free"))
+      val digestInit = CFuncPtr.fromPtr[EVP_DigestInit_t](dlsym(cryptoHandle, c"EVP_DigestInit"))
+      val digestUpdate =
+        CFuncPtr.fromPtr[EVP_DigestUpdate_t](dlsym(cryptoHandle, c"EVP_DigestUpdate"))
+      val digestFinal = CFuncPtr.fromPtr[EVP_DigestFinal_t](dlsym(cryptoHandle, c"EVP_DigestFinal"))
 
       val evpName = algorithm match {
         case "SHA-1"   => "SHA1"
@@ -260,9 +262,11 @@ object Platform {
         val hashBuf = alloc[Byte](64)
         val hashLen = alloc[CUnsignedInt](1)
 
-        if (digestInit(ctx, md) != 1 ||
-            digestUpdate(ctx, dataPtr, data.length.toUSize) != 1 ||
-            digestFinal(ctx, hashBuf, hashLen) != 1)
+        if (
+          digestInit(ctx, md) != 1 ||
+          digestUpdate(ctx, dataPtr, data.length.toUSize) != 1 ||
+          digestFinal(ctx, hashBuf, hashLen) != 1
+        )
           throw new RuntimeException(s"Hash computation failed for $algorithm")
 
         val len = (!hashLen).toShort.toInt
