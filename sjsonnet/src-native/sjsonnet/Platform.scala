@@ -6,6 +6,9 @@ import java.util
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
+import scala.scalanative.unsafe._
+import scala.scalanative.unsigned._
+import scala.scalanative.posix.dlfcn._
 import scala.annotation.nowarn
 import scala.collection.mutable
 import org.virtuslab.yaml.*
@@ -186,8 +189,96 @@ object Platform {
     new String(out)
   }
 
-  private def computeHash(algorithm: String, s: String): String =
-    bytesToHex(java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8)))
+  // --- OpenSSL lazy loading via dlopen (avoids libcrypto startup cost) ---
+
+  private type EVP_MD_Ptr = CVoidPtr
+  private type EVP_MD_CTX_Ptr = CVoidPtr
+
+  private type EVP_get_digestbyname_t = CFuncPtr1[CString, EVP_MD_Ptr]
+  private type EVP_MD_CTX_new_t = CFuncPtr0[EVP_MD_CTX_Ptr]
+  private type EVP_MD_CTX_free_t = CFuncPtr1[EVP_MD_CTX_Ptr, Unit]
+  private type EVP_DigestInit_t = CFuncPtr2[EVP_MD_CTX_Ptr, EVP_MD_Ptr, CInt]
+  private type EVP_DigestUpdate_t = CFuncPtr3[EVP_MD_CTX_Ptr, Ptr[Byte], CSize, CInt]
+  private type EVP_DigestFinal_t = CFuncPtr3[EVP_MD_CTX_Ptr, Ptr[Byte], Ptr[CUnsignedInt], CInt]
+
+  private lazy val cryptoHandle: CVoidPtr = {
+    def tryOpen(names: List[String])(implicit z: Zone): CVoidPtr = names match {
+      case Nil          => null
+      case name :: rest =>
+        val h = dlopen(toCString(name), RTLD_LAZY | RTLD_LOCAL)
+        if (h != null) h else tryOpen(rest)
+    }
+    Zone.acquire { implicit z =>
+      tryOpen(
+        List(
+          "/opt/homebrew/lib/libcrypto.dylib",
+          "/opt/homebrew/lib/libcrypto.3.dylib",
+          "/usr/local/lib/libcrypto.dylib",
+          "/usr/local/lib/libcrypto.3.dylib",
+          "libcrypto.dylib",
+          "libcrypto.3.dylib",
+          "libcrypto.1.1.dylib",
+          "/usr/lib/x86_64-linux-gnu/libcrypto.so",
+          "/usr/lib/aarch64-linux-gnu/libcrypto.so",
+          "libcrypto.so",
+          "libcrypto.so.3",
+          "libcrypto.so.1.1"
+        )
+      )
+    }
+  }
+
+  private def computeHash(algorithm: String, s: String): String = {
+    if (cryptoHandle == null)
+      throw new RuntimeException(s"libcrypto not found; install OpenSSL to use $algorithm")
+
+    Zone.acquire { implicit z =>
+      val evpGetDigest =
+        CFuncPtr.fromPtr[EVP_get_digestbyname_t](dlsym(cryptoHandle, c"EVP_get_digestbyname"))
+      val ctxNew = CFuncPtr.fromPtr[EVP_MD_CTX_new_t](dlsym(cryptoHandle, c"EVP_MD_CTX_new"))
+      val ctxFree = CFuncPtr.fromPtr[EVP_MD_CTX_free_t](dlsym(cryptoHandle, c"EVP_MD_CTX_free"))
+      val digestInit = CFuncPtr.fromPtr[EVP_DigestInit_t](dlsym(cryptoHandle, c"EVP_DigestInit"))
+      val digestUpdate =
+        CFuncPtr.fromPtr[EVP_DigestUpdate_t](dlsym(cryptoHandle, c"EVP_DigestUpdate"))
+      val digestFinal = CFuncPtr.fromPtr[EVP_DigestFinal_t](dlsym(cryptoHandle, c"EVP_DigestFinal"))
+
+      val evpName = algorithm match {
+        case "SHA-1"   => "SHA1"
+        case "SHA-256" => "SHA256"
+        case "SHA-512" => "SHA512"
+        case other     => other
+      }
+      val md = evpGetDigest(toCString(evpName))
+      if (md == null)
+        throw new RuntimeException(s"Hash algorithm not found in OpenSSL: $algorithm")
+
+      val ctx = ctxNew()
+      if (ctx == null)
+        throw new RuntimeException("EVP_MD_CTX_new failed")
+
+      try {
+        val data = s.getBytes(UTF_8)
+        val dataPtr = if (data.isEmpty) alloc[Byte](1) else data.at(0)
+        val hashBuf = alloc[Byte](64)
+        val hashLen = alloc[CUnsignedInt](1)
+
+        if (
+          digestInit(ctx, md) != 1 ||
+          digestUpdate(ctx, dataPtr, data.length.toUSize) != 1 ||
+          digestFinal(ctx, hashBuf, hashLen) != 1
+        )
+          throw new RuntimeException(s"Hash computation failed for $algorithm")
+
+        val len = (!hashLen).toShort.toInt
+        val result = new Array[Byte](len)
+        var i = 0
+        while (i < len) { result(i) = !(hashBuf + i); i += 1 }
+        bytesToHex(result)
+      } finally {
+        ctxFree(ctx)
+      }
+    }
+  }
 
   def md5(s: String): String = computeHash("MD5", s)
 
