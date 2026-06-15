@@ -44,7 +44,11 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   @inline private def renderDouble(d: Double): Unit = {
     val i = d.toLong
     if (d == i) {
-      writeLongDirect(i)
+      if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
+        appendString("-0")
+      } else {
+        writeLongDirect(i)
+      }
     } else if (d % 1 == 0) {
       appendString(
         BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()

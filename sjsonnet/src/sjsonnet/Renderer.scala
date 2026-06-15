@@ -59,9 +59,11 @@ class Renderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
     flushBuffer()
     val i = d.toLong
     if (d == i) {
-      // Fast path: render integers directly to char buffer, avoiding String allocation.
-      // Most numbers in Jsonnet output are integers (array indices, counters, etc.).
-      RenderUtils.appendLong(elemBuilder, i)
+      if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
+        appendString("-0")
+      } else {
+        RenderUtils.appendLong(elemBuilder, i)
+      }
     } else if (d % 1 == 0) {
       appendString(
         BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
@@ -432,7 +434,8 @@ object RenderUtils {
   def renderDouble(d: Double): String = {
     val l = d.toLong
     if (l.toDouble == d) {
-      if (l >= 0 && l < 256) intStrCache(l.toInt)
+      if (l == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) "-0"
+      else if (l >= 0 && l < 256) intStrCache(l.toInt)
       else l.toString
     } else if (d % 1 == 0) {
       BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
