@@ -10,7 +10,10 @@ object Util {
   // greater than every non-NaN value (same total order as the old
   // java.lang.Double.compare, so sort stability is preserved).
   @inline def compareDoubles(a: Double, b: Double): Int =
-    if (a < b) -1 else if (a > b) 1 else if (a == b) 0 else {
+    if (a < b) -1
+    else if (a > b) 1
+    else if (a == b) 0
+    else {
       val aN = a != a
       val bN = b != b
       if (aN && bN) 0 else if (aN) 1 else -1

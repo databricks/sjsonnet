@@ -14,5 +14,8 @@ object StdSetDiffTests extends TestSuite {
           |}
           |""".stripMargin).toString ==> """{"diff":["d"]}"""
     }
+    test("setDiff treats negative zero and zero as equal") {
+      eval("std.setDiff([0], [-0.0])") ==> ujson.Arr()
+    }
   }
 }

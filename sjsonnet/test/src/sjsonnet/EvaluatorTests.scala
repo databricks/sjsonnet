@@ -1032,6 +1032,14 @@ object EvaluatorTests extends TestSuite {
         ) ==> ujson.Num(3)
       }
     }
+    test("negativeZeroComparison") {
+      // IEEE 754: -0.0 == 0.0, so neither is less than or greater than the other.
+      eval("[-0.0] < [0]") ==> ujson.False
+      eval("[-0.0] > [0]") ==> ujson.False
+      eval("[-0.0] <= [0]") ==> ujson.True
+      eval("[-0.0] >= [0]") ==> ujson.True
+      eval("[-0.0] == [0]") ==> ujson.True
+    }
 
   }
 }
