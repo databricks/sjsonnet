@@ -430,6 +430,19 @@ object EvaluatorTests extends TestSuite {
         """("%(hello)s" % {hello::"world", bad:: error "lol"})"""
       ) ==> ujson.Str("world")
     }
+    test("objectEqualityIgnoresHiddenFields") {
+      // Hidden field in y should not be matched during equality comparison.
+      // C++ jsonnet and jrsonnet both return false here.
+      eval("{a: 1} == {a:: 1, b: 2}") ==> ujson.False
+      // Different visible key counts: x has {a, b}, y has only {a} visible.
+      eval("{a: 1, b: 2} == {a: 1, b:: 2}") ==> ujson.False
+      // x has no visible keys, y has {a} visible.
+      eval("{a:: 1} == {a: 1}") ==> ujson.False
+      // Hidden field in y does not affect equality when visible keys match.
+      eval("{a: 1} == {a: 1, b:: 2}") ==> ujson.True
+      // Both sides have the same visible key with same value; hidden fields ignored.
+      eval("{a: 1, b:: 3} == {a: 1, c:: 4}") ==> ujson.True
+    }
     test("evaluator2") {
       eval(
         """{local x = 1, [x]: x, for x in ["foo"]}.foo"""
