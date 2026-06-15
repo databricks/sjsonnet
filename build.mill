@@ -22,7 +22,7 @@ import mill.api.BuildCtx
 
 import java.util.Base64
 
-val scalaVersions: Seq[String] = Seq("3.3.7", "2.13.18")
+val scalaVersions: Seq[String] = Seq("3.3.8", "2.13.18")
 val jvmScalaVersions: Seq[String] = scalaVersions ++ Seq("2.12.21")
 val stackSize = "100m"
 val stackSizekBytes = 100 * 1024
@@ -85,7 +85,10 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
       ) ++ (if (scalaVersion().startsWith("2.13"))
               Seq("-Wopt", "-Wconf:origin=scala.collection.compat.*:s")
             else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
-    else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
+    else Seq[String](
+      "-Wconf:origin=scala.collection.compat.*:s",
+      "-Xlint:all"
+    )
   )
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.5")
@@ -365,7 +368,8 @@ object sjsonnet extends VersionFileModule {
     def forkArgs =
       Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
 
-    def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
+    def scalacOptions = super.scalacOptions() ++ Seq("-release", "17") ++
+      (if (JvmWorkerUtil.isScala3(scalaVersion())) Seq("-Yfuture-lazy-vals") else Seq.empty)
     def javacOptions = super.javacOptions() ++ Seq("--release", "17")
 
     def mvnDeps = super.mvnDeps() ++ Seq(
@@ -396,7 +400,8 @@ object sjsonnet extends VersionFileModule {
       def artifactName = "sjsonnet-server"
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
-      def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
+      def scalacOptions = super.scalacOptions() ++ Seq("-release", "17") ++
+        (if (JvmWorkerUtil.isScala3(scalaVersion())) Seq("-Yfuture-lazy-vals") else Seq.empty)
       def javacOptions = super.javacOptions() ++ Seq("--release", "17")
       def mvnDeps = Seq(
         mvn"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
