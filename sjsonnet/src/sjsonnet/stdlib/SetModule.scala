@@ -93,7 +93,7 @@ object SetModule extends AbstractFunctionModule {
     a match {
       case aNum: Val.Num =>
         b match {
-          case bNum: Val.Num => java.lang.Double.compare(aNum.asDouble, bNum.asDouble)
+          case bNum: Val.Num => Util.compareDoubles(aNum.asDouble, bNum.asDouble)
           case _             => ev.compare(a, b)
         }
       case aStr: Val.Str =>

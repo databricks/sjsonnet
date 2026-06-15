@@ -4,6 +4,18 @@ object Util {
   // A special empty LinkedHashMap instance to avoid creating multiple empty maps
   private val EMPTY_LINKED_HASHMAP = new java.util.LinkedHashMap[Any, Any]()
   private val hashMapDefaultLoadFactor = 0.75f
+
+  // Use IEEE 754 < > == so that -0.0 and 0.0 compare equal, matching the
+  // C++ and Go Jsonnet reference implementations.  NaN is treated as
+  // greater than every non-NaN value (same total order as the old
+  // java.lang.Double.compare, so sort stability is preserved).
+  @inline def compareDoubles(a: Double, b: Double): Int =
+    if (a < b) -1 else if (a > b) 1 else if (a == b) 0 else {
+      val aN = a != a
+      val bN = b != b
+      if (aN && bN) 0 else if (aN) 1 else -1
+    }
+
   def prettyIndex(lineStarts: Array[Int], index: Int): String = {
     // Returns (-insertionPoint - 1) when the value is not found, where
     // insertionPoint is the index where the element would have been inserted.
