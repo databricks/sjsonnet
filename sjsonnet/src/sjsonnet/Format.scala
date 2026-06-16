@@ -712,8 +712,7 @@ object Format {
                 case 'G'             => formatGeneric(formatted, s)
                 case 'c'             => widenRaw(formatted, Character.toString(s.toInt))
                 case 's'             =>
-                  if (s.toLong == s) widenRaw(formatted, s.toLong.toString)
-                  else widenRaw(formatted, s.toString)
+                  widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
@@ -889,8 +888,7 @@ object Format {
     rawVal match {
       case vs: Val.Str => vs.str
       case vn: Val.Num =>
-        if (vn.asDouble.toLong.toDouble == vn.asDouble) vn.asDouble.toLong.toString
-        else vn.asDouble.toString
+        RenderUtils.renderDouble(vn.asDouble)
       case _: Val.True  => "true"
       case _: Val.False => "false"
       case _: Val.Null  => "null"

@@ -430,6 +430,7 @@ object RenderUtils {
    * Custom rendering of Doubles used in rendering
    */
   def renderDouble(d: Double): String = {
+    if (java.lang.Double.compare(d, -0.0) == 0) return "-0"
     val l = d.toLong
     if (l.toDouble == d) {
       if (l >= 0 && l < 256) intStrCache(l.toInt)
