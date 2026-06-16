@@ -174,11 +174,10 @@ object ManifestModule extends AbstractFunctionModule {
         v: Val.Obj,
         cumulatedIndent: String,
         indent: String,
-        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): StringBuilderWriter = {
+        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): Boolean = {
       val keys = v.sortedVisibleKeyNames
       if (keys.length == 0) {
-        out.write('\n')
-        return out
+        return false
       }
 
       // Resolve each field once and cache the result: the value is needed twice
@@ -195,9 +194,11 @@ object ManifestModule extends AbstractFunctionModule {
       }
 
       val renderer = new TomlRenderer(out, cumulatedIndent, indent)
+      var hasSimpleKV = false
       keyIdx = 0
       while (keyIdx < keys.length) {
         if (!sectionFlags(keyIdx)) {
+          hasSimpleKV = true
           out.write(cumulatedIndent)
           TomlRenderer.writeEscapedKey(out, keys(keyIdx))
           out.write(" = ")
@@ -205,11 +206,10 @@ object ManifestModule extends AbstractFunctionModule {
         }
         keyIdx += 1
       }
-      out.write('\n')
-
       // childIndent depends only on cumulatedIndent + indent, so compute it once
       // instead of per section iteration.
       val childIndent = cumulatedIndent + indent
+      var lastEndedWithNewline = hasSimpleKV
       keyIdx = 0
       while (keyIdx < keys.length) {
         if (sectionFlags(keyIdx)) {
@@ -220,6 +220,12 @@ object ManifestModule extends AbstractFunctionModule {
             case arr: Val.Arr =>
               var i = 0
               while (i < arr.length) {
+                if (i == 0) {
+                  if (lastEndedWithNewline) out.write('\n')
+                  else out.write("\n\n")
+                } else {
+                  out.write('\n')
+                }
                 out.write(cumulatedIndent)
                 renderTableArrayHeader(out, path)
                 out.write('\n')
@@ -232,11 +238,15 @@ object ManifestModule extends AbstractFunctionModule {
                 )
                 i += 1
               }
+              lastEndedWithNewline = true
             case obj: Val.Obj =>
+              if (lastEndedWithNewline) out.write('\n')
+              else out.write("\n\n")
               out.write(cumulatedIndent)
               renderTableHeader(out, path)
-              out.write('\n')
-              renderTableInternal(
+              val childHasContent = obj.sortedVisibleKeyNames.nonEmpty
+              if (childHasContent) out.write('\n')
+              lastEndedWithNewline = renderTableInternal(
                 out,
                 obj,
                 childIndent,
@@ -250,7 +260,7 @@ object ManifestModule extends AbstractFunctionModule {
         }
         keyIdx += 1
       }
-      out
+      keys.nonEmpty
     }
 
     private def renderTableHeader(out: StringBuilderWriter, path: mutable.ArrayBuffer[String]) = {
@@ -285,7 +295,7 @@ object ManifestModule extends AbstractFunctionModule {
         indent.value.asString,
         new mutable.ArrayBuffer[String](8)
       )(ev)
-      Val.Str(pos, out.toString.strip)
+      Val.Str(pos, out.toString.stripTrailing())
     }
   }
 
