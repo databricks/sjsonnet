@@ -729,7 +729,8 @@ object Format {
                 case 'f' | 'F'       => formatFloat(formatted, b)
                 case 'g'             => formatGeneric(formatted, b).toLowerCase
                 case 'G'             => formatGeneric(formatted, b)
-                case 'c'             => widenRaw(formatted, Character.forDigit(b, 10).toString)
+                case 'c'             =>
+                  Error.fail("%c expected number / string, got: boolean")
                 case 's'             => widenRaw(formatted, "true")
                 case _               =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
@@ -746,7 +747,8 @@ object Format {
                 case 'f' | 'F'       => formatFloat(formatted, b)
                 case 'g'             => formatGeneric(formatted, b).toLowerCase
                 case 'G'             => formatGeneric(formatted, b)
-                case 'c'             => widenRaw(formatted, Character.forDigit(b, 10).toString)
+                case 'c'             =>
+                  Error.fail("%c expected number / string, got: boolean")
                 case 's'             => widenRaw(formatted, "false")
                 case _               =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
