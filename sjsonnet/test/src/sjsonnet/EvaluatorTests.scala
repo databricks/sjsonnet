@@ -613,7 +613,9 @@ object EvaluatorTests extends TestSuite {
 
       // Self-composition identity (g = id): still forced exactly once.
       val (compVal, compTraces) =
-        evalWithTraces("""local g = function(x) x; local f = function(x) g(g(x)); f(std.trace("comp", 9))""")
+        evalWithTraces(
+          """local g = function(x) x; local f = function(x) g(g(x)); f(std.trace("comp", 9))"""
+        )
       compVal ==> ujson.Num(9)
       compTraces ==> Vector("TRACE: (memory) comp")
 
@@ -673,6 +675,30 @@ object EvaluatorTests extends TestSuite {
       // -0.3 truncates to 0, so no minus sign should appear.
       eval("'%5.3d' % -0.3") ==> ujson.Str("  000")
       eval("'%d' % -0.9") ==> ujson.Str("0")
+    }
+    test("formatNullErrors") {
+      evalErr(
+        "'%d' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%f' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%e' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%g' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%o' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%x' % null"
+      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      evalErr(
+        "'%c' % null"
+      ) ==> "sjsonnet.Error: [std.format] %c expected number / string, got: null\nat [<root>].(:1:6)"
+      eval("'%s' % null") ==> ujson.Str("null")
     }
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", strict = false) ==> ujson

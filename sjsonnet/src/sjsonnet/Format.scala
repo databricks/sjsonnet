@@ -752,7 +752,12 @@ object Format {
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
             case _: Val.Null =>
-              widenRaw(formatted, "null")
+              formatted.conversion match {
+                case 's' => widenRaw(formatted, "null")
+                case 'c' => Error.fail("%c expected number / string, got: null")
+                case _   =>
+                  Error.fail("Format required number at %d, got null".format(i))
+              }
             case _ =>
               // Complex types (Arr, Obj): materialize via Renderer
               val value = rawVal match {
