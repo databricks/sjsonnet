@@ -71,6 +71,8 @@ object DecimalFormat {
         val precision = zeroes + hashes
         val denominator = math.pow(10, precision)
         val numerator = number * denominator + 0.5
+        if (numerator.isInfinite)
+          throw new sjsonnet.Error("overflow")
         val whole = math.floor(numerator / denominator)
         var fracNum = (math.floor(numerator) % denominator).toLong
         val prefix = whole.toLong.toString
