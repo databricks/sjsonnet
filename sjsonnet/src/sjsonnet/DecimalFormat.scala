@@ -45,7 +45,7 @@ object DecimalFormat {
     expLengthOpt match {
       case Some(expLength) =>
         val expNum =
-          if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
+          if (number == 0.0) 0L else Math.floor(Math.log(math.abs(number)) / Math.log(10)).toLong
         val scaled = number / math.pow(10, expNum.toDouble)
         val prefix = scaled.toLong.toString
         val expSign = if (expNum >= 0) "+" else ""
