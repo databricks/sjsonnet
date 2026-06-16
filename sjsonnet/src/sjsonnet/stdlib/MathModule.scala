@@ -513,7 +513,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.log10(x) as a mathematical function.
      */
     builtin("log10", "x") { (pos, ev, x: Double) =>
-      math.log(x) / math.log(10)
+      math.log10(x)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.exp(x)]].

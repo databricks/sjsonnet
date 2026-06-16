@@ -1058,7 +1058,7 @@ object Format {
 
   private def formatGeneric(formatted: FormatSpec, s: Double): String = {
     val precision = formatted.precisionOr(6)
-    val exponent = if (s != 0) math.floor(math.log(math.abs(s)) / math.log(10)).toInt else 0
+    val exponent = if (s != 0) math.floor(math.log10(math.abs(s))).toInt else 0
     if (exponent < -4 || exponent >= precision) {
       widen(
         formatted,
