@@ -45,6 +45,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     Val.Num(
       pos,
       if (decIndex != -1 || expIndex != -1) s.toString.toDouble
+      else if (s.length() == 2 && s.charAt(0) == '-' && s.charAt(1) == '0') -0.0
       else upickle.core.ParseUtils.parseIntegralNum(s, decIndex, expIndex, index).toDouble
     )
 
