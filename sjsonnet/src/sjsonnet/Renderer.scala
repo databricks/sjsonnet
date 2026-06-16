@@ -326,12 +326,14 @@ private[sjsonnet] final class FastMaterializeJsonRenderer(
     escapeUnicode: Boolean = false,
     newline: String = "\n",
     keyValueSeparator: String = ": ",
+    indentStr: Array[Char] = null,
     private val outWriter: StringBuilderWriter = new StringBuilderWriter())
     extends BaseCharRenderer(
       outWriter,
       indent,
       escapeUnicode,
-      newline.toCharArray
+      newline.toCharArray,
+      indentStr
     ) {
   private val newLineCharArray = newline.toCharArray
   private val keyValueSeparatorCharArray = keyValueSeparator.toCharArray

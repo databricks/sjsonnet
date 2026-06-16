@@ -40,11 +40,17 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     out: T,
     indent: Int = -1,
     escapeUnicode: Boolean = false,
-    newline: Array[Char] = Array('\n'))
+    newline: Array[Char] = Array('\n'),
+    indentStr: Array[Char] = null)
     extends JsVisitor[T, T] {
 
   override def visitJsonableObject(length: Int, index: Int): ObjVisitor[T, T] =
     visitObject(length, index)
+
+  private val indentChars: Array[Char] =
+    if (indentStr != null) indentStr
+    else if (indent > 0) { val a = new Array[Char](indent); java.util.Arrays.fill(a, ' '); a }
+    else Array.empty[Char]
 
   protected val elemBuilder = new upickle.core.CharBuilder
   def flushCharBuilder(): Unit = {
@@ -56,8 +62,8 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
   protected var commaBuffered = false
 
   /**
-   * Pre-computed indent arrays: indentCache(d) = newline + indent*d spaces. Used by
-   * [[renderIndent]] to replace the per-character space loop with a single bulk `System.arraycopy`,
+   * Pre-computed indent arrays: indentCache(d) = newline + indentChars*d. Used by
+   * [[renderIndent]] to replace the per-character loop with a single bulk `System.arraycopy`,
    * which is a significant win on Scala Native (no JIT to unroll the loop) and measurable even on
    * JVM for materialization-heavy workloads.
    */
@@ -66,13 +72,19 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     else {
       val maxDepth = BaseCharRenderer.MaxCachedDepth
       val arr = new Array[Array[Char]](maxDepth)
+      val ic = indentChars
+      val icLen = ic.length
       var d = 0
       while (d < maxDepth) {
-        val spaces = indent * d
-        val totalLen = newline.length + spaces
+        val indentLen = icLen * d
+        val totalLen = newline.length + indentLen
         val buf = new Array[Char](totalLen)
         System.arraycopy(newline, 0, buf, 0, newline.length)
-        java.util.Arrays.fill(buf, newline.length, totalLen, ' ')
+        var j = 0
+        while (j < d) {
+          System.arraycopy(ic, 0, buf, newline.length + j * icLen, icLen)
+          j += 1
+        }
         arr(d) = buf
         d += 1
       }
@@ -312,12 +324,15 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       val cached = indentCache(depth)
       elemBuilder.appendAll(cached, cached.length)
     } else {
-      var i = indent * depth
-      elemBuilder.ensureLength(i + newline.length)
+      val ic = indentChars
+      val icLen = ic.length
+      val indentLen = icLen * depth
+      elemBuilder.ensureLength(indentLen + newline.length)
       elemBuilder.appendAll(newline, newline.length)
-      while (i > 0) {
-        elemBuilder.appendUnsafe(' ')
-        i -= 1
+      var d = 0
+      while (d < depth) {
+        elemBuilder.appendAll(ic, icLen)
+        d += 1
       }
     }
   }
