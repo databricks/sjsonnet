@@ -1054,5 +1054,32 @@ object EvaluatorTests extends TestSuite {
       eval("[-0.0] == [0]") ==> ujson.True
     }
 
+    test("negativeZeroMaterialization") {
+      // std.manifestJson(-0.0) should output "-0", not "0"
+      // All reference implementations (C++ jsonnet, go-jsonnet, jrsonnet) output "-0"
+      eval("""std.manifestJson(-0.0)""") ==> ujson.Str("-0")
+      eval("""std.manifestJsonMinified(-0.0)""") ==> ujson.Str("-0")
+      eval("""std.manifestJsonEx(-0.0, "  ")""") ==> ujson.Str("-0")
+      eval("""std.toString(-0.0)""") ==> ujson.Str("-0")
+      eval("""std.manifestYamlDoc(-0.0)""") ==> ujson.Str("-0")
+      // -0.0 inside objects
+      eval("""std.manifestJson({a: -0.0})""") ==> ujson.Str("{\n    \"a\": -0\n}")
+      // -0.0 inside arrays
+      eval("""std.manifestJson([-0.0])""") ==> ujson.Str("[\n    -0\n]")
+      // +0.0 should still output "0"
+      eval("""std.manifestJson(0.0)""") ==> ujson.Str("0")
+      eval("""std.toString(0.0)""") ==> ujson.Str("0")
+    }
+
+    test("largeIntegerDoubleMaterialization") {
+      // std.manifestJson(1e308) should output full decimal, not "1.0E308"
+      // go-jsonnet and jrsonnet output 10^308 (1 followed by 308 zeros)
+      val expected1e308 = "1" + "0" * 308
+      eval("""std.manifestJson(1e308)""") ==> ujson.Str(expected1e308)
+      // 1e100 should also work
+      val expected1e100 = "1" + "0" * 100
+      eval("""std.manifestJson(1e100)""") ==> ujson.Str(expected1e100)
+    }
+
   }
 }
