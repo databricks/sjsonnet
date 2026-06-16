@@ -7,33 +7,11 @@ package sjsonnet
  */
 object DecimalFormat {
 
-  private def trailingZeroes(n: Long): Int = {
-    var count = 0
-    var current = n
-    var done = false
-    while (!done && current > 0) {
-      if (current % 10 == 0) count += 1
-      else done = true
-      current /= 10
-    }
-    count
-  }
-
   private def leftPad(n: Long, targetWidth: Int): String = {
     val sign = if (n < 0) "-" else ""
     val absN = math.abs(n)
     val nWidth = if (absN == 0) 1 else Math.log10(absN.toDouble).toInt + 1
     sign + Platform.repeatString("0", targetWidth - nWidth) + absN
-  }
-
-  private def rightPad(n0: Long, minWidth: Int, maxWidth: Int): String = {
-    if (n0 == 0 && minWidth == 0) ""
-    else {
-      val n = (n0 / Math.pow(10, trailingZeroes(n0))).toInt
-      assert(n == math.abs(n))
-      val nWidth = if (n == 0) 1 else Math.log10(n).toInt + 1
-      ("" + n + Platform.repeatString("0", minWidth - nWidth)).take(maxWidth)
-    }
   }
 
   def format(
@@ -46,25 +24,37 @@ object DecimalFormat {
       case Some(expLength) =>
         val expNum =
           if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
-        val scaled = number / math.pow(10, expNum.toDouble)
-        val prefix = scaled.toLong.toString
+        val precision = zeroes + hashes
+        // Scale so mantissa * 10^precision becomes a roundable integer
+        val divided = number / Math.pow(10, (expNum - precision).toDouble)
+        val rounded = Math.round(divided)
+        val tenPowPrec = Math.pow(10, precision).toLong
+        val intPart = rounded / tenPowPrec
+        val fracNum = math.abs(rounded % tenPowPrec)
+        val prefix = intPart.toString
         val expSign = if (expNum >= 0) "+" else ""
         val expFrag = expSign + leftPad(expNum, expLength)
-        val precision = zeroes + hashes
+        // Left-pad fractional digits with zeros to exact precision width
+        val fracDigits = leftPad(fracNum, precision)
 
         (precision, alternate) match {
           case (0, false) => prefix + "E" + expFrag
           case (0, true)  => prefix + ".E" + expFrag
           case (_, _)     =>
-            val divided = number / Math.pow(10, (expNum - precision).toDouble)
-            val scaledFrac = divided % Math.pow(10, precision)
-            val frac = rightPad(Math.abs(Math.round(scaledFrac)), zeroes, precision)
-            if (frac.isEmpty) {
-              prefix + "E" + expFrag
-            } else {
-              prefix + "." + frac + "E" + expFrag
-            }
-
+            // Strip trailing zeros only for '#' (hash) positions, not '0' positions
+            val stripped =
+              if (hashes == 0) fracDigits
+              else {
+                var end = fracDigits.length
+                var hashesLeft = hashes
+                while (end > 0 && hashesLeft > 0 && fracDigits.charAt(end - 1) == '0') {
+                  end -= 1
+                  hashesLeft -= 1
+                }
+                fracDigits.substring(0, end)
+              }
+            if (stripped.isEmpty) prefix + "E" + expFrag
+            else prefix + "." + stripped + "E" + expFrag
         }
 
       case None =>
