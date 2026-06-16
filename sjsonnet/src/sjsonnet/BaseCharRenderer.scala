@@ -62,10 +62,10 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
   protected var commaBuffered = false
 
   /**
-   * Pre-computed indent arrays: indentCache(d) = newline + indentChars*d. Used by
-   * [[renderIndent]] to replace the per-character loop with a single bulk `System.arraycopy`,
-   * which is a significant win on Scala Native (no JIT to unroll the loop) and measurable even on
-   * JVM for materialization-heavy workloads.
+   * Pre-computed indent arrays: indentCache(d) = newline + indentChars*d. Used by [[renderIndent]]
+   * to replace the per-character loop with a single bulk `System.arraycopy`, which is a significant
+   * win on Scala Native (no JIT to unroll the loop) and measurable even on JVM for
+   * materialization-heavy workloads.
    */
   protected val indentCache: Array[Array[Char]] =
     if (indent <= 0) null
