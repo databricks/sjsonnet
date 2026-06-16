@@ -710,7 +710,13 @@ object Format {
                 case 'f' | 'F'       => formatFloat(formatted, s)
                 case 'g'             => formatGeneric(formatted, s).toLowerCase
                 case 'G'             => formatGeneric(formatted, s)
-                case 'c'             => widenRaw(formatted, Character.toString(s.toInt))
+                case 'c'             =>
+                  val codePoint = s.toInt
+                  if (codePoint < 0)
+                    Error.fail("Codepoints must be >= 0, got " + codePoint)
+                  if (codePoint > 0x10FFFF)
+                    Error.fail("Invalid unicode codepoint, got " + codePoint)
+                  widenRaw(formatted, Character.toString(codePoint))
                 case 's'             =>
                   widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
