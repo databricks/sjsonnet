@@ -87,20 +87,24 @@ object ManifestModule extends AbstractFunctionModule {
         newline: Eval,
         keyValSep: Eval,
         ev: EvalScope,
-        pos: Position): Val =
+        pos: Position): Val = {
+      val indentString = i.value.asString
+      val indentChars = indentString.toCharArray
       Val.Str(
         pos,
         Materializer
           .apply0(
             v.value,
             new FastMaterializeJsonRenderer(
-              indent = i.value.asString.length,
+              indent = indentChars.length,
               newline = newline.value.asString,
-              keyValueSeparator = keyValSep.value.asString
+              keyValueSeparator = keyValSep.value.asString,
+              indentStr = indentChars
             )
           )(ev)
           .toString
       )
+    }
   }
 
   /**
