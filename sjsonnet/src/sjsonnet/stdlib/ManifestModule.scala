@@ -246,14 +246,13 @@ object ManifestModule extends AbstractFunctionModule {
               renderTableHeader(out, path)
               val childHasContent = obj.sortedVisibleKeyNames.nonEmpty
               if (childHasContent) out.write('\n')
-              renderTableInternal(
+              lastEndedWithNewline = renderTableInternal(
                 out,
                 obj,
                 childIndent,
                 indent,
                 path
               )
-              lastEndedWithNewline = childHasContent
             case _ =>
               ()
           }
@@ -296,7 +295,7 @@ object ManifestModule extends AbstractFunctionModule {
         indent.value.asString,
         new mutable.ArrayBuffer[String](8)
       )(ev)
-      Val.Str(pos, out.toString.strip)
+      Val.Str(pos, out.toString.stripTrailing())
     }
   }
 

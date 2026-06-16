@@ -115,7 +115,7 @@
    "manifestJsonMinified": "{\"a\":{\"b\":\"c\"}}",
    "manifestPython": "{\"a\": {\"b\": \"c\"}}",
    "manifestPythonVars": "a = {\"b\": \"c\"}\n",
-   "manifestTomlEx": "[a]\n b = \"c\"",
+   "manifestTomlEx": "\n\n[a]\n b = \"c\"",
    "manifestXmlJsonml": "<blah a=\"42\"></blah>",
    "manifestYamlDoc": "\"a\":\n  \"b\": \"c\"",
    "manifestYamlStream": "---\n42\n---\n\"a\":\n  \"b\": \"c\"\n...\n",
