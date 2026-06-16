@@ -25,6 +25,12 @@ object StdMathTests extends TestSuite {
     test("mantissa and exponent for subnormal values") {
       eval("std.mantissa(std.pow(2, -1074))") ==> ujson.Num(0.5)
       eval("std.exponent(std.pow(2, -1074))") ==> ujson.Num(-1073)
+      eval("std.mantissa(3 * std.pow(2, -1074))") ==> ujson.Num(0.75)
+      eval("std.exponent(3 * std.pow(2, -1074))") ==> ujson.Num(-1072)
+      eval("std.mantissa(std.pow(2, -1023))") ==> ujson.Num(0.5)
+      eval("std.exponent(std.pow(2, -1023))") ==> ujson.Num(-1022)
+      eval("std.mantissa(-std.pow(2, -1074))") ==> ujson.Num(-0.5)
+      eval("std.exponent(-std.pow(2, -1074))") ==> ujson.Num(-1073)
     }
     test("mantissa and exponent for NaN and Infinity") {
       evalErr("std.mantissa(std.sqrt(-1))")
