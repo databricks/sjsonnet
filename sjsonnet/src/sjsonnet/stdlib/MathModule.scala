@@ -310,7 +310,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.round(x) as a mathematical function.
      */
     builtin("round", "x") { (pos, ev, x: Double) =>
-      math.round(x)
+      if (x >= 0) math.floor(x + 0.5) else math.ceil(x - 0.5)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.ceil(x)]].
@@ -381,7 +381,7 @@ object MathModule extends AbstractFunctionModule {
      * a floating number to test for even or odd.
      */
     builtin("isEven", "x") { (_, _, x: Double) =>
-      math.round(x) % 2 == 0
+      math.floor(math.abs(x)) % 2 == 0
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.isInteger(x)]].
@@ -391,7 +391,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.isInteger(x) as a mathematical function.
      */
     builtin("isInteger", "x") { (_, _, x: Double) =>
-      math.round(x).toDouble == x
+      x % 1 == 0
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.isOdd(x)]].
@@ -402,7 +402,7 @@ object MathModule extends AbstractFunctionModule {
      * a floating number to test for even or odd.
      */
     builtin("isOdd", "x") { (_, _, x: Double) =>
-      math.round(x) % 2 != 0
+      math.floor(math.abs(x)) % 2 != 0
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.isDecimal(x)]].
@@ -412,7 +412,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.isDecimal(x) as a mathematical function.
      */
     builtin("isDecimal", "x") { (_, _, x: Double) =>
-      math.round(x).toDouble != x
+      x % 1 != 0
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.asin(x)]].
