@@ -2046,7 +2046,7 @@ class Evaluator(
   // this to direct instanceof/checkcast without Tuple2 allocation. The inner array loop uses nested
   // match for the per-element numeric fast path. Error path is extracted to keep the happy path small.
   def compare(x: Val, y: Val): Int = (x, y) match {
-    case (x: Val.Num, y: Val.Num) => java.lang.Double.compare(x.asDouble, y.asDouble)
+    case (x: Val.Num, y: Val.Num) => Util.compareDoubles(x.asDouble, y.asDouble)
     case (x: Val.Str, y: Val.Str) => Util.compareStringsByCodepoint(x.str, y.str)
     case (x: Val.Arr, y: Val.Arr) =>
       // Use eval(i) to access raw Eval without materializing ConcatViews.
@@ -2072,7 +2072,7 @@ class Evaluator(
           val cmp = xi match {
             case xn: Val.Num =>
               yi match {
-                case yn: Val.Num => java.lang.Double.compare(xn.asDouble, yn.asDouble)
+                case yn: Val.Num => Util.compareDoubles(xn.asDouble, yn.asDouble)
                 case _           => compare(xi, yi)
               }
             case _ => compare(xi, yi)
