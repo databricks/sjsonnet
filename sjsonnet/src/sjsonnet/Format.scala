@@ -731,8 +731,8 @@ object Format {
                 case 'G'             => formatGeneric(formatted, b)
                 case 'c'             =>
                   Error.fail("%c expected number / string, got: boolean")
-                case 's'             => widenRaw(formatted, "true")
-                case _               =>
+                case 's' => widenRaw(formatted, "true")
+                case _   =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
             case _: Val.False =>
@@ -749,8 +749,8 @@ object Format {
                 case 'G'             => formatGeneric(formatted, b)
                 case 'c'             =>
                   Error.fail("%c expected number / string, got: boolean")
-                case 's'             => widenRaw(formatted, "false")
-                case _               =>
+                case 's' => widenRaw(formatted, "false")
+                case _   =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
               }
             case _: Val.Null =>
