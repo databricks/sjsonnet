@@ -1,0 +1,3 @@
+sjsonnet.Error: [std.format] %c expected number / string, got: boolean
+    at [<root>].(error.format_c_boolean.jsonnet:4:6)
+
