@@ -2137,7 +2137,7 @@ class Evaluator(
           var i = 0
           while (i < k1len) {
             val k = k1(i)
-            if (!y.containsKey(k)) return false
+            if (!y.containsVisibleKey(k)) return false
             val v1 = x.value(k, emptyMaterializeFileScopePos)
             val v2 = y.value(k, emptyMaterializeFileScopePos)
             if (!equal(v1, v2)) return false
