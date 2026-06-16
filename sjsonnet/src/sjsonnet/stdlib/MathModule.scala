@@ -547,7 +547,9 @@ object MathModule extends AbstractFunctionModule {
           else {
             val nBits = java.lang.Double.doubleToRawLongBits(normalized)
             val nAbsBits = nBits & 0x7fffffffffffffffL
-            sign * java.lang.Double.longBitsToDouble((0x3feL << 52) | (nAbsBits & 0x000fffffffffffffL))
+            sign * java.lang.Double.longBitsToDouble(
+              (0x3feL << 52) | (nAbsBits & 0x000fffffffffffffL)
+            )
           }
         }
       }
