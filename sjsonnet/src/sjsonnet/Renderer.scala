@@ -57,6 +57,13 @@ class Renderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
     flushBuffer()
+    if (java.lang.Double.compare(d, -0.0) == 0) {
+      elemBuilder.ensureLength(2)
+      elemBuilder.append('-')
+      elemBuilder.append('0')
+      flushCharBuilder()
+      return out
+    }
     val i = d.toLong
     if (d == i) {
       if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
