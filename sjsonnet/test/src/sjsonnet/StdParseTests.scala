@@ -17,5 +17,11 @@ object StdParseTests extends TestSuite {
       eval("""std.parseHex(":")""") ==> ujson.Num(10)
       eval("""std.parseHex("?")""") ==> ujson.Num(15)
     }
+
+    test("parseInt negative zero returns positive zero") {
+      eval("""std.parseInt("-0")""") ==> ujson.Num(0)
+      eval("""std.parseInt("-00")""") ==> ujson.Num(0)
+      eval("""std.atan2(std.parseInt("-0"), -1)""") ==> ujson.Num(math.Pi)
+    }
   }
 }
