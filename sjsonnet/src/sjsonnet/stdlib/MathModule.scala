@@ -533,10 +533,25 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.mantissa(x) as a mathematical function.
      */
     builtin("mantissa", "x") { (pos, ev, x: Double) =>
-      if (x == 0) 0
+      if (x == 0) 0.0
       else {
-        val exponent = Math.floor((Math.log(Math.abs(x)) / Math.log(2)) + 1).toLong
-        x * Math.pow(2.0, (-exponent).toDouble)
+        val bits = java.lang.Double.doubleToRawLongBits(x)
+        val absBits = bits & 0x7fffffffffffffffL
+        val sign = if (bits < 0) -1.0 else 1.0
+        val expField = (absBits >>> 52).toInt
+        if (expField != 0) {
+          sign * java.lang.Double.longBitsToDouble((0x3feL << 52) | (absBits & 0x000fffffffffffffL))
+        } else {
+          val normalized = java.lang.Double.longBitsToDouble(absBits) * (1L << 52).toDouble
+          if (normalized == 0) 0.0
+          else {
+            val nBits = java.lang.Double.doubleToRawLongBits(normalized)
+            val nAbsBits = nBits & 0x7fffffffffffffffL
+            sign * java.lang.Double.longBitsToDouble(
+              (0x3feL << 52) | (nAbsBits & 0x000fffffffffffffL)
+            )
+          }
+        }
       }
     },
     /**
@@ -549,7 +564,20 @@ object MathModule extends AbstractFunctionModule {
     builtin("exponent", "x") { (pos, ev, x: Double) =>
       if (x == 0) 0L
       else {
-        Math.floor((Math.log(Math.abs(x)) / Math.log(2)) + 1).toLong
+        val bits = java.lang.Double.doubleToRawLongBits(x)
+        val absBits = bits & 0x7fffffffffffffffL
+        val expField = (absBits >>> 52).toInt
+        if (expField != 0) {
+          (expField - 1022).toLong
+        } else {
+          val normalized = java.lang.Double.longBitsToDouble(absBits) * (1L << 52).toDouble
+          if (normalized == 0) 0L
+          else {
+            val nBits = java.lang.Double.doubleToRawLongBits(normalized)
+            val nExpField = ((nBits & 0x7fffffffffffffffL) >>> 52).toInt
+            (nExpField - 1022 - 52).toLong
+          }
+        }
       }
     },
     /**
