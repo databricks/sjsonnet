@@ -714,10 +714,10 @@ object Format {
                   val codePoint = s.toInt
                   if (codePoint < 0)
                     Error.fail("Codepoints must be >= 0, got " + codePoint)
-                  if (codePoint > 0x10FFFF)
+                  if (codePoint > 0x10ffff)
                     Error.fail("Invalid unicode codepoint, got " + codePoint)
                   widenRaw(formatted, Character.toString(codePoint))
-                case 's'             =>
+                case 's' =>
                   widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
                   Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
