@@ -107,8 +107,7 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
             visitFloat64StringParts("-0", -1, -1, index)
           else
             visitFloat64StringParts(i.toString, -1, -1, index)
-        }
-        else super.visitFloat64(d, index)
+        } else super.visitFloat64(d, index)
         flushBuffer()
     }
 
