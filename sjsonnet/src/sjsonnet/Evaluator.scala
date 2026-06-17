@@ -1462,14 +1462,14 @@ class Evaluator(
       case Expr.BinaryOp.OP_== =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+        if (l.isInstanceOf[Val.Func] || r.isInstanceOf[Val.Func])
           Error.fail("cannot test equality of functions", pos)
         Val.bool(equal(l, r))
 
       case Expr.BinaryOp.OP_!= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+        if (l.isInstanceOf[Val.Func] || r.isInstanceOf[Val.Func])
           Error.fail("cannot test equality of functions", pos)
         Val.bool(!equal(l, r))
 

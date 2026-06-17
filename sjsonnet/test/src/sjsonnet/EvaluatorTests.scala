@@ -77,9 +77,9 @@ object EvaluatorTests extends TestSuite {
         11
       )
       eval("local f(x) = function() true; f(42)") ==> ujson.True
-      eval(
+      assert(evalErr(
         "local f(x) = function() true; f(42) == true"
-      ) ==> ujson.False
+      ).contains("cannot test equality of functions"))
       eval(
         "local f(x) = function() true; f(42)() == true"
       ) ==> ujson.True
@@ -793,7 +793,7 @@ object EvaluatorTests extends TestSuite {
         |at [<root>].(:1:7)""".stripMargin
     }
     test("functionEqualsNull") {
-      eval("""local f(x)=null; f == null""") ==> ujson.False
+      assert(evalErr("""local f(x)=null; f == null""").contains("cannot test equality of functions"))
       eval("""local f=null; f == null""") ==> ujson.True
     }
 
@@ -1163,6 +1163,26 @@ object EvaluatorTests extends TestSuite {
       eval("""local index = 42; index""") ==> ujson.Num(42)
       eval("""local information = [1, 2, 3]; information""") ==> ujson.Arr(1, 2, 3)
       eval("""local input = {a: 1}; input""") ==> ujson.Obj("a" -> ujson.Num(1))
+    }
+
+    test("functionEqualityError") {
+      // comparing function with non-function should error
+      val ex1 = assertThrows[Exception] { eval("""local f = function(x) x; f == 42""") }
+      assert(ex1.getMessage.contains("cannot test equality of functions"))
+
+      val ex2 = assertThrows[Exception] { eval("""local f = function(x) x; 42 != f""") }
+      assert(ex2.getMessage.contains("cannot test equality of functions"))
+
+      val ex3 = assertThrows[Exception] {
+        eval("""local f = function(x) x; f == "hello" """)
+      }
+      assert(ex3.getMessage.contains("cannot test equality of functions"))
+
+      // two functions should also error (already worked before)
+      val ex4 = assertThrows[Exception] {
+        eval("""local f = function(x) x; local g = function(x) x; f == g""")
+      }
+      assert(ex4.getMessage.contains("cannot test equality of functions"))
     }
 
   }
