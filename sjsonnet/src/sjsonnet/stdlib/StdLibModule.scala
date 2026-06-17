@@ -21,14 +21,14 @@ final class StdLibModule(
       nativeFunctions.getOrElse(name.value.asString, Val.Null(pos))
   }
 
-  // All functions including native and additional functions
-  val functions: Map[String, Val.Func] = allModuleFunctions ++
+  // All functions including native and additional functions (lazy to defer startup cost)
+  lazy val functions: Map[String, Val.Func] = allModuleFunctions ++
     additionalStdFunctions +
     ("native" -> nativeFunction) +
     ("trace" -> traceFunction) +
     ("extVar" -> extVarFunction)
 
-  val module: Val.Obj = Val.Obj.mk(
+  lazy val module: Val.Obj = Val.Obj.mk(
     null,
     functions.size + additionalStdMembers.size,
     functions.view.map { case (k, v) =>
@@ -52,8 +52,8 @@ final class StdLibModule(
  *   - [[https://jsonnet.org/ref/stdlib.html#math std.pi]]
  */
 object StdLibModule {
-  // Combine all functions from all modules
-  private val allModuleFunctions: Map[String, Val.Func] = (
+  // Combine all functions from all modules (lazy to defer startup cost)
+  private[stdlib] lazy val allModuleFunctions: Map[String, Val.Func] = (
     ArrayModule.functions ++
       StringModule.functions ++
       ObjectModule.functions ++
@@ -133,7 +133,7 @@ object StdLibModule {
   )
 
   /**
-   * The default standard library module instance
+   * The default standard library module instance (lazy to defer startup cost)
    */
-  val Default = new StdLibModule()
+  lazy val Default = new StdLibModule()
 }

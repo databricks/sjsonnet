@@ -5,6 +5,9 @@ import scala.scalanative.libc.stdio
 
 object SjsonnetMain {
   def main(args: Array[String]): Unit = {
+    val stdLib = new sjsonnet.stdlib.StdLibModule(nativeFunctions =
+      Map.from(NativeGzip.functions ++ NativeRegex.functions)
+    )
     val exitCode = SjsonnetMainBase.main0(
       args,
       new DefaultParseCache,
@@ -14,9 +17,7 @@ object SjsonnetMain {
       os.pwd,
       None,
       None,
-      new sjsonnet.stdlib.StdLibModule(nativeFunctions =
-        Map.from(NativeGzip.functions ++ NativeRegex.functions)
-      ).module,
+      stdLib.module,
       None,
       new NativeOutputStream(stdio.stdout)
     )

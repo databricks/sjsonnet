@@ -255,10 +255,10 @@ object Val {
    * Shared singletons for runtime boolean results — avoids per-comparison allocation. WARNING:
    * These singletons have mutable `var pos` (inherited from Expr). Their `pos` must NEVER be
    * mutated. The evaluation model is single-threaded, but mutating shared singleton state would
-   * corrupt all subsequent uses.
+   * corrupt all subsequent uses. (Lazy to defer startup cost)
    */
-  val staticTrue: Bool = True(new Position(null, -1))
-  val staticFalse: Bool = False(new Position(null, -1))
+  lazy val staticTrue: Bool = True(new Position(null, -1))
+  lazy val staticFalse: Bool = False(new Position(null, -1))
 
   /**
    * Returns a shared singleton boolean. Use for runtime comparison results where position is not
@@ -271,10 +271,10 @@ object Val {
   /**
    * Pre-allocated pool of Val.Num for small non-negative integers 0–255. Used by Evaluator
    * arithmetic fast paths to avoid per-operation allocation. Position is synthetic — acceptable for
-   * intermediate runtime results.
+   * intermediate runtime results. (Lazy to defer startup cost)
    */
   private val numCacheSize = 256
-  private val numCache: Array[Num] = {
+  private lazy val numCache: Array[Num] = {
     val pos = new Position(null, -1)
     val arr = new Array[Num](numCacheSize)
     var i = 0
@@ -317,9 +317,9 @@ object Val {
 
   /**
    * Singleton null for runtime results where position is not meaningful. Safe in single-threaded
-   * evaluation. See staticTrue/staticFalse for rationale.
+   * evaluation. See staticTrue/staticFalse for rationale. (Lazy to defer startup cost)
    */
-  val staticNull: Val.Null = Val.Null(new Position(null, -1))
+  lazy val staticNull: Val.Null = Val.Null(new Position(null, -1))
 
   /**
    * Rope string: O(1) concatenation via inline tree nodes.
