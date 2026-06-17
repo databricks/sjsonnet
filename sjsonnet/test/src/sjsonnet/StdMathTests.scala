@@ -38,5 +38,15 @@ object StdMathTests extends TestSuite {
       evalErr("std.exponent(std.sqrt(-1))")
       evalErr("std.exponent(std.pow(2, 1024))")
     }
+    test("sqrt rejects negative input") {
+      // go-jsonnet: makeDoubleCheck returns "Not a number" for NaN results
+      val err = evalErr("std.sqrt(-1)")
+      assert(err.contains("Not a number"))
+      val err2 = evalErr("std.sqrt(-0.001)")
+      assert(err2.contains("Not a number"))
+      // sqrt(0) and sqrt(positive) must still work
+      eval("std.sqrt(0)") ==> ujson.Num(0.0)
+      eval("std.sqrt(4)") ==> ujson.Num(2.0)
+    }
   }
 }

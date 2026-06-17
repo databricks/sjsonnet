@@ -219,7 +219,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.sqrt(x) as a mathematical function.
      */
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
-      math.sqrt(x)
+      val r = math.sqrt(x)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.max(a, b)]].
