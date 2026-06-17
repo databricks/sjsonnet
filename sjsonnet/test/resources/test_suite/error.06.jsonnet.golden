@@ -1,4 +1,4 @@
-sjsonnet.Error: division by zero
+sjsonnet.Error: Division by zero.
     at [f].(error.06.jsonnet:17:15)
     at [<root>].(error.06.jsonnet:17:7)
 
