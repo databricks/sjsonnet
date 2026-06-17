@@ -233,12 +233,11 @@ object StringModule extends AbstractFunctionModule {
     def evalRhs(str: Eval, from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
       val fromForce = from.value.asString
       if (fromForce.isEmpty) {
-        Error.fail("Cannot replace empty string in strReplace")
+        Error.fail("'from' string must not be zero length.", pos)(ev)
       }
       val srcVal = str.value
       val toVal = to.value
       val out = srcVal.asString.replace(fromForce, toVal.asString)
-      // Result is asciiSafe iff both src and `to` are asciiSafe (`from` is removed).
       val srcSafe = srcVal.isInstanceOf[Val.AsciiSafeStr]
       val toSafe = toVal.isInstanceOf[Val.AsciiSafeStr]
       if (srcSafe && toSafe) Val.Str.asciiSafe(pos, out) else Val.Str(pos, out)
