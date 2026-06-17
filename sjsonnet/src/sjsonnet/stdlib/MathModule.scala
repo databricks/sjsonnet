@@ -292,7 +292,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.pow(x, n) as a mathematical function.
      */
     builtin("pow", "x", "n") { (pos, ev, x: Double, n: Double) =>
-      math.pow(x, n)
+      val r = math.pow(x, n)
+      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.floor(x)]].
@@ -424,7 +426,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.asin(x) as a mathematical function.
      */
     builtin("asin", "x") { (pos, ev, x: Double) =>
-      math.asin(x)
+      val r = math.asin(x)
+      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.acos(x)]].
@@ -434,7 +438,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.acos(x) as a mathematical function.
      */
     builtin("acos", "x") { (pos, ev, x: Double) =>
-      math.acos(x)
+      val r = math.acos(x)
+      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.atan(x)]].

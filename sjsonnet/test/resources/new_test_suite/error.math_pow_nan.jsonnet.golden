@@ -1,2 +1,1 @@
 sjsonnet.Error: [std.pow] not a number
-    at [<root>].(pow4.jsonnet:1:8)
