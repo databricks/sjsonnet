@@ -1107,5 +1107,15 @@ object EvaluatorTests extends TestSuite {
       eval("""std.manifestJson(1e100)""") ==> ujson.Str(expected1e100)
     }
 
+    test("inOperatorWordBoundary") {
+      // `in` still works as a binary operator
+      eval(""" "a" in {a: 1} """) ==> ujson.True
+      eval(""" "b" in {a: 1} """) ==> ujson.False
+      // identifiers starting with "in" must not be parsed as the `in` operator
+      eval("""local index = 42; index""") ==> ujson.Num(42)
+      eval("""local information = [1, 2, 3]; information""") ==> ujson.Arr(1, 2, 3)
+      eval("""local input = {a: 1}; input""") ==> ujson.Obj("a" -> ujson.Num(1))
+    }
+
   }
 }
