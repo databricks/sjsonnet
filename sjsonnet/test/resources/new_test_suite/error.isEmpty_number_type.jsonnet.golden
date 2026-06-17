@@ -1,2 +1,1 @@
 sjsonnet.Error: [std.isEmpty] isEmpty operates on strings, objects, and arrays, got number
-    at [<root>].(builtinIsEmpty2.jsonnet:1:12)

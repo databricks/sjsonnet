@@ -1314,14 +1314,16 @@ object StringModule extends AbstractFunctionModule {
      *
      * Returns true if the given string is of zero length.
      */
-    builtin("isEmpty", "str") { (_, _, value: Val) =>
+    builtin("isEmpty", "str") { (pos, ev, value: Val) =>
       value match {
         case Val.Str(_, s) => s.isEmpty
         case a: Val.Arr    => a.length == 0
         case o: Val.Obj    => o.visibleKeyNames.isEmpty
-        case f: Val.Func   => f.params.names.isEmpty
         case x             =>
-          Error.fail("length operates on strings, objects, and arrays, got " + x.prettyName)
+          Error.fail(
+            "isEmpty operates on strings, objects, and arrays, got " + x.prettyName,
+            pos
+          )(ev)
       }
     },
     /**
