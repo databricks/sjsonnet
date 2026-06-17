@@ -2121,7 +2121,10 @@ class Evaluator(
     case _                          => compareTypeMismatch(x, y)
   }
 
-  def equal(x: Val, y: Val): Boolean = (x eq y) || (x match {
+  def equal(x: Val, y: Val): Boolean = ((x eq y) && !x.isInstanceOf[Val.Func]) || (x match {
+    case _: Val.Func =>
+      if (y.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
+      false
     case _: Val.True  => y.isInstanceOf[Val.True]
     case _: Val.False => y.isInstanceOf[Val.False]
     case _: Val.Null  => y.isInstanceOf[Val.Null]
@@ -2150,9 +2153,10 @@ class Evaluator(
             // Skip forcing when Eval references match (shared backing elements)
             if (!(xe eq ye)) {
               if (!equal(xe.value, ye.value)) return false
-            } else if (!xe.isInstanceOf[Val]) {
-              // Invariant: Eval = Val | Lazy. Val is pure; Lazy may error on force.
-              xe.value // Force shared Lazy thunks for error semantics
+            } else {
+              val v = xe.value
+              if (v.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
+              else if (!xe.isInstanceOf[Val]) v // Force shared Lazy thunks for error semantics
             }
             i += 1
           }
