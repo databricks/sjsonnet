@@ -27,10 +27,10 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
 
     test("removeAt filters by exact index equality") {
       eval("""std.removeAt([1, 2, 3], 1)""") ==> ujson.Arr(1, 3)
-      eval("""std.removeAt([1, 2, 3], 1.5)""") ==> ujson.Arr(1, 2, 3)
-      eval("""std.removeAt([1, 2, 3], -1)""") ==> ujson.Arr(1, 2, 3)
-      eval("""std.removeAt([1, 2, 3], 9)""") ==> ujson.Arr(1, 2, 3)
-      eval("""std.removeAt([1, 2, 3], "1")""") ==> ujson.Arr(1, 2, 3)
+      assert(evalErr("""std.removeAt([1, 2, 3], 1.5)""").contains("idx must be an integer"))
+      assert(evalErr("""std.removeAt([1, 2, 3], -1)""").contains("idx out of bounds"))
+      assert(evalErr("""std.removeAt([1, 2, 3], 9)""").contains("idx out of bounds"))
+      assert(evalErr("""std.removeAt([1, 2, 3], "1")""").contains("idx must be a number"))
     }
 
     test("isEmpty delegates to std.length") {

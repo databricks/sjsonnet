@@ -1076,15 +1076,19 @@ object ArrayModule extends AbstractFunctionModule {
      *
      * Remove element at idx index from arr.
      */
-    builtin("removeAt", "arr", "idx") { (_, _, arr: Val.Arr, idx: Val) =>
+    builtin("removeAt", "arr", "idx") { (pos, ev, arr: Val.Arr, idx: Val) =>
       val removeIdx = idx match {
         case n: Val.Num =>
           val d = n.asDouble
-          if (d.isWhole && d >= 0 && d < arr.length) d.toInt else -1
-        case _ => -1
+          if (!d.isWhole)
+            Error.fail("std.removeAt: idx must be an integer, got " + d, pos)(ev)
+          if (d < 0 || d >= arr.length)
+            Error.fail("std.removeAt: idx out of bounds", pos)(ev)
+          d.toInt
+        case _ =>
+          Error.fail("std.removeAt: idx must be a number, got " + idx.value.prettyName, pos)(ev)
       }
-      if (removeIdx == -1) arr
-      else removeAtView(arr, removeIdx)
+      removeAtView(arr, removeIdx)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-sum std.sum(arr)]].
