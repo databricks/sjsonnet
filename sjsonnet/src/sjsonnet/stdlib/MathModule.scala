@@ -219,6 +219,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.sqrt(x) as a mathematical function.
      */
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
+      if (x < 0) Error.fail("sqrt input is negative", pos)(ev)
       math.sqrt(x)
     },
     /**

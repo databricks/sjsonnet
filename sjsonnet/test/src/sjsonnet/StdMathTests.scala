@@ -38,5 +38,15 @@ object StdMathTests extends TestSuite {
       evalErr("std.exponent(std.sqrt(-1))")
       evalErr("std.exponent(std.pow(2, 1024))")
     }
+    test("sqrt rejects negative input") {
+      // go-jsonnet: "RUNTIME ERROR: sqrt input is negative"
+      val err = evalErr("std.sqrt(-1)")
+      assert(err.contains("sqrt input is negative"))
+      val err2 = evalErr("std.sqrt(-0.001)")
+      assert(err2.contains("sqrt input is negative"))
+      // sqrt(0) and sqrt(positive) must still work
+      eval("std.sqrt(0)") ==> ujson.Num(0.0)
+      eval("std.sqrt(4)") ==> ujson.Num(2.0)
+    }
   }
 }
