@@ -1165,5 +1165,16 @@ object EvaluatorTests extends TestSuite {
       eval("""local input = {a: 1}; input""") ==> ujson.Obj("a" -> ujson.Num(1))
     }
 
+    test("stdlibParameterNames") {
+      // std.hypot(a, b) per official docs, not std.hypot(x, y)
+      eval("""std.hypot(a=3, b=4)""") ==> ujson.Num(5)
+      // std.xor(x, y) per official docs, not std.xor(bool1, bool2)
+      eval("""std.xor(x=true, y=false)""") ==> ujson.True
+      eval("""std.xor(x=true, y=true)""") ==> ujson.False
+      // std.xnor(x, y) per official docs, not std.xnor(bool1, bool2)
+      eval("""std.xnor(x=true, y=true)""") ==> ujson.True
+      eval("""std.xnor(x=true, y=false)""") ==> ujson.False
+    }
+
   }
 }
