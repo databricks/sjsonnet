@@ -1,7 +1,7 @@
 package sjsonnet
 
 import utest._
-import TestUtils.eval
+import TestUtils.{eval, evalErr}
 
 object StdStringTests extends TestSuite {
   def tests: Tests = Tests {
@@ -16,14 +16,13 @@ object StdStringTests extends TestSuite {
       eval("""std.equalsIgnoreCase("İ", "i")""") ==> ujson.False
     }
 
-    test("strReplace with empty from inserts between characters") {
-      // go-jsonnet: std.strReplace("abc", "", "-") => "-a-b-c-"
-      eval("""std.strReplace("abc", "", "-")""") ==> ujson.Str("-a-b-c-")
-      eval("""std.strReplace("", "", "-")""") ==> ujson.Str("-")
-      eval("""std.strReplace("a", "", "-")""") ==> ujson.Str("-a-")
-      eval("""std.strReplace("ab", "", "XY")""") ==> ujson.Str("XYaXYbXY")
+    test("strReplace rejects empty from string") {
+      // go-jsonnet: "'from' string must not be zero length."
+      val err = evalErr("""std.strReplace("abc", "", "-")""")
+      assert(err.contains("'from' string must not be zero length."))
       // Normal replacement still works
       eval("""std.strReplace("hello world", "world", "jsonnet")""") ==> ujson.Str("hello jsonnet")
+      eval("""std.strReplace("aaa", "a", "b")""") ==> ujson.Str("bbb")
     }
   }
 }

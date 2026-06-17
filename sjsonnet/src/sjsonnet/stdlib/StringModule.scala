@@ -232,30 +232,12 @@ object StringModule extends AbstractFunctionModule {
   private object StrReplace extends Val.Builtin3("strReplace", "str", "from", "to") {
     def evalRhs(str: Eval, from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
       val fromForce = from.value.asString
+      if (fromForce.isEmpty) {
+        Error.fail("'from' string must not be zero length.", pos)(ev)
+      }
       val srcVal = str.value
       val toVal = to.value
-      val out =
-        if (fromForce.isEmpty) {
-          // Go's strings.ReplaceAll(s, "", to) inserts `to` between every rune and at start/end.
-          val s = srcVal.asString
-          val t = toVal.asString
-          if (s.isEmpty) t
-          else {
-            val sb = new java.lang.StringBuilder(s.length * (t.length + 1) + t.length)
-            sb.append(t)
-            var i = 0
-            while (i < s.length) {
-              val cp = s.codePointAt(i)
-              sb.appendCodePoint(cp)
-              sb.append(t)
-              i += Character.charCount(cp)
-            }
-            sb.toString
-          }
-        } else {
-          srcVal.asString.replace(fromForce, toVal.asString)
-        }
-      // Result is asciiSafe iff both src and `to` are asciiSafe (`from` is removed).
+      val out = srcVal.asString.replace(fromForce, toVal.asString)
       val srcSafe = srcVal.isInstanceOf[Val.AsciiSafeStr]
       val toSafe = toVal.isInstanceOf[Val.AsciiSafeStr]
       if (srcSafe && toSafe) Val.Str.asciiSafe(pos, out) else Val.Str(pos, out)

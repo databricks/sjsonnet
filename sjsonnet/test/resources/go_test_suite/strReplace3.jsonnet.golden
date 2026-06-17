@@ -1,2 +1,2 @@
-"blahtblaheblahsblahtblah"
-
+sjsonnet.Error: [std.strReplace] 'from' string must not be zero length.
+    at [<root>].(strReplace3.jsonnet:1:15)
