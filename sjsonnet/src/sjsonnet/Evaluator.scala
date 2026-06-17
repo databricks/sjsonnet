@@ -1152,7 +1152,13 @@ class Evaluator(
   }
 
   def visitAssert(e: AssertExpr)(implicit scope: ValScope): Val = {
-    if (!visitExpr(e.asserted.value).isInstanceOf[Val.True]) {
+    val cond = visitExpr(e.asserted.value)
+    cond match {
+      case _: Val.Bool => // ok
+      case _           =>
+        Error.fail("Expected boolean, got " + cond.value.prettyName, e.asserted.value.pos)
+    }
+    if (!cond.isInstanceOf[Val.True]) {
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
         case msg  =>
@@ -1726,7 +1732,13 @@ class Evaluator(
       var i = 0
       while (i < asserts.length) {
         val a = asserts(i)
-        if (!visitExpr(a.value)(newScope).isInstanceOf[Val.True]) {
+        val cond = visitExpr(a.value)(newScope)
+        cond match {
+          case _: Val.Bool => // ok
+          case _           =>
+            Error.fail("Expected boolean, got " + cond.value.prettyName, a.value.pos)
+        }
+        if (!cond.isInstanceOf[Val.True]) {
           a.msg match {
             case null => Error.fail("Assertion failed", a.value.pos)
             case msg  =>

@@ -1107,5 +1107,15 @@ object EvaluatorTests extends TestSuite {
       eval("""std.manifestJson(1e100)""") ==> ujson.Str(expected1e100)
     }
 
+    test("assertBooleanTypeCheck") {
+      // non-boolean assert condition should error with type error
+      assert(evalErr("""assert "hello"; 42""").contains("Expected boolean, got string"))
+      assert(evalErr("""assert 0; 42""").contains("Expected boolean, got number"))
+      assert(evalErr("""assert null; 42""").contains("Expected boolean, got null"))
+      // boolean conditions should still work
+      eval("""assert true; 42""") ==> ujson.Num(42)
+      assert(evalErr("""assert false; 42""").contains("Assertion failed"))
+    }
+
   }
 }
