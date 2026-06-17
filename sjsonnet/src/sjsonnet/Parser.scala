@@ -1065,7 +1065,6 @@ class Parser(
       ">>",
       "<=",
       ">=",
-      "in",
       "==",
       "!=",
       "&&",
@@ -1080,7 +1079,7 @@ class Parser(
       "&",
       "^",
       "|"
-    )
+    ) | ("in" ~~ break)
   ).!
 
   def document[$: P]: P[(Expr, FileScope)] = P(expr ~ Pass(fileScope) ~ End)

@@ -1155,5 +1155,15 @@ object EvaluatorTests extends TestSuite {
       assert(evalErr("""assert false; 42""").contains("Assertion failed"))
     }
 
+    test("inOperatorWordBoundary") {
+      // `in` still works as a binary operator
+      eval(""" "a" in {a: 1} """) ==> ujson.True
+      eval(""" "b" in {a: 1} """) ==> ujson.False
+      // identifiers starting with "in" must not be parsed as the `in` operator
+      eval("""local index = 42; index""") ==> ujson.Num(42)
+      eval("""local information = [1, 2, 3]; information""") ==> ujson.Arr(1, 2, 3)
+      eval("""local input = {a: 1}; input""") ==> ujson.Obj("a" -> ujson.Num(1))
+    }
+
   }
 }
