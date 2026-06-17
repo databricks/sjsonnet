@@ -716,7 +716,7 @@ class Evaluator(
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
-        if (rd == 0) Error.fail("division by zero", pos)
+        if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld / rd
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
@@ -861,7 +861,7 @@ class Evaluator(
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
-        if (r == 0) Error.fail("division by zero", pos)
+        if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
         if (result.isInfinite) Error.fail("overflow", pos); result
       case Expr.BinaryOp.OP_% =>
@@ -1343,7 +1343,7 @@ class Evaluator(
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
-        if (r == 0) Error.fail("division by zero", pos)
+        if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
         if (result.isNaN) Error.fail("not a number", pos)
         if (result.isInfinite) Error.fail("overflow", pos)

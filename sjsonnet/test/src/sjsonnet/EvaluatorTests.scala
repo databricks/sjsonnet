@@ -28,6 +28,15 @@ object EvaluatorTests extends TestSuite {
       eval("-1 + 2 * 3") ==> ujson.Num(5)
       eval("6 - 3 + 2") ==> ujson.Num(5)
     }
+    test("divisionByZeroErrorMessage") {
+      // go-jsonnet uses "Division by zero." (capitalized, with period) for both / and %
+      assert(evalErr("1 / 0").contains("Division by zero."))
+      assert(evalErr("1.0 / 0.0").contains("Division by zero."))
+      assert(evalErr("1 % 0").contains("Division by zero."))
+      assert(evalErr("1.0 % 0.0").contains("Division by zero."))
+      // Ensure the old lowercase format is not used
+      assert(!evalErr("1 / 0").contains("division by zero"))
+    }
     test("objects") {
       eval("{x: 1}.x") ==> ujson.Num(1)
       eval("std.objectKeysValues({a: error 'unused'})[0].key") ==> ujson.Str("a")
