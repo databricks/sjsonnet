@@ -63,7 +63,9 @@ class TomlRenderer(
       case d if java.lang.Double.isNaN(d)              => out.write("nan")
       case d if java.lang.Double.compare(d, -0.0) == 0 => out.write("-0")
       case d if math.round(d).toDouble == d => out.write(java.lang.Long.toString(d.toLong))
-      case d                                => out.write(java.lang.Double.toString(d))
+      case d if d % 1 == 0                  =>
+        out.write(BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString())
+      case d => out.write(java.lang.Double.toString(d))
     }
     flush
   }
