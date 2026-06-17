@@ -2287,7 +2287,7 @@ object Val {
         case (_, _: Val.Null) =>
           Error.fail("Cannot merge " + l.prettyName + " with null", pos)
         case _ =>
-          throw new MatchError((l, r))
+          Error.fail("Cannot merge " + l.prettyName + " with " + r.prettyName, pos)
       }
 
     def valueRaw(k: String, self: Obj, pos: Position, cacheOwner: Obj = null, cacheKey: Any = null)(
