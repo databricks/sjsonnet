@@ -401,12 +401,17 @@ object ManifestModule extends AbstractFunctionModule {
       val indentArrayInObject = args(1) match {
         case Val.False(_) => false
         case Val.True(_)  => true
-        case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
+        case _            =>
+          Error.fail(
+            "indent_array_in_object has to be a boolean, got " + args(1).value.prettyName,
+            pos
+          )(ev)
       }
       val quoteKeys = args(2) match {
         case Val.False(_) => false
         case Val.True(_)  => true
-        case _            => Error.fail("quote_keys has to be a boolean, got " + v.getClass)
+        case _            =>
+          Error.fail("quote_keys has to be a boolean, got " + args(2).value.prettyName, pos)(ev)
       }
       Materializer
         .apply0(
@@ -433,22 +438,31 @@ object ManifestModule extends AbstractFunctionModule {
       "indent_array_in_object" -> Val.False(dummyPos),
       "c_document_end" -> Val.True(dummyPos),
       "quote_keys" -> Val.True(dummyPos)
-    ) { (args, _, ev) =>
+    ) { (args, pos, ev) =>
       val v = args(0)
       val indentArrayInObject = args(1) match {
         case Val.False(_) => false
         case Val.True(_)  => true
-        case _ => Error.fail("indent_array_in_object has to be a boolean, got" + v.getClass)
+        case _            =>
+          Error.fail(
+            "indent_array_in_object has to be a boolean, got " + args(1).value.prettyName,
+            pos
+          )(ev)
       }
       val cDocumentEnd = args(2) match {
         case Val.False(_) => false
         case Val.True(_)  => true
-        case _            => Error.fail("c_document_end has to be a boolean, got " + v.getClass)
+        case _            =>
+          Error.fail(
+            "c_document_end has to be a boolean, got " + args(2).value.prettyName,
+            pos
+          )(ev)
       }
       val quoteKeys = args(3) match {
         case Val.False(_) => false
         case Val.True(_)  => true
-        case _            => Error.fail("quote_keys has to be a boolean, got " + v.getClass)
+        case _            =>
+          Error.fail("quote_keys has to be a boolean, got " + args(3).value.prettyName, pos)(ev)
       }
       v match {
         case arr: Val.Arr =>

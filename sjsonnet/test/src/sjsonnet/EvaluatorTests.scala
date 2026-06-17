@@ -1097,6 +1097,24 @@ object EvaluatorTests extends TestSuite {
       eval("""std.toString(0.0)""") ==> ujson.Str("0")
     }
 
+    test("manifestYamlParameterErrors") {
+      evalErr(
+        """std.manifestYamlDoc({}, indent_array_in_object="yes")"""
+      ).contains("indent_array_in_object has to be a boolean, got string")
+      evalErr(
+        """std.manifestYamlDoc({}, quote_keys=42)"""
+      ).contains("quote_keys has to be a boolean, got number")
+      evalErr(
+        """std.manifestYamlStream([{}], indent_array_in_object="x")"""
+      ).contains("indent_array_in_object has to be a boolean, got string")
+      evalErr(
+        """std.manifestYamlStream([{}], false, c_document_end=[])"""
+      ).contains("c_document_end has to be a boolean, got array")
+      evalErr(
+        """std.manifestYamlStream([{}], false, false, quote_keys=null)"""
+      ).contains("quote_keys has to be a boolean, got null")
+    }
+
     test("largeIntegerDoubleMaterialization") {
       // std.manifestJson(1e308) should output full decimal, not "1.0E308"
       // go-jsonnet and jrsonnet output 10^308 (1 followed by 308 zeros)
