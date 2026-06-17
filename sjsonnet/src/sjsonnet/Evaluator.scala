@@ -1916,6 +1916,7 @@ class Evaluator(
         case Val.Str(_, k) =>
           val member = new ObjCompMember(
             e.plus,
+            e.visibility,
             this,
             binds,
             s,
@@ -2240,11 +2241,12 @@ private[sjsonnet] final class ObjectScopeFactory(
  */
 private[sjsonnet] final class ObjCompMember(
     plus0: Boolean,
+    visibility0: Visibility,
     private val evaluator: Evaluator,
     private val binds: Array[Expr.Bind],
     private val compScope: ValScope,
     private val valueExpr: Expr)
-    extends Val.Obj.Member(plus0, Visibility.Normal, deprecatedSkipAsserts = true) {
+    extends Val.Obj.Member(plus0, visibility0, deprecatedSkipAsserts = true) {
   def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val = {
     evaluator.checkStackDepth(valueExpr.pos, "object comprehension")
     try {

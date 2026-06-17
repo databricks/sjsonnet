@@ -887,7 +887,7 @@ class Parser(
                   Expr.FieldName.Dyn(lhs),
                   plus,
                   args,
-                  Visibility.Normal,
+                  visibility,
                   rhsBody
                 ) =>
               val rhs = if (args == null) {
@@ -920,6 +920,7 @@ class Parser(
                       lhs,
                       rhs,
                       plus,
+                      visibility,
                       postLocals.toArray,
                       comps._1,
                       comps._2.toList
