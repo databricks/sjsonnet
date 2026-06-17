@@ -240,7 +240,7 @@ class Evaluator(
   @inline private def tryInlineArith(op: Int, ld: Double, rd: Double, pos: Position): Val =
     (op: @switch) match {
       case Expr.BinaryOp.OP_* =>
-        val r = ld * rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+        val r = ld * rd; if (r.isNaN || r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         if (rd == 0) null
         else { val r = ld / rd; if (r.isNaN || r.isInfinite) null else Val.cachedNum(pos, r) }
@@ -248,9 +248,9 @@ class Evaluator(
         if (rd == 0) null
         else { val r = ld % rd; if (r.isNaN) null else Val.cachedNum(pos, r) }
       case Expr.BinaryOp.OP_+ =>
-        val r = ld + rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+        val r = ld + rd; if (r.isNaN || r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
-        val r = ld - rd; if (r.isInfinite) null else Val.cachedNum(pos, r)
+        val r = ld - rd; if (r.isNaN || r.isInfinite) null else Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_<< =>
         val ll = ld.toLong; val rl = rd.toLong
         if (ll.toDouble != ld || rl.toDouble != rd) null // not safe integers
@@ -706,13 +706,19 @@ class Evaluator(
     val ld = ln.asDouble
     val rd = rn.asDouble
     (op: @switch) match {
-      case Expr.BinaryOp.OP_+ => Val.cachedNum(pos, ld + rd)
+      case Expr.BinaryOp.OP_+ =>
+        val r = ld + rd
+        if (r.isNaN) Error.fail("not a number", pos)
+        if (r.isInfinite) Error.fail("overflow", pos)
+        Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = ld - rd
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_* =>
         val r = ld * rd
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
@@ -857,23 +863,28 @@ class Evaluator(
     (e.op: @switch) match {
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos); r
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
+        if (result.isNaN) Error.fail("not a number", pos)
         if (result.isInfinite) Error.fail("overflow", pos); result
       case Expr.BinaryOp.OP_% =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
-        l % r
+        val result = l % r
+        if (result.isNaN) Error.fail("not a number", pos); result
       case Expr.BinaryOp.OP_+ =>
         val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos); r
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos); r
       case Expr.BinaryOp.OP_<< =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
@@ -1334,10 +1345,12 @@ class Evaluator(
       // Pure numeric fast path: avoid intermediate Val.Num allocation
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
@@ -1370,9 +1383,13 @@ class Evaluator(
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) => Val.cachedNum(pos, l + r)
-          case (l: Val.Str, r: Val.Str)       => Val.Str.concat(pos, l, r)
-          case (n: Val.Num, r: Val.Str)       =>
+          case (Val.Num(_, l), Val.Num(_, r)) =>
+            val result = l + r
+            if (result.isNaN) Error.fail("not a number", pos)
+            if (result.isInfinite) Error.fail("overflow", pos)
+            Val.cachedNum(pos, result)
+          case (l: Val.Str, r: Val.Str) => Val.Str.concat(pos, l, r)
+          case (n: Val.Num, r: Val.Str) =>
             Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)), r)
           case (l: Val.Str, n: Val.Num) =>
             Val.Str.concat(pos, l, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)))
