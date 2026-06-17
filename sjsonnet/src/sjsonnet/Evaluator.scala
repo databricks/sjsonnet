@@ -223,8 +223,9 @@ class Evaluator(
       val idx = v.nameIdx
       if (idx < scope.length) {
         val binding = scope.bindings(idx)
-        if (binding != null) binding.value match {
+        if (binding != null) binding match {
           case n: Val.Num => n.rawDouble
+          case _: Val     => Double.NaN
           case _          => Double.NaN
         }
         else Double.NaN
