@@ -713,6 +713,17 @@ object EvaluatorTests extends TestSuite {
       ) ==> "sjsonnet.Error: [std.format] %c expected number / string, got: null\nat [<root>].(:1:6)"
       eval("'%s' % null") ==> ujson.Str("null")
     }
+    test("formatTypeErrorMessages") {
+      evalErr(
+        "'%a' % 42"
+      ) ==> "sjsonnet.Error: [std.format] Format required a number at 0, got number\nat [<root>].(:1:6)"
+      evalErr(
+        "'%a' % true"
+      ) ==> "sjsonnet.Error: [std.format] Format required a boolean at 0, got boolean\nat [<root>].(:1:6)"
+      evalErr(
+        "'%a' % false"
+      ) ==> "sjsonnet.Error: [std.format] Format required a boolean at 0, got boolean\nat [<root>].(:1:6)"
+    }
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", strict = false) ==> ujson
         .Num(1)

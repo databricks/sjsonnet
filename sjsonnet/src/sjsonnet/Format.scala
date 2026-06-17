@@ -714,7 +714,7 @@ object Format {
                 case 's'             =>
                   widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
-                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
+                  Error.fail("Format required a %s at %d, got number".format(rawVal.prettyName, i))
               }
             case _: Val.True =>
               val b = 1
@@ -732,7 +732,7 @@ object Format {
                   Error.fail("%c expected number / string, got: boolean")
                 case 's' => widenRaw(formatted, "true")
                 case _   =>
-                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
+                  Error.fail("Format required a %s at %d, got boolean".format(rawVal.prettyName, i))
               }
             case _: Val.False =>
               val b = 0
@@ -750,7 +750,7 @@ object Format {
                   Error.fail("%c expected number / string, got: boolean")
                 case 's' => widenRaw(formatted, "false")
                 case _   =>
-                  Error.fail("Format required a %s at %d, got string".format(rawVal.prettyName, i))
+                  Error.fail("Format required a %s at %d, got boolean".format(rawVal.prettyName, i))
               }
             case _: Val.Null =>
               formatted.conversion match {
