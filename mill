@@ -8,6 +8,8 @@ if [ -z "${GITHUB_RELEASE_CDN}" ] ; then GITHUB_RELEASE_CDN=""; fi
 
 if [ -z "$MILL_MAIN_CLI" ] ; then MILL_MAIN_CLI="${0}"; fi
 
+if [ -z "$MILL_MAVEN_REPO" ] ; then MILL_MAVEN_REPO="https://repo1.maven.org/maven2"; fi
+
 MILL_REPO_URL="https://github.com/com-lihaoyi/mill"
 
 MILL_BUILD_SCRIPT=""
@@ -164,7 +166,7 @@ if [ ! -s "${MILL}" ] || [ "$MILL_TEST_DRY_RUN_LAUNCHER_SCRIPT" = "1" ] ; then
   mkdir -p "$(dirname "${MILL_TEMP_DOWNLOAD_FILE}")"
 
   if [ "$MILL_DOWNLOAD_FROM_MAVEN" = "1" ] ; then
-    MILL_DOWNLOAD_URL="https://repo1.maven.org/maven2/com/lihaoyi/mill-dist${ARTIFACT_SUFFIX}/${MILL_VERSION}/mill-dist${ARTIFACT_SUFFIX}-${MILL_VERSION}.${MILL_DOWNLOAD_EXT}"
+    MILL_DOWNLOAD_URL="${MILL_MAVEN_REPO}/com/lihaoyi/mill-dist${ARTIFACT_SUFFIX}/${MILL_VERSION}/mill-dist${ARTIFACT_SUFFIX}-${MILL_VERSION}.${MILL_DOWNLOAD_EXT}"
   else
     MILL_VERSION_TAG=$(echo "$MILL_VERSION" | sed -E 's/([^-]+)(-M[0-9]+)?(-.*)?/\1\2/')
     MILL_DOWNLOAD_URL="${GITHUB_RELEASE_CDN}${MILL_REPO_URL}/releases/download/${MILL_VERSION_TAG}/${MILL_VERSION}${MILL_DOWNLOAD_SUFFIX}"
