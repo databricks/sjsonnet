@@ -1155,5 +1155,26 @@ object EvaluatorTests extends TestSuite {
       assert(evalErr("""assert false; 42""").contains("Assertion failed"))
     }
 
+    test("inOperatorWordBoundary") {
+      // `in` still works as a binary operator
+      eval(""" "a" in {a: 1} """) ==> ujson.True
+      eval(""" "b" in {a: 1} """) ==> ujson.False
+      // identifiers starting with "in" must not be parsed as the `in` operator
+      eval("""local index = 42; index""") ==> ujson.Num(42)
+      eval("""local information = [1, 2, 3]; information""") ==> ujson.Arr(1, 2, 3)
+      eval("""local input = {a: 1}; input""") ==> ujson.Obj("a" -> ujson.Num(1))
+    }
+
+    test("stdlibParameterNames") {
+      // std.hypot(a, b) per official docs, not std.hypot(x, y)
+      eval("""std.hypot(a=3, b=4)""") ==> ujson.Num(5)
+      // std.xor(x, y) per official docs, not std.xor(bool1, bool2)
+      eval("""std.xor(x=true, y=false)""") ==> ujson.True
+      eval("""std.xor(x=true, y=true)""") ==> ujson.False
+      // std.xnor(x, y) per official docs, not std.xnor(bool1, bool2)
+      eval("""std.xnor(x=true, y=true)""") ==> ujson.True
+      eval("""std.xnor(x=true, y=false)""") ==> ujson.False
+    }
+
   }
 }

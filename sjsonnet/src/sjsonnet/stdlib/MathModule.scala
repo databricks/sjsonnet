@@ -463,8 +463,8 @@ object MathModule extends AbstractFunctionModule {
      *
      * The official docs list std.hypot(a, b) as a mathematical function.
      */
-    builtin("hypot", "x", "y") { (pos, ev, x: Double, y: Double) =>
-      math.hypot(x, y)
+    builtin("hypot", "a", "b") { (pos, ev, a: Double, b: Double) =>
+      math.hypot(a, b)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.deg2rad(x)]].
@@ -589,8 +589,8 @@ object MathModule extends AbstractFunctionModule {
      *
      * Returns the xor of the two given booleans.
      */
-    builtin("xor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
-      bool1 ^ bool2
+    builtin("xor", "x", "y") { (_, _, x: Boolean, y: Boolean) =>
+      x ^ y
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-xnor std.xnor(x, y)]].
@@ -599,8 +599,8 @@ object MathModule extends AbstractFunctionModule {
      *
      * Returns the xnor of the two given booleans.
      */
-    builtin("xnor", "bool1", "bool2") { (_, _, bool1: Boolean, bool2: Boolean) =>
-      !(bool1 ^ bool2)
+    builtin("xnor", "x", "y") { (_, _, x: Boolean, y: Boolean) =>
+      !(x ^ y)
     }
   )
 }
