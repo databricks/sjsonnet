@@ -48,5 +48,23 @@ object StdMathTests extends TestSuite {
       eval("std.sqrt(0)") ==> ujson.Num(0.0)
       eval("std.sqrt(4)") ==> ujson.Num(2.0)
     }
+    test("log and log2 reject negative and zero input") {
+      // go-jsonnet: makeDoubleCheck returns "Not a number" for NaN, Val.Num catches Infinity as "overflow"
+      val errLog = evalErr("std.log(-1)")
+      assert(errLog.contains("Not a number"))
+      val errLog2 = evalErr("std.log2(-1)")
+      assert(errLog2.contains("Not a number"))
+      val errLog10 = evalErr("std.log10(-1)")
+      assert(errLog10.contains("Not a number"))
+      val errLog0 = evalErr("std.log(0)")
+      assert(errLog0.contains("overflow"))
+      val errLog2Zero = evalErr("std.log2(0)")
+      assert(errLog2Zero.contains("overflow"))
+      // log(positive) must still work
+      eval("std.log(1)") ==> ujson.Num(0.0)
+      eval("std.log2(1)") ==> ujson.Num(0.0)
+      eval("std.log2(8)") ==> ujson.Num(3.0)
+      eval("std.log10(100)") ==> ujson.Num(2.0)
+    }
   }
 }

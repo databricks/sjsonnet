@@ -1,3 +1,3 @@
-sjsonnet.Error: not a number
+sjsonnet.Error: [std.log] Not a number
     at [<root>].(builtin_log7.jsonnet:1:8)
 
