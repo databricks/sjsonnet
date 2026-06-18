@@ -947,13 +947,24 @@ object StringModule extends AbstractFunctionModule {
    *
    * Note: Versions up to and including 0.18.0 require c to be a single character.
    */
+  private def validateMaxSplits(d: Double, pos: Position, name: String)(implicit
+      ev: EvalErrorScope): Int = {
+    if (d.isNaN || d.isInfinite || Math.floor(d) != d)
+      Error.fail(s"$name third parameter must be an integer, got $d", pos)
+    val i = d.toInt
+    if (i < -1)
+      Error.fail(s"$name third parameter should be -1 or non-negative, got $i", pos)
+    i
+  }
+
   private object SplitLimit extends Val.Builtin3("splitLimit", "str", "c", "maxsplits") {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
       val safe = v.isInstanceOf[Val.AsciiSafeStr]
+      val ms = validateMaxSplits(maxSplits.value.asDouble, pos, "std.splitLimit")(ev)
       Val.Arr(
         pos,
-        splitLimit(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
+        splitLimit(pos, v.asString, c.value.asString, ms, safe)
       )
     }
   }
@@ -969,9 +980,10 @@ object StringModule extends AbstractFunctionModule {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
       val safe = v.isInstanceOf[Val.AsciiSafeStr]
+      val ms = validateMaxSplits(maxSplits.value.asDouble, pos, "std.splitLimitR")(ev)
       Val.Arr(
         pos,
-        splitLimitR(pos, v.asString, c.value.asString, maxSplits.value.asInt, safe)
+        splitLimitR(pos, v.asString, c.value.asString, ms, safe)
       )
     }
   }
