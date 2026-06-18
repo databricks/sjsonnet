@@ -41,10 +41,21 @@ object Platform {
   def isAsciiJsonSafe(s: String, from: Int, to: Int): Boolean =
     CharSWAR.isAsciiJsonSafe(s, from, to)
 
-  private def nodeToJson(node: Node): ujson.Value = node match {
-    case _: Node.ScalarNode =>
-      YamlDecoder.forAny.construct(node).getOrElse("") match {
+  private val Yaml12OctalPattern = Pattern.compile("[-+]?0o[0-7]+")
+
+  private def nodeToJson(node: Node, input: String): ujson.Value = node match {
+    case sn: Node.ScalarNode =>
+      val constructed = YamlDecoder.forAny.construct(sn).getOrElse("")
+      constructed match {
         case null | None => ujson.Null
+        case v: String
+            if sn.tag == Tag.str && Yaml12OctalPattern.matcher(v).matches() &&
+              !isQuotedScalar(sn, input) =>
+          val negative = v.charAt(0) == '-'
+          val octalPart =
+            if (negative || v.charAt(0) == '+') v.substring(3) else v.substring(2)
+          val result = java.lang.Long.parseLong(octalPart, 8)
+          ujson.Num((if (negative) -result else result).toDouble)
         case v: String  => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
         case v: Boolean => ujson.Bool(v)
         case v: Int     => ujson.Num(v.toDouble)
@@ -59,7 +70,7 @@ object Platform {
     case Node.SequenceNode(nodes, _) =>
       val buf = new mutable.ArrayBuffer[ujson.Value](nodes.size)
       for (n <- nodes) {
-        buf += nodeToJson(n)
+        buf += nodeToJson(n, input)
       }
       ujson.Arr(buf)
     case Node.MappingNode(mappings, _) =>
@@ -67,7 +78,7 @@ object Platform {
       buf.sizeHint(mappings.size)
       for ((key, value) <- mappings) {
         key match {
-          case Node.ScalarNode(k, _) => buf(k) = nodeToJson(value)
+          case Node.ScalarNode(k, _) => buf(k) = nodeToJson(value, input)
           case _ => Error.fail("Invalid YAML mapping key class: " + key.getClass.getSimpleName)
         }
       }
@@ -76,6 +87,20 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
+  private def isQuotedScalar(sn: Node.ScalarNode, input: String): Boolean = {
+    sn.pos match {
+      case Some(range) =>
+        val offset = range.start.offset
+        offset >= 0 && offset < input.length && {
+          val c = input.charAt(offset)
+          c == '"' || c == '\''
+        }
+      case None => false
+    }
+  }
+
+  private val YamlDocStartPattern = Pattern.compile("\\A\\s*---(?:[ \\t\\n\\r]|\\z)")
+
   def yamlToJson(s: String): ujson.Value = {
     if (s.trim.isEmpty) return ujson.Null
 
@@ -83,16 +108,17 @@ object Platform {
     // since scala-yaml's parseManyYamls can't handle empty documents
     // (DocumentStart immediately followed by DocumentEnd).
     val preprocessed = addExplicitNullsForEmptyDocs(s)
+    val hasExplicitDocStart = YamlDocStartPattern.matcher(s).find()
 
     parseManyYamls(preprocessed) match {
       case Right(documents) =>
         documents.size match {
           case 0 => ujson.Null
-          case 1 => nodeToJson(documents.head)
+          case 1 if !hasExplicitDocStart => nodeToJson(documents.head, preprocessed)
           case _ =>
             val buf = new mutable.ArrayBuffer[ujson.Value](documents.size)
             for (doc <- documents) {
-              buf += nodeToJson(doc)
+              buf += nodeToJson(doc, preprocessed)
             }
             ujson.Arr(buf)
         }

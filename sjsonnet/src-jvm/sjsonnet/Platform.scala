@@ -10,8 +10,8 @@ import com.google.re2j.Pattern
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
 import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZOutputStream
-import org.yaml.snakeyaml.{LoaderOptions, Yaml}
-import org.yaml.snakeyaml.constructor.SafeConstructor
+import org.yaml.snakeyaml.{DumperOptions, LoaderOptions, Yaml}
+import org.yaml.snakeyaml.nodes.{MappingNode, Node, ScalarNode, SequenceNode, Tag}
 
 import scala.annotation.nowarn
 import scala.collection.compat.*
@@ -73,48 +73,113 @@ object Platform {
     xzBytes(s.getBytes(UTF_8), compressionLevel)
   }
 
-  private def nodeToJson(node: Any): ujson.Value = node match {
-    case m: java.util.List[?] =>
-      val buf = new mutable.ArrayBuffer[ujson.Value](m.size)
-      for (n <- m.asScala) {
-        buf += nodeToJson(n)
-      }
-      ujson.Arr(buf)
-    case m: java.util.Map[?, ?] =>
-      val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
-      buf.sizeHint(m.size)
-      for ((key, value) <- m.asScala) {
-        key match {
-          case k: String => buf(k) = nodeToJson(value)
-          case _ => Error.fail("Invalid YAML mapping key class: " + key.getClass.getSimpleName)
+  private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7]+")
+
+  private def yamlNodeToJson(node: Node): ujson.Value = node match {
+    case sn: ScalarNode =>
+      val value = sn.getValue
+      val tag = sn.getTag
+      val isPlain = sn.getScalarStyle == DumperOptions.ScalarStyle.PLAIN
+
+      if (isPlain && Yaml12OctalPattern.matcher(value).matches()) {
+        val negative = value.charAt(0) == '-'
+        val octalPart =
+          if (negative || value.charAt(0) == '+') value.substring(3) else value.substring(2)
+        val result = java.lang.Long.parseUnsignedLong(octalPart, 8)
+        val signed = if (negative) -result else result
+        ujson.Num(signed.toDouble)
+      } else if (tag == Tag.INT) {
+        val cleaned = value.replace("_", "")
+        val result: Long =
+          if (cleaned.startsWith("0x") || cleaned.startsWith("-0x") || cleaned.startsWith("+0x")) {
+            val negative = cleaned.startsWith("-")
+            val hex =
+              if (negative || cleaned.startsWith("+")) cleaned.substring(3)
+              else cleaned.substring(2)
+            val v = java.lang.Long.parseUnsignedLong(hex, 16)
+            if (negative) -v else v
+          } else if (
+            cleaned.startsWith("0b") || cleaned.startsWith("-0b") || cleaned.startsWith("+0b")
+          ) {
+            val negative = cleaned.startsWith("-")
+            val bin =
+              if (negative || cleaned.startsWith("+")) cleaned.substring(3)
+              else cleaned.substring(2)
+            val v = java.lang.Long.parseUnsignedLong(bin, 2)
+            if (negative) -v else v
+          } else if (cleaned.length > 1 && cleaned.startsWith("0") && !cleaned.contains(".")) {
+            val negative = cleaned.startsWith("-")
+            val oct = if (negative || cleaned.startsWith("+")) cleaned.substring(1) else cleaned
+            val v = java.lang.Long.parseUnsignedLong(oct, 8)
+            if (negative) -v else v
+          } else if (cleaned.contains(":")) {
+            val parts = cleaned.split(":")
+            parts.foldLeft(0L)((acc, p) => acc * 60 + p.trim.toLong)
+          } else {
+            cleaned.toLong
+          }
+        ujson.Num(result.toDouble)
+      } else if (tag == Tag.FLOAT) {
+        val cleaned = value.replace("_", "")
+        val result = cleaned match {
+          case ".inf" | ".Inf" | ".INF"    => Double.PositiveInfinity
+          case "-.inf" | "-.Inf" | "-.INF" => Double.NegativeInfinity
+          case ".nan" | ".NaN" | ".NAN"    => Double.NaN
+          case s if s.contains(":")        =>
+            s.split(":").foldLeft(0.0)((acc, p) => acc * 60 + p.trim.toDouble)
+          case s => s.toDouble
         }
+        ujson.Num(result)
+      } else if (tag == Tag.BOOL) {
+        ujson.Bool(value.toLowerCase match {
+          case "true" | "yes" | "on"  => true
+          case "false" | "no" | "off" => false
+          case _                      => Error.fail("Invalid YAML boolean: " + value)
+        })
+      } else if (tag == Tag.NULL) {
+        ujson.Null
+      } else {
+        ujson.Str(value)
+      }
+
+    case mn: MappingNode =>
+      val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
+      buf.sizeHint(mn.getValue.size)
+      for (tuple <- mn.getValue.asScala) {
+        val key = tuple.getKeyNode match {
+          case sn: ScalarNode => sn.getValue
+          case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
+        }
+        buf(key) = yamlNodeToJson(tuple.getValueNode)
       }
       ujson.Obj(buf)
-    case null          => ujson.Null
-    case v: String     => ujson.Str(v)
-    case v: Boolean    => ujson.Bool(v)
-    case v: Int        => ujson.Num(v.toDouble)
-    case v: Long       => ujson.Num(v.toDouble)
-    case v: Double     => ujson.Num(v)
-    case v: Float      => ujson.Num(v.toDouble)
-    case v: BigDecimal => ujson.Num(v.toDouble)
-    case v: BigInt     => ujson.Num(v.toDouble)
-    case v: Short      => ujson.Num(v.toDouble)
-    case _             =>
+
+    case sn: SequenceNode =>
+      val buf = new mutable.ArrayBuffer[ujson.Value](sn.getValue.size)
+      for (n <- sn.getValue.asScala) {
+        buf += yamlNodeToJson(n)
+      }
+      ujson.Arr(buf)
+
+    case _ =>
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
+  private val YamlDocStartPattern =
+    java.util.regex.Pattern.compile("\\A\\s*---(?:[ \\t\\n\\r]|\\z)")
+
   def yamlToJson(yamlString: String): ujson.Value = {
     try {
-      val yaml =
-        new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlString).asScala.toSeq
-      yaml.size match {
-        case 0 => ujson.Null
-        case 1 => nodeToJson(yaml.head)
-        case _ =>
-          val buf = new mutable.ArrayBuffer[ujson.Value](yaml.size)
-          for (doc <- yaml) {
-            buf += nodeToJson(doc)
+      val yaml = new Yaml(new LoaderOptions())
+      val docs = yaml.composeAll(new java.io.StringReader(yamlString)).asScala.toSeq
+      val hasExplicitDocStart = YamlDocStartPattern.matcher(yamlString).find()
+      docs.size match {
+        case 0                         => ujson.Null
+        case 1 if !hasExplicitDocStart => yamlNodeToJson(docs.head)
+        case _                         =>
+          val buf = new mutable.ArrayBuffer[ujson.Value](docs.size)
+          for (doc <- docs) {
+            buf += yamlNodeToJson(doc)
           }
           ujson.Arr(buf)
       }
