@@ -210,10 +210,11 @@ object StringModule extends AbstractFunctionModule {
    */
   private object Char_ extends Val.Builtin1("char", "n") {
     def evalRhs(n: Eval, ev: EvalScope, pos: Position): Val = {
-      val c = n.value.asInt
-      if (!Character.isValidCodePoint(c)) {
-        Error.fail(s"Invalid unicode code point, got " + c)
+      val c0 = n.value.asInt
+      if (!Character.isValidCodePoint(c0)) {
+        Error.fail(s"Invalid unicode code point, got " + c0)
       }
+      val c = if (c0 >= 0xd800 && c0 <= 0xdfff) 0xfffd else c0
       val s = Character.toString(c)
       // Single-codepoint result; ASCII printable except '"' and '\\' is JSON-safe.
       if (c >= 0x20 && c < 0x7f && c != '"' && c != '\\') Val.Str.asciiSafe(pos, s)
