@@ -2149,10 +2149,16 @@ class Evaluator(
             val ye = y.eval(i)
             // Skip forcing when Eval references match (shared backing elements)
             if (!(xe eq ye)) {
-              if (!equal(xe.value, ye.value)) return false
+              val xv = xe.value
+              val yv = ye.value
+              if (xv.isInstanceOf[Val.Func] && yv.isInstanceOf[Val.Func])
+                Error.fail("cannot test equality of functions")
+              if (!equal(xv, yv)) return false
             } else if (!xe.isInstanceOf[Val]) {
               // Invariant: Eval = Val | Lazy. Val is pure; Lazy may error on force.
-              xe.value // Force shared Lazy thunks for error semantics
+              val xv = xe.value // Force shared Lazy thunks for error semantics
+              if (xv.isInstanceOf[Val.Func])
+                Error.fail("cannot test equality of functions")
             }
             i += 1
           }
@@ -2174,12 +2180,17 @@ class Evaluator(
             if (!y.containsVisibleKey(k)) return false
             val v1 = x.value(k, emptyMaterializeFileScopePos)
             val v2 = y.value(k, emptyMaterializeFileScopePos)
+            if (v1.isInstanceOf[Val.Func] && v2.isInstanceOf[Val.Func])
+              Error.fail("cannot test equality of functions")
             if (!equal(v1, v2)) return false
             i += 1
           }
           true
         case _ => false
       }
+    case _: Val.Func =>
+      if (y.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
+      false
     case _ => false
   })
 }
