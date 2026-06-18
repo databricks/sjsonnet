@@ -810,6 +810,7 @@ class Evaluator(
 
   protected def materializeError(value: Val): String = value match {
     case Val.Str(_, s) => s
+    case _: Val.Func   => "Couldn't manifest function as JSON"
     case r             => Materializer.stringify(r)
   }
 
