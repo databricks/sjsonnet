@@ -2156,7 +2156,7 @@ class Evaluator(
             } else {
               val v = xe.value
               if (v.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
-              else if (!xe.isInstanceOf[Val]) v // Force shared Lazy thunks for error semantics
+              // else: shared non-Func value, elements are equal
             }
             i += 1
           }
