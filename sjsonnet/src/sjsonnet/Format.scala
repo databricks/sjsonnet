@@ -682,6 +682,10 @@ object Format {
                     valuesArr.value(i)
                 }
             } else {
+              if (formatted.widthStar)
+                Error.fail("Cannot use * width with object.", pos)
+              if (formatted.precisionStar)
+                Error.fail("Cannot use * precision with object.", pos)
               if (valuesArr != null) valuesArr.value(i)
               else if (valuesObj != null) valuesObj.value(key, pos)
               else Error.fail("Invalid format values")
