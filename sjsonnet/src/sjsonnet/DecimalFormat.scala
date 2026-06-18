@@ -59,29 +59,41 @@ object DecimalFormat {
 
       case None =>
         val precision = zeroes + hashes
-        val denominator = math.pow(10, precision)
-        val numerator = number * denominator + 0.5
-        if (numerator.isInfinite)
-          throw new sjsonnet.Error("overflow")
-        val whole = math.floor(numerator / denominator)
-        var fracNum = (math.floor(numerator) % denominator).toLong
-        val prefix = whole.toLong.toString
+        if (precision == 0) {
+          // No fractional digits needed - just round and format the integer part
+          val rounded = math.rint(number)
+          val prefix =
+            if (rounded.isInfinite || math.abs(rounded) > Long.MaxValue)
+              BigDecimal(rounded).toBigInt.toString
+            else rounded.toLong.toString
+          if (alternate) prefix + "." else prefix
+        } else {
+          val denominator = BigDecimal(10).pow(precision)
+          val bd = BigDecimal(number)
+          val scaled =
+            (bd * denominator + BigDecimal("0.5")).setScale(0, BigDecimal.RoundingMode.FLOOR)
+          val wholeBD = (scaled / denominator).setScale(0, BigDecimal.RoundingMode.FLOOR)
+          val fracBD = (scaled - wholeBD * denominator).abs
 
-        val frac =
-          if (fracNum == 0 && zeroes == 0) ""
-          else {
-            var n = 0
-            while (n < hashes && fracNum % 10 == 0 && fracNum != 0) {
-              fracNum /= 10
-              n += 1
+          val prefix = wholeBD.toBigInt.toString
+          val fracStr = fracBD.toBigInt.toString
+
+          val frac =
+            if (fracStr == "0" && zeroes == 0) ""
+            else {
+              val padded = Platform.repeatString("0", precision - fracStr.length) + fracStr
+              if (hashes > 0) {
+                var end = padded.length
+                var hashesLeft = hashes
+                while (end > 0 && hashesLeft > 0 && padded.charAt(end - 1) == '0') {
+                  end -= 1
+                  hashesLeft -= 1
+                }
+                padded.substring(0, end)
+              } else padded
             }
-            leftPad(fracNum, precision - n)
-          }
 
-        (precision, alternate) match {
-          case (0, false) => prefix
-          case (0, true)  => prefix + "."
-          case (_, _)     => if (frac.isEmpty) prefix else prefix + "." + frac
+          if (frac.isEmpty) prefix else prefix + "." + frac
         }
     }
   }
