@@ -494,7 +494,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.log(x) as a mathematical function.
      */
     builtin("log", "x") { (pos, ev, x: Double) =>
-      math.log(x)
+      val r = math.log(x)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.log2(x)]].
@@ -504,8 +506,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.log2(x) as a mathematical function.
      */
     builtin("log2", "x") { (pos, ev, x: Double) =>
-      // no scala log2, do our best without getting fancy with numerics
-      math.log(x) / math.log(2.0)
+      val r = math.log(x) / math.log(2.0)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.log10(x)]].
@@ -515,7 +518,9 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.log10(x) as a mathematical function.
      */
     builtin("log10", "x") { (pos, ev, x: Double) =>
-      math.log10(x)
+      val r = math.log10(x)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      r
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.exp(x)]].
