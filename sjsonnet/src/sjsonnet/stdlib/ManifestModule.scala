@@ -178,93 +178,109 @@ object ManifestModule extends AbstractFunctionModule {
         v: Val.Obj,
         cumulatedIndent: String,
         indent: String,
-        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): Boolean = {
-      val keys = v.sortedVisibleKeyNames
-      if (keys.length == 0) {
-        return false
-      }
-
-      // Resolve each field once and cache the result: the value is needed twice
-      // (to classify scalars vs sections, then to render). Iterating `keys` directly
-      // also skips the binary search that mapped `visibleKeyNames` back into `keys`.
-      val resolved = new Array[Val](keys.length)
-      val sectionFlags = new Array[Boolean](keys.length)
-      var keyIdx = 0
-      while (keyIdx < keys.length) {
-        val r = v.value(keys(keyIdx), v.pos)(ev)
-        resolved(keyIdx) = r
-        sectionFlags(keyIdx) = isSection(r)
-        keyIdx += 1
-      }
-
-      val renderer = new TomlRenderer(out, cumulatedIndent, indent)
-      var hasSimpleKV = false
-      keyIdx = 0
-      while (keyIdx < keys.length) {
-        if (!sectionFlags(keyIdx)) {
-          hasSimpleKV = true
-          out.write(cumulatedIndent)
-          TomlRenderer.writeEscapedKey(out, keys(keyIdx))
-          out.write(" = ")
-          Materializer.apply0(resolved(keyIdx), renderer)(ev)
+        path: mutable.ArrayBuffer[String],
+        depth: Int,
+        visited: java.util.IdentityHashMap[Val.Obj, java.lang.Boolean])(implicit
+        ev: EvalScope): Boolean = {
+      val maxDepth = ev.settings.maxMaterializeDepth
+      if (depth >= maxDepth)
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
+      if (visited.put(v, java.lang.Boolean.TRUE) ne null)
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
+      try {
+        val keys = v.sortedVisibleKeyNames
+        if (keys.length == 0) {
+          return false
         }
-        keyIdx += 1
-      }
-      // childIndent depends only on cumulatedIndent + indent, so compute it once
-      // instead of per section iteration.
-      val childIndent = cumulatedIndent + indent
-      var lastEndedWithNewline = hasSimpleKV
-      keyIdx = 0
-      while (keyIdx < keys.length) {
-        if (sectionFlags(keyIdx)) {
-          val k = keys(keyIdx)
-          val v0 = resolved(keyIdx)
-          path += k
-          v0 match {
-            case arr: Val.Arr =>
-              var i = 0
-              while (i < arr.length) {
-                if (i == 0) {
-                  if (lastEndedWithNewline) out.write('\n')
-                  else out.write("\n\n")
-                } else {
+
+        // Resolve each field once and cache the result: the value is needed twice
+        // (to classify scalars vs sections, then to render). Iterating `keys` directly
+        // also skips the binary search that mapped `visibleKeyNames` back into `keys`.
+        val resolved = new Array[Val](keys.length)
+        val sectionFlags = new Array[Boolean](keys.length)
+        var keyIdx = 0
+        while (keyIdx < keys.length) {
+          val r = v.value(keys(keyIdx), v.pos)(ev)
+          resolved(keyIdx) = r
+          sectionFlags(keyIdx) = isSection(r)
+          keyIdx += 1
+        }
+
+        val renderer = new TomlRenderer(out, cumulatedIndent, indent)
+        var hasSimpleKV = false
+        keyIdx = 0
+        while (keyIdx < keys.length) {
+          if (!sectionFlags(keyIdx)) {
+            hasSimpleKV = true
+            out.write(cumulatedIndent)
+            TomlRenderer.writeEscapedKey(out, keys(keyIdx))
+            out.write(" = ")
+            Materializer.apply0(resolved(keyIdx), renderer)(ev)
+          }
+          keyIdx += 1
+        }
+        // childIndent depends only on cumulatedIndent + indent, so compute it once
+        // instead of per section iteration.
+        val childIndent = cumulatedIndent + indent
+        var lastEndedWithNewline = hasSimpleKV
+        keyIdx = 0
+        while (keyIdx < keys.length) {
+          if (sectionFlags(keyIdx)) {
+            val k = keys(keyIdx)
+            val v0 = resolved(keyIdx)
+            path += k
+            v0 match {
+              case arr: Val.Arr =>
+                var i = 0
+                while (i < arr.length) {
+                  if (i == 0) {
+                    if (lastEndedWithNewline) out.write('\n')
+                    else out.write("\n\n")
+                  } else {
+                    out.write('\n')
+                  }
+                  out.write(cumulatedIndent)
+                  renderTableArrayHeader(out, path)
                   out.write('\n')
+                  renderTableInternal(
+                    out,
+                    arr.value(i).asObj,
+                    childIndent,
+                    indent,
+                    path,
+                    depth + 1,
+                    visited
+                  )
+                  i += 1
                 }
+                lastEndedWithNewline = true
+              case obj: Val.Obj =>
+                if (lastEndedWithNewline) out.write('\n')
+                else out.write("\n\n")
                 out.write(cumulatedIndent)
-                renderTableArrayHeader(out, path)
-                out.write('\n')
-                renderTableInternal(
+                renderTableHeader(out, path)
+                val childHasContent = obj.sortedVisibleKeyNames.nonEmpty
+                if (childHasContent) out.write('\n')
+                lastEndedWithNewline = renderTableInternal(
                   out,
-                  arr.value(i).asObj,
+                  obj,
                   childIndent,
                   indent,
-                  path
+                  path,
+                  depth + 1,
+                  visited
                 )
-                i += 1
-              }
-              lastEndedWithNewline = true
-            case obj: Val.Obj =>
-              if (lastEndedWithNewline) out.write('\n')
-              else out.write("\n\n")
-              out.write(cumulatedIndent)
-              renderTableHeader(out, path)
-              val childHasContent = obj.sortedVisibleKeyNames.nonEmpty
-              if (childHasContent) out.write('\n')
-              lastEndedWithNewline = renderTableInternal(
-                out,
-                obj,
-                childIndent,
-                indent,
-                path
-              )
-            case _ =>
-              ()
+              case _ =>
+                ()
+            }
+            path.remove(path.length - 1)
           }
-          path.remove(path.length - 1)
+          keyIdx += 1
         }
-        keyIdx += 1
+        keys.nonEmpty
+      } finally {
+        visited.remove(v)
       }
-      keys.nonEmpty
     }
 
     private def renderTableHeader(out: StringBuilderWriter, path: mutable.ArrayBuffer[String]) = {
@@ -288,7 +304,7 @@ object ManifestModule extends AbstractFunctionModule {
       out
     }
 
-    def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = try {
       // Pre-size at 1 KiB to skip the first ~6 doublings (16→1024) for typical TOML
       // outputs without overcommitting memory on small ones.
       val out = new StringBuilderWriter(1024)
@@ -297,9 +313,16 @@ object ManifestModule extends AbstractFunctionModule {
         v.value.asObj,
         "",
         indent.value.asString,
-        new mutable.ArrayBuffer[String](8)
+        new mutable.ArrayBuffer[String](8),
+        depth = 0,
+        visited = new java.util.IdentityHashMap[Val.Obj, java.lang.Boolean]()
       )(ev)
       Val.Str(pos, out.toString.stripTrailing())
+    } catch {
+      case _: StackOverflowError =>
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", pos)(ev)
+      case _: OutOfMemoryError =>
+        Error.fail("Out of memory while materializing, possibly due to recursive value", pos)(ev)
     }
   }
 
