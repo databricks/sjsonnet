@@ -1,0 +1,1 @@
+std.manifestYamlDoc({a: $})
