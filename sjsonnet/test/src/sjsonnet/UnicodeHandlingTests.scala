@@ -164,22 +164,19 @@ object UnicodeHandlingTests extends TestSuite {
       assert(sjsonnet.Util.compareStringsByCodepoint(rawSurrogatePrefix, validSurrogatePair) < 0)
       assert(sjsonnet.Util.compareStringsByCodepoint(validSurrogatePair, rawSurrogatePrefix) > 0)
 
-      eval("(std.char(55296) + std.char(65535)) < (std.char(55296) + std.char(56320))") ==>
-      ujson.Bool(true)
+      // std.char now replaces surrogates with U+FFFD (matching go-jsonnet)
+      eval("(std.char(55296) + std.char(65535)) == (std.char(55296) + std.char(56320))") ==>
+      ujson.Bool(false)
 
-      eval(
-        "std.sort([std.char(55296) + std.char(56320), std.char(55296) + std.char(65535)])"
-      ) ==> ujson.Arr(rawSurrogatePrefix, validSurrogatePair)
+      eval("std.char(55296)") ==> ujson.Str("\uFFFD")
     }
 
-    // Unpaired surrogate handling - sjsonnet-specific behavior
+    // Unpaired surrogate handling
     //
-    // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
+    // sjsonnet aligns with go-jsonnet:
     // - go/C++ reject unpaired surrogates in escape sequences at parse time
     // - go-jsonnet's std.char() replaces surrogate codepoints with U+FFFD
-    // - sjsonnet was preserving unpaired surrogates throughout
-    //
-    // sjsonnet now reject these to align with go-jsonet/ c++ jsonnet
+    // - sjsonnet now matches both behaviors
     //
 
     test("unpairedSurrogatesInEscapes") {
@@ -191,10 +188,10 @@ object UnicodeHandlingTests extends TestSuite {
       eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
     }
 
-    test("stdCharPreservesRawSurrogates") {
-      // sjsonnet preserves raw surrogate codepoints (go-jsonnet would replace with U+FFFD)
-      eval("std.codepoint(std.char(55296))") ==> ujson.Num(55296) // 0xD800 high surrogate
-      eval("std.codepoint(std.char(56320))") ==> ujson.Num(56320) // 0xDC00 low surrogate
+    test("stdCharReplacesSurrogates") {
+      // std.char() replaces surrogate codepoints with U+FFFD (matching go-jsonnet)
+      eval("std.codepoint(std.char(55296))") ==> ujson.Num(65533) // 0xD800 → U+FFFD
+      eval("std.codepoint(std.char(56320))") ==> ujson.Num(65533) // 0xDC00 → U+FFFD
     }
 
     test("invalidSurrogateHandling") {

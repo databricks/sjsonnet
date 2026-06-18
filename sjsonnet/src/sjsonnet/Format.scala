@@ -720,7 +720,8 @@ object Format {
                     Error.fail("Codepoints must be >= 0, got " + codePoint)
                   if (codePoint > 0x10ffff)
                     Error.fail("Invalid unicode codepoint, got " + codePoint)
-                  widenRaw(formatted, Character.toString(codePoint))
+                  val c = if (codePoint >= 0xd800 && codePoint <= 0xdfff) 0xfffd else codePoint
+                  widenRaw(formatted, Character.toString(c))
                 case 's' =>
                   widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
