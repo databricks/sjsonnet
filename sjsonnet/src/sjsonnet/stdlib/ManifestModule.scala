@@ -583,6 +583,10 @@ object ManifestModule extends AbstractFunctionModule {
                 // decimal point and trailing zero
                 case (k, ujson.Num(v)) => attr(k) := ujson.write(v)
 
+                case (k, ujson.True)  => attr(k) := "true"
+                case (k, ujson.False) => attr(k) := "false"
+                case (k, ujson.Null)  => attr(k) := "null"
+
                 case (k, v) => Error.fail("Cannot call manifestXmlJsonml on " + v.getClass)
               }.toSeq,
               children.map(rec)
