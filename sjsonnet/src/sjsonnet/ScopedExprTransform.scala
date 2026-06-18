@@ -37,7 +37,7 @@ class ScopedExprTransform extends ExprTransform {
     case Function(pos, params, body) =>
       nestedNames(params.names)(rec(e))
 
-    case ObjComp(pos, preLocals, key, value, plus, postLocals, first, rest) =>
+    case ObjComp(pos, preLocals, key, value, plus, visibility, postLocals, first, rest) =>
       val (f2 :: r2, (k2, (pre2, post2, v2))) = compSpecs(
         first :: rest,
         { () =>
@@ -55,7 +55,7 @@ class ScopedExprTransform extends ExprTransform {
           rest
         ).zipped.forall(_ eq _): @nowarn
       ) e
-      else ObjComp(pos, pre2, k2, v2, plus, post2, f2.asInstanceOf[ForSpec], r2)
+      else ObjComp(pos, pre2, k2, v2, plus, visibility, post2, f2.asInstanceOf[ForSpec], r2)
 
     case Comp(pos, value, first, rest) =>
       val (f2 :: r2, v2) = compSpecs(first :: rest.toList, () => transform(value)): @unchecked

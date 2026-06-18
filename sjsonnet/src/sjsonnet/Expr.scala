@@ -458,6 +458,7 @@ object Expr {
         key: Expr,
         value: Expr,
         plus: Boolean, // see https://jsonnet.org/ref/language.html#nested-field-inheritance
+        visibility: Member.Visibility,
         postLocals: Array[Bind],
         first: ForSpec,
         rest: List[CompSpec])
