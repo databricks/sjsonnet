@@ -31,17 +31,23 @@ object JsonImportFastPathTests extends TestSuite {
     test("strict json imports produce normal Jsonnet values") {
       val files = Map(
         "data.json" ->
-          """{"a":[1,true,null],"b":{"c":"d"},"n":9.007199254740992E15}"""
+        """{"a":[1,true,null],"b":{"c":"d"},"n":9.007199254740992E15}"""
       )
 
       eval(files, """import "data.json"""") ==>
-      Right(ujson.Obj("a" -> ujson.Arr(1, true, ujson.Null), "b" -> ujson.Obj("c" -> "d"), "n" -> 9.007199254740992E15))
+      Right(
+        ujson.Obj(
+          "a" -> ujson.Arr(1, true, ujson.Null),
+          "b" -> ujson.Obj("c" -> "d"),
+          "n" -> 9.007199254740992e15
+        )
+      )
     }
 
     test("invalid json can still fall back to Jsonnet syntax") {
       val files = Map(
         "loose.json" ->
-          """// Valid Jsonnet, invalid strict JSON.
+        """// Valid Jsonnet, invalid strict JSON.
             |{
             |  a: 1,
             |}
@@ -66,7 +72,7 @@ object JsonImportFastPathTests extends TestSuite {
       val files = Map("large-int.json" -> """{"n":18446744073709551615}""")
 
       eval(files, """import "large-int.json"""") ==>
-      Right(ujson.Obj("n" -> 1.8446744073709552E19))
+      Right(ujson.Obj("n" -> 1.8446744073709552e19))
     }
 
     test("non-finite json numbers keep Jsonnet parser errors") {

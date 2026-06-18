@@ -20,7 +20,9 @@ object Std0150FunctionsTests extends TestSuite {
       assert(evalErr("""std.clamp(true, false, true)""").contains("booleans"))
       assert(evalErr("""std.clamp(1, "a", 2)""").contains("requires matching types"))
       assert(evalErr("""std.clamp([true], [true], [true])""").contains("boolean"))
-      assert(evalErr("""local p = [true]; std.clamp(p + [1], p + [0], p + [2])""").contains("boolean"))
+      assert(
+        evalErr("""local p = [true]; std.clamp(p + [1], p + [0], p + [2])""").contains("boolean")
+      )
     }
     test("member") {
       eval("std.member('foo', 'o')") ==> ujson.True
@@ -80,7 +82,9 @@ object Std0150FunctionsTests extends TestSuite {
 
     test("splitLimitR edge cases") {
       val bulb = new String(Character.toChars(0x1f4a1))
-      eval("""std.splitLimitR("a" + std.char(128161) + "b" + std.char(128161) + "c", std.char(128161), 1)""") ==>
+      eval(
+        """std.splitLimitR("a" + std.char(128161) + "b" + std.char(128161) + "c", std.char(128161), 1)"""
+      ) ==>
       ujson.Arr("a" + bulb + "b", "c")
       eval("""std.splitLimitR("abc", ",", 3)""") ==> ujson.Arr("abc")
       eval("""std.splitLimitR("a,b,", ",", 1)""") ==> ujson.Arr("a,b", "")

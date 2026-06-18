@@ -58,6 +58,11 @@ object SetModule extends AbstractFunctionModule {
   @inline private def isIdentityKeyF(v: Val): Boolean =
     v == null || isDefaultKeyF(v) || (v.isInstanceOf[Val.Func] && v.asFunc.isIdentityFunction)
 
+  private def validateKeyF(keyF: Val, pos: Position)(implicit ev: EvalErrorScope): Unit = {
+    if (!isDefaultKeyF(keyF) && !keyF.isInstanceOf[Val.Func])
+      Error.fail("keyF must be a function, got " + keyF.prettyName, pos)
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-set std.set(arr, keyF=id)]].
    *
@@ -67,7 +72,9 @@ object SetModule extends AbstractFunctionModule {
    */
   private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, DefaultKeyF)) {
     def evalRhs(arr: Eval, keyF: Eval, ev: EvalScope, pos: Position): Val = {
-      uniqArr(pos, ev, sortArr(pos, ev, arr.value, keyF.value), keyF.value)
+      val kf = keyF.value
+      validateKeyF(kf, pos)(ev)
+      uniqArr(pos, ev, sortArr(pos, ev, arr.value, kf), kf)
     }
   }
 
@@ -491,6 +498,7 @@ object SetModule extends AbstractFunctionModule {
      * array element. Default value is identity function keyF=function(x) x.
      */
     builtinWithDefaults("uniq", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
+      validateKeyF(args(1), pos)(ev)
       uniqArr(pos, ev, args(0), args(1))
     },
     /**
@@ -504,6 +512,7 @@ object SetModule extends AbstractFunctionModule {
      * array element. Default value is identity function keyF=function(x) x.
      */
     builtinWithDefaults("sort", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
+      validateKeyF(args(1), pos)(ev)
       sortArr(pos, ev, args(0), args(1))
     },
     /**
@@ -518,6 +527,7 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
+        validateKeyF(keyF, pos)(ev)
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
@@ -584,6 +594,7 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
+        validateKeyF(keyF, pos)(ev)
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
@@ -635,6 +646,7 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
+        validateKeyF(keyF, pos)(ev)
         validateSet(ev, pos, keyF, args(0))
         validateSet(ev, pos, keyF, args(1))
 
@@ -694,6 +706,7 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
+        validateKeyF(keyF, pos)(ev)
         validateSet(ev, pos, keyF, args(1))
         val arr = toArrOrString(args(1), pos, ev)
         existsInSet(ev, pos, keyF, arr, args(0))
