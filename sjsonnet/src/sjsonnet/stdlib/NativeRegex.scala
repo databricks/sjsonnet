@@ -26,7 +26,11 @@ object NativeRegex extends AbstractFunctionModule {
 
       Val.Obj.mk(
         pos.noOffset,
-        "string" -> new Obj.ConstMember(true, Visibility.Normal, Val.Str(pos.noOffset, str)),
+        "string" -> new Obj.ConstMember(
+          true,
+          Visibility.Normal,
+          Val.Str(pos.noOffset, str.substring(matcher.start(), matcher.end()))
+        ),
         "captures" -> new Obj.ConstMember(
           true,
           Visibility.Normal,

@@ -34,7 +34,7 @@ std.assertEqual(std.native('regexPartialMatch')(@'world', 'hello'), null) &&
 std.assertEqual(
   std.native('regexPartialMatch')(@'e', 'hello'),
   {
-    string: 'hello',
+    string: 'e',
     captures: [],
     namedCaptures: {},
   }
@@ -43,7 +43,7 @@ std.assertEqual(
 std.assertEqual(
   std.native('regexPartialMatch')(@'e(.*)o', 'hello'),
   {
-    string: 'hello',
+    string: 'ello',
     captures: ['ll'],
     namedCaptures: {},
   }
@@ -52,7 +52,7 @@ std.assertEqual(
 std.assertEqual(
   std.native('regexPartialMatch')(@'e(?P<mid>.*)o', 'hello'),
   {
-    string: 'hello',
+    string: 'ello',
     captures: ['ll'],
     namedCaptures: {
       mid: 'll',
