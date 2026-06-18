@@ -594,10 +594,17 @@ object ArrayModule extends AbstractFunctionModule {
    *
    * Return an array of ascending numbers between the two limits, inclusively.
    */
+  private def requireInt(v: Val, name: String, pos: Position)(implicit ev: EvalErrorScope): Int = {
+    val d = v.asDouble
+    if (d.isNaN || d.isInfinite || Math.floor(d) != d)
+      Error.fail(s"std.range $name must be an integer, got $d", pos)
+    d.toInt
+  }
+
   private object Range extends Val.Builtin2("range", "from", "to") {
     def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
-      val fromInt = from.value.asInt
-      val toInt = to.value.asInt
+      val fromInt = requireInt(from.value, "from", pos)(ev)
+      val toInt = requireInt(to.value, "to", pos)(ev)
       // Use Long arithmetic to detect overflow before allocating
       val sizeLong = toInt.toLong - fromInt.toLong + 1L
       val size =
