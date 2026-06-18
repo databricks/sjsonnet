@@ -163,23 +163,17 @@ object UnicodeHandlingTests extends TestSuite {
 
       assert(sjsonnet.Util.compareStringsByCodepoint(rawSurrogatePrefix, validSurrogatePair) < 0)
       assert(sjsonnet.Util.compareStringsByCodepoint(validSurrogatePair, rawSurrogatePrefix) > 0)
-
-      eval("(std.char(55296) + std.char(65535)) < (std.char(55296) + std.char(56320))") ==>
-      ujson.Bool(true)
-
-      eval(
-        "std.sort([std.char(55296) + std.char(56320), std.char(55296) + std.char(65535)])"
-      ) ==> ujson.Arr(rawSurrogatePrefix, validSurrogatePair)
     }
 
-    // Unpaired surrogate handling - sjsonnet-specific behavior
+    // Unpaired surrogate handling
     //
-    // Note: This is an intentional divergence from go-jsonnet and C++ jsonnet:
-    // - go/C++ reject unpaired surrogates in escape sequences at parse time
-    // - go-jsonnet's std.char() replaces surrogate codepoints with U+FFFD
-    // - sjsonnet was preserving unpaired surrogates throughout
+    // Note: The three reference implementations diverge on surrogate codepoints:
+    // - go-jsonnet replaces surrogates with U+FFFD
+    // - jsonnet-cpp preserves raw surrogates
+    // - jrsonnet rejects surrogates with an error
     //
-    // sjsonnet now reject these to align with go-jsonet/ c++ jsonnet
+    // sjsonnet rejects surrogates with an error (matching jrsonnet),
+    // since surrogates are not valid Unicode codepoints per the Unicode spec.
     //
 
     test("unpairedSurrogatesInEscapes") {
@@ -191,10 +185,10 @@ object UnicodeHandlingTests extends TestSuite {
       eval("\"\\uD83C\\uDF0D\"") ==> ujson.Str("🌍") // Earth emoji
     }
 
-    test("stdCharPreservesRawSurrogates") {
-      // sjsonnet preserves raw surrogate codepoints (go-jsonnet would replace with U+FFFD)
-      eval("std.codepoint(std.char(55296))") ==> ujson.Num(55296) // 0xD800 high surrogate
-      eval("std.codepoint(std.char(56320))") ==> ujson.Num(56320) // 0xDC00 low surrogate
+    test("stdCharRejectsSurrogates") {
+      evalErr("std.char(55296)").contains("Invalid unicode code point") // 0xD800
+      evalErr("std.char(56320)").contains("Invalid unicode code point") // 0xDC00
+      evalErr("std.char(57343)").contains("Invalid unicode code point") // 0xDFFF
     }
 
     test("invalidSurrogateHandling") {
