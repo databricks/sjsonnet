@@ -181,8 +181,8 @@ object ArrayModule extends AbstractFunctionModule {
       val arr = args(0).value.asArr
       val keyF = args(1).value
       validateKeyF(keyF, pos)(ev)
-      val onEmpty = args(2).value
       if (arr.length == 0) {
+        val onEmpty = args(2).value
         if (isDefaultOnEmpty(onEmpty)) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
@@ -228,8 +228,8 @@ object ArrayModule extends AbstractFunctionModule {
       val arr = args(0).value.asArr
       val keyF = args(1).value
       validateKeyF(keyF, pos)(ev)
-      val onEmpty = args(2).value
       if (arr.length == 0) {
+        val onEmpty = args(2).value
         if (isDefaultOnEmpty(onEmpty)) {
           Error.fail("Expected at least one element in array. Got none")
         } else {
