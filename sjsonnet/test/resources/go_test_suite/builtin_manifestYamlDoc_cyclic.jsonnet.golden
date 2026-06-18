@@ -1,0 +1,4 @@
+sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
+    at [std.manifestYamlDoc].(builtin_manifestYamlDoc_cyclic.jsonnet:1:21)
+    at [<root>].(builtin_manifestYamlDoc_cyclic.jsonnet:1:20)
+

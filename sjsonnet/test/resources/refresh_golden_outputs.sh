@@ -28,6 +28,8 @@ if [ $# -gt 0 ]; then
     fi
 
     java $JAVA_OPTS -jar "$SJSONNET" $PARAMS $EXT_PARAMS $TLA_PARAMS "$f" > "$f.golden" 2>&1 || true
+    # Strip Java runtime WARNING lines (e.g. sun.misc.Unsafe deprecation)
+    sed -i '' '/^WARNING:/d' "$f.golden"
   done
   popd || exit 1
   echo "Done refreshing specified golden outputs."
@@ -52,6 +54,8 @@ for f in *.jsonnet; do
   fi
 
   java $JAVA_OPTS -jar "$SJSONNET" $PARAMS $EXT_PARAMS $TLA_PARAMS "$f" > "$f.golden" 2>&1 || true
+  # Strip Java runtime WARNING lines (e.g. sun.misc.Unsafe deprecation)
+  sed -i '' '/^WARNING:/d' "$f.golden"
 done
 popd || exit 1
 
@@ -64,6 +68,8 @@ for f in *.jsonnet; do
 
   echo "  Processing file: $f"
   java $JAVA_OPTS -jar "$SJSONNET" $PARAMS "$f" > "$f.golden" 2>&1 || true
+  # Strip Java runtime WARNING lines (e.g. sun.misc.Unsafe deprecation)
+  sed -i '' '/^WARNING:/d' "$f.golden"
 done
 popd || exit 1
 
@@ -76,6 +82,8 @@ for f in *.jsonnet; do
 
   echo "  Processing file: $f"
   java $JAVA_OPTS -jar "$SJSONNET" $PARAMS "$f" > "$f.golden" 2>&1 || true
+  # Strip Java runtime WARNING lines (e.g. sun.misc.Unsafe deprecation)
+  sed -i '' '/^WARNING:/d' "$f.golden"
 done
 popd || exit 1
 

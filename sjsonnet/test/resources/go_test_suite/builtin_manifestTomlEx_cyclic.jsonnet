@@ -1,0 +1,1 @@
+std.manifestTomlEx({a: {b: $}}, " ")

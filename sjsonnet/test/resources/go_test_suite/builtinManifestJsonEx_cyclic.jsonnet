@@ -1,0 +1,1 @@
+std.manifestJsonEx({a: $}, " ")

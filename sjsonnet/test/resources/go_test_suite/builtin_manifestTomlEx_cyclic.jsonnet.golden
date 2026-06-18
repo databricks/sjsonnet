@@ -1,0 +1,4 @@
+sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
+    at [std.manifestTomlEx].(builtin_manifestTomlEx_cyclic.jsonnet:1:20)
+    at [<root>].(builtin_manifestTomlEx_cyclic.jsonnet:1:19)
+

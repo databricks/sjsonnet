@@ -178,7 +178,16 @@ object ManifestModule extends AbstractFunctionModule {
         v: Val.Obj,
         cumulatedIndent: String,
         indent: String,
-        path: mutable.ArrayBuffer[String])(implicit ev: EvalScope): Boolean = {
+        path: mutable.ArrayBuffer[String],
+        depth: Int,
+        visited: java.util.IdentityHashMap[Val.Obj, java.lang.Boolean])(implicit
+        ev: EvalScope): Boolean = {
+      val maxDepth = ev.settings.maxMaterializeDepth
+      if (depth >= maxDepth)
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
+      if (visited.put(v, java.lang.Boolean.TRUE) ne null)
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", v.pos)
+      try {
       val keys = v.sortedVisibleKeyNames
       if (keys.length == 0) {
         return false
@@ -238,7 +247,9 @@ object ManifestModule extends AbstractFunctionModule {
                   arr.value(i).asObj,
                   childIndent,
                   indent,
-                  path
+                  path,
+                  depth + 1,
+                  visited
                 )
                 i += 1
               }
@@ -255,7 +266,9 @@ object ManifestModule extends AbstractFunctionModule {
                 obj,
                 childIndent,
                 indent,
-                path
+                path,
+                depth + 1,
+                visited
               )
             case _ =>
               ()
@@ -265,6 +278,9 @@ object ManifestModule extends AbstractFunctionModule {
         keyIdx += 1
       }
       keys.nonEmpty
+      } finally {
+        visited.remove(v)
+      }
     }
 
     private def renderTableHeader(out: StringBuilderWriter, path: mutable.ArrayBuffer[String]) = {
@@ -288,7 +304,7 @@ object ManifestModule extends AbstractFunctionModule {
       out
     }
 
-    def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = {
+    def evalRhs(v: Eval, indent: Eval, ev: EvalScope, pos: Position): Val = try {
       // Pre-size at 1 KiB to skip the first ~6 doublings (16→1024) for typical TOML
       // outputs without overcommitting memory on small ones.
       val out = new StringBuilderWriter(1024)
@@ -297,9 +313,16 @@ object ManifestModule extends AbstractFunctionModule {
         v.value.asObj,
         "",
         indent.value.asString,
-        new mutable.ArrayBuffer[String](8)
+        new mutable.ArrayBuffer[String](8),
+        depth = 0,
+        visited = new java.util.IdentityHashMap[Val.Obj, java.lang.Boolean]()
       )(ev)
       Val.Str(pos, out.toString.stripTrailing())
+    } catch {
+      case _: StackOverflowError =>
+        Error.fail("Stackoverflow while materializing, possibly due to recursive value", pos)(ev)
+      case _: OutOfMemoryError =>
+        Error.fail("Out of memory while materializing, possibly due to recursive value", pos)(ev)
     }
   }
 
