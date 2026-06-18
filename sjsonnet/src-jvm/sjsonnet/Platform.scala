@@ -73,7 +73,7 @@ object Platform {
     xzBytes(s.getBytes(UTF_8), compressionLevel)
   }
 
-  private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7]+")
+  private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7][0-7_]*")
 
   private def yamlNodeToJson(node: Node): ujson.Value = node match {
     case sn: ScalarNode =>
@@ -85,7 +85,7 @@ object Platform {
         val negative = value.charAt(0) == '-'
         val octalPart =
           if (negative || value.charAt(0) == '+') value.substring(3) else value.substring(2)
-        val result = java.lang.Long.parseUnsignedLong(octalPart, 8)
+        val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
         val signed = if (negative) -result else result
         ujson.Num(signed.toDouble)
       } else if (tag == Tag.INT) {
@@ -96,7 +96,7 @@ object Platform {
             val hex =
               if (negative || cleaned.startsWith("+")) cleaned.substring(3)
               else cleaned.substring(2)
-            val v = java.lang.Long.parseUnsignedLong(hex, 16)
+            val v = java.lang.Long.parseLong(hex, 16)
             if (negative) -v else v
           } else if (
             cleaned.startsWith("0b") || cleaned.startsWith("-0b") || cleaned.startsWith("+0b")
@@ -105,12 +105,12 @@ object Platform {
             val bin =
               if (negative || cleaned.startsWith("+")) cleaned.substring(3)
               else cleaned.substring(2)
-            val v = java.lang.Long.parseUnsignedLong(bin, 2)
+            val v = java.lang.Long.parseLong(bin, 2)
             if (negative) -v else v
           } else if (cleaned.length > 1 && cleaned.startsWith("0") && !cleaned.contains(".")) {
             val negative = cleaned.startsWith("-")
             val oct = if (negative || cleaned.startsWith("+")) cleaned.substring(1) else cleaned
-            val v = java.lang.Long.parseUnsignedLong(oct, 8)
+            val v = java.lang.Long.parseLong(oct, 8)
             if (negative) -v else v
           } else if (cleaned.contains(":")) {
             val parts = cleaned.split(":")
@@ -122,8 +122,9 @@ object Platform {
       } else if (tag == Tag.FLOAT) {
         val cleaned = value.replace("_", "")
         val result = cleaned match {
-          case ".inf" | ".Inf" | ".INF"    => Double.PositiveInfinity
-          case "-.inf" | "-.Inf" | "-.INF" => Double.NegativeInfinity
+          case ".inf" | ".Inf" | ".INF"                => Double.PositiveInfinity
+          case "+.inf" | "+.Inf" | "+.INF"             => Double.PositiveInfinity
+          case "-.inf" | "-.Inf" | "-.INF"             => Double.NegativeInfinity
           case ".nan" | ".NaN" | ".NAN"    => Double.NaN
           case s if s.contains(":")        =>
             s.split(":").foldLeft(0.0)((acc, p) => acc * 60 + p.trim.toDouble)
