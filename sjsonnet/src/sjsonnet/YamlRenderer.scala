@@ -46,13 +46,18 @@ class YamlRenderer(
       elemBuilder.append('"')
       elemBuilder.append('"')
     } else if (s.charAt(len - 1) == '\n') {
-      val splits = YamlRenderer.newlinePattern.split(s.toString)
-      elemBuilder.append('|')
+      val str = s.toString
+      val splits = YamlRenderer.newlinePattern.split(str, -1)
+      val blockOffsetNumeral = if (str.charAt(0) != ' ') "" else indent
+      val (blockStyle, dropRight) =
+        if (len > 1 && str.charAt(len - 2) == '\n') (s"|${blockOffsetNumeral}+", 1)
+        else (s"|${blockOffsetNumeral}", 1)
+      appendString(blockStyle)
       depth += 1
-      splits.foreach { split =>
+      splits.dropRight(dropRight).foreach { split =>
         newlineBuffered = true
         flushBuffer()
-        appendString(split) // TODO escaping?
+        appendString(split)
       }
       depth -= 1
     } else {

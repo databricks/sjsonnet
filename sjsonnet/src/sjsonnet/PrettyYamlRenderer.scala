@@ -278,7 +278,7 @@ object PrettyYamlRenderer {
     val splits = YamlRenderer.newlinePattern.split(str, -1)
     val blockOffsetNumeral = if (str.charAt(0) != ' ') "" else indent
     val (blockStyle, dropRight) =
-      (str.charAt(len - 1), if (len > 2) Some(str.charAt(len - 2)) else None) match {
+      (str.charAt(len - 1), if (len > 1) Some(str.charAt(len - 2)) else None) match {
         case ('\n', Some('\n')) => (s"|$blockOffsetNumeral+", 1)
         case ('\n', _)          => (s"|$blockOffsetNumeral", 1)
         case (_, _)             => (s"|$blockOffsetNumeral-", 0)
