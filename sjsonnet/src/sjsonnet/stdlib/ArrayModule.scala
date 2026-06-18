@@ -1081,12 +1081,12 @@ object ArrayModule extends AbstractFunctionModule {
         case n: Val.Num =>
           val d = n.asDouble
           if (!d.isWhole)
-            Error.fail("std.removeAt: idx must be an integer, got " + d, pos)(ev)
+            Error.fail("idx must be an integer, got " + d, pos)(ev)
           if (d < 0 || d >= arr.length)
-            Error.fail("std.removeAt: idx out of bounds", pos)(ev)
+            Error.fail("idx out of bounds", pos)(ev)
           d.toInt
         case _ =>
-          Error.fail("std.removeAt: idx must be a number, got " + idx.value.prettyName, pos)(ev)
+          Error.fail("idx must be a number, got " + idx.value.prettyName, pos)(ev)
       }
       removeAtView(arr, removeIdx)
     },

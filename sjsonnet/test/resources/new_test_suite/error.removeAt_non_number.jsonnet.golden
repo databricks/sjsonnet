@@ -1,1 +1,1 @@
-sjsonnet.Error: [std.removeAt] std.removeAt: idx must be a number, got string
+sjsonnet.Error: [std.removeAt] idx must be a number, got string
