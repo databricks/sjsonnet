@@ -72,12 +72,16 @@ object Std0150FunctionsTests extends TestSuite {
     }
 
     test("splitLimit negative maxsplits") {
-      eval("""std.splitLimit("a,b,c", ",", -2)""") ==> ujson.Arr("a", "b", "c")
-      eval("""std.splitLimit("a,b,c", ",", -2.5)""") ==> ujson.Arr("a", "b", "c")
-      eval("""std.splitLimitR("a,b,c", ",", -2)""") ==> ujson.Arr("a", "b", "c")
-      eval("""std.splitLimitR("a,b,c", ",", -2.5)""") ==> ujson.Arr("a", "b", "c")
-      eval("""std.splitLimit("a,b,c", ",", 1.5)""") ==> ujson.Arr("a", "b,c")
-      eval("""std.splitLimitR("a,b,c", ",", 1.5)""") ==> ujson.Arr("a,b", "c")
+      assert(
+        evalErr("""std.splitLimit("a,b,c", ",", -2)""").contains("should be -1 or non-negative")
+      )
+      assert(evalErr("""std.splitLimit("a,b,c", ",", -2.5)""").contains("must be an integer"))
+      assert(
+        evalErr("""std.splitLimitR("a,b,c", ",", -2)""").contains("should be -1 or non-negative")
+      )
+      assert(evalErr("""std.splitLimitR("a,b,c", ",", -2.5)""").contains("must be an integer"))
+      assert(evalErr("""std.splitLimit("a,b,c", ",", 1.5)""").contains("must be an integer"))
+      assert(evalErr("""std.splitLimitR("a,b,c", ",", 1.5)""").contains("must be an integer"))
     }
 
     test("splitLimitR edge cases") {
@@ -91,7 +95,9 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.splitLimitR("::a::", "::", 1)""") ==> ujson.Arr("::a", "")
       eval("""std.splitLimitR("aaaa", "aa", 1)""") ==> ujson.Arr("aa", "")
       eval("""std.splitLimitR("aaa", "aa", -1)""") ==> ujson.Arr("", "a")
-      eval("""std.splitLimitR("aaa", "aa", -2)""") ==> ujson.Arr("a", "")
+      assert(
+        evalErr("""std.splitLimitR("aaa", "aa", -2)""").contains("should be -1 or non-negative")
+      )
       eval("""std.splitLimit("a::b::c", "::", 1)""") ==> ujson.Arr("a", "b::c")
       eval("""std.splitLimitR("a::b::c", "::", 1)""") ==> ujson.Arr("a::b", "c")
     }
