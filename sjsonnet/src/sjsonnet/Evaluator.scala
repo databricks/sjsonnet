@@ -724,11 +724,14 @@ class Evaluator(
       case Expr.BinaryOp.OP_/ =>
         if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld / rd
+        if (r.isNaN) Error.fail("not a number", pos)
         if (r.isInfinite) Error.fail("overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_% =>
         if (rd == 0) Error.fail("Division by zero.", pos)
-        Val.cachedNum(pos, ld % rd)
+        val r = ld % rd
+        if (r.isNaN) Error.fail("not a number", pos)
+        Val.cachedNum(pos, r)
       // Use position-free static singletons for boolean results — this method is only called
       // from comprehension fast paths where position info on boolean results is unnecessary.
       // Avoids 1 object allocation per comparison in inner loops (significant for 1M+ iterations).
