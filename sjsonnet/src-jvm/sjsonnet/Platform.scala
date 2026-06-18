@@ -165,14 +165,18 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
+  private val YamlDocStartPattern =
+    java.util.regex.Pattern.compile("\\A\\s*---(?:[ \\t\\n\\r]|\\z)")
+
   def yamlToJson(yamlString: String): ujson.Value = {
     try {
       val yaml = new Yaml(new LoaderOptions())
       val docs = yaml.composeAll(new java.io.StringReader(yamlString)).asScala.toSeq
+      val hasExplicitDocStart = YamlDocStartPattern.matcher(yamlString).find()
       docs.size match {
-        case 0 => ujson.Null
-        case 1 => yamlNodeToJson(docs.head)
-        case _ =>
+        case 0                         => ujson.Null
+        case 1 if !hasExplicitDocStart => yamlNodeToJson(docs.head)
+        case _                         =>
           val buf = new mutable.ArrayBuffer[ujson.Value](docs.size)
           for (doc <- docs) {
             buf += yamlNodeToJson(doc)

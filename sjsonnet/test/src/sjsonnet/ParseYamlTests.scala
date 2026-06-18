@@ -46,12 +46,12 @@ object ParseYamlTests extends TestSuite {
     }
     test {
       // Scalar documents can start on the same line as the document-start marker
-      // "--- 3" as standalone
-      eval("std.parseYaml('--- 3\\n')") ==> ujson.Value("""3""")
+      // "--- 3" as standalone (explicit doc start → always array)
+      eval("std.parseYaml('--- 3\\n')") ==> ujson.Value("""[3]""")
     }
     test {
-      // Folded scalar as document
-      eval("std.parseYaml('--- >\\n  hello\\n  world\\n')") ==> ujson.Value(""""hello world\n"""")
+      // Folded scalar as document (explicit doc start → always array)
+      eval("std.parseYaml('--- >\\n  hello\\n  world\\n')") ==> ujson.Value("""["hello world\n"]""")
     }
     test {
       // Combined: scalar docs on same line as marker
@@ -66,8 +66,8 @@ object ParseYamlTests extends TestSuite {
       )
     }
     test {
-      // Bare document separator
-      eval("""std.parseYaml("---")""") ==> ujson.Value("""null""")
+      // Bare document separator → explicit doc start, always returns array
+      eval("""std.parseYaml("---")""") ==> ujson.Value("""[null]""")
     }
     test {
       // Folded scalar without document marker (directly)
