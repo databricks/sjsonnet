@@ -79,27 +79,14 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
       assert(evalErr("""std.maxArray([null])""").contains("null"))
     }
 
-    test("set keyF defaults do not collide with explicit false") {
-      eval(
-        """{
-          |  sortOne: std.sort([1], keyF=false),
-          |  uniqOne: std.uniq([1], keyF=false),
-          |  setOne: std.set([1], keyF=false),
-          |  setUnionEmpty: std.setUnion([], [1], keyF=false),
-          |  setInterEmpty: std.setInter([], [1], keyF=false),
-          |  setDiffEmpty: std.setDiff([], [1], keyF=false),
-          |  setMemberEmpty: std.setMember(1, [], keyF=false),
-          |}
-          |""".stripMargin
-      ) ==> ujson.Obj(
-        "sortOne" -> ujson.Arr(1),
-        "uniqOne" -> ujson.Arr(1),
-        "setOne" -> ujson.Arr(1),
-        "setUnionEmpty" -> ujson.Arr(1),
-        "setInterEmpty" -> ujson.Arr(),
-        "setDiffEmpty" -> ujson.Arr(),
-        "setMemberEmpty" -> ujson.False
-      )
+    test("set keyF rejects non-function values") {
+      assert(evalErr("""std.sort([1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.uniq([1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.set([1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.setUnion([], [1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.setInter([], [1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.setDiff([], [1], keyF=false)""").contains("function"))
+      assert(evalErr("""std.setMember(1, [], keyF=false)""").contains("function"))
       assert(evalErr("""std.sort([2, 1], keyF=false)""").contains("boolean"))
       assert(evalErr("""std.uniq([1, 1], keyF=false)""").contains("boolean"))
       assert(evalErr("""std.setUnion([1], [2], keyF=false)""").contains("boolean"))

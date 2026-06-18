@@ -1,0 +1,1 @@
+std.sort([], keyF=null)

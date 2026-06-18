@@ -27,7 +27,7 @@ object JsonImportFastPathJvmTests extends TestSuite {
     test("strict json imports can be shared by concurrent interpreters") {
       val files = Map(
         "data.json" ->
-          """{"a":{"b":[1,2,3]},"arr":[{"x":"one"},{"x":"two"}],"z":true}"""
+        """{"a":{"b":[1,2,3]},"arr":[{"x":"one"},{"x":"two"}],"z":true}"""
       )
       val importer = new Importer {
         def resolve(docBase: Path, importName: String): Option[Path] =
@@ -47,12 +47,12 @@ object JsonImportFastPathJvmTests extends TestSuite {
       val expected = Right(
         ujson.Obj(
           "whole" -> ujson.Obj(
-            "a"   -> ujson.Obj("b" -> ujson.Arr(1, 2, 3)),
+            "a" -> ujson.Obj("b" -> ujson.Arr(1, 2, 3)),
             "arr" -> ujson.Arr(ujson.Obj("x" -> "one"), ujson.Obj("x" -> "two")),
-            "z"   -> true
+            "z" -> true
           ),
-          "pick"         -> "two",
-          "fields"       -> ujson.Arr("a", "arr", "z"),
+          "pick" -> "two",
+          "fields" -> ujson.Arr("a", "arr", "z"),
           "singleFields" -> ujson.Arr("b")
         )
       )

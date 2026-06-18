@@ -47,6 +47,11 @@ object ArrayModule extends AbstractFunctionModule {
   @inline private def isDefaultOnEmpty(v: Val): Boolean =
     v.asInstanceOf[AnyRef] eq DefaultOnEmpty
 
+  private def validateKeyF(keyF: Val, pos: Position)(implicit ev: EvalErrorScope): Unit = {
+    if (!isDefaultKeyF(keyF) && !keyF.isInstanceOf[Val.Func])
+      Error.fail("keyF must be a function, got " + keyF.prettyName, pos)
+  }
+
   private def applyArrayKey(keyF: Val, elem: Val, pos: Position, ev: EvalScope): Val =
     if (isDefaultKeyF(keyF)) elem
     else keyF.asFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled)
@@ -175,6 +180,7 @@ object ArrayModule extends AbstractFunctionModule {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
+      validateKeyF(keyF, pos)(ev)
       val onEmpty = args(2).value
       if (arr.length == 0) {
         if (isDefaultOnEmpty(onEmpty)) {
@@ -221,6 +227,7 @@ object ArrayModule extends AbstractFunctionModule {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
+      validateKeyF(keyF, pos)(ev)
       val onEmpty = args(2).value
       if (arr.length == 0) {
         if (isDefaultOnEmpty(onEmpty)) {

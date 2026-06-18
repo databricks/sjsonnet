@@ -73,7 +73,8 @@ object RendererTests extends TestSuite {
         DummyPath(),
         Importer.empty,
         parseCache = new DefaultParseCache,
-        settings = Settings.default.copy(materializeRecursiveDepthLimit = 2, maxMaterializeDepth = 2)
+        settings =
+          Settings.default.copy(materializeRecursiveDepthLimit = 2, maxMaterializeDepth = 2)
       )
       val value = interpreter.evaluate(
         """local o = {

@@ -4,17 +4,16 @@ import utest._
 
 /**
  * Comprehensive Base64 tests covering:
- * - RFC 4648 Section 10 test vectors (all 7)
- * - Padding variants (0, 1, 2 padding chars)
- * - SIMD boundary sizes (12, 16, 24, 32, 48, 64 bytes)
- * - All 256 byte values coverage
- * - Roundtrip encode/decode for various sizes
- * - Invalid input handling
- * - Byte array encode/decode
- * - Large input stress tests
+ *   - RFC 4648 Section 10 test vectors (all 7)
+ *   - Padding variants (0, 1, 2 padding chars)
+ *   - SIMD boundary sizes (12, 16, 24, 32, 48, 64 bytes)
+ *   - All 256 byte values coverage
+ *   - Roundtrip encode/decode for various sizes
+ *   - Invalid input handling
+ *   - Byte array encode/decode
+ *   - Large input stress tests
  *
- * Ported from aklomp/base64 test suite (test_char_table, roundtrip tests)
- * and RFC 4648 Section 10.
+ * Ported from aklomp/base64 test suite (test_char_table, roundtrip tests) and RFC 4648 Section 10.
  */
 object Base64Tests extends TestSuite {
 
@@ -129,18 +128,12 @@ object Base64Tests extends TestSuite {
       }
 
       val sizes = Seq(
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-        12, // SSSE3 encode unit
-        13, 14, 15,
-        16, // SSSE3 decode unit
-        17, 23,
-        24, // AVX2 encode unit
-        25, 31,
-        32, // AVX2 decode unit
-        33, 47,
-        48, // NEON encode unit / AVX-512 encode unit
-        49, 63,
-        64, // NEON decode unit / AVX-512 decode unit
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, // SSSE3 encode unit
+        13, 14, 15, 16, // SSSE3 decode unit
+        17, 23, 24, // AVX2 encode unit
+        25, 31, 32, // AVX2 decode unit
+        33, 47, 48, // NEON encode unit / AVX-512 encode unit
+        49, 63, 64, // NEON decode unit / AVX-512 decode unit
         100, 128, 255, 256, 500, 1000, 4096
       )
 
