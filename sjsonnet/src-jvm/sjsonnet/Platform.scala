@@ -122,9 +122,9 @@ object Platform {
       } else if (tag == Tag.FLOAT) {
         val cleaned = value.replace("_", "")
         val result = cleaned match {
-          case ".inf" | ".Inf" | ".INF"                => Double.PositiveInfinity
-          case "+.inf" | "+.Inf" | "+.INF"             => Double.PositiveInfinity
-          case "-.inf" | "-.Inf" | "-.INF"             => Double.NegativeInfinity
+          case ".inf" | ".Inf" | ".INF"    => Double.PositiveInfinity
+          case "+.inf" | "+.Inf" | "+.INF" => Double.PositiveInfinity
+          case "-.inf" | "-.Inf" | "-.INF" => Double.NegativeInfinity
           case ".nan" | ".NaN" | ".NAN"    => Double.NaN
           case s if s.contains(":")        =>
             s.split(":").foldLeft(0.0)((acc, p) => acc * 60 + p.trim.toDouble)
