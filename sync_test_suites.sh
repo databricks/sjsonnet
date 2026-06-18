@@ -242,6 +242,13 @@ sync_test_files() {
     if [ ! -e "$dest_file" ]; then
       cp -r "$src_file" "$dest_file"
       new_golden=$((new_golden + 1))
+      # If the new golden is an error output, regenerate with sjsonnet's error format
+      if ! is_success_golden "$src_file"; then
+        local jsonnet_file="$target_dir/${stem}.jsonnet"
+        if [ -f "$jsonnet_file" ]; then
+          echo "$jsonnet_file" >> "$GOLDEN_REFRESH_FILES"
+        fi
+      fi
     elif ! diff -q "$src_file" "$dest_file" > /dev/null 2>&1; then
       local src_ok=0 dest_ok=0
       is_success_golden "$src_file" && src_ok=1
@@ -301,6 +308,13 @@ sync_test_files() {
       if [ ! -e "$dest_file" ]; then
         cp -r "$src_entry" "$dest_file"
         new_golden=$((new_golden + 1))
+        # If the new golden is an error output, regenerate with sjsonnet's error format
+        if ! is_success_golden "$src_entry"; then
+          local local_jsonnet="$target_dir/${stem}.jsonnet"
+          if [ -f "$local_jsonnet" ]; then
+            echo "$local_jsonnet" >> "$GOLDEN_REFRESH_FILES"
+          fi
+        fi
       elif ! diff -q "$src_entry" "$dest_file" > /dev/null 2>&1; then
         local src_ok=0 dest_ok=0
         is_success_golden "$src_entry" && src_ok=1
