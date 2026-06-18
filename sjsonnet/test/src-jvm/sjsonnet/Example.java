@@ -1,5 +1,6 @@
 package sjsonnet;
 
+import scala.Function0;
 import scala.collection.immutable.Map$;
 
 public class Example {
@@ -13,8 +14,13 @@ public class Example {
             os.package$.MODULE$.pwd(),
             scala.None$.empty(),
             scala.None$.empty(),
-            new sjsonnet.stdlib.StdLibModule(Map$.MODULE$.empty(), Map$.MODULE$.empty()).module(),
-            scala.None$.empty()
+            new Function0<Val.Obj>() {
+                public Val.Obj apply() {
+                    return new sjsonnet.stdlib.StdLibModule(Map$.MODULE$.empty(), Map$.MODULE$.empty()).module();
+                }
+            },
+            scala.None$.empty(),
+            null
         );
     }
 }

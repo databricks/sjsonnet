@@ -24,13 +24,14 @@ import ScopedExprTransform.*
 class StaticOptimizer(
     ev: EvalScope,
     variableResolver: String => Option[Expr],
-    std: Val.Obj,
+    stdParam: => Val.Obj,
     internedStrings: mutable.HashMap[String, String],
     internedStaticFieldSets: mutable.HashMap[
       Val.StaticObjectFieldSet,
       java.util.LinkedHashMap[String, java.lang.Boolean]
     ])
     extends ScopedExprTransform {
+  lazy val std: Val.Obj = stdParam
   def optimize(e: Expr): Expr = transform(e)
 
   override def transform(_e: Expr): Expr = {
