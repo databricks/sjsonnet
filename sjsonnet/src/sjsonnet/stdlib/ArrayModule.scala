@@ -986,19 +986,22 @@ object ArrayModule extends AbstractFunctionModule {
      *
      * Repeats an array or a string what a number of times specified by an integer count.
      */
-    builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Int) =>
-      if (count < 0) {
-        Error.fail("repeat requires count >= 0, got " + count)
+    builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Double) =>
+      if (count.isNaN || count.isInfinite || Math.floor(count) != count)
+        Error.fail("std.repeat count must be an integer, got " + count, pos)(ev)
+      val countInt = count.toInt
+      if (countInt < 0) {
+        Error.fail("repeat requires count >= 0, got " + countInt)
       }
       val res: Val = what match {
         case Val.Str(_, str) =>
-          val repeated = Platform.repeatString(str, count)
+          val repeated = Platform.repeatString(str, countInt)
           if (Platform.isAsciiJsonSafe(str)) Val.Str.asciiSafe(pos, repeated)
           else Val.Str(pos, repeated)
         case a: Val.Arr =>
-          if (a.length.toLong * count.toLong > Int.MaxValue)
+          if (a.length.toLong * countInt.toLong > Int.MaxValue)
             Error.fail("array too large", pos)(ev)
-          Val.Arr.repeated(pos, a, count)
+          Val.Arr.repeated(pos, a, countInt)
         case x => Error.fail("std.repeat first argument must be an array or a string")
       }
       res
