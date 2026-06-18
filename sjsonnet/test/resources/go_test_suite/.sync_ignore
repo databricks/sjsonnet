@@ -19,9 +19,3 @@ stdlib_smoke_test
 builtin_escapeStringJson
 builtin_manifestTomlEx
 pow6
-
-# --- Semantic differences ---
-# std.parseYaml("---") returns null in sjsonnet (no document found), but [null]
-# in go-jsonnet (one empty document). sjsonnet's behavior treats a bare "---"
-# as an empty input with no documents, which is defensible. Needs further review.
-parseYaml
