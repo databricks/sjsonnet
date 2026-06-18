@@ -256,8 +256,11 @@ class Evaluator(
         val ll = ld.toLong; val rl = rd.toLong
         if (ll.toDouble != ld || rl.toDouble != rd) null // not safe integers
         else if (rl < 0) null
-        else if (rl >= 1 && math.abs(ll) >= (1L << (63 - rl))) null
-        else Val.cachedNum(pos, (ll << rl).toDouble)
+        else {
+          val masked = (rl % 64).toInt
+          if (masked >= 1 && math.abs(ll) >= (1L << (63 - masked))) null
+          else Val.cachedNum(pos, (ll << masked).toDouble)
+        }
       case Expr.BinaryOp.OP_>> =>
         val ll = ld.toLong; val rl = rd.toLong
         if (ll.toDouble != ld || rl.toDouble != rd) null
@@ -1411,10 +1414,11 @@ class Evaluator(
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
         if (rr < 0) Error.fail("shift by negative exponent", pos)
-        if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
+        val masked = (rr % 64).toInt
+        if (masked >= 1 && math.abs(ll) >= (1L << (63 - masked)))
           Error.fail("numeric value outside safe integer range for bitwise operation", pos)
         else
-          Val.cachedNum(pos, (ll << rr).toDouble)
+          Val.cachedNum(pos, (ll << masked).toDouble)
 
       case Expr.BinaryOp.OP_>> =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
