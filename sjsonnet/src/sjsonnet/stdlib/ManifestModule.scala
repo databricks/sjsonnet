@@ -397,7 +397,7 @@ object ManifestModule extends AbstractFunctionModule {
     builtin(Lines),
     builtin(DeepJoin),
     builtin("manifestToml", "value") { (pos, ev, value: Val) =>
-      ManifestTomlEx.evalRhs(value, Val.Str(pos, ""), ev, pos)
+      ManifestTomlEx.evalRhs(value, Val.Str(pos, "  "), ev, pos)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-manifestYamlDoc std.manifestYamlDoc(value, indent_array_in_object=false, quote_keys=true)]].
