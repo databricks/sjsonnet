@@ -1,0 +1,2 @@
+sjsonnet.Error: numeric value outside safe integer range for bitwise operation
+    at [<root>].(error.leftshift_large_amount_overflow.jsonnet:1:3)
