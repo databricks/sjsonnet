@@ -469,7 +469,7 @@ object ManifestModule extends AbstractFunctionModule {
           val sb = new java.lang.StringBuilder()
           var i = 0
           while (i < arr.length) {
-            if (i > 0) sb.append("\n---\n")
+            if (i > 0) sb.append("---\n")
             else sb.append("---\n")
             sb.append(
               Materializer
@@ -479,9 +479,11 @@ object ManifestModule extends AbstractFunctionModule {
                 )(ev)
                 .toString
             )
+            sb.append('\n')
             i += 1
           }
-          if (cDocumentEnd) sb.append("\n...\n") else sb.append('\n')
+          if (arr.length == 0) sb.append("---\n\n")
+          if (cDocumentEnd) sb.append("...\n")
           sb.toString
         case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
       }
