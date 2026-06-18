@@ -426,12 +426,29 @@ object StringModule extends AbstractFunctionModule {
    *
    * Removes characters chars from the beginning and from the end of str.
    */
+  private def charsToString(charsVal: Val): String = charsVal match {
+    case s: Val.Str => s.str
+    case a: Val.Arr =>
+      val sb = new java.lang.StringBuilder
+      var i = 0
+      while (i < a.length) {
+        a.value(i) match {
+          case s: Val.Str if s.str.codePointCount(0, s.str.length) == 1 =>
+            sb.append(s.str)
+          case _ =>
+        }
+        i += 1
+      }
+      sb.toString
+    case other => Error.fail(s"expected string or array, got ${other.prettyName}")
+  }
+
   private object StripChars extends Val.Builtin2("stripChars", "str", "chars") {
     def evalRhs(str: Eval, chars: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        chars.value.asString,
+        charsToString(chars.value),
         left = true,
         right = true
       )
@@ -454,7 +471,7 @@ object StringModule extends AbstractFunctionModule {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        chars.value.asString,
+        charsToString(chars.value),
         left = true,
         right = false
       )
@@ -477,7 +494,7 @@ object StringModule extends AbstractFunctionModule {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        chars.value.asString,
+        charsToString(chars.value),
         left = false,
         right = true
       )
