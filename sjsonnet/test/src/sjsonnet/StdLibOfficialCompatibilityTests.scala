@@ -37,9 +37,8 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
       eval("""std.isEmpty("")""") ==> ujson.True
       eval("""std.isEmpty([])""") ==> ujson.True
       eval("""std.isEmpty({})""") ==> ujson.True
-      eval("""std.isEmpty(function() 1)""") ==> ujson.True
-      eval("""std.isEmpty(function(a, b) a)""") ==> ujson.False
-      assert(evalErr("""std.isEmpty(10)""").contains("length operates on strings"))
+      assert(evalErr("""std.isEmpty(function() 1)""").contains("isEmpty operates on strings"))
+      assert(evalErr("""std.isEmpty(10)""").contains("isEmpty operates on strings"))
     }
 
     test("escape string helpers stringify non-string inputs") {
