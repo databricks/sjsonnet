@@ -50,7 +50,7 @@ object Platform {
         case null | None => ujson.Null
         case v: String
             if sn.tag == Tag.str && Yaml12OctalPattern.matcher(v).matches() &&
-              !isQuotedScalar(sn, input) =>
+            !isQuotedScalar(sn, input) =>
           val negative = v.charAt(0) == '-'
           val octalPart =
             if (negative || v.charAt(0) == '+') v.substring(3) else v.substring(2)
@@ -113,9 +113,9 @@ object Platform {
     parseManyYamls(preprocessed) match {
       case Right(documents) =>
         documents.size match {
-          case 0 => ujson.Null
+          case 0                         => ujson.Null
           case 1 if !hasExplicitDocStart => nodeToJson(documents.head, preprocessed)
-          case _ =>
+          case _                         =>
             val buf = new mutable.ArrayBuffer[ujson.Value](documents.size)
             for (doc <- documents) {
               buf += nodeToJson(doc, preprocessed)
