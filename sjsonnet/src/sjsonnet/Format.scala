@@ -993,7 +993,7 @@ object Format {
           math.abs(s)
         ),
       numeric = true,
-      signedConversion = s > 0
+      signedConversion = s >= 0
     )
 
   }
@@ -1089,7 +1089,7 @@ object Format {
             math.abs(s)
           ),
         numeric = true,
-        signedConversion = s > 0
+        signedConversion = s >= 0
       )
     } else {
       val digitsBeforePoint = math.max(1, exponent + 1)
@@ -1106,7 +1106,7 @@ object Format {
             math.abs(s)
           ),
         numeric = true,
-        signedConversion = s > 0
+        signedConversion = s >= 0
       )
     }
 
@@ -1126,7 +1126,7 @@ object Format {
           math.abs(s)
         ),
       numeric = true,
-      signedConversion = s > 0
+      signedConversion = s >= 0
     )
   }
 
