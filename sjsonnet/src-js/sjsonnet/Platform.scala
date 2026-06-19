@@ -44,6 +44,8 @@ object Platform {
   private val Yaml12OctalPattern = Pattern.compile("[-+]?0o[0-7][0-7_]*")
   private val YamlInvalidOctalDecimalPattern =
     Pattern.compile("[-+]?0[0-9]*[89][0-9]*")
+  private val YamlNonFiniteFloatPattern =
+    Pattern.compile("[-+]?[.](?:inf|Inf|INF|nan|NaN|NAN)")
 
   private def parseYamlDecimalLong(value: String): ujson.Num =
     ujson.Num(java.lang.Long.parseLong(value).toDouble)
@@ -51,6 +53,8 @@ object Platform {
   private def nodeToJson(node: Node, input: String): ujson.Value = node match {
     case sn: Node.ScalarNode =>
       if (sn.value.contains(":") && (sn.tag == Tag.int || sn.tag == Tag.float)) {
+        ujson.Str(sn.value)
+      } else if (sn.tag == Tag.float && YamlNonFiniteFloatPattern.matcher(sn.value).matches()) {
         ujson.Str(sn.value)
       } else {
         val constructed = YamlDecoder.forAny.construct(sn).getOrElse("")
