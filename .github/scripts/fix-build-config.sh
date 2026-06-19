@@ -98,3 +98,11 @@ credentials ++= {
   else Nil
 }
 EOF
+
+# JVM network timeouts: prevent Coursier's HttpURLConnection from hanging
+# indefinitely on slow/unresponsive Maven mirrors. Default Java timeouts are
+# infinite — these convert hangs into timeout errors that Coursier can retry.
+cat >> .mill-jvm-opts << 'EOF'
+-Dsun.net.client.defaultConnectTimeout=15000
+-Dsun.net.client.defaultReadTimeout=30000
+EOF
