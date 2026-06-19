@@ -1,76 +1,61 @@
 package sjsonnet.client;
 
-import org.scalasbt.ipcsocket.UnixDomainSocket;
-import org.scalasbt.ipcsocket.Win32NamedPipeSocket;
-
 import java.io.*;
-import java.net.Socket;
+import java.net.StandardProtocolFamily;
+import java.net.UnixDomainSocketAddress;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class SjsonnetClientMain {
-    static void initServer(String lockBase, boolean setJnaNoSys) throws IOException {
+    static void initServer(String lockBase) throws IOException {
         List<String> l = new ArrayList<>();
-        List<String> vmOptions = new ArrayList<>();
         l.add("java");
         l.add("-DSJSONNET_VERSION=" + System.getProperty("SJSONNET_VERSION"));
         l.add("-cp");
         l.add(System.getProperty("SJSONNET_EXECUTABLE"));
-        if (setJnaNoSys) {
-            vmOptions.add("-Djna.nosys=true");
-        }
-        if(!Util.isWindows){
-            l.addAll(vmOptions);
-        } else {
-            final File vmOptionsFile = new File(lockBase, "vmoptions");
-            try (PrintWriter out = new PrintWriter(vmOptionsFile)) {
-                for(String opt: vmOptions) {
-                    out.println(opt);
-                }
-            }
-            l.add("-XX:VMOptionsFile=" + vmOptionsFile.getCanonicalPath());
-        }
-
-        l.add("sjsonnet.SjsonnetServerMain");
+        l.add("sjsonnet.SjsonnetServerRealMain");
         l.add(lockBase);
 
         new ProcessBuilder()
                 .command(l)
-                .redirectOutput(new java.io.File(lockBase + "/logs"))
-                .redirectError(new java.io.File(lockBase + "/logs"))
+                .redirectOutput(Path.of(lockBase, "logs").toFile())
+                .redirectError(Path.of(lockBase, "logs").toFile())
                 .start();
     }
-    public static void main(String[] args) throws Exception{
+
+    public static void main(String[] args) throws Exception {
         System.exit(main0(args));
     }
-    public static int main0(String[] args) throws Exception{
-        boolean setJnaNoSys = System.getProperty("jna.nosys") == null;
+
+    public static int main0(String[] args) throws Exception {
         Map<String, String> env = System.getenv();
-        if (setJnaNoSys) {
-            System.setProperty("jna.nosys", "true");
-        }
         int index = 0;
         while (index < 5) {
             index += 1;
             String lockBase = System.getProperty("user.home") + "/.sjsonnet/out/mill-worker-" + index;
-            new java.io.File(lockBase).mkdirs();
+            Files.createDirectories(Path.of(lockBase));
 
-            try(RandomAccessFile lockFile = new RandomAccessFile(lockBase + "/clientLock", "rw");
-                FileChannel channel = lockFile.getChannel();
-                java.nio.channels.FileLock tryLock = channel.tryLock();
-                Locks locks = Locks.files(lockBase)){
+            try (RandomAccessFile lockFile = new RandomAccessFile(lockBase + "/clientLock", "rw");
+                 FileChannel channel = lockFile.getChannel();
+                 java.nio.channels.FileLock tryLock = channel.tryLock();
+                 Locks locks = Locks.files(lockBase)) {
                 if (tryLock != null) {
                     return SjsonnetClientMain.run(
                             lockBase,
-                        () -> {
-                            try {
-                                initServer(lockBase, setJnaNoSys);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        },
+                            () -> {
+                                try {
+                                    initServer(lockBase);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            },
                             locks,
                             System.in,
                             System.out,
@@ -91,12 +76,13 @@ public class SjsonnetClientMain {
                           OutputStream stdout,
                           OutputStream stderr,
                           String[] args,
-                          Map<String, String> env) throws Exception{
+                          Map<String, String> env) throws Exception {
 
-        try(FileOutputStream f = new FileOutputStream(lockBase + "/run")){
+        Path runFile = Path.of(lockBase, "run");
+        try (FileOutputStream f = new FileOutputStream(runFile.toFile())) {
             f.write(System.console() != null ? 1 : 0);
             Util.writeString(f, System.getProperty("SJSONNET_VERSION"));
-            Util.writeString(f, java.nio.file.Paths.get("").toAbsolutePath().toString());
+            Util.writeString(f, Path.of("").toAbsolutePath().toString());
             Util.writeArgs(args, f);
             Util.writeMap(env, f);
         }
@@ -106,31 +92,34 @@ public class SjsonnetClientMain {
             serverInit = true;
             initServer.run();
         }
-        while(locks.processLock.probe()) Thread.sleep(3);
+        while (locks.processLock.probe()) Thread.sleep(3);
 
-        // Need to give sometime for Win32NamedPipeSocket to work
-        // if the server is just initialized
+        // Need to give some time for the UDS server socket to be ready
         if (serverInit && Util.isWindows) Thread.sleep(1000);
 
-        Socket ioSocket = null;
+        UnixDomainSocketAddress addr = UnixDomainSocketAddress.of(lockBase + "/io");
+        SocketChannel ioSocket = null;
 
         long retryStart = System.currentTimeMillis();
 
-        while(ioSocket == null && System.currentTimeMillis() - retryStart < 1000){
-            try{
-                ioSocket = Util.isWindows?
-                        new Win32NamedPipeSocket(Util.WIN32_PIPE_PREFIX + new File(lockBase).getName())
-                        : new UnixDomainSocket(lockBase + "/io");
-            }catch(Throwable e){
+        while (ioSocket == null && System.currentTimeMillis() - retryStart < 1000) {
+            try {
+                ioSocket = SocketChannel.open(StandardProtocolFamily.UNIX);
+                ioSocket.connect(addr);
+            } catch (Throwable e) {
+                if (ioSocket != null) {
+                    try { ioSocket.close(); } catch (IOException ignored) {}
+                    ioSocket = null;
+                }
                 Thread.sleep(1);
             }
         }
-        if (ioSocket == null){
+        if (ioSocket == null) {
             throw new Exception("Failed to connect to server");
         }
 
-        InputStream outErr = ioSocket.getInputStream();
-        OutputStream in = ioSocket.getOutputStream();
+        InputStream outErr = Channels.newInputStream(ioSocket);
+        OutputStream in = Channels.newOutputStream(ioSocket);
         ProxyStreamPumper outPump = new ProxyStreamPumper(outErr, stdout, stderr);
         InputPumper inPump = new InputPumper(stdin, in, true);
         Thread outThread = new Thread(outPump);
@@ -142,11 +131,12 @@ public class SjsonnetClientMain {
 
         locks.serverLock.await();
 
-        try(FileInputStream fos = new FileInputStream(lockBase + "/exitCode")){
-            return Integer.parseInt(new BufferedReader(new InputStreamReader(fos)).readLine());
-        } catch(Throwable e){
+        try {
+            String content = Files.readString(Path.of(lockBase, "exitCode"), StandardCharsets.UTF_8);
+            return Integer.parseInt(content.trim());
+        } catch (Throwable e) {
             return 1;
-        } finally{
+        } finally {
             ioSocket.close();
         }
     }

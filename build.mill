@@ -391,12 +391,6 @@ object sjsonnet extends VersionFileModule {
     object client extends JavaModule with SjsonnetPublishModule {
       def artifactName = "sjsonnet-server"
       def javacOptions = super.javacOptions() ++ Seq("--release", "17")
-      def mvnDeps = Seq(
-        mvn"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
-          "net.java.dev.jna" -> "jna",
-          "net.java.dev.jna" -> "jna-platform"
-        )
-      )
       object test extends JavaTests with TestModule.Junit4
     }
 
@@ -406,14 +400,6 @@ object sjsonnet extends VersionFileModule {
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
       def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
       def javacOptions = super.javacOptions() ++ Seq("--release", "17")
-      def mvnDeps = Seq(
-        mvn"org.scala-sbt.ipcsocket:ipcsocket:1.6.3".exclude(
-          "net.java.dev.jna" -> "jna",
-          "net.java.dev.jna" -> "jna-platform"
-        ),
-        mvn"net.java.dev.jna:jna:5.17.0",
-        mvn"net.java.dev.jna:jna-platform:5.17.0"
-      )
 
       override def prependShellScript = mill.util.Jvm.universalScript(
         shellCommands = {

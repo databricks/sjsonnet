@@ -1,5 +1,10 @@
 package sjsonnet.client;
 
-public interface Locked{
+public interface Locked extends AutoCloseable {
     void release() throws Exception;
+
+    @Override
+    default void close() throws Exception {
+        release();
+    }
 }
