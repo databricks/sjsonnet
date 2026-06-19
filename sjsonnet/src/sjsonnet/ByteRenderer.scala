@@ -51,7 +51,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       return
     }
     val i = d.toLong
-    if (d == i) {
+    if (d == i && d >= Long.MinValue.toDouble && d < 9223372036854775808.0) {
       if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
         appendString("-0")
       } else {
@@ -59,7 +59,10 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       }
     } else if (d % 1 == 0) {
       appendString(
-        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+        new java.math.BigDecimal(d)
+          .setScale(0, java.math.RoundingMode.HALF_EVEN)
+          .toBigInteger
+          .toString
       )
     } else {
       appendString(d.toString)

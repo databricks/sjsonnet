@@ -443,12 +443,15 @@ object RenderUtils {
   def renderDouble(d: Double): String = {
     if (java.lang.Double.compare(d, -0.0) == 0) return "-0"
     val l = d.toLong
-    if (l.toDouble == d) {
+    if (l.toDouble == d && d >= Long.MinValue.toDouble && d < 9223372036854775808.0) {
       if (l == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) "-0"
       else if (l >= 0 && l < 256) intStrCache(l.toInt)
       else l.toString
     } else if (d % 1 == 0) {
-      BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
+      new java.math.BigDecimal(d)
+        .setScale(0, java.math.RoundingMode.HALF_EVEN)
+        .toBigInteger
+        .toString
     } else d.toString
   }
 

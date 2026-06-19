@@ -1056,53 +1056,35 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private def parseDigitNat(str: String, start: Int, base: Int, baseName: String): Double = {
-    var acc = 0.0
-    var i = start
     val len = str.length
-    // Fast path for base 10: process 4 digits at a time.
-    // Inspired by jsoniter-scala's SWAR digit parsing technique.
-    if (base == 10 && len - start >= 4) {
-      val limit = len - 3
-      while (i < limit) {
-        val c0 = str.charAt(i).toInt - '0'
-        val c1 = str.charAt(i + 1).toInt - '0'
-        val c2 = str.charAt(i + 2).toInt - '0'
-        val c3 = str.charAt(i + 3).toInt - '0'
-        if (c0 < 0 || c0 > 9 || c1 < 0 || c1 > 9 || c2 < 0 || c2 > 9 || c3 < 0 || c3 > 9) {
-          // Non-digit found, fall through to scalar loop for error reporting
-          while (i < len) {
-            val digit = str.charAt(i) - '0'
-            if (digit < 0 || digit >= base) {
-              Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
-            }
-            acc = base * acc + digit
-            i += 1
-          }
-          return acc
-        }
-        acc = acc * 10000 + c0 * 1000 + c1 * 100 + c2 * 10 + c3
-        i += 4
-      }
-    }
-    // Scalar tail: process remaining digits one at a time
+    // Validate all digits first
+    var i = start
     while (i < len) {
       val digit = str.charAt(i) - '0'
       if (digit < 0 || digit >= base) {
         Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
       }
-      acc = base * acc + digit
       i += 1
     }
-    acc
+    // Parse with exact integer arithmetic, then convert to double.
+    // This avoids precision loss from accumulating in double arithmetic.
+    val sub = if (start == 0) str else str.substring(start)
+    try {
+      java.lang.Long.parseLong(sub, base).toDouble
+    } catch {
+      case _: NumberFormatException =>
+        new java.math.BigInteger(sub, base).doubleValue()
+    }
   }
 
   private def parseHexNat(str: String, start: Int, baseName: String): Double = {
-    var acc = 0.0
+    val len = str.length
+    // Validate all hex digits and check if normalization is needed.
+    // The official digit mapping accepts ':'..'?' as digits 10-15 in addition to A-F/a-f.
+    var needsNormalize = false
     var i = start
-    while (i < str.length) {
+    while (i < len) {
       val code = str.charAt(i)
-      // Keep the official digit mapping used by go-jsonnet/C++ jsonnet, where ':'..'?' map to
-      // 10..15 in addition to A-F/a-f.
       val digit =
         if (code >= 'a') code - 'a' + 10
         else if (code >= 'A') code - 'A' + 10
@@ -1110,10 +1092,36 @@ object StringModule extends AbstractFunctionModule {
       if (digit < 0 || digit >= 16) {
         Error.fail("Cannot parse '" + str + "' as an integer in " + baseName)
       }
-      acc = 16.0 * acc + digit
+      if (code >= ':' && code <= '?') needsNormalize = true
       i += 1
     }
-    acc
+    // Normalize non-standard hex chars to lowercase a-f for Long/BigInteger parsing
+    val sub =
+      if (!needsNormalize) {
+        if (start == 0) str else str.substring(start)
+      } else {
+        val buf = new Array[Char](len - start)
+        var j = 0
+        i = start
+        while (i < len) {
+          val code = str.charAt(i)
+          buf(j) =
+            if (code >= ':' && code <= '?') ('a' + (code - ':')).toChar
+            else code
+          i += 1
+          j += 1
+        }
+        new String(buf)
+      }
+    // Parse with exact integer arithmetic, then convert to double.
+    try {
+      val unsigned = java.lang.Long.parseUnsignedLong(sub, 16)
+      if (unsigned >= 0) unsigned.toDouble
+      else (unsigned >>> 1).toDouble * 2.0 + (unsigned & 1)
+    } catch {
+      case _: NumberFormatException =>
+        new java.math.BigInteger(sub, 16).doubleValue()
+    }
   }
 
   // Official asciiUpper/asciiLower convert ASCII letters only; non-ASCII codepoints are preserved.
