@@ -1391,11 +1391,11 @@ object StringModule extends AbstractFunctionModule {
       v match {
         case s: Val.Str =>
           val out = new StringBuilderWriter(s.str.length + 16)
-          BaseRenderer.escape(out, s.str, unicode = true)
+          BaseRenderer.escape(out, s.str, unicode = false)
           out.toString
         case _ =>
           val out = new StringBuilderWriter(64)
-          BaseRenderer.escape(out, Materializer.stringify(v)(ev), unicode = true)
+          BaseRenderer.escape(out, Materializer.stringify(v)(ev), unicode = false)
           out.toString
       }
     },
@@ -1409,7 +1409,7 @@ object StringModule extends AbstractFunctionModule {
     builtin("escapeStringPython", "str") { (pos, ev, str: Val) =>
       val s = stdToString(str)(ev)
       val out = new StringBuilderWriter(s.length + 16)
-      BaseRenderer.escape(out, s, unicode = true)
+      BaseRenderer.escape(out, s, unicode = false)
       out.toString
     },
     /**
