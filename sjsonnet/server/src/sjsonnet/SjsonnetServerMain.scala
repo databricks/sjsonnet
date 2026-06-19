@@ -1,14 +1,15 @@
 package sjsonnet
 
 import java.io._
-import java.net.Socket
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.channels.{Channels, ServerSocketChannel, SocketChannel}
+import java.nio.file.{Files, Paths}
 
-import scala.collection.JavaConverters._
-import org.scalasbt.ipcsocket._
+import scala.jdk.CollectionConverters._
 import sjsonnet.client.{Lock, Locks, ProxyOutputStream, Util => ClientUtil}
 import sun.misc.{Signal, SignalHandler}
 
-import scala.annotation.nowarn
 import scala.util.control.NonFatal
 
 trait SjsonnetServerMain[T] {
@@ -42,7 +43,7 @@ object SjsonnetServerMain extends SjsonnetServerMain[DefaultParseCache] {
     // the case when a Mill client that did *not* spawn the server gets `CTRL-C`ed
     Signal.handle(
       new Signal("INT"),
-      new SignalHandler() {
+      new SignalHandler {
         def handle(sig: Signal): Unit = {} // do nothing
       }
     )
@@ -109,35 +110,34 @@ class Server[T](
         var running = true
         while (running) {
           Server.lockBlock(locks.serverLock) {
-            val (serverSocket, socketClose) = if (ClientUtil.isWindows) {
-              val socketName = ClientUtil.WIN32_PIPE_PREFIX + new File(lockBase).getName
-              (
-                new Win32NamedPipeServerSocket(socketName),
-                () => new Win32NamedPipeSocket(socketName).close()
-              )
-            } else {
-              val socketName = lockBase + "/io"
-              new File(socketName).delete()
-              (
-                new UnixDomainServerSocket(socketName),
-                () => new UnixDomainSocket(socketName).close()
-              )
-            }
+            val socketPath = Paths.get(lockBase, "io")
+            Files.deleteIfExists(socketPath)
+            val addr = UnixDomainSocketAddress.of(socketPath)
+            val serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+            try {
+              serverSocket.bind(addr)
 
-            val sockOpt = Server.interruptWith(
-              "SjsonnetSocketTimeoutInterruptThread",
-              acceptTimeout,
-              socketClose(),
-              serverSocket.accept()
-            )
+              val socketClose = () => {
+                val ch = SocketChannel.open(StandardProtocolFamily.UNIX)
+                try ch.connect(addr) finally ch.close()
+              }
 
-            sockOpt match {
-              case None       => running = false
-              case Some(sock) =>
-                try {
-                  handleRun(sock)
-                  serverSocket.close()
-                } catch { case NonFatal(e) => e.printStackTrace(originalStdout) }
+              val sockOpt = Server.interruptWith(
+                "SjsonnetSocketTimeoutInterruptThread",
+                acceptTimeout,
+                socketClose(),
+                serverSocket.accept()
+              )
+
+              sockOpt match {
+                case None       => running = false
+                case Some(sock) =>
+                  try {
+                    handleRun(sock)
+                  } catch { case NonFatal(e) => e.printStackTrace(originalStdout) }
+              }
+            } finally {
+              serverSocket.close()
             }
           }
           // Make sure you give an opportunity for the client to probe the lock
@@ -148,16 +148,23 @@ class Server[T](
       .getOrElse(throw new Exception("PID already present"))
   }
 
-  @nowarn("cat=deprecation")
-  def handleRun(clientSocket: Socket): Unit = {
+  def handleRun(clientSocket: SocketChannel): Unit = {
 
-    val currentOutErr = clientSocket.getOutputStream
+    val currentOutErr = Channels.newOutputStream(clientSocket)
     val stdout = new PrintStream(new ProxyOutputStream(currentOutErr, 1), true)
     val stderr = new PrintStream(new ProxyOutputStream(currentOutErr, -1), true)
-    val socketIn = clientSocket.getInputStream
-    val argStream = new FileInputStream(lockBase + "/run")
-    val interactive = argStream.read() != 0
-    val clientSjsonnetVersion = ClientUtil.readString(argStream)
+    val socketIn = Channels.newInputStream(clientSocket)
+    val (interactive, clientSjsonnetVersion, wd, args, env) = {
+      val argStream = new FileInputStream(lockBase + "/run")
+      try {
+        val i = argStream.read() != 0
+        val cv = ClientUtil.readString(argStream)
+        val w = ClientUtil.readString(argStream)
+        val a = ClientUtil.parseArgs(argStream)
+        val e = ClientUtil.parseMap(argStream)
+        (i, cv, w, a, e)
+      } finally argStream.close()
+    }
     val serverSjsonnetVersion = sys.props("SJSONNET_VERSION")
     if (clientSjsonnetVersion != serverSjsonnetVersion) {
       stdout.println(
@@ -165,10 +172,6 @@ class Server[T](
       )
       System.exit(0)
     }
-    val wd = ClientUtil.readString(argStream)
-    val args = ClientUtil.parseArgs(argStream)
-    val env = ClientUtil.parseMap(argStream)
-    argStream.close()
 
     @volatile var done = false
     @volatile var idle = false
@@ -189,9 +192,9 @@ class Server[T](
             )
 
             sm.stateCache = newStateCache
-            java.nio.file.Files.write(
-              java.nio.file.Paths.get(lockBase + "/exitCode"),
-              (if (result) 0 else 1).toString.getBytes
+            Files.write(
+              Paths.get(lockBase, "exitCode"),
+              (if (result) 0 else 1).toString.getBytes(java.nio.charset.StandardCharsets.UTF_8)
             )
           } finally {
             done = true
@@ -215,10 +218,9 @@ class Server[T](
     catch { case NonFatal(_) => }
 
     if (ClientUtil.isWindows) {
-      // Closing Win32NamedPipeSocket can often take ~5s
+      // Closing the socket on Windows can sometimes take a few seconds.
       // It seems OK to exit the client early and subsequently
-      // start up sjsonnet client again (perhaps closing the server
-      // socket helps speed up the process).
+      // start up sjsonnet client again.
       val t = new Thread(() => clientSocket.close())
       t.setDaemon(true)
       t.start()

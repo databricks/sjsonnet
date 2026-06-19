@@ -3,23 +3,25 @@ package sjsonnet.client;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class InputPumper implements Runnable{
+public class InputPumper implements Runnable {
     private final InputStream src;
     private final OutputStream dest;
-    private final Boolean checkAvailable;
+    private final boolean checkAvailable;
+
+    private volatile boolean running = true;
+
     public InputPumper(InputStream src,
                        OutputStream dest,
-                       Boolean checkAvailable){
+                       boolean checkAvailable) {
         this.src = src;
         this.dest = dest;
         this.checkAvailable = checkAvailable;
     }
 
-    boolean running = true;
     public void run() {
         byte[] buffer = new byte[1024];
-        try{
-            while(running){
+        try {
+            while (running) {
                 if (checkAvailable && src.available() == 0) Thread.sleep(2);
                 else {
                     int n = src.read(buffer);
@@ -30,7 +32,7 @@ public class InputPumper implements Runnable{
                     }
                 }
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
