@@ -57,5 +57,15 @@ jobs:
           sbt: 'true'
       - name: Check Formatting
         run: ./mill -j1 _.${{ matrix.lang }}[_].__.checkFormat
+      - name: Pre-resolve dependencies
+        run: |
+          for i in 1 2 3; do
+            if timeout 180 ./mill -j1 _.${{ matrix.lang }}[_].__.resolvedMvnDeps; then
+              exit 0
+            fi
+            echo "Pre-resolution attempt $i failed, retrying..."
+          done
+          echo "Pre-resolution failed after 3 attempts"
+          exit 1
       - name: Run mill tests for ${{ matrix.lang }}
         run: ./mill -j1 _.${{ matrix.lang }}[_].__.test
