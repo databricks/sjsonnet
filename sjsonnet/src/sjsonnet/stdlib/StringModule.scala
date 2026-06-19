@@ -88,7 +88,7 @@ object StringModule extends AbstractFunctionModule {
             else s.codePointCount(0, s.length)
           case a: Val.Arr  => a.length
           case o: Val.Obj  => o.visibleKeyNames.length
-          case o: Val.Func => o.params.names.length
+          case o: Val.Func => o.params.requiredParamsCount
           case x           => Error.fail("Cannot get length of " + x.prettyName)
         }).toDouble
       )
