@@ -213,9 +213,6 @@ class Server[T](
     if (!idle) interruptServer()
 
     t.interrupt()
-    // Thread.stop() is removed in Java 25+; try it for older JVMs but ignore failures
-    try t.stop()
-    catch { case NonFatal(_) => }
 
     if (ClientUtil.isWindows) {
       // Closing the socket on Windows can sometimes take a few seconds.
