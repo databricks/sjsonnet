@@ -76,6 +76,8 @@ object Platform {
   private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7][0-7_]*")
   private val YamlInvalidOctalDecimalPattern =
     java.util.regex.Pattern.compile("[-+]?0[0-9]*[89][0-9]*")
+  private val YamlNonFiniteFloatPattern =
+    java.util.regex.Pattern.compile("[-+]?[.](?:inf|Inf|INF|nan|NaN|NAN)")
 
   private def parseYamlDecimalLong(value: String): ujson.Num =
     ujson.Num(java.lang.Long.parseLong(value).toDouble)
@@ -96,6 +98,10 @@ object Platform {
       } else if (isPlain && YamlInvalidOctalDecimalPattern.matcher(value).matches()) {
         parseYamlDecimalLong(value)
       } else if (isPlain && value.contains(":") && (tag == Tag.INT || tag == Tag.FLOAT)) {
+        ujson.Str(value)
+      } else if (
+        isPlain && tag == Tag.FLOAT && YamlNonFiniteFloatPattern.matcher(value).matches()
+      ) {
         ujson.Str(value)
       } else if (tag == Tag.INT) {
         val cleaned = value.replace("_", "")
@@ -134,7 +140,7 @@ object Platform {
           case ".nan" | ".NaN" | ".NAN"    => Double.NaN
           case s                           => s.toDouble
         }
-        ujson.Num(result)
+        if (java.lang.Double.isFinite(result)) ujson.Num(result) else ujson.Str(value)
       } else if (tag == Tag.BOOL) {
         ujson.Bool(value.toLowerCase match {
           case "true" | "yes" | "on"  => true
