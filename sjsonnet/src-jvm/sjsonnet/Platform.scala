@@ -74,6 +74,11 @@ object Platform {
   }
 
   private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7][0-7_]*")
+  private val YamlInvalidOctalDecimalPattern =
+    java.util.regex.Pattern.compile("[-+]?0[0-9]*[89][0-9]*")
+
+  private def parseYamlDecimalLong(value: String): ujson.Num =
+    ujson.Num(java.lang.Long.parseLong(value).toDouble)
 
   private def yamlNodeToJson(node: Node): ujson.Value = node match {
     case sn: ScalarNode =>
@@ -88,6 +93,8 @@ object Platform {
         val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
         val signed = if (negative) -result else result
         ujson.Num(signed.toDouble)
+      } else if (isPlain && YamlInvalidOctalDecimalPattern.matcher(value).matches()) {
+        parseYamlDecimalLong(value)
       } else if (tag == Tag.INT) {
         val cleaned = value.replace("_", "")
         val result: Long =
