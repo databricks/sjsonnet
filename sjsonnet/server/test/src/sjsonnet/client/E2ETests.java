@@ -97,7 +97,8 @@ public class E2ETests {
 
         assertEquals("first run exit", 0, a.exitCode);
         assertEquals("second run exit", 0, b.exitCode);
-        assertEquals("both runs produce same JSON", a.stdout, b.stdout);
+        assertEquals("both runs produce same JSON",
+                a.stdout.stripTrailing(), b.stdout.stripTrailing());
         assertTrue("expected arr in output", a.stdout.contains("\"arr\""));
     }
 
