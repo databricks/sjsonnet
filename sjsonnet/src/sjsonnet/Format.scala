@@ -1072,9 +1072,21 @@ object Format {
     }
   }
 
+  private def roundedGenericExponent(s: Double, precision: Int): Int = {
+    if (s == 0) 0
+    else {
+      val abs = math.abs(s)
+      val rawExponent = math.floor(math.log10(abs)).toInt
+      val scale = math.pow(10, rawExponent - precision + 1)
+      val rounded = Math.round(abs / scale) * scale
+      if (rounded == 0) 0 else math.floor(math.log10(rounded)).toInt
+    }
+  }
+
   private def formatGeneric(formatted: FormatSpec, s: Double): String = {
-    val precision = formatted.precisionOr(6)
-    val exponent = if (s != 0) math.floor(math.log10(math.abs(s))).toInt else 0
+    val requestedPrecision = formatted.precisionOr(6)
+    val precision = if (requestedPrecision == 0) 1 else requestedPrecision
+    val exponent = roundedGenericExponent(s, precision)
     if (exponent < -4 || exponent >= precision) {
       widen(
         formatted,
@@ -1092,15 +1104,15 @@ object Format {
         signedConversion = s >= 0
       )
     } else {
-      val digitsBeforePoint = math.max(1, exponent + 1)
+      val fractionalPrecision = math.max(0, precision - exponent - 1)
       widen(
         formatted,
         if (s < 0) "-" else "",
         "",
         sjsonnet.DecimalFormat
           .format(
-            if (formatted.alternate) precision - digitsBeforePoint else 0,
-            if (formatted.alternate) 0 else precision - digitsBeforePoint,
+            if (formatted.alternate) fractionalPrecision else 0,
+            if (formatted.alternate) 0 else fractionalPrecision,
             formatted.alternate,
             None,
             math.abs(s)
