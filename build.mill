@@ -327,6 +327,14 @@ object sjsonnet extends VersionFileModule {
       )
     }
 
+    override def nativeLink = Task {
+      val linked = super.nativeLink()
+      val stripped = Task.ctx().dest / "out"
+      os.copy(linked.path, stripped)
+      os.proc("strip", stripped.toString).call()
+      PathRef(stripped)
+    }
+
     object test extends ScalaNativeTests with CrossTests {
       def releaseMode = ReleaseMode.Debug
       def nativeMultithreading = None
