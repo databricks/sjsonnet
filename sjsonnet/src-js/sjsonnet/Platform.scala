@@ -42,6 +42,11 @@ object Platform {
     CharSWAR.isAsciiJsonSafe(s, from, to)
 
   private val Yaml12OctalPattern = Pattern.compile("[-+]?0o[0-7][0-7_]*")
+  private val YamlInvalidOctalDecimalPattern =
+    Pattern.compile("[-+]?0[0-9]*[89][0-9]*")
+
+  private def parseYamlDecimalLong(value: String): ujson.Num =
+    ujson.Num(java.lang.Long.parseLong(value).toDouble)
 
   private def nodeToJson(node: Node, input: String): ujson.Value = node match {
     case sn: Node.ScalarNode =>
@@ -56,6 +61,10 @@ object Platform {
             if (negative || v.charAt(0) == '+') v.substring(3) else v.substring(2)
           val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
           ujson.Num((if (negative) -result else result).toDouble)
+        case v: String
+            if sn.tag == Tag.str && YamlInvalidOctalDecimalPattern.matcher(v).matches() &&
+            !isQuotedScalar(sn, input) =>
+          parseYamlDecimalLong(v)
         case v: String  => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
         case v: Boolean => ujson.Bool(v)
         case v: Int     => ujson.Num(v.toDouble)
