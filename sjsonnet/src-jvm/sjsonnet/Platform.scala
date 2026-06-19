@@ -95,6 +95,8 @@ object Platform {
         ujson.Num(signed.toDouble)
       } else if (isPlain && YamlInvalidOctalDecimalPattern.matcher(value).matches()) {
         parseYamlDecimalLong(value)
+      } else if (isPlain && value.contains(":") && (tag == Tag.INT || tag == Tag.FLOAT)) {
+        ujson.Str(value)
       } else if (tag == Tag.INT) {
         val cleaned = value.replace("_", "")
         val result: Long =
@@ -119,9 +121,6 @@ object Platform {
             val oct = if (negative || cleaned.startsWith("+")) cleaned.substring(1) else cleaned
             val v = java.lang.Long.parseLong(oct, 8)
             if (negative) -v else v
-          } else if (cleaned.contains(":")) {
-            val parts = cleaned.split(":")
-            parts.foldLeft(0L)((acc, p) => acc * 60 + p.trim.toLong)
           } else {
             cleaned.toLong
           }
@@ -133,9 +132,7 @@ object Platform {
           case "+.inf" | "+.Inf" | "+.INF" => Double.PositiveInfinity
           case "-.inf" | "-.Inf" | "-.INF" => Double.NegativeInfinity
           case ".nan" | ".NaN" | ".NAN"    => Double.NaN
-          case s if s.contains(":")        =>
-            s.split(":").foldLeft(0.0)((acc, p) => acc * 60 + p.trim.toDouble)
-          case s => s.toDouble
+          case s                           => s.toDouble
         }
         ujson.Num(result)
       } else if (tag == Tag.BOOL) {

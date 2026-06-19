@@ -50,31 +50,36 @@ object Platform {
 
   private def nodeToJson(node: Node, input: String): ujson.Value = node match {
     case sn: Node.ScalarNode =>
-      val constructed = YamlDecoder.forAny.construct(sn).getOrElse("")
-      constructed match {
-        case null | None => ujson.Null
-        case v: String
-            if sn.tag == Tag.str && Yaml12OctalPattern.matcher(v).matches() &&
-            !isQuotedScalar(sn, input) =>
-          val negative = v.charAt(0) == '-'
-          val octalPart =
-            if (negative || v.charAt(0) == '+') v.substring(3) else v.substring(2)
-          val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
-          ujson.Num((if (negative) -result else result).toDouble)
-        case v: String
-            if sn.tag == Tag.str && YamlInvalidOctalDecimalPattern.matcher(v).matches() &&
-            !isQuotedScalar(sn, input) =>
-          parseYamlDecimalLong(v)
-        case v: String  => ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
-        case v: Boolean => ujson.Bool(v)
-        case v: Int     => ujson.Num(v.toDouble)
-        case v: Long    => ujson.Num(v.toDouble)
-        case v: Double  => ujson.Num(v)
-        case v: Float   => ujson.Num(v.toDouble)
-        case v: BigDecimal => ujson.Num(v.toDouble)
-        case v: BigInt     => ujson.Num(v.toDouble)
-        case v: Short      => ujson.Num(v.toDouble)
-        case _ => Error.fail("Unsupported YAML scalar type: " + node.getClass.getSimpleName)
+      if (sn.value.contains(":") && (sn.tag == Tag.int || sn.tag == Tag.float)) {
+        ujson.Str(sn.value)
+      } else {
+        val constructed = YamlDecoder.forAny.construct(sn).getOrElse("")
+        constructed match {
+          case null | None => ujson.Null
+          case v: String
+              if sn.tag == Tag.str && Yaml12OctalPattern.matcher(v).matches() &&
+              !isQuotedScalar(sn, input) =>
+            val negative = v.charAt(0) == '-'
+            val octalPart =
+              if (negative || v.charAt(0) == '+') v.substring(3) else v.substring(2)
+            val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
+            ujson.Num((if (negative) -result else result).toDouble)
+          case v: String
+              if sn.tag == Tag.str && YamlInvalidOctalDecimalPattern.matcher(v).matches() &&
+              !isQuotedScalar(sn, input) =>
+            parseYamlDecimalLong(v)
+          case v: String =>
+            ujson.read(s"\"${v.replace("\"", "\\\"").replace("\n", "\\n")}\"", false)
+          case v: Boolean    => ujson.Bool(v)
+          case v: Int        => ujson.Num(v.toDouble)
+          case v: Long       => ujson.Num(v.toDouble)
+          case v: Double     => ujson.Num(v)
+          case v: Float      => ujson.Num(v.toDouble)
+          case v: BigDecimal => ujson.Num(v.toDouble)
+          case v: BigInt     => ujson.Num(v.toDouble)
+          case v: Short      => ujson.Num(v.toDouble)
+          case _ => Error.fail("Unsupported YAML scalar type: " + node.getClass.getSimpleName)
+        }
       }
     case Node.SequenceNode(nodes, _) =>
       val buf = new mutable.ArrayBuffer[ujson.Value](nodes.size)
