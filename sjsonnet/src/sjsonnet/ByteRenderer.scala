@@ -33,6 +33,13 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   @inline private def isEmpty: Boolean = (emptyBits & (1L << depth)) == 0L
   @inline private def resetEmpty(): Unit = emptyBits &= ~(1L << depth)
 
+  private var objectKeyCount = 0
+  private var objectKeyCacheKeys: Array[String] = null
+  private var objectKeyCacheBytes: Array[Array[Byte]] = null
+  private var stringValueCount = 0
+  private var stringValueCacheKeys: Array[String] = null
+  private var stringValueCacheBytes: Array[Array[Byte]] = null
+
   override def visitFloat64(d: Double, index: Int): OutputStream = {
     flushBuffer()
     renderDouble(d)
@@ -201,7 +208,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     (vt: @scala.annotation.switch) match {
       case 0 => // TAG_STR
         val s = v.asInstanceOf[Val.Str]
-        if (s.isInstanceOf[Val.AsciiSafeStr]) renderAsciiSafeString(s.str)
+        if (s.isInstanceOf[Val.AsciiSafeStr]) renderAsciiSafeValueString(s.str)
         else renderQuotedString(s.str)
       case 1 => // TAG_NUM
         renderDouble(v.asDouble)
@@ -309,10 +316,109 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     markNonEmpty()
     flushBuffer()
-    renderQuotedString(key)
+    renderObjectKey(key)
     elemBuilder.append(':')
     elemBuilder.append(' ')
     materializeChild(childVal, matDepth, ctx)
+  }
+
+  private def renderObjectKey(key: String): Unit = {
+    objectKeyCount += 1
+    if (
+      objectKeyCount <= ByteRenderer.ObjectKeyCacheWarmupKeys ||
+      key.length > ByteRenderer.ObjectKeyCacheMaxLength
+    ) {
+      renderQuotedString(key)
+      return
+    }
+    var cacheKeys = objectKeyCacheKeys
+    var cacheBytes = objectKeyCacheBytes
+    if (cacheKeys == null) {
+      cacheKeys = new Array[String](ByteRenderer.ObjectKeyCacheSize)
+      cacheBytes = new Array[Array[Byte]](ByteRenderer.ObjectKeyCacheSize)
+      objectKeyCacheKeys = cacheKeys
+      objectKeyCacheBytes = cacheBytes
+    }
+    val slot = System.identityHashCode(key) & ByteRenderer.ObjectKeyCacheMask
+    val cachedKey = cacheKeys(slot)
+    if (cachedKey eq key) {
+      val cachedBytes = cacheBytes(slot)
+      if (cachedBytes != null) {
+        if (cachedBytes ne ByteRenderer.UncacheableKeyBytes) appendCachedStringBytes(cachedBytes)
+        else renderQuotedString(key)
+      } else if (Platform.isAsciiJsonSafe(key)) {
+        val bytes = makeQuotedAsciiBytes(key)
+        cacheBytes(slot) = bytes
+        appendCachedStringBytes(bytes)
+      } else {
+        cacheBytes(slot) = ByteRenderer.UncacheableKeyBytes
+        renderQuotedString(key)
+      }
+    } else {
+      cacheKeys(slot) = key
+      cacheBytes(slot) = null
+      renderQuotedString(key)
+    }
+  }
+
+  private def renderAsciiSafeValueString(str: String): Unit = {
+    val len = str.length
+    if (
+      len < ByteRenderer.StringValueCacheMinLength || len > ByteRenderer.StringValueCacheMaxLength
+    ) {
+      renderAsciiSafeString(str)
+      return
+    }
+    stringValueCount += 1
+    if (stringValueCount <= ByteRenderer.StringValueCacheWarmupValues) {
+      renderAsciiSafeString(str)
+      return
+    }
+    var cacheKeys = stringValueCacheKeys
+    var cacheBytes = stringValueCacheBytes
+    if (cacheKeys == null) {
+      cacheKeys = new Array[String](ByteRenderer.StringValueCacheSize)
+      cacheBytes = new Array[Array[Byte]](ByteRenderer.StringValueCacheSize)
+      stringValueCacheKeys = cacheKeys
+      stringValueCacheBytes = cacheBytes
+    }
+    val slot = System.identityHashCode(str) & ByteRenderer.StringValueCacheMask
+    if (cacheKeys(slot) eq str) {
+      val bytes = cacheBytes(slot)
+      if (bytes != null) appendCachedValueBytes(bytes)
+      else {
+        val made = makeQuotedAsciiBytes(str)
+        cacheBytes(slot) = made
+        appendCachedValueBytes(made)
+      }
+    } else {
+      cacheKeys(slot) = str
+      cacheBytes(slot) = null
+      renderAsciiSafeString(str)
+    }
+  }
+
+  private def makeQuotedAsciiBytes(str: String): Array[Byte] = {
+    val len = str.length
+    val bytes = new Array[Byte](len + 2)
+    bytes(0) = '"'.toByte
+    Platform.copyAsciiStringToBytes(str, bytes, 1)
+    bytes(len + 1) = '"'.toByte
+    bytes
+  }
+
+  @inline private def appendCachedStringBytes(bytes: Array[Byte]): Unit = {
+    val len = bytes.length
+    elemBuilder.ensureLength(len)
+    System.arraycopy(bytes, 0, elemBuilder.arr, elemBuilder.length, len)
+    elemBuilder.length += len
+  }
+
+  @inline private def appendCachedValueBytes(bytes: Array[Byte]): Unit = {
+    if (bytes.length >= ByteRenderer.DirectCachedStringWriteMinLength) {
+      elemBuilder.writeOutToIfLongerThan(out, 0)
+      out.write(bytes)
+    } else appendCachedStringBytes(bytes)
   }
 
   /** Fused inline object rendering — bypasses visibleKeyNames and value() lookup. */
@@ -478,4 +584,18 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
     elemBuilder.append(']')
     flushByteBuilder()
   }
+}
+
+object ByteRenderer {
+  private final val ObjectKeyCacheWarmupKeys = 1024
+  private final val ObjectKeyCacheSize = 128
+  private final val ObjectKeyCacheMask = ObjectKeyCacheSize - 1
+  private final val ObjectKeyCacheMaxLength = 256
+  private val UncacheableKeyBytes: Array[Byte] = Array.emptyByteArray
+  private final val StringValueCacheWarmupValues = 4
+  private final val StringValueCacheMinLength = 256
+  private final val StringValueCacheMaxLength = 16384
+  private final val StringValueCacheSize = 32
+  private final val StringValueCacheMask = StringValueCacheSize - 1
+  private final val DirectCachedStringWriteMinLength = 1024
 }

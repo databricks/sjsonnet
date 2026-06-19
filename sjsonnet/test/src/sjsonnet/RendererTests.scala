@@ -97,6 +97,32 @@ object RendererTests extends TestSuite {
       assert(out.size() < 15000)
     }
 
+    test("byteRendererRepeatedLongAsciiValues") {
+      val interpreter = new Interpreter(
+        Map(),
+        Map(),
+        DummyPath(),
+        Importer.empty,
+        parseCache = new DefaultParseCache
+      )
+      val value = interpreter.evaluate(
+        """local s = std.repeat("x", 2048);
+          |[s, s, s, s, s, s, s, s]""".stripMargin,
+        DummyPath("(memory)")
+      ) match {
+        case Right(v)  => v
+        case Left(err) => throw new Exception(Error.formatError(err))
+      }
+      val out = new ByteArrayOutputStream
+      interpreter.materialize(value, new ByteRenderer(out)) match {
+        case Left(err) => throw new Exception(Error.formatError(err))
+        case Right(_)  =>
+      }
+      val rendered = new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+      val elem = "\"" + ("x" * 2048) + "\""
+      rendered ==> "[" + Array.fill(8)(elem).mkString(", ") + "]"
+    }
+
     test("indentZero") {
       // indent=0 should produce newlines but no spaces
       ujson.transform(ujson.Arr(1, 2), new Renderer(indent = 0)).toString ==>
