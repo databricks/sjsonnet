@@ -146,6 +146,15 @@ object Expr {
 
   final case class Params(names: Array[String], defaultExprs: Array[Expr]) {
     val paramMap: Map[String, Int] = names.zipWithIndex.toMap
+    val requiredParamsCount: Int = {
+      var count = 0
+      var i = 0
+      while (i < defaultExprs.length) {
+        if (defaultExprs(i) == null) count += 1
+        i += 1
+      }
+      count
+    }
     override def toString: String = s"Params(${arrStr(names)}, ${arrStr(defaultExprs)})"
   }
 

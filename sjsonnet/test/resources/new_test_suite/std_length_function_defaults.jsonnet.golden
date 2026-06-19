@@ -1,0 +1,11 @@
+{
+   "all_defaults": 0,
+   "builtin_format": 2,
+   "builtin_map": 2,
+   "builtin_sort": 1,
+   "no_params": 0,
+   "one_req_one_default": 1,
+   "one_req_two_defaults": 1,
+   "one_required": 1,
+   "two_required": 2
+}
