@@ -22,13 +22,17 @@ object DecimalFormat {
       number: Double): String = {
     expLengthOpt match {
       case Some(expLength) =>
-        val expNum =
+        var expNum =
           if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
         val precision = zeroes + hashes
         // Scale so mantissa * 10^precision becomes a roundable integer
         val divided = number / Math.pow(10, (expNum - precision).toDouble)
-        val rounded = Math.round(divided)
+        var rounded = Math.round(divided)
         val tenPowPrec = Math.pow(10, precision).toLong
+        if (rounded.toDouble >= Math.pow(10, precision + 1)) {
+          rounded = Math.round(rounded / 10.0)
+          expNum += 1
+        }
         val intPart = rounded / tenPowPrec
         val fracNum = math.abs(rounded % tenPowPrec)
         val prefix = intPart.toString

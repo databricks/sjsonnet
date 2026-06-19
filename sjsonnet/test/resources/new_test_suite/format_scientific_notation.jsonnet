@@ -12,7 +12,7 @@ local b6 = std.assertEqual(std.format("%e", 0), "0.000000e+00");
 // Rounding cases (previously truncated instead of rounding)
 local r1 = std.assertEqual("%.0e" % 1.5e10, "2e+10");
 local r2 = std.assertEqual("%.0e" % 2.5e10, "3e+10");
-local r3 = std.assertEqual("%.0e" % 9.5e10, "10e+10");
+local r3 = std.assertEqual("%.0e" % 9.5e10, "1e+11");
 local r4 = std.assertEqual("%.1e" % 1.55e10, "1.6e+10");
 local r5 = std.assertEqual("%.0e" % 1.4e10, "1e+10");
 local r6 = std.assertEqual("%.0e" % 1.6e10, "2e+10");
