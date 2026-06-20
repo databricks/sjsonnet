@@ -57,6 +57,16 @@ object ParserTests extends TestSuite {
     test("duplicateFields") {
       parseErr("{ a: 1, a: 2 }") ==> """Expected no duplicate field: a:1:14, found "}""""
     }
+    test("duplicateParams") {
+      parseErr("(function(x, x, x) x)(null, 3, 2)") ==>
+        """Expected no duplicate parameter: x:1:14, found "x, x) x)(n""""
+      parseErr("local f(x, x) = x; f(1, 2)") ==>
+        "Expected no duplicate parameter: x:1:12, found \"x) = x; f(\""
+      parseErr("{ f(x, x): x }.f(1, 2)") ==>
+        "Expected no duplicate parameter: x:1:8, found \"x): x }.f(\""
+      parseErr("{ local f(x, x) = x, a: f(1, 2) }") ==>
+        "Expected no duplicate parameter: x:1:14, found \"x) = x, a:\""
+    }
     test("localInObj") {
       parse("""{
               |local x = 1,
