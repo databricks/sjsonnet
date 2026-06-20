@@ -120,7 +120,7 @@ object ManifestModule extends AbstractFunctionModule {
         ujson.StringParser.transform(str.value.asString, new ValVisitor(pos))
       } catch {
         case e: ujson.ParseException =>
-          throw Error.fail("failed to parse json: " + e.getMessage, pos)(ev)
+          throw Error.fail("Invalid JSON: " + e.getMessage, pos)(ev)
       }
     }
   }
