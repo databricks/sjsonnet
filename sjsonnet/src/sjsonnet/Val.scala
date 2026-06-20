@@ -510,7 +510,7 @@ object Val {
 
     override def asDouble: Double = {
       if (num.isNaN) {
-        Error.fail("not a number")
+        Error.fail("Not a number")
       }
       num
     }

@@ -1140,7 +1140,7 @@ object ArrayModule extends AbstractFunctionModule {
      */
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
       if (arr.length == 0) {
-        Error.fail("Cannot calculate average of an empty array")
+        Error.fail("Cannot calculate average of an empty array.")
       }
       arr match {
         case r: Val.RangeArr =>

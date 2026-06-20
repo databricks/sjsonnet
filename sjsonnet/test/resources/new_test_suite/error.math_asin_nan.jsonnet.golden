@@ -1,1 +1,3 @@
-sjsonnet.Error: [std.asin] not a number
+sjsonnet.Error: [std.asin] Not a number
+    at [<root>].(error.math_asin_nan.jsonnet:2:9)
+

@@ -293,7 +293,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("pow", "x", "n") { (pos, ev, x: Double, n: Double) =>
       val r = math.pow(x, n)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
       r
     },
     /**
@@ -427,7 +427,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("asin", "x") { (pos, ev, x: Double) =>
       val r = math.asin(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
       r
     },
     /**
@@ -439,7 +439,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("acos", "x") { (pos, ev, x: Double) =>
       val r = math.acos(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
       r
     },
     /**

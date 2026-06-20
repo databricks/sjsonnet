@@ -1,3 +1,3 @@
-sjsonnet.Error: [std.parseJson] Invalid JSON: expected json value got "b" at index 0
+sjsonnet.Error: [std.parseJson] failed to parse json: expected json value got "b" at index 0
     at [<root>].(error.parse_json.jsonnet:1:14)
 
