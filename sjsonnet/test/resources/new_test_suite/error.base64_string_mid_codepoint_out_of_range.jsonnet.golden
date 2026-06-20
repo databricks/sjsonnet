@@ -1,0 +1,3 @@
+sjsonnet.Error: [std.base64] base64 encountered invalid codepoint value in the string (must be 0 <= X <= 255), got 19990
+    at [<root>].(error.base64_string_mid_codepoint_out_of_range.jsonnet:5:11)
+

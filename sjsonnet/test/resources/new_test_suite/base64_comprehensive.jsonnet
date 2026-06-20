@@ -134,13 +134,6 @@ std.assertEqual(e1, e2) &&
 std.assertEqual(e2, e3) &&
 
 // ================================================================
-// Unicode string roundtrip (UTF-8)
-// ================================================================
-std.assertEqual(std.base64Decode(std.base64("café résumé naïve")), "café résumé naïve") &&
-std.assertEqual(std.base64Decode(std.base64("你好世界")), "你好世界") &&
-std.assertEqual(std.base64Decode(std.base64("日本語テスト")), "日本語テスト") &&
-
-// ================================================================
 // String roundtrip for sizes 0..64 (covers SIMD boundaries)
 // ================================================================
 local mkStr(len) = std.join("", std.makeArray(len, function(i) std.char(65 + (i % 26))));
