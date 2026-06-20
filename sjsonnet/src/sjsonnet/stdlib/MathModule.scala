@@ -314,7 +314,12 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.round(x) as a mathematical function.
      */
     builtin("round", "x") { (pos, ev, x: Double) =>
-      if (x >= 0) math.floor(x + 0.5) else math.ceil(x - 0.5)
+      // For |x| >= 2^52 the double is already an exact integer (ULP >= 1.0);
+      // adding 0.5 would invoke IEEE 754 round-to-even and produce the wrong
+      // result for odd inputs (e.g. 2^53 - 1). Short-circuit to avoid it.
+      if (x != x || math.abs(x) >= 4503599627370496.0) x
+      else if (x >= 0) math.floor(x + 0.5)
+      else math.ceil(x - 0.5)
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#math std.ceil(x)]].

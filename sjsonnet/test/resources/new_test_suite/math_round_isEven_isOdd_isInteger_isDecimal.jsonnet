@@ -12,6 +12,14 @@ assert std.round(-1.8) == -2 : 'round(-1.8)';
 assert std.round(0) == 0 : 'round(0)';
 assert std.round(1) == 1 : 'round(1)';
 assert std.round(-1) == -1 : 'round(-1)';
+// Large-integer regression: for |x| >= 2^52 the double is already an exact
+// integer (ULP >= 1.0), so std.round must be the identity. go-jsonnet and
+// jrsonnet agree on all four values below.
+assert std.round(9007199254740991) == 9007199254740991 : 'round(2^53 - 1)';
+assert std.round(9007199254740990) == 9007199254740990 : 'round(2^53 - 2)';
+assert std.round(4503599627370497) == 4503599627370497 : 'round(2^52 + 1)';
+assert std.round(-9007199254740991) == -9007199254740991 : 'round(-(2^53 - 1))';
+assert std.round(1e20) == 1e20 : 'round(1e20)';
 
 // === std.isEven: truncation of integral part (go-jsonnet + jrsonnet agree) ===
 // Integer inputs
