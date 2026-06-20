@@ -1,3 +1,3 @@
-sjsonnet.Error: [std.log] overflow
+sjsonnet.Error: [std.log] Overflow
     at [<root>].(builtin_log5.jsonnet:1:8)
 

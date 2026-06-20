@@ -469,7 +469,7 @@ object Val {
   }
   final case class Num(var pos: Position, private val num: Double) extends Literal {
     if (num.isInfinite) {
-      Error.fail("overflow")
+      Error.fail("Overflow")
     }
 
     def prettyName = "number"

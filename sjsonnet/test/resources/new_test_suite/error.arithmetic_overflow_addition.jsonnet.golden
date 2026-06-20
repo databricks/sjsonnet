@@ -1,2 +1,2 @@
-sjsonnet.Error: overflow
+sjsonnet.Error: Overflow
     at [<root>].(error.arithmetic_overflow_addition.jsonnet:2:7)

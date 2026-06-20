@@ -712,29 +712,29 @@ class Evaluator(
     (op: @switch) match {
       case Expr.BinaryOp.OP_+ =>
         val r = ld + rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = ld - rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_* =>
         val r = ld * rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld / rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_% =>
         if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld % rd
-        if (r.isNaN) Error.fail("not a number", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
         Val.cachedNum(pos, r)
       // Use position-free static singletons for boolean results — this method is only called
       // from comprehension fast paths where position info on boolean results is unnecessary.
@@ -871,29 +871,29 @@ class Evaluator(
     (e.op: @switch) match {
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
-        if (result.isNaN) Error.fail("not a number", pos)
-        if (result.isInfinite) Error.fail("overflow", pos); result
+        if (result.isNaN) Error.fail("Not a number", pos)
+        if (result.isInfinite) Error.fail("Overflow", pos); result
       case Expr.BinaryOp.OP_% =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l % r
-        if (result.isNaN) Error.fail("not a number", pos); result
+        if (result.isNaN) Error.fail("Not a number", pos); result
       case Expr.BinaryOp.OP_+ =>
         val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_<< =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
@@ -1353,21 +1353,21 @@ class Evaluator(
       // Pure numeric fast path: avoid intermediate Val.Num allocation
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
-        if (result.isNaN) Error.fail("not a number", pos)
-        if (result.isInfinite) Error.fail("overflow", pos)
+        if (result.isNaN) Error.fail("Not a number", pos)
+        if (result.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, result)
       // Polymorphic ops: nested match avoids Tuple2 allocation; Num checked first (most common)
       case Expr.BinaryOp.OP_% =>
@@ -1379,7 +1379,7 @@ class Evaluator(
               case Val.Num(_, rd) =>
                 if (rd == 0) Error.fail("Division by zero.", pos)
                 val result = ld % rd
-                if (result.isNaN) Error.fail("not a number", pos)
+                if (result.isNaN) Error.fail("Not a number", pos)
                 Val.cachedNum(pos, result)
               case _ => failBinOp(l, e.op, r, pos)
             }
@@ -1393,8 +1393,8 @@ class Evaluator(
         (l, r) match {
           case (Val.Num(_, l), Val.Num(_, r)) =>
             val result = l + r
-            if (result.isNaN) Error.fail("not a number", pos)
-            if (result.isInfinite) Error.fail("overflow", pos)
+            if (result.isNaN) Error.fail("Not a number", pos)
+            if (result.isInfinite) Error.fail("Overflow", pos)
             Val.cachedNum(pos, result)
           case (l: Val.Str, r: Val.Str) => Val.Str.concat(pos, l, r)
           case (n: Val.Num, r: Val.Str) =>

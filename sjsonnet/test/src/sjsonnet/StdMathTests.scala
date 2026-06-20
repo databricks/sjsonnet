@@ -57,9 +57,9 @@ object StdMathTests extends TestSuite {
       val errLog10 = evalErr("std.log10(-1)")
       assert(errLog10.contains("Not a number"))
       val errLog0 = evalErr("std.log(0)")
-      assert(errLog0.contains("overflow"))
+      assert(errLog0.contains("Overflow"))
       val errLog2Zero = evalErr("std.log2(0)")
-      assert(errLog2Zero.contains("overflow"))
+      assert(errLog2Zero.contains("Overflow"))
       // log(positive) must still work
       eval("std.log(1)") ==> ujson.Num(0.0)
       eval("std.log2(1)") ==> ujson.Num(0.0)
