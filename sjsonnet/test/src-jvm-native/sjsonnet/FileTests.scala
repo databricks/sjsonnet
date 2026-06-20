@@ -16,10 +16,7 @@ object FileTests extends BaseFileTests {
       )
     else Set.empty[String]
 
-  val goTestDataSkippedTests: Set[String] = Set(
-    // We support base64 of unicode strings
-    "builtinBase64_string_high_codepoint.jsonnet"
-  )
+  val goTestDataSkippedTests: Set[String] = Set.empty[String]
 
   val tests: Tests = Tests {
     test("test_suite") - {

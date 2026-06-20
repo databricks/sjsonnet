@@ -402,24 +402,27 @@ object Base64Tests extends TestSuite {
     }
 
     // ================================================================
-    // Unicode string base64 (UTF-8 encoding)
+    // Unicode string base64 — codepoints outside [0, 255] must be rejected
+    // (Jsonnet spec: base64 input is a byte string; go-jsonnet errors with
+    // "base64 encountered invalid codepoint value in the array (must be
+    // 0 <= X <= 255), got <value>" for such inputs).
     // ================================================================
     test("unicode") {
-      test("chineseRoundtrip") {
-        val r = eval(
-          """local s = "你好世界";
-            |std.base64Decode(std.base64(s)) == s
-            |""".stripMargin
+      test("chineseRejected") {
+        // CJK characters have codepoints > 255; std.base64 must error.
+        val err = evalErr(
+          """std.base64("你好世界")""".stripMargin
         )
-        assert(r == ujson.True)
+        assert(err.contains("base64 encountered invalid codepoint value"))
+        assert(err.contains("got 20320"))
       }
-      test("emojiRoundtrip") {
-        val r = eval(
-          """local s = "Hello 🌍!";
-            |std.base64Decode(std.base64(s)) == s
-            |""".stripMargin
+      test("emojiRejected") {
+        // Emoji have codepoints > 255; std.base64 must error.
+        val err = evalErr(
+          """std.base64("Hello 🌍!")""".stripMargin
         )
-        assert(r == ujson.True)
+        assert(err.contains("base64 encountered invalid codepoint value"))
+        assert(err.contains("got 127757"))
       }
       test("mixedRoundtrip") {
         val r = eval(
@@ -569,17 +572,15 @@ object Base64Tests extends TestSuite {
         )
         assert(r == ujson.True)
       }
-      test("largeUnicodeStillCorrect") {
-        // 1500+ char unicode string — must NOT take the ASCII fast path
+      test("largeUnicodeRejected") {
+        // 1500+ char Japanese string — must NOT take the ASCII fast path
         // (AsciiSafeStr is only tagged for pure-ASCII literals), and the
-        // result must equal what we get going via the byte array.
+        // non-ASCII codepoints must be rejected per the Jsonnet spec.
         val src = "日本語テスト" * 250
-        val r = eval(
-          s"""local s = "$src";
-             |std.base64(s) == std.base64(std.encodeUTF8(s))
-             |""".stripMargin
+        val err = evalErr(
+          s"""std.base64("$src")""".stripMargin
         )
-        assert(r == ujson.True)
+        assert(err.contains("base64 encountered invalid codepoint value"))
       }
     }
   }

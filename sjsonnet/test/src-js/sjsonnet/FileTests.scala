@@ -16,8 +16,6 @@ object FileTests extends BaseFileTests {
   )
 
   val goTestDataSkippedTests: Set[String] = Set(
-    // We support base64 of unicode strings
-    "builtinBase64_string_high_codepoint.jsonnet",
     "builtinSha1.jsonnet",
     "builtinSha256.jsonnet",
     "builtinSha3.jsonnet",

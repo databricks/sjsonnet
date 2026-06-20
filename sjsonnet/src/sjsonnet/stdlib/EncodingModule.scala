@@ -32,6 +32,19 @@ object EncodingModule extends AbstractFunctionModule {
     true
   }
 
+  private def validateBase64StringCodepoints(str: String): Unit = {
+    var i = 0
+    while (i < str.length) {
+      val cp = str.codePointAt(i)
+      if (cp > 255) {
+        Error.fail(
+          f"base64 encountered invalid codepoint value in the string (must be 0 <= X <= 255), got $cp"
+        )
+      }
+      i += Character.charCount(cp)
+    }
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-md5 std.md5(s)]].
    *
@@ -67,6 +80,13 @@ object EncodingModule extends AbstractFunctionModule {
           // intermediate heap Array[Byte]); on the JVM/JS side we still allocate the byte array
           // but skip the encoder's pre-count branch. See docs/perf-gap-vs-jrsonnet.md.
           val asciiSafe = s.isInstanceOf[Val.AsciiSafeStr]
+          if (!asciiSafe) {
+            // Non-ASCII-safe string: reject any codepoint outside [0, 255]. The Jsonnet spec
+            // requires base64 input to be a byte string, and go-jsonnet applies the same check
+            // (otherwise PlatformBase64 silently UTF-8-encodes values that are outside the
+            // specified input domain).
+            validateBase64StringCodepoints(s.str)
+          }
           Val.Str.asciiSafe(pos, PlatformBase64.encodeStringToString(s.str, asciiSafe))
         case ba: Val.ByteArr =>
           Val.Str.asciiSafe(pos, PlatformBase64.encodeToString(ba.rawBytes))
