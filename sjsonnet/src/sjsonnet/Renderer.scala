@@ -156,6 +156,42 @@ class Renderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
 class PythonRenderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
 
+  /**
+   * Render a Double in CPython 3 `repr()` style so that `std.manifestPython` matches Python 3's
+   * output byte-for-byte on all common inputs:
+   *   - integer-valued doubles emit without a decimal point (e.g. 1.0 → "1", 1e100 → "1e+100" in
+   *     scientific, but here rendered via the integer branch only when the value fits a Long; large
+   *     whole doubles go through sci).
+   *   - negative zero emits as "-0".
+   *   - non-integer doubles use the shortest round-trip form. Scientific notation (lowercase "e",
+   *     signed exponent, ≥2 digits, zero-padded) is used for magnitudes outside [1e-4, 1e16);
+   *     fixed-point otherwise.
+   */
+  override def visitFloat64(d: Double, index: Int): Writer = {
+    d match {
+      case Double.PositiveInfinity        => visitString("Infinity", -1)
+      case Double.NegativeInfinity        => visitString("-Infinity", -1)
+      case d if java.lang.Double.isNaN(d) => visitString("NaN", -1)
+      case d                              =>
+        val i = d.toLong
+        val abs = math.abs(d)
+        if (d == i.toDouble && abs < 1e16) {
+          if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
+            visitFloat64StringParts("-0", -1, -1, index)
+          } else writeLongDirect(i)
+        } else {
+          // Non-integer double, or integer-valued double >= 1e16 (Python 3
+          // repr() switches to scientific notation at 1e+16). Apply Python
+          // repr()-style formatting.
+          val s = PythonRenderer.formatPythonFloat(d)
+          visitFloat64StringParts(s, s.indexOf('.'), s.indexOf('e'), index)
+        }
+        flushBuffer()
+    }
+    flushCharBuilder()
+    out
+  }
+
   override def visitNull(index: Int): Writer = {
     flushBuffer()
     elemBuilder.ensureLength(4)
@@ -413,6 +449,106 @@ private[sjsonnet] final class FastMaterializeJsonRenderer(
       elemBuilder.appendAll(newLineCharArray, newLineCharArray.length)
     else renderIndent()
     reusableObjVisitor
+  }
+}
+
+object PythonRenderer {
+
+  /**
+   * Format a non-integer Double in CPython 3 `repr()` style.
+   *
+   * Rules (from the Python 3 language reference):
+   *   - Lowercase `e` for scientific notation.
+   *   - Exponent always carries a sign and has at least 2 digits (zero-padded).
+   *   - Scientific notation is used when the adjusted exponent is outside [-4, 16); otherwise
+   *     fixed-point form is used.
+   *   - The mantissa is the shortest round-trip form (produced by Java's Double.toString, Ryu
+   *     algorithm on JDK 15+).
+   *
+   * Implementation: parse Java's `Double.toString` output (which uses uppercase `E` and a
+   * non-padded exponent), then shift the decimal point on the integer mantissa so that exactly one
+   * digit precedes the point. The shift preserves the parsed Double value, so round-trip safety is
+   * retained.
+   */
+  def formatPythonFloat(d: Double): String = {
+    val negative = d < 0
+    val abs = if (negative) -d else d
+    val raw = java.lang.Double.toString(abs) // shortest round-trip form
+
+    // Handle both JVM format (uppercase 'E', e.g. "1.0E100") and Scala.js
+    // format (lowercase 'e' with sign, e.g. "1e+100"). RenderUtils.renderDouble
+    // avoids Double.toString entirely; here we must parse it but handle both.
+    val eIdx = {
+      val upper = raw.indexOf('E')
+      if (upper >= 0) upper else raw.indexOf('e')
+    }
+    val (mantissaStr, rawExp) =
+      if (eIdx < 0) (raw, 0)
+      else (raw.substring(0, eIdx), raw.substring(eIdx + 1).toInt)
+
+    val dotIdx = mantissaStr.indexOf('.')
+    val rawDigits =
+      if (dotIdx < 0) mantissaStr
+      else mantissaStr.substring(0, dotIdx) + mantissaStr.substring(dotIdx + 1)
+
+    // Compute adjustedExp (floor of log10) from the string representation.
+    // Formula: adjustedExp = rawExp + effectiveDotIdx - firstNonZero - 1
+    // where effectiveDotIdx = dotIdx if present, else rawDigits.length (implicit
+    // decimal at the end). This handles all Double.toString output formats:
+    //   JVM "1.0E100"    → rawExp=100, dot=1, firstNZ=0 → 100+1-0-1 = 100 ✓
+    //   JS  "1e+100"     → rawExp=100, dot=1, firstNZ=0 → 100+1-0-1 = 100 ✓
+    //   JS  "10000000000000000" → rawExp=0, dot=17, firstNZ=0 → 0+17-0-1 = 16 ✓
+    //   JS  "0.000001"   → rawExp=0, dot=1, firstNZ=6 → 0+1-6-1 = -6 ✓
+    //   JS  "1e-10"      → rawExp=-10, dot=1, firstNZ=0 → -10+1-0-1 = -10 ✓
+    val effectiveDotIdx = if (dotIdx < 0) rawDigits.length else dotIdx
+    var firstNonZero = 0
+    while (firstNonZero < rawDigits.length && rawDigits.charAt(firstNonZero) == '0')
+      firstNonZero += 1
+    if (firstNonZero == rawDigits.length) firstNonZero = 0 // zero value
+    val adjustedExp = rawExp + effectiveDotIdx - firstNonZero - 1
+
+    if (adjustedExp >= -4 && adjustedExp < 16) {
+      // Fixed-point: strip trailing zeros from rawDigits first. This removes
+      // JVM scientific notation artifacts (e.g. "10" from "1.0E-4" → "1")
+      // while preserving JS fixed-point leading zeros (e.g. "0001" from
+      // "0.0001" has no trailing zeros to strip).
+      val fpDigits = {
+        var end = rawDigits.length
+        while (end > 1 && rawDigits.charAt(end - 1) == '0') end -= 1
+        if (end == rawDigits.length) rawDigits else rawDigits.substring(0, end)
+      }
+      val body =
+        if (adjustedExp < 0) {
+          // Strip leading zeros from fpDigits — they come from JS fixed-point
+          // format (e.g. "00001" for 0.0001) and must not be duplicated by
+          // the "0" * (-(adjustedExp+1)) padding.
+          val sigDigits = fpDigits.substring(firstNonZero)
+          "0." + "0" * (-(adjustedExp + 1)) + sigDigits
+        } else if (adjustedExp >= fpDigits.length - 1) {
+          fpDigits + "0" * (adjustedExp - fpDigits.length + 1)
+        } else {
+          val intPart = fpDigits.substring(0, adjustedExp + 1)
+          val fracPart = fpDigits.substring(adjustedExp + 1)
+          if (fracPart.isEmpty) intPart
+          else intPart + "." + fracPart
+        }
+      if (negative) "-" + body else body
+    } else {
+      // Scientific: strip leading zeros (from JS fixed-point like "0.000001")
+      // and trailing zeros (from JVM "1.0E100" → "1e+100" not "1.0e+100").
+      val sigDigits = rawDigits.substring(firstNonZero)
+      var end = sigDigits.length
+      while (end > 1 && sigDigits.charAt(end - 1) == '0') end -= 1
+      val digits = sigDigits.substring(0, end)
+
+      val prefix = if (negative) "-" else ""
+      val expSign = if (adjustedExp < 0) "-" else "+"
+      val expStr = math.abs(adjustedExp).toString.reverse.padTo(2, '0').reverse
+      val mantissa =
+        if (digits.length == 1) digits
+        else String.valueOf(digits.charAt(0)) + "." + digits.substring(1)
+      prefix + mantissa + "e" + expSign + expStr
+    }
   }
 }
 
