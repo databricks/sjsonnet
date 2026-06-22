@@ -131,6 +131,13 @@ public class SjsonnetClientMain {
 
         locks.serverLock.await();
 
+        // The server closes its end of the socket before releasing serverLock,
+        // so the output pumper will see EOF. Wait for it to finish so that all
+        // output is fully written to stdout/stderr before we exit. Without this
+        // join, System.exit() kills the daemon thread mid-pump, which can result
+        // in empty or truncated output (flaky test: secondInvocationReusesServer).
+        outThread.join(5_000);
+
         try {
             String content = Files.readString(Path.of(lockBase, "exitCode"), StandardCharsets.UTF_8);
             return Integer.parseInt(content.trim());
