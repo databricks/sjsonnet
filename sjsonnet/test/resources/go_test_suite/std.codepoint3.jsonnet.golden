@@ -1,3 +1,3 @@
-sjsonnet.Error: [std.codepoint] expected a single character string, got aa
+sjsonnet.Error: [std.codepoint] expected a single character string (length 2), got: aa
     at [<root>].(std.codepoint3.jsonnet:1:14)
 

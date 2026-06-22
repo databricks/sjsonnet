@@ -1,1 +1,3 @@
-sjsonnet.Error: binary operator || does not operate on numbers.
+sjsonnet.Error: Binary operator || does not operate on numbers.
+    at [f].(error.auto_tco_or_tailcall_bool_check.jsonnet:5:14)
+    at [<root>].(error.auto_tco_or_tailcall_bool_check.jsonnet:3:7)

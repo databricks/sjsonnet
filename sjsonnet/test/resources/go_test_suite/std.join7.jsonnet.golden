@@ -1,3 +1,3 @@
-sjsonnet.Error: [std.join] Cannot join array
+sjsonnet.Error: [std.join] cannot join array
     at [<root>].(std.join7.jsonnet:1:9)
 

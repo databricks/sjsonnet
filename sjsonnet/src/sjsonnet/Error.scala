@@ -145,7 +145,8 @@ object Error {
       var frameStart = 0
       // Collapse innermost frame name into message when flagged, hiding it from "at" lines
       if (frames.size > 0 && rawFrames(0).collapseIntoMessage) {
-        msg = "[" + frames.get(0)._2 + "] " + msg
+        val name = frames.get(0)._2
+        msg = "[" + name + "] " + stripDuplicateMessagePrefix(msg, name)
         frameStart = 1
       }
 
@@ -185,6 +186,17 @@ object Error {
   private def isBuiltinName(name: String): Boolean =
     name.startsWith("std.") || name == "default" ||
     name == "object comprehension" || name == "array comprehension"
+
+  private def stripDuplicateMessagePrefix(msg: String, name: String): String = {
+    if (name == null || !msg.startsWith(name) || msg.length <= name.length) msg
+    else {
+      msg.charAt(name.length) match {
+        case ':' => msg.substring(name.length + 1).stripPrefix(" ")
+        case ' ' => msg.substring(name.length + 1)
+        case _   => msg
+      }
+    }
+  }
 
   private def appendFrame(sb: StringBuilder, f: Frame, name: String): Unit = {
     sb.append("\n    at [").append(name).append("]")

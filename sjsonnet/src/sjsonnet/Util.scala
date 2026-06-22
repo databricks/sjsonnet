@@ -69,9 +69,9 @@ object Util {
       case Some(d) =>
         val s = asSliceInt(d, "step")
         if (s < 0) {
-          Error.fail(s"got [$start:$end:$s] but negative steps are not supported", pos)(ev)
+          Error.fail(s"Got [$start:$end:$s] but negative steps are not supported", pos)(ev)
         } else if (s == 0) {
-          Error.fail(s"got $s but step must be greater than 0", pos)(ev)
+          Error.fail(s"Got $s but step must be greater than 0", pos)(ev)
         }
         s
     }
@@ -199,7 +199,7 @@ object Util {
       case _: Val.Func | _: Val.Obj | _: Val.Bool =>
         Error.fail("Values of type " + t1 + " are not comparable.")
       case _: Val.Null =>
-        Error.fail("binary operator < does not operate on null.")
+        Error.fail("Binary operator < does not operate on null.")
       case _ =>
         val cmp = ev.compare(v1, v2)
         if (cmp < 0) -1 else if (cmp > 0) 1 else 0

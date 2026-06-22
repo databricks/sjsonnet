@@ -22,7 +22,7 @@ object UnicodeHandlingTests extends TestSuite {
     test("stringIndex") {
       eval("'Hello 🌍 World'[6]") ==> ujson.Str("🌍")
       eval("'A🌍B'[1]") ==> ujson.Str("🌍")
-      assert(evalErr("'A🌍B'[3]").contains("string bounds error"))
+      assert(evalErr("'A🌍B'[3]").contains("String bounds error"))
     }
 
     test("codepoint") {

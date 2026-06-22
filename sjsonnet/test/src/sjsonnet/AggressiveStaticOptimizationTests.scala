@@ -233,11 +233,11 @@ object AggressiveStaticOptimizationTests extends TestSuite {
         // rhs is a Val.Bool. If rhs is not a Bool, the BinaryOp is left intact and
         // the runtime type-check fires.
         val err = evalErr(""" true && "hello" """)
-        assert(err.contains("binary operator &&"))
+        assert(err.contains("Binary operator &&"))
       }
       test("orWithNonBoolRhsStillErrors") {
         val err = evalErr(""" false || "hello" """)
-        assert(err.contains("binary operator ||"))
+        assert(err.contains("Binary operator ||"))
       }
     }
 

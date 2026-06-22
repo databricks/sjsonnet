@@ -143,7 +143,7 @@ object TypeModule extends AbstractFunctionModule {
         // Only materialize on failure for the error message
         val x1 = Materializer(a)(ev)
         val x2 = Materializer(b)(ev)
-        Error.fail("assertEqual failed: " + x1 + " != " + x2)
+        Error.fail("std.assertEqual: " + x1 + " != " + x2)
       }
     }
   }

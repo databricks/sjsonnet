@@ -22,14 +22,14 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
     }
 
     test("repeat reports official negative count error") {
-      assert(evalErr("""std.repeat("a", -1)""").contains("repeat requires count >= 0, got -1"))
+      assert(evalErr("""std.repeat("a", -1)""").contains("count must be >= 0, got -1"))
     }
 
     test("removeAt filters by exact index equality") {
       eval("""std.removeAt([1, 2, 3], 1)""") ==> ujson.Arr(1, 3)
       assert(evalErr("""std.removeAt([1, 2, 3], 1.5)""").contains("idx must be an integer"))
-      assert(evalErr("""std.removeAt([1, 2, 3], -1)""").contains("idx out of bounds"))
-      assert(evalErr("""std.removeAt([1, 2, 3], 9)""").contains("idx out of bounds"))
+      assert(evalErr("""std.removeAt([1, 2, 3], -1)""").contains("out of bounds"))
+      assert(evalErr("""std.removeAt([1, 2, 3], 9)""").contains("out of bounds"))
       assert(evalErr("""std.removeAt([1, 2, 3], "1")""").contains("idx must be a number"))
     }
 
@@ -91,6 +91,9 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
       assert(evalErr("""std.uniq([1, 1], keyF=false)""").contains("boolean"))
       assert(evalErr("""std.setUnion([1], [2], keyF=false)""").contains("boolean"))
       assert(evalErr("""std.setMember(1, [1], keyF=false)""").contains("boolean"))
+      val badFirstSetArg = evalErr("""std.setUnion([2, 1], [])""")
+      assert(badFirstSetArg.contains("sorted array or string without duplicates"))
+      assert(!badFirstSetArg.contains("second argument"))
     }
   }
 }

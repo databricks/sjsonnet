@@ -107,7 +107,10 @@ object StringModule extends AbstractFunctionModule {
       val s = str.value.asString
       val codePointCount = s.codePointCount(0, s.length)
       if (codePointCount != 1) {
-        Error.fail("expected a single character string, got " + s)
+        val shown = if (s.isEmpty) "<empty>" else s
+        Error.fail(
+          "expected a single character string (length " + codePointCount + "), got: " + shown
+        )
       } else {
         Val.cachedNum(pos, s.codePointAt(0).toDouble)
       }
@@ -427,7 +430,7 @@ object StringModule extends AbstractFunctionModule {
    *
    * Removes characters chars from the beginning and from the end of str.
    */
-  private def charsToString(charsVal: Val): String = charsVal match {
+  private def charsToString(callerName: String, charsVal: Val): String = charsVal match {
     case s: Val.Str => s.str
     case a: Val.Arr =>
       val sb = new java.lang.StringBuilder
@@ -449,7 +452,7 @@ object StringModule extends AbstractFunctionModule {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        charsToString(chars.value),
+        charsToString("stripChars", chars.value),
         left = true,
         right = true
       )
@@ -472,7 +475,7 @@ object StringModule extends AbstractFunctionModule {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        charsToString(chars.value),
+        charsToString("lstripChars", chars.value),
         left = true,
         right = false
       )
@@ -495,7 +498,7 @@ object StringModule extends AbstractFunctionModule {
       val v = str.value
       val out = StripUtils.strip(
         v.asString,
-        charsToString(chars.value),
+        charsToString("rstripChars", chars.value),
         left = false,
         right = true
       )
@@ -526,7 +529,7 @@ object StringModule extends AbstractFunctionModule {
         val s = str.str
         val sepStr = sep.str
         val resultLen = s.length.toLong * count + sepStr.length.toLong * (count - 1)
-        if (resultLen > Int.MaxValue) Error.fail("String is too large to join")
+        if (resultLen > Int.MaxValue) Error.fail("string is too large to join")
         if (count == 1) str
         else {
           val asciiSafe = str.isInstanceOf[Val.AsciiSafeStr] && sep.isInstanceOf[Val.AsciiSafeStr]
@@ -605,10 +608,10 @@ object StringModule extends AbstractFunctionModule {
             }
             val str = x.str
             totalLen += str.length
-            if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+            if (totalLen > Int.MaxValue) Error.fail("string is too large to join")
             asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
             added = true
-          case x => Error.fail("Cannot join " + x.prettyName)
+          case x => Error.fail("cannot join " + x.prettyName)
         }
         i += 1
       }
@@ -650,7 +653,7 @@ object StringModule extends AbstractFunctionModule {
           case _: Val.Null =>
           case x: Val.Str  =>
             totalLen += x.str.length
-            if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+            if (totalLen > Int.MaxValue) Error.fail("string is too large to join")
             asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
             elemCount += 1
           case _ => return null
@@ -660,7 +663,7 @@ object StringModule extends AbstractFunctionModule {
       if (elemCount == 0) return Val.Str.asciiSafe(pos, "")
       if (elemCount > 1) {
         totalLen += sepLen.toLong * (elemCount - 1)
-        if (totalLen > Int.MaxValue) Error.fail("String is too large to join")
+        if (totalLen > Int.MaxValue) Error.fail("string is too large to join")
         asciiSafe &&= sep.isInstanceOf[Val.AsciiSafeStr]
       }
 
@@ -721,7 +724,7 @@ object StringModule extends AbstractFunctionModule {
                 added = true
                 b.append(x.str)
                 asciiSafe &&= x.isInstanceOf[Val.AsciiSafeStr]
-              case x => Error.fail("Cannot join " + x.prettyName)
+              case x => Error.fail("cannot join " + x.prettyName)
             }
             i += 1
           }
@@ -741,7 +744,7 @@ object StringModule extends AbstractFunctionModule {
                   if (added) sep.copyEvalTo(out)
                   added = true
                   v.copyEvalTo(out)
-                case x => Error.fail("Cannot join " + x.prettyName)
+                case x => Error.fail("cannot join " + x.prettyName)
               }
               i += 1
             }
@@ -759,10 +762,11 @@ object StringModule extends AbstractFunctionModule {
               case v: Val.Arr  =>
                 if (partCount > 0) totalLen += sepLen
                 totalLen += v.length
-                if (totalLen > Int.MaxValue) Error.fail("array too large", pos)(ev)
+                if (totalLen > Int.MaxValue)
+                  Error.fail("array too large", pos)(ev)
                 parts(partCount) = v
                 partCount += 1
-              case x => Error.fail("Cannot join " + x.prettyName)
+              case x => Error.fail("cannot join " + x.prettyName)
             }
             i += 1
           }
@@ -776,7 +780,7 @@ object StringModule extends AbstractFunctionModule {
             i += 1
           }
           Val.Arr(pos, result)
-        case x => Error.fail("Cannot join " + x.prettyName)
+        case x => Error.fail("separator must be a string or array, got " + x.prettyName)
       }
     }
   }
@@ -788,7 +792,7 @@ object StringModule extends AbstractFunctionModule {
       maxSplits: Int,
       asciiSafe: Boolean): Array[Eval] = {
     if (cStr.isEmpty) {
-      Error.fail("Cannot split by an empty string")
+      Error.fail("cannot split by an empty string")
     }
 
     val b = new mutable.ArrayBuilder.ofRef[Eval]
@@ -852,7 +856,7 @@ object StringModule extends AbstractFunctionModule {
     }
 
     if (cStr.isEmpty) {
-      Error.fail("Cannot split by an empty string")
+      Error.fail("cannot split by an empty string")
     }
 
     if (maxSplits >= 0 && maxSplits <= SplitLimitRPreallocMaxSplits) {
@@ -947,13 +951,12 @@ object StringModule extends AbstractFunctionModule {
    *
    * Note: Versions up to and including 0.18.0 require c to be a single character.
    */
-  private def validateMaxSplits(d: Double, pos: Position, name: String)(implicit
-      ev: EvalErrorScope): Int = {
+  private def validateMaxSplits(d: Double, pos: Position)(implicit ev: EvalErrorScope): Int = {
     if (d.isNaN || d.isInfinite || Math.floor(d) != d)
-      Error.fail(s"$name third parameter must be an integer, got $d", pos)
+      Error.fail(s"third parameter must be an integer, got $d", pos)
     val i = d.toInt
     if (i < -1)
-      Error.fail(s"$name third parameter should be -1 or non-negative, got $i", pos)
+      Error.fail(s"third parameter should be -1 or non-negative, got $i", pos)
     i
   }
 
@@ -961,7 +964,7 @@ object StringModule extends AbstractFunctionModule {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
       val safe = v.isInstanceOf[Val.AsciiSafeStr]
-      val ms = validateMaxSplits(maxSplits.value.asDouble, pos, "std.splitLimit")(ev)
+      val ms = validateMaxSplits(maxSplits.value.asDouble, pos)(ev)
       Val.Arr(
         pos,
         splitLimit(pos, v.asString, c.value.asString, ms, safe)
@@ -980,7 +983,7 @@ object StringModule extends AbstractFunctionModule {
     def evalRhs(str: Eval, c: Eval, maxSplits: Eval, ev: EvalScope, pos: Position): Val = {
       val v = str.value
       val safe = v.isInstanceOf[Val.AsciiSafeStr]
-      val ms = validateMaxSplits(maxSplits.value.asDouble, pos, "std.splitLimitR")(ev)
+      val ms = validateMaxSplits(maxSplits.value.asDouble, pos)(ev)
       Val.Arr(
         pos,
         splitLimitR(pos, v.asString, c.value.asString, ms, safe)
@@ -1223,7 +1226,7 @@ object StringModule extends AbstractFunctionModule {
       for ((v, idx) <- arr.value.asArr.iterator.zipWithIndex) {
         if (!v.isInstanceOf[Val.Num] || !v.asDouble.isWhole || v.asInt < 0 || v.asInt > 255) {
           throw Error.fail(
-            f"Element $idx of the provided array was not an integer in range [0,255]"
+            "std.decodeUTF8: element " + idx + " is not an integer in range [0,255], got " + v.value.prettyName
           )
         }
       }

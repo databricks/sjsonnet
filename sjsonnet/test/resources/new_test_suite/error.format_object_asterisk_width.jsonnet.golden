@@ -1,1 +1,1 @@
-sjsonnet.Error: [std.format] Cannot use * width with object.
+sjsonnet.Error: [std.format] cannot use * width with named format

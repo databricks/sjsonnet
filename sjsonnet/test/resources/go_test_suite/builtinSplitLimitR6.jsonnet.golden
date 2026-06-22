@@ -1,3 +1,3 @@
-sjsonnet.Error: [std.splitLimitR] Cannot split by an empty string
+sjsonnet.Error: [std.splitLimitR] cannot split by an empty string
     at [<root>].(builtinSplitLimitR6.jsonnet:1:16)
 

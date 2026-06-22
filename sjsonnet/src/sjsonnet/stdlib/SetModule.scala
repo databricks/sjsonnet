@@ -58,9 +58,11 @@ object SetModule extends AbstractFunctionModule {
   @inline private def isIdentityKeyF(v: Val): Boolean =
     v == null || isDefaultKeyF(v) || (v.isInstanceOf[Val.Func] && v.asFunc.isIdentityFunction)
 
-  private def validateKeyF(keyF: Val, pos: Position)(implicit ev: EvalErrorScope): Unit = {
+  private def validateKeyF(callerName: String, keyF: Val, pos: Position)(implicit
+      ev: EvalErrorScope
+  ): Unit = {
     if (!isDefaultKeyF(keyF) && !keyF.isInstanceOf[Val.Func])
-      Error.fail("keyF must be a function, got " + keyF.prettyName, pos)
+      Error.fail(s"keyF must be a function, got ${keyF.prettyName}", pos)
   }
 
   /**
@@ -73,8 +75,8 @@ object SetModule extends AbstractFunctionModule {
   private object Set_ extends Val.Builtin2("set", "arr", "keyF", Array(null, DefaultKeyF)) {
     def evalRhs(arr: Eval, keyF: Eval, ev: EvalScope, pos: Position): Val = {
       val kf = keyF.value
-      validateKeyF(kf, pos)(ev)
-      uniqArr(pos, ev, sortArr(pos, ev, arr.value, kf), kf)
+      validateKeyF("set", kf, pos)(ev)
+      uniqArr("set", pos, ev, sortArr("set", pos, ev, arr.value, kf), kf)
     }
   }
 
@@ -83,11 +85,12 @@ object SetModule extends AbstractFunctionModule {
     else keyF.asFunc.apply1(elem, pos.noOffset)(ev, TailstrictModeDisabled).value
   }
 
-  private def toArrOrString(arg: Val, pos: Position, ev: EvalScope) = {
+  private def toArrOrString(callerName: String, arg: Val, pos: Position, ev: EvalScope) = {
     arg match {
       case arr: Val.Arr => arr.asLazyArray
       case str: Val.Str => stringChars(pos, str.str).asLazyArray
-      case _            => Error.fail(f"Argument must be either arrays or strings")
+      case _            =>
+        Error.fail(s"expected an array or string, got ${arg.prettyName}")
     }
   }
 
@@ -250,9 +253,20 @@ object SetModule extends AbstractFunctionModule {
     Val.Arr(pos, trimSetOutput(out, outLen))
   }
 
-  private def validateSet(ev: EvalScope, pos: Position, keyF: Val, arr: Val): Unit = {
+  private def validateSet(
+      callerName: String,
+      ev: EvalScope,
+      pos: Position,
+      keyF: Val,
+      arr: Val): Unit = {
     if (ev.settings.throwErrorForInvalidSets) {
-      val sorted = uniqArr(pos.noOffset, ev, sortArr(pos.noOffset, ev, arr, keyF), keyF)
+      val sorted = uniqArr(
+        callerName,
+        pos.noOffset,
+        ev,
+        sortArr(callerName, pos.noOffset, ev, arr, keyF),
+        keyF
+      )
       val isSet = arr match {
         case Val.Str(_, str) =>
           sorted match {
@@ -271,7 +285,9 @@ object SetModule extends AbstractFunctionModule {
           ev.equal(arr, sorted)
       }
       if (!isSet) {
-        Error.fail("Set operation on " + arr.value.prettyName + " was called with a non-set")
+        Error.fail(
+          s"argument must be a sorted array or string without duplicates, got ${arr.value.prettyName}"
+        )
       }
     }
   }
@@ -292,8 +308,13 @@ object SetModule extends AbstractFunctionModule {
       .isInstanceOf[Found]
   }
 
-  private def uniqArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val): Val = {
-    val arrValue = toArrOrString(arr, pos, ev)
+  private def uniqArr(
+      callerName: String,
+      pos: Position,
+      ev: EvalScope,
+      arr: Val,
+      keyF: Val): Val = {
+    val arrValue = toArrOrString(callerName, arr, pos, ev)
     if (arrValue.length <= 1) {
       return arr
     }
@@ -319,7 +340,12 @@ object SetModule extends AbstractFunctionModule {
     Val.Arr(pos, out.result())
   }
 
-  private def sortArr(pos: Position, ev: EvalScope, arr: Val, keyF: Val): Val = {
+  private def sortArr(
+      callerName: String,
+      pos: Position,
+      ev: EvalScope,
+      arr: Val,
+      keyF: Val): Val = {
     // Fast path: range arrays are already sorted ascending by construction.
     // Avoids O(n) materialization + O(n log n) sort for already-sorted data.
     if (isIdentityKeyF(keyF) || keyF.isInstanceOf[Val.False]) {
@@ -338,11 +364,11 @@ object SetModule extends AbstractFunctionModule {
         case _ =>
       }
     }
-    sortArrSlow(pos, ev, arr, keyF)
+    sortArrSlow(callerName, pos, ev, arr, keyF)
   }
 
-  private def sortArrSlow(pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
-    val vs = toArrOrString(arr, pos, ev)
+  private def sortArrSlow(callerName: String, pos: Position, ev: EvalScope, arr: Val, keyF: Val) = {
+    val vs = toArrOrString(callerName, arr, pos, ev)
     if (vs.length <= 1) {
       arr
     } else {
@@ -498,8 +524,8 @@ object SetModule extends AbstractFunctionModule {
      * array element. Default value is identity function keyF=function(x) x.
      */
     builtinWithDefaults("uniq", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
-      validateKeyF(args(1), pos)(ev)
-      uniqArr(pos, ev, args(0), args(1))
+      validateKeyF("uniq", args(1), pos)(ev)
+      uniqArr("uniq", pos, ev, args(0), args(1))
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-sort std.sort(arr, keyF=id)]].
@@ -512,8 +538,8 @@ object SetModule extends AbstractFunctionModule {
      * array element. Default value is identity function keyF=function(x) x.
      */
     builtinWithDefaults("sort", "arr" -> null, "keyF" -> DefaultKeyF) { (args, pos, ev) =>
-      validateKeyF(args(1), pos)(ev)
-      sortArr(pos, ev, args(0), args(1))
+      validateKeyF("sort", args(1), pos)(ev)
+      sortArr("sort", pos, ev, args(0), args(1))
     },
     /**
      * [[https://jsonnet.org/ref/stdlib.html#std-setUnion std.setUnion(a, b, keyF=id)]].
@@ -527,12 +553,12 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setUnion", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
-        validateKeyF(keyF, pos)(ev)
-        validateSet(ev, pos, keyF, args(0))
-        validateSet(ev, pos, keyF, args(1))
+        validateKeyF("setUnion", keyF, pos)(ev)
+        validateSet("setUnion", ev, pos, keyF, args(0))
+        validateSet("setUnion", ev, pos, keyF, args(1))
 
-        val a = toArrOrString(args(0), pos, ev)
-        val b = toArrOrString(args(1), pos, ev)
+        val a = toArrOrString("setUnion", args(0), pos, ev)
+        val b = toArrOrString("setUnion", args(1), pos, ev)
 
         if (a.isEmpty) {
           args(1)
@@ -594,12 +620,12 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setInter", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
-        validateKeyF(keyF, pos)(ev)
-        validateSet(ev, pos, keyF, args(0))
-        validateSet(ev, pos, keyF, args(1))
+        validateKeyF("setInter", keyF, pos)(ev)
+        validateSet("setInter", ev, pos, keyF, args(0))
+        validateSet("setInter", ev, pos, keyF, args(1))
 
-        val a = toArrOrString(args(0), pos, ev)
-        val b = toArrOrString(args(1), pos, ev)
+        val a = toArrOrString("setInter", args(0), pos, ev)
+        val b = toArrOrString("setInter", args(1), pos, ev)
 
         if (isDefaultKeyF(keyF)) {
           setInterDefaultKeyF(pos, ev, a, b)
@@ -646,12 +672,12 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setDiff", "a" -> null, "b" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
-        validateKeyF(keyF, pos)(ev)
-        validateSet(ev, pos, keyF, args(0))
-        validateSet(ev, pos, keyF, args(1))
+        validateKeyF("setDiff", keyF, pos)(ev)
+        validateSet("setDiff", ev, pos, keyF, args(0))
+        validateSet("setDiff", ev, pos, keyF, args(1))
 
-        val a = toArrOrString(args(0), pos, ev)
-        val b = toArrOrString(args(1), pos, ev)
+        val a = toArrOrString("setDiff", args(0), pos, ev)
+        val b = toArrOrString("setDiff", args(1), pos, ev)
         if (isDefaultKeyF(keyF)) {
           setDiffDefaultKeyF(pos, ev, a, b)
         } else {
@@ -706,9 +732,9 @@ object SetModule extends AbstractFunctionModule {
     builtinWithDefaults("setMember", "x" -> null, "arr" -> null, "keyF" -> DefaultKeyF) {
       (args, pos, ev) =>
         val keyF = args(2)
-        validateKeyF(keyF, pos)(ev)
-        validateSet(ev, pos, keyF, args(1))
-        val arr = toArrOrString(args(1), pos, ev)
+        validateKeyF("setMember", keyF, pos)(ev)
+        validateSet("setMember", ev, pos, keyF, args(1))
+        val arr = toArrOrString("setMember", args(1), pos, ev)
         existsInSet(ev, pos, keyF, arr, args(0))
     }
   )

@@ -1,1 +1,2 @@
 sjsonnet.Error: [std.acos] not a number
+    at [<root>].(error.math_acos_nan.jsonnet:2:9)

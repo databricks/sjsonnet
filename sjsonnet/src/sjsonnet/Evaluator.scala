@@ -309,7 +309,7 @@ class Evaluator(
 
   def visitSelect(e: Select)(implicit scope: ValScope): Val = visitExpr(e.value) match {
     case obj: Val.Obj => obj.value(e.name, e.pos)
-    case r => Error.fail(s"attempted to index a ${r.prettyName} with string ${e.name}", e.pos)
+    case r => Error.fail(s"Attempted to index a ${r.prettyName} with string ${e.name}", e.pos)
   }
 
   def visitLocalExpr(e: LocalExpr)(implicit scope: ValScope): Val = {
@@ -712,29 +712,29 @@ class Evaluator(
     (op: @switch) match {
       case Expr.BinaryOp.OP_+ =>
         val r = ld + rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = ld - rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_* =>
         val r = ld * rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld / rd
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_% =>
         if (rd == 0) Error.fail("Division by zero.", pos)
         val r = ld % rd
-        if (r.isNaN) Error.fail("not a number", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
         Val.cachedNum(pos, r)
       // Use position-free static singletons for boolean results — this method is only called
       // from comprehension fast paths where position info on boolean results is unnecessary.
@@ -747,13 +747,13 @@ class Evaluator(
       case Expr.BinaryOp.OP_!= => Val.bool(ld != rd)
       case Expr.BinaryOp.OP_<< =>
         val ll = ld.toSafeLong(pos); val rr = rd.toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
-          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+          Error.fail("Numeric value outside safe integer range for bitwise operation", pos)
         Val.cachedNum(pos, (ll << rr).toDouble)
       case Expr.BinaryOp.OP_>> =>
         val ll = ld.toSafeLong(pos); val rr = rd.toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         Val.cachedNum(pos, (ll >> rr).toDouble)
       case Expr.BinaryOp.OP_& =>
         Val.cachedNum(pos, (ld.toSafeLong(pos) & rd.toSafeLong(pos)).toDouble)
@@ -871,40 +871,40 @@ class Evaluator(
     (e.op: @switch) match {
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
-        if (result.isNaN) Error.fail("not a number", pos)
-        if (result.isInfinite) Error.fail("overflow", pos); result
+        if (result.isNaN) Error.fail("Not a number", pos)
+        if (result.isInfinite) Error.fail("Overflow", pos); result
       case Expr.BinaryOp.OP_% =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l % r
-        if (result.isNaN) Error.fail("not a number", pos); result
+        if (result.isNaN) Error.fail("Not a number", pos); result
       case Expr.BinaryOp.OP_+ =>
         val r = visitExprAsDouble(e.lhs) + visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos); r
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos); r
       case Expr.BinaryOp.OP_<< =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
-          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+          Error.fail("Numeric value outside safe integer range for bitwise operation", pos)
         (ll << rr).toDouble
       case Expr.BinaryOp.OP_>> =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         (ll >> rr).toDouble
       case Expr.BinaryOp.OP_& =>
         (visitExprAsDouble(e.lhs).toSafeLong(pos) & visitExprAsDouble(e.rhs).toSafeLong(
@@ -1220,36 +1220,36 @@ class Evaluator(
         rhs match {
           case i: Val.Num =>
             val int = i.asPositiveInt
-            if (v.length == 0) Error.fail("array bounds error: array is empty", pos)
+            if (v.length == 0) Error.fail("Array bounds error: array is empty", pos)
             if (int >= v.length)
-              Error.fail(s"array bounds error: $int not within [0, ${v.length})", pos)
+              Error.fail(s"Array bounds error: $int not within [0, ${v.length})", pos)
             v.value(int)
           case _ =>
-            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+            Error.fail(s"Attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
         }
       case v: Val.Str =>
         rhs match {
           case i: Val.Num =>
             val int = i.asPositiveInt
             val str = v.str
-            if (str.isEmpty) Error.fail("string bounds error: string is empty", pos)
+            if (str.isEmpty) Error.fail("String bounds error: string is empty", pos)
             val unicodeLength = str.codePointCount(0, str.length)
             if (int >= unicodeLength)
-              Error.fail(s"string bounds error: $int not within [0, $unicodeLength)", pos)
+              Error.fail(s"String bounds error: $int not within [0, $unicodeLength)", pos)
             val startUtf16 = if (int == 0) 0 else str.offsetByCodePoints(0, int)
             val endUtf16 = str.offsetByCodePoints(startUtf16, 1)
             Val.Str(pos, str.substring(startUtf16, endUtf16))
           case _ =>
-            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+            Error.fail(s"Attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
         }
       case v: Val.Obj =>
         rhs match {
           case i: Val.Str => v.value(i.str, pos)
           case _          =>
-            Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+            Error.fail(s"Attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
         }
       case _ =>
-        Error.fail(s"attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
+        Error.fail(s"Attempted to index a ${lhs.prettyName} with ${rhs.prettyName}", pos)
     }
   }
 
@@ -1315,12 +1315,12 @@ class Evaluator(
           case b: Val.Bool =>
             b
           case unknown =>
-            Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+            Error.fail(s"Binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
         }
       case _: Val.False =>
         Val.staticFalse
       case unknown =>
-        Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+        Error.fail(s"Binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
     }
   }
 
@@ -1331,10 +1331,10 @@ class Evaluator(
         visitExpr(e.rhs) match {
           case b: Val.Bool => b
           case unknown     =>
-            Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+            Error.fail(s"Binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
         }
       case unknown =>
-        Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+        Error.fail(s"Binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
     }
   }
 
@@ -1353,21 +1353,21 @@ class Evaluator(
       // Pure numeric fast path: avoid intermediate Val.Num allocation
       case Expr.BinaryOp.OP_* =>
         val r = visitExprAsDouble(e.lhs) * visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_- =>
         val r = visitExprAsDouble(e.lhs) - visitExprAsDouble(e.rhs)
-        if (r.isNaN) Error.fail("not a number", pos)
-        if (r.isInfinite) Error.fail("overflow", pos)
+        if (r.isNaN) Error.fail("Not a number", pos)
+        if (r.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, r)
       case Expr.BinaryOp.OP_/ =>
         val l = visitExprAsDouble(e.lhs)
         val r = visitExprAsDouble(e.rhs)
         if (r == 0) Error.fail("Division by zero.", pos)
         val result = l / r
-        if (result.isNaN) Error.fail("not a number", pos)
-        if (result.isInfinite) Error.fail("overflow", pos)
+        if (result.isNaN) Error.fail("Not a number", pos)
+        if (result.isInfinite) Error.fail("Overflow", pos)
         Val.cachedNum(pos, result)
       // Polymorphic ops: nested match avoids Tuple2 allocation; Num checked first (most common)
       case Expr.BinaryOp.OP_% =>
@@ -1379,7 +1379,7 @@ class Evaluator(
               case Val.Num(_, rd) =>
                 if (rd == 0) Error.fail("Division by zero.", pos)
                 val result = ld % rd
-                if (result.isNaN) Error.fail("not a number", pos)
+                if (result.isNaN) Error.fail("Not a number", pos)
                 Val.cachedNum(pos, result)
               case _ => failBinOp(l, e.op, r, pos)
             }
@@ -1393,8 +1393,8 @@ class Evaluator(
         (l, r) match {
           case (Val.Num(_, l), Val.Num(_, r)) =>
             val result = l + r
-            if (result.isNaN) Error.fail("not a number", pos)
-            if (result.isInfinite) Error.fail("overflow", pos)
+            if (result.isNaN) Error.fail("Not a number", pos)
+            if (result.isInfinite) Error.fail("Overflow", pos)
             Val.cachedNum(pos, result)
           case (l: Val.Str, r: Val.Str) => Val.Str.concat(pos, l, r)
           case (n: Val.Num, r: Val.Str) =>
@@ -1414,17 +1414,17 @@ class Evaluator(
       case Expr.BinaryOp.OP_<< =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         val masked = (rr % 64).toInt
         if (masked >= 1 && math.abs(ll) >= (1L << (63 - masked)))
-          Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+          Error.fail("Numeric value outside safe integer range for bitwise operation", pos)
         else
           Val.cachedNum(pos, (ll << masked).toDouble)
 
       case Expr.BinaryOp.OP_>> =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
-        if (rr < 0) Error.fail("shift by negative exponent", pos)
+        if (rr < 0) Error.fail("Shift by negative exponent", pos)
         Val.cachedNum(pos, (ll >> rr).toDouble)
 
       // Comparison ops: polymorphic (Num/Str/Arr)
@@ -1489,14 +1489,14 @@ class Evaluator(
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
-          Error.fail("cannot test equality of functions", pos)
+          Error.fail("Cannot test equality of functions", pos)
         Val.bool(equal(l, r))
 
       case Expr.BinaryOp.OP_!= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
         if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
-          Error.fail("cannot test equality of functions", pos)
+          Error.fail("Cannot test equality of functions", pos)
         Val.bool(!equal(l, r))
 
       // Bitwise ops: pure numeric with safe-integer range check
@@ -1578,7 +1578,7 @@ class Evaluator(
       case b: Val.Bool  => b
       case tc: TailCall => tc.withBooleanCheck(isAnd = true, andPos)
       case unknown      =>
-        Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", andPos)
+        Error.fail(s"Binary operator && does not operate on ${unknown.prettyName}s.", andPos)
     }
   }
 
@@ -1587,7 +1587,7 @@ class Evaluator(
       case b: Val.Bool  => b
       case tc: TailCall => tc.withBooleanCheck(isAnd = false, orPos)
       case unknown      =>
-        Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", orPos)
+        Error.fail(s"Binary operator || does not operate on ${unknown.prettyName}s.", orPos)
     }
   }
 
@@ -1660,7 +1660,7 @@ class Evaluator(
         case _: Val.True  => visitAndRhsTailPos(e.rhs, e.pos)
         case _: Val.False => Val.staticFalse
         case unknown      =>
-          Error.fail(s"binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
+          Error.fail(s"Binary operator && does not operate on ${unknown.prettyName}s.", e.pos)
       }
     case e: Or =>
       // rhs of || is in tail position: when lhs is false, rhs is returned directly.
@@ -1669,7 +1669,7 @@ class Evaluator(
         case _: Val.True  => Val.staticTrue
         case _: Val.False => visitOrRhsTailPos(e.rhs, e.pos)
         case unknown      =>
-          Error.fail(s"binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
+          Error.fail(s"Binary operator || does not operate on ${unknown.prettyName}s.", e.pos)
       }
     case e: Expr.Error =>
       visitErrorValueTailPos(e.value, e.pos)
@@ -2128,7 +2128,7 @@ class Evaluator(
 
   def equal(x: Val, y: Val): Boolean = ((x eq y) && !x.isInstanceOf[Val.Func]) || (x match {
     case _: Val.Func =>
-      if (y.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
+      if (y.isInstanceOf[Val.Func]) Error.fail("Cannot test equality of functions")
       false
     case _: Val.True  => y.isInstanceOf[Val.True]
     case _: Val.False => y.isInstanceOf[Val.False]
@@ -2160,7 +2160,7 @@ class Evaluator(
               if (!equal(xe.value, ye.value)) return false
             } else {
               val v = xe.value
-              if (v.isInstanceOf[Val.Func]) Error.fail("cannot test equality of functions")
+              if (v.isInstanceOf[Val.Func]) Error.fail("Cannot test equality of functions")
               // else: shared non-Func value, elements are equal
             }
             i += 1
@@ -2198,7 +2198,7 @@ object Evaluator {
   implicit class SafeDoubleOps(private val d: Double) extends AnyVal {
     @inline def toSafeLong(pos: Position)(implicit ev: EvalErrorScope): Long = {
       if (d < Val.DOUBLE_MIN_SAFE_INTEGER || d > Val.DOUBLE_MAX_SAFE_INTEGER)
-        Error.fail("numeric value outside safe integer range for bitwise operation", pos)
+        Error.fail("Numeric value outside safe integer range for bitwise operation", pos)
       d.toLong
     }
   }
