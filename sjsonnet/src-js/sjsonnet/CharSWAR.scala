@@ -7,7 +7,7 @@ object CharSWAR {
     val len = s.length
     while (i < len) {
       val c = s.charAt(i)
-      if (c < 32 || c == '"' || c == '\\') return true
+      if (c < 32 || c == '"' || c == '\\' || (c >= 0x7f && c <= 0x9f)) return true
       i += 1
     }
     false
@@ -17,7 +17,7 @@ object CharSWAR {
     var i = from
     while (i < to) {
       val c = arr(i)
-      if (c < 32 || c == '"' || c == '\\') return true
+      if (c < 32 || c == '"' || c == '\\' || (c >= 0x7f && c <= 0x9f)) return true
       i += 1
     }
     false
@@ -29,7 +29,7 @@ object CharSWAR {
     var i = from
     while (i < to) {
       val c = s.charAt(i)
-      if (c < 32 || c == '"' || c == '\\' || c >= 128) return false
+      if (c < 32 || c == '"' || c == '\\' || c >= 0x7f) return false
       i += 1
     }
     true
@@ -40,7 +40,7 @@ object CharSWAR {
     var i = from
     while (i < to) {
       val b = arr(i) & 0xff
-      if (b < 32 || b == '"' || b == '\\') return true
+      if (b < 32 || b == '"' || b == '\\' || b == 0x7f) return true
       i += 1
     }
     false
@@ -50,7 +50,7 @@ object CharSWAR {
     var i = from
     while (i < to) {
       val b = arr(i) & 0xff
-      if (b < 32 || b == '"' || b == '\\') return i
+      if (b < 32 || b == '"' || b == '\\' || b == 0x7f) return i
       i += 1
     }
     -1

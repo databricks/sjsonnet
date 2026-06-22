@@ -138,9 +138,11 @@ object BaseRenderer {
    * collapses the per-character `Writer.write(int)` loop — which on `StringWriter` synchronizes and
    * bounds-checks per call — into one `System.arraycopy` per safe run, with no upfront pass.
    *
-   * "Safe" characters are everything outside `"`, `\`, control chars `< 0x20`, and — when
-   * `unicode = true` — chars `> 0x7E` (which would otherwise be escaped to `\\uXXXX`). The mapping
-   * for the unsafe set is identical to the per-char path it replaces.
+   * "Safe" characters are everything outside `"`, `\`, control chars `< 0x20`, DEL (0x7F), C1
+   * control characters (0x80–0x9F), and — when `unicode = true` — chars `> 0x7E` (which would
+   * otherwise be escaped to `\\uXXXX`). DEL and C1 are always escaped to match go-jsonnet's
+   * defensive behavior (RFC 8259 only requires U+0000–U+001F). The mapping for the unsafe set is
+   * identical to the per-char path it replaces.
    *
    * Tight, branch-light, charAt-based loop: friendly to JIT inlining (HotSpot, GraalVM) and to
    * Scala Native's LLVM backend. Common case (ASCII-clean strings used by config and manifest
@@ -171,7 +173,9 @@ object BaseRenderer {
       val c = str.charAt(i)
       // Inlined classification, mirroring escapeChars below; `<` on a signed char is fine since
       // chars are unsigned 16-bit; 0x20 / 0x7E comparisons are valid for all values.
-      if (c == '"' || c == '\\' || c < 0x20 || (unicode && c > 0x7e)) {
+      // DEL (0x7F) and C1 control characters (0x80–0x9F) are always escaped to match
+      // go-jsonnet's defensive behavior (RFC 8259 only requires U+0000–U+001F).
+      if (c == '"' || c == '\\' || c < 0x20 || (c >= 0x7f && c <= 0x9f) || (unicode && c > 0x7e)) {
         if (i > start) sb.write(str, start, i - start)
         (c: @switch) match {
           case '"'  => sb.append("\\\"")
@@ -207,7 +211,9 @@ object BaseRenderer {
         case '\r' => sb.append("\\r")
         case '\t' => sb.append("\\t")
         case c    =>
-          if (c < ' ' || (c > '~' && unicode)) {
+          // DEL (0x7F) and C1 control characters (0x80–0x9F) are always escaped to match
+          // go-jsonnet's defensive behavior (RFC 8259 only requires U+0000–U+001F).
+          if (c < ' ' || (c >= 0x7f && c <= 0x9f) || (c > '~' && unicode)) {
             sb.append("\\u")
               .append(toHex((c >> 12) & 15))
               .append(toHex((c >> 8) & 15))

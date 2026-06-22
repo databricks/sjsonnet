@@ -3,17 +3,16 @@ package sjsonnet;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 
 /**
  * SWAR (SIMD Within A Register) escape-char scanner for JSON string rendering.
  *
  * <p>Detects characters requiring JSON escaping: control chars ({@code < 32}),
- * double-quote ({@code '"'}), and backslash ({@code '\\'}).
+ * double-quote ({@code '"'}), backslash ({@code '\\'}), DEL ({@code 0x7F}),
+ * and C1 control characters ({@code 0x80–0x9F}).
  *
- * <p>For strings above a threshold length, converts to ISO-8859-1 bytes and
- * processes 8 bytes at a time using {@link VarHandle} bulk reads + Hacker's
- * Delight zero-detection formula. For shorter strings, uses a scalar charAt loop.
+ * <p>String scans use char-level semantics. Byte-array scans process 8 bytes at a time using
+ * {@link VarHandle} bulk reads + Hacker's Delight zero-detection formula.
  *
  * <p>Based on the SWAR technique from Hacker's Delight Ch. 6, as used by
  * <a href="https://github.com/netty/netty/blob/4.2/common/src/main/java/io/netty/util/internal/SWARUtil.java">
@@ -51,9 +50,6 @@ final class CharSWAR {
     /** Mask for bits 5-7 of each byte; zero result means byte < 32. */
     private static final long CTRL  = 0xE0E0_E0E0_E0E0_E0E0L;
 
-    /** Below this length, scalar charAt is faster than SWAR + byte[] conversion. */
-    private static final int SWAR_THRESHOLD = 128;
-
     private static final long U16_HOLE  = 0x7FFF_7FFF_7FFF_7FFFL;
     private static final long U16_QUOTE = 0x0022_0022_0022_0022L;
     private static final long U16_BSLAS = 0x005C_005C_005C_005CL;
@@ -66,21 +62,14 @@ final class CharSWAR {
      */
     static boolean hasEscapeChar(String str) {
         int len = str.length();
-        if (len < SWAR_THRESHOLD) {
-            return hasEscapeCharScalar(str, len);
-        }
-        // ISO-8859-1 encoding is a JVM intrinsic for LATIN1 compact strings —
-        // essentially a memcpy of the internal byte[]. Chars > 255 map to '?'
-        // (0x3F), which is safe (not a control char, not '"', not '\\').
-        byte[] bytes = str.getBytes(StandardCharsets.ISO_8859_1);
-        return hasEscapeCharSWAR(bytes, 0, bytes.length);
+        return hasEscapeCharScalar(str, len);
     }
 
     /**
      * Check if any byte in {@code arr[from..to)} needs JSON string escaping.
-     * Used by ByteRenderer for in-place SWAR scan on byte[] buffers.
-     * UTF-8 multi-byte sequences never produce bytes matching '"', '\\', or &lt; 0x20,
-     * so this is safe for scanning UTF-8 encoded data.
+     * Used by ByteRenderer for in-place SWAR scan on UTF-8 byte[] buffers. UTF-8 multi-byte
+     * sequences can contain high-bit bytes, but those are data bytes, not JSON escapes; callers that
+     * need C1 detection must scan the original chars before encoding.
      */
     static boolean hasEscapeChar(byte[] arr, int from, int to) {
         return hasEscapeCharSWAR(arr, from, to);
@@ -116,7 +105,7 @@ final class CharSWAR {
         }
         while (i < to) {
             char c = str.charAt(i);
-            if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
+            if (c < 32 || c == '"' || c == '\\' || c >= 0x7F) return false;
             i++;
         }
         return true;
@@ -128,7 +117,7 @@ final class CharSWAR {
     static boolean hasEscapeChar(char[] arr, int from, int to) {
         for (int i = from; i < to; i++) {
             char c = arr[i];
-            if (c < 32 || c == '"' || c == '\\') return true;
+            if (c < 32 || c == '"' || c == '\\' || (c >= 0x7F && c <= 0x9F)) return true;
         }
         return false;
     }
@@ -150,7 +139,7 @@ final class CharSWAR {
         }
         while (i < to) {
             int b = arr[i] & 0xFF;
-            if (b < 32 || b == '"' || b == '\\') return i;
+            if (b < 32 || b == '"' || b == '\\' || b == 0x7F) return i;
             i++;
         }
         return -1;
@@ -167,18 +156,18 @@ final class CharSWAR {
         // Tail: remaining 0-7 bytes
         while (i < to) {
             int b = arr[i] & 0xFF;
-            if (b < 32 || b == '"' || b == '\\') return true;
+            if (b < 32 || b == '"' || b == '\\' || b == 0x7F) return true;
             i++;
         }
         return false;
     }
 
     /**
-     * 8-bit SWAR: returns true if any byte lane in {@code word}
-     * contains '"' (0x22), '\\' (0x5C), or a control char (&lt; 0x20).
+     * 8-bit SWAR mask for bytes requiring JSON escaping: control chars ({@code < 0x20}),
+     * double-quote ({@code '"'}), backslash ({@code '\\'}), or DEL ({@code 0x7F}).
      *
-     * <p>Uses Netty/Pekko pattern: XOR to produce zero lanes, then
-     * Hacker's Delight formula to detect zero bytes.
+     * <p>Uses Netty/Pekko pattern: XOR to produce zero lanes, then Hacker's Delight formula to
+     * detect zero bytes.
      */
     private static long swarMatchMask(long word) {
         // 1. Detect '"' via XOR + zero-detection (Netty SWARUtil.applyPattern)
@@ -193,7 +182,11 @@ final class CharSWAR {
         long c = word & CTRL;
         long cz = ~((c & HOLE) + HOLE | c | HOLE);
 
-        return qz | bz | cz;
+        // 4. Detect DEL (0x7F) via XOR + zero-detection (HOLE == DEL broadcast pattern)
+        long d = word ^ HOLE;
+        long dz = ~((d & HOLE) + HOLE | d | HOLE);
+
+        return qz | bz | cz | dz;
     }
 
     private static int firstMatchedByte(long mask) {
@@ -202,13 +195,16 @@ final class CharSWAR {
                 : Long.numberOfLeadingZeros(mask)) >>> 3;
     }
 
+    private static final long U16_DEL = 0x007F_007F_007F_007FL;
+
     private static boolean swarHasUnsafeAsciiChar(long word) {
         if ((word & U16_ASCII) != 0L) return true;
 
         long qz = zero16(word ^ U16_QUOTE);
         long bz = zero16(word ^ U16_BSLAS);
         long cz = zero16(word & U16_CTRL);
-        return (qz | bz | cz) != 0L;
+        long dz = zero16(word ^ U16_DEL);
+        return (qz | bz | cz | dz) != 0L;
     }
 
     private static long zero16(long word) {
@@ -219,7 +215,7 @@ final class CharSWAR {
     private static boolean hasEscapeCharScalar(String s, int len) {
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
-            if (c < 32 || c == '"' || c == '\\') return true;
+            if (c < 32 || c == '"' || c == '\\' || (c >= 0x7F && c <= 0x9F)) return true;
         }
         return false;
     }
@@ -227,7 +223,7 @@ final class CharSWAR {
     private static boolean isAsciiJsonSafeScalar(String s, int from, int to) {
         for (int i = from; i < to; i++) {
             char c = s.charAt(i);
-            if (c < 32 || c == '"' || c == '\\' || c >= 128) return false;
+            if (c < 32 || c == '"' || c == '\\' || c >= 0x7F) return false;
         }
         return true;
     }
