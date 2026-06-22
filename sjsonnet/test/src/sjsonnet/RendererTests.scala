@@ -1,6 +1,6 @@
 package sjsonnet
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, StringWriter}
 import utest._
 
 object RendererTests extends TestSuite {
@@ -64,6 +64,18 @@ object RendererTests extends TestSuite {
       ujson.transform(ujson.Num(42), new Renderer()).toString ==> "42"
       ujson.transform(ujson.Num(-1), new Renderer()).toString ==> "-1"
       ujson.transform(ujson.Num(1e15), new Renderer()).toString ==> "1000000000000000"
+    }
+
+    test("baseRendererSpecialFloat64Values") {
+      def render(d: Double): String = {
+        val out = new StringWriter
+        new BaseRenderer(out).visitFloat64(d, -1)
+        out.toString
+      }
+
+      render(Double.PositiveInfinity) ==> "\"Infinity\""
+      render(Double.NegativeInfinity) ==> "\"-Infinity\""
+      render(Double.NaN) ==> "\"NaN\""
     }
 
     test("byteRendererFallbackPreservesCycleContext") {

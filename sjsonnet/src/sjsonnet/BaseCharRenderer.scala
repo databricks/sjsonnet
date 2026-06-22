@@ -205,20 +205,13 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
       case Double.NegativeInfinity        => visitNonNullString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitNonNullString("NaN", -1)
       case d                              =>
-        val i = d.toLong
-        if (d == i) {
-          if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
-            visitFloat64StringParts("-0", -1, -1, index)
-          } else writeLongDirect(i)
-        } else if (d % 1 == 0) {
-          visitFloat64StringParts(
-            BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString(),
-            -1,
-            -1,
-            index
-          )
-        } else super.visitFloat64(d, index)
-        flushBuffer()
+        val l = d.toLong
+        if (RenderUtils.isExactLongDouble(d, l)) writeLongDirect(l)
+        else {
+          flushBuffer()
+          appendString(RenderUtils.renderDouble(d))
+          flushBuffer()
+        }
     }
     flushCharBuilder()
     out

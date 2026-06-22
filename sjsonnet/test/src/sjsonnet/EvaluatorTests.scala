@@ -1136,13 +1136,13 @@ object EvaluatorTests extends TestSuite {
     }
 
     test("largeIntegerDoubleMaterialization") {
-      // std.manifestJson(1e308) should output full decimal, not "1.0E308"
-      // go-jsonnet and jrsonnet output 10^308 (1 followed by 308 zeros)
-      val expected1e308 = "1" + "0" * 308
-      eval("""std.manifestJson(1e308)""") ==> ujson.Str(expected1e308)
-      // 1e100 should also work
+      // Large whole numbers that don't fit in Long should render as decimal integers,
+      // without Java scientific notation or exact binary64 noise.
       val expected1e100 = "1" + "0" * 100
+      val expected1e308 = "1" + "0" * 308
       eval("""std.manifestJson(1e100)""") ==> ujson.Str(expected1e100)
+      eval("""std.manifestJson(1e308)""") ==> ujson.Str(expected1e308)
+      eval("""std.manifestToml({a: 1e100})""") ==> ujson.Str("a = " + expected1e100)
     }
 
     test("assertBooleanTypeCheck") {
