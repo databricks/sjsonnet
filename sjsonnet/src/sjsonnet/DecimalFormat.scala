@@ -64,8 +64,11 @@ object DecimalFormat {
       case None =>
         val precision = zeroes + hashes
         if (precision == 0) {
-          // No fractional digits needed - just round and format the integer part
-          val rounded = math.rint(number)
+          // Round half away from zero (matching go-jsonnet/jrsonnet behavior)
+          val rounded =
+            if (number != number || math.abs(number) >= 4503599627370496.0) number
+            else if (number >= 0) math.floor(number + 0.5)
+            else math.ceil(number - 0.5)
           val prefix =
             if (rounded.isInfinite || math.abs(rounded) > Long.MaxValue)
               BigDecimal(rounded).toBigInt.toString
@@ -73,13 +76,14 @@ object DecimalFormat {
           if (alternate) prefix + "." else prefix
         } else {
           val denominator = BigDecimal(10).pow(precision)
-          val bd = BigDecimal(number)
+          val bd = BigDecimal(number).abs
           val scaled =
             (bd * denominator + BigDecimal("0.5")).setScale(0, BigDecimal.RoundingMode.FLOOR)
           val wholeBD = (scaled / denominator).setScale(0, BigDecimal.RoundingMode.FLOOR)
           val fracBD = (scaled - wholeBD * denominator).abs
 
-          val prefix = wholeBD.toBigInt.toString
+          val sign = if (number < 0) "-" else ""
+          val prefix = sign + wholeBD.toBigInt.toString
           val fracStr = fracBD.toBigInt.toString
 
           val frac =
