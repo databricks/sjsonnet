@@ -109,7 +109,7 @@ object RendererTests extends TestSuite {
       assert(out.size() < 15000)
     }
 
-    test("byteRendererRepeatedLongAsciiValues") {
+    def renderByte(expr: String): String = {
       val interpreter = new Interpreter(
         Map(),
         Map(),
@@ -117,11 +117,7 @@ object RendererTests extends TestSuite {
         Importer.empty,
         parseCache = new DefaultParseCache
       )
-      val value = interpreter.evaluate(
-        """local s = std.repeat("x", 2048);
-          |[s, s, s, s, s, s, s, s]""".stripMargin,
-        DummyPath("(memory)")
-      ) match {
+      val value = interpreter.evaluate(expr, DummyPath("(memory)")) match {
         case Right(v)  => v
         case Left(err) => throw new Exception(Error.formatError(err))
       }
@@ -130,9 +126,36 @@ object RendererTests extends TestSuite {
         case Left(err) => throw new Exception(Error.formatError(err))
         case Right(_)  =>
       }
-      val rendered = new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+      new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+    }
+
+    test("byteRendererRepeatedLongAsciiValues") {
+      val rendered = renderByte(
+        """local s = std.repeat("x", 2048);
+          |[s, s, s, s, s, s, s, s]""".stripMargin
+      )
       val elem = "\"" + ("x" * 2048) + "\""
       rendered ==> "[" + Array.fill(8)(elem).mkString(", ") + "]"
+    }
+
+    test("byteRendererEscapesDelAndC1Controls") {
+      renderByte("""[std.char(127), std.char(128), std.char(159)]""") ==>
+      "[\"\\u007f\", \"\\u0080\", \"\\u009f\"]"
+    }
+
+    test("byteRendererPreservesNonAsciiLiterals") {
+      renderByte("""[std.char(160), "é", std.repeat("é", 200)]""") ==>
+      "[\"\u00a0\", \"é\", \"" + ("é" * 200) + "\"]"
+    }
+
+    test("byteRendererLongC1Controls") {
+      renderByte("""std.repeat(std.char(128), 130)""") ==> "\"" + ("\\u0080" * 130) + "\""
+    }
+
+    test("charRendererEscapesDelAndC1Controls") {
+      ujson.transform(ujson.Str("\u007f"), new Renderer()).toString ==> "\"\\u007f\""
+      ujson.transform(ujson.Str("\u0080"), new Renderer()).toString ==> "\"\\u0080\""
+      ujson.transform(ujson.Str("\u009f"), new Renderer()).toString ==> "\"\\u009f\""
     }
 
     test("indentZero") {
@@ -180,13 +203,22 @@ object RendererTests extends TestSuite {
       escape(" ", unicode = true) ==> "\" \""
       escape("~", unicode = true) ==> "\"~\""
 
-      // 0x7F (DEL): escaped under unicode=true, but passes through under unicode=false.
+      // DEL (0x7F) and C1 control characters (0x80-0x9F) are now always escaped as a
+      // \\uNNNN sequence (regardless of the unicode flag) to match go-jsonnet and
+      // C++ jsonnet's defensive behavior. RFC 8259 only requires U+0000-U+001F to be
+      // escaped, but the 0x7F..0x9F range is treated the same way by the reference
+      // implementations.
       escape("\u007f", unicode = true) ==> "\"\\u007f\""
-      escape("\u007f", unicode = false) ==> "\"\u007f\""
+      escape("\u007f", unicode = false) ==> "\"\\u007f\""
+      escape("\u0080", unicode = false) ==> "\"\\u0080\""
+      escape("\u009f", unicode = false) ==> "\"\\u009f\""
+      escape("\u009f", unicode = true) ==> "\"\\u009f\""
 
-      // Higher BMP: \u00ff escaped under unicode=true, passes through under unicode=false.
+      // Higher BMP (>= 0xA0): \\u00ff escaped under unicode=true, passes through under
+      // unicode=false. NBSP (0xA0) and accented letters fall into this category.
       escape("\u00ff", unicode = true) ==> "\"\\u00ff\""
       escape("\u00ff", unicode = false) ==> "\"\u00ff\""
+      escape("\u00a0", unicode = false) ==> "\"\u00a0\""
 
       // U+2028 / U+2029 (JS-specific line separators) — pinned to current behaviour: escaped
       // only when unicode=true. Old per-char path behaved the same way.

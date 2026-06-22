@@ -34,6 +34,9 @@ object BaseCharRenderer {
     while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
     a
   }
+
+  private[sjsonnet] val HEX_CHARS: Array[Char] =
+    Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 }
 
 class BaseCharRenderer[T <: upickle.core.CharOps.Output](
@@ -284,20 +287,51 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
           elemBuilder.length = pos + len
           elemBuilder.appendUnsafe('"')
         } else {
-          upickle.core.RenderUtils
-            .escapeChar(null, elemBuilder, s, escapeUnicode = escapeUnicode, wrapQuotes = true)
+          appendEscapedString(s, escapeUnicode)
         }
       case _ =>
-        upickle.core.RenderUtils.escapeChar(
-          null,
-          elemBuilder,
-          s,
-          escapeUnicode = escapeUnicode,
-          wrapQuotes = true
-        )
+        appendEscapedString(s, escapeUnicode)
     }
     flushCharBuilder()
     out
+  }
+
+  private def appendEscapedString(s: CharSequence, escapeUnicode: Boolean): Unit = {
+    elemBuilder.append('"')
+    var i = 0
+    val len = s.length
+    while (i < len) {
+      s.charAt(i) match {
+        case '"'  => appendEscapedAscii('"')
+        case '\\' => appendEscapedAscii('\\')
+        case '\b' => appendEscapedAscii('b')
+        case '\f' => appendEscapedAscii('f')
+        case '\n' => appendEscapedAscii('n')
+        case '\r' => appendEscapedAscii('r')
+        case '\t' => appendEscapedAscii('t')
+        case c    =>
+          if (c < ' ' || (c >= 0x7f && c <= 0x9f) || (escapeUnicode && c > '~')) {
+            appendUnicodeEscape(c)
+          } else elemBuilder.append(c)
+      }
+      i += 1
+    }
+    elemBuilder.append('"')
+  }
+
+  private def appendEscapedAscii(c: Char): Unit = {
+    elemBuilder.append('\\')
+    elemBuilder.append(c)
+  }
+
+  private def appendUnicodeEscape(c: Char): Unit = {
+    val hex = BaseCharRenderer.HEX_CHARS
+    elemBuilder.append('\\')
+    elemBuilder.append('u')
+    elemBuilder.append(hex((c >> 12) & 0xf))
+    elemBuilder.append(hex((c >> 8) & 0xf))
+    elemBuilder.append(hex((c >> 4) & 0xf))
+    elemBuilder.append(hex(c & 0xf))
   }
 
   /**

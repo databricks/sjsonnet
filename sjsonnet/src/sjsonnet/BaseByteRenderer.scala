@@ -14,7 +14,7 @@ import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
  *
  * String rendering uses a two-tier strategy:
  *   - Short strings (< 128 chars): fused encode+check loop, zero allocation
- *   - Long strings (>= 128 chars): getBytes(UTF-8) + SWAR bulk scan + arraycopy
+ *   - Long strings (>= 128 chars): char-level escape check, then UTF-8 bytes + SWAR bulk scan
  */
 class BaseByteRenderer[T <: java.io.OutputStream](
     out: T,
@@ -223,13 +223,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
         if (len < 128) visitShortString(str, len)
         else visitLongString(str)
       case _ =>
-        upickle.core.RenderUtils.escapeByte(
-          unicodeCharBuilder,
-          elemBuilder,
-          s,
-          escapeUnicode = escapeUnicode,
-          wrapQuotes = true
-        )
+        appendEscapedStringBytes(s, escapeUnicode)
     }
     flushByteBuilder()
     out
@@ -278,7 +272,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
    * Zero-allocation fast path for short ASCII strings (the vast majority of JSON keys/values). Uses
    * getChars to bulk-copy into a reusable char buffer, then scans the buffer directly (avoiding
    * per-char String.charAt virtual dispatch). If any char needs escaping or is non-ASCII, falls
-   * back to escapeByte.
+   * back to appendEscapedStringBytes.
    */
   private def visitShortString(str: String, len: Int): Unit = {
     // Reuse unicodeCharBuilder's array as temp char buffer (no allocation after warmup)
@@ -295,18 +289,12 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     var i = 0
     while (i < len) {
       val c = chars(i)
-      if (c < 0x20 || c == '"' || c == '\\' || c >= 0x80) {
+      if (c < 0x20 || c == '"' || c == '\\' || c >= 0x7f) {
         // DO NOT CHANGE
         // WHY: elemBuilder.length is intentionally NOT updated before this call.
-        // escapeByte writes from the current elemBuilder.length position, overwriting
+        // appendEscapedStringBytes writes from the current elemBuilder.length position, overwriting
         // our partial work in the array. This avoids needing a separate "rollback".
-        upickle.core.RenderUtils.escapeByte(
-          unicodeCharBuilder,
-          elemBuilder,
-          str,
-          escapeUnicode = false,
-          wrapQuotes = true
-        )
+        appendEscapedStringBytes(str, escapeUnicode = false)
         return
       }
       arr(pos) = c.toByte
@@ -318,8 +306,8 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   }
 
   /**
-   * SWAR-accelerated path for long strings. Converts to UTF-8 bytes once, then bulk-copies clean
-   * chunks and escapes only the bytes that require it.
+   * SWAR-accelerated path for long strings. Escapable chars are detected before UTF-8 encoding;
+   * clean non-ASCII strings then encode once and bulk-copy their bytes.
    *
    * Probes the string with a SWAR ASCII-safe scan first. When the string is clean printable ASCII
    * (no escape chars, no non-ASCII), the entire UTF-8 encode pass (HeapCharBuffer.wrap +
@@ -330,6 +318,10 @@ class BaseByteRenderer[T <: java.io.OutputStream](
   private def visitLongString(str: String): Unit = {
     if (Platform.isAsciiJsonSafe(str)) {
       renderAsciiSafeString(str)
+      return
+    }
+    if (CharSWAR.hasEscapeChar(str)) {
+      appendEscapedStringBytes(str, escapeUnicode = false)
       return
     }
     val bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8)
@@ -370,6 +362,60 @@ class BaseByteRenderer[T <: java.io.OutputStream](
       arr(outPos) = '"'.toByte
       elemBuilder.length = outPos + 1
     }
+  }
+
+  private def appendEscapedStringBytes(s: CharSequence, escapeUnicode: Boolean): Unit = {
+    elemBuilder.append('"')
+    var i = 0
+    var start = 0
+    val len = s.length
+    while (i < len) {
+      val c = s.charAt(i)
+      val needsEscape =
+        c == '"' || c == '\\' || c < 0x20 || (c >= 0x7f && c <= 0x9f) || (escapeUnicode && c > 0x7e)
+      if (needsEscape) {
+        appendUtf8Slice(s, start, i)
+        c match {
+          case '"'  => appendEscapedAsciiByte('"')
+          case '\\' => appendEscapedAsciiByte('\\')
+          case '\b' => appendEscapedAsciiByte('b')
+          case '\f' => appendEscapedAsciiByte('f')
+          case '\n' => appendEscapedAsciiByte('n')
+          case '\r' => appendEscapedAsciiByte('r')
+          case '\t' => appendEscapedAsciiByte('t')
+          case _    => appendUnicodeEscapeByte(c)
+        }
+        start = i + 1
+      }
+      i += 1
+    }
+    appendUtf8Slice(s, start, len)
+    elemBuilder.append('"')
+  }
+
+  private def appendUtf8Slice(s: CharSequence, from: Int, to: Int): Unit = {
+    if (from < to) {
+      val bytes = s.subSequence(from, to).toString.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+      elemBuilder.appendAll(bytes, bytes.length)
+    }
+  }
+
+  private def appendEscapedAsciiByte(c: Char): Unit = {
+    elemBuilder.append('\\')
+    elemBuilder.append(c)
+  }
+
+  private def appendUnicodeEscapeByte(c: Char): Unit = {
+    val outPos = elemBuilder.length
+    elemBuilder.ensureLength(6)
+    val arr = elemBuilder.arr
+    arr(outPos) = '\\'.toByte
+    arr(outPos + 1) = 'u'.toByte
+    arr(outPos + 2) = BaseByteRenderer.HEX_BYTES((c >> 12) & 0xf)
+    arr(outPos + 3) = BaseByteRenderer.HEX_BYTES((c >> 8) & 0xf)
+    arr(outPos + 4) = BaseByteRenderer.HEX_BYTES((c >> 4) & 0xf)
+    arr(outPos + 5) = BaseByteRenderer.HEX_BYTES(c & 0xf)
+    elemBuilder.length = outPos + 6
   }
 
   private def escapedStringLength(bytes: Array[Byte], bLen: Int, firstEscape: Int): Int = {
