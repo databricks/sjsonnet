@@ -64,8 +64,14 @@ class TomlRenderer(
       case d if java.lang.Double.compare(d, -0.0) == 0 => out.write("-0")
       case d if math.round(d).toDouble == d => out.write(java.lang.Long.toString(d.toLong))
       case d if d % 1 == 0                  =>
-        out.write(BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString())
-      case d => out.write(java.lang.Double.toString(d))
+        out.write(
+          java.math.BigDecimal
+            .valueOf(d)
+            .setScale(0, java.math.RoundingMode.HALF_EVEN)
+            .toBigInteger
+            .toString
+        )
+      case d => out.write(RenderUtils.formatDoubleString(java.lang.Double.toString(d)))
     }
     flush
   }

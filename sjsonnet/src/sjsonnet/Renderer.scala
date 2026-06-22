@@ -5,7 +5,7 @@ import java.io.{StringWriter, Writer}
 import upickle.core.{ArrVisitor, ObjVisitor}
 
 final class StringBuilderWriter(initialCapacity: Int = 16) extends Writer {
-  private[this] val builder = new java.lang.StringBuilder(initialCapacity)
+  private val builder = new java.lang.StringBuilder(initialCapacity)
 
   /**
    * Exposes the underlying [[java.lang.StringBuilder]] for callers that need direct
@@ -56,27 +56,11 @@ class Renderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
     extends BaseCharRenderer(out, indent) {
   var newlineBuffered = false
   override def visitFloat64(d: Double, index: Int): Writer = {
-    flushBuffer()
-    if (java.lang.Double.compare(d, -0.0) == 0) {
-      elemBuilder.ensureLength(2)
-      elemBuilder.append('-')
-      elemBuilder.append('0')
-      flushCharBuilder()
-      return out
-    }
-    val i = d.toLong
-    if (d == i) {
-      if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
-        appendString("-0")
-      } else {
-        RenderUtils.appendLong(elemBuilder, i)
-      }
-    } else if (d % 1 == 0) {
-      appendString(
-        BigDecimal(d).setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt.toString()
-      )
-    } else {
-      appendString(d.toString)
+    val l = d.toLong
+    if (RenderUtils.isExactLongDouble(d, l)) writeLongDirect(l)
+    else {
+      flushBuffer()
+      appendString(RenderUtils.renderDouble(d))
     }
     flushCharBuilder()
     out
@@ -437,23 +421,107 @@ object RenderUtils {
   // Pre-cached string representations of small integers (0-255)
   private val intStrCache: Array[String] = Array.tabulate(256)(_.toString)
 
+  /** Normalize platform double strings to a stable shortest-round-trip decimal spelling. */
+  private[sjsonnet] def formatDoubleString(s: String): String = {
+    val eIdx = s.indexOf('E')
+    if (eIdx >= 0) {
+      normalizeScientificString(s, eIdx)
+    } else {
+      val eIdxLower = s.indexOf('e')
+      if (eIdxLower >= 0) {
+        normalizeScientificString(s, eIdxLower)
+      } else s
+    }
+  }
+
+  private def normalizeScientificString(s: String, eIdx: Int): String = {
+    val rawMantissa = s.substring(0, eIdx)
+    val exp = s.substring(eIdx + 1)
+    val expValue = Integer.parseInt(exp)
+    val fixed = formatFixedDecimal(rawMantissa, expValue)
+    if (fixed != null) return fixed
+
+    val mantissa = trimTrailingFractionZeros(rawMantissa)
+    val expHasSign = exp.nonEmpty && (exp.charAt(0) == '-' || exp.charAt(0) == '+')
+    val expSign = if (exp.nonEmpty && exp.charAt(0) == '-') "-" else "+"
+    val expDigits = if (expHasSign) exp.substring(1) else exp
+    mantissa + "e" + expSign + padExponent(expDigits)
+  }
+
+  private def formatFixedDecimal(mantissa: String, exp: Int): String = {
+    val negative = mantissa.startsWith("-")
+    val unsigned = if (negative) mantissa.substring(1) else mantissa
+    val dotIdx = unsigned.indexOf('.')
+    val digitsBeforeDecimal = if (dotIdx >= 0) dotIdx else unsigned.length
+    val decimalPoint = digitsBeforeDecimal + exp
+
+    // ECMAScript Number.prototype.toString fixed-notation window: values in
+    // [1e-6, 1e21) are spelled in fixed decimal form, and values outside that
+    // window use scientific notation. JSON/Java/Scala.js follow the same
+    // convention, so this keeps sjsonnet's canonical spelling aligned with
+    // the platforms users compare against.
+    if (decimalPoint <= -6 || decimalPoint > 21) return null
+
+    val digits =
+      if (dotIdx >= 0) unsigned.substring(0, dotIdx) + unsigned.substring(dotIdx + 1)
+      else unsigned
+
+    val fixed =
+      if (decimalPoint <= 0) "0." + ("0" * -decimalPoint) + digits
+      else if (decimalPoint >= digits.length) digits + ("0" * (decimalPoint - digits.length))
+      else digits.substring(0, decimalPoint) + "." + digits.substring(decimalPoint)
+
+    val trimmed = trimTrailingFractionZeros(fixed)
+    if (negative) "-" + trimmed else trimmed
+  }
+
+  private def trimTrailingFractionZeros(s: String): String = {
+    val dotIdx = s.indexOf('.')
+    if (dotIdx < 0) return s
+
+    var end = s.length
+    while (end > dotIdx + 1 && s.charAt(end - 1) == '0') end -= 1
+    if (end == dotIdx + 1) s.substring(0, dotIdx)
+    else s.substring(0, end)
+  }
+
+  private def padExponent(expDigits: String): String =
+    if (expDigits.length < 2) "0" + expDigits else expDigits
+
   /**
-   * Custom rendering of Doubles used in rendering
+   * Custom rendering of Doubles used in rendering.
+   *
+   * Keeps non-integer doubles in fixed decimal form for the common JSON range, and otherwise
+   * normalizes scientific notation to lowercase 'e', explicit sign, and minimum 2 exponent digits.
    */
   def renderDouble(d: Double): String = {
     if (java.lang.Double.compare(d, -0.0) == 0) return "-0"
     val l = d.toLong
-    if (l.toDouble == d && d >= Long.MinValue.toDouble && d < 9223372036854775808.0) {
-      if (l == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) "-0"
-      else if (l >= 0 && l < 256) intStrCache(l.toInt)
+    if (isExactLongDouble(d, l)) {
+      if (l >= 0 && l < 256) intStrCache(l.toInt)
       else l.toString
     } else if (d % 1 == 0) {
-      new java.math.BigDecimal(d)
+      // valueOf uses the canonical decimal spelling of the double. The BigDecimal(double)
+      // constructor exposes the exact binary64 payload, which is surprising for Jsonnet output
+      // and regresses values such as 1e100 into long implementation-specific decimals.
+      // HALF_EVEN is fine here: doubles that reach this branch have magnitude >= 2^53, where
+      // the ULP is >= 1, so no representable value is an exact .5 tie — any rounding mode
+      // yields the same integer.
+      java.math.BigDecimal
+        .valueOf(d)
         .setScale(0, java.math.RoundingMode.HALF_EVEN)
         .toBigInteger
         .toString
-    } else d.toString
+    } else formatDoubleString(d.toString)
   }
+
+  private final val LongUpperExclusive = 9223372036854775808.0
+
+  private[sjsonnet] def isExactLongDouble(d: Double, l: Long): Boolean =
+    java.lang.Double.compare(d, -0.0) != 0 &&
+    l.toDouble == d &&
+    d >= Long.MinValue.toDouble &&
+    d < LongUpperExclusive
 
   /** Maximum number of digits in a Long value (Long.MinValue = -9223372036854775808, 20 chars). */
   private final val MaxLongChars = 20

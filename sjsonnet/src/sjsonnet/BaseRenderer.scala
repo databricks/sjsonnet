@@ -101,16 +101,10 @@ class BaseRenderer[T <: java.io.Writer](out: T, indent: Int = -1, escapeUnicode:
       case Double.NegativeInfinity        => visitString("-Infinity", -1)
       case d if java.lang.Double.isNaN(d) => visitString("NaN", -1)
       case d                              =>
-        val i = d.toLong
-        if (d == i) {
-          if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L)
-            visitFloat64StringParts("-0", -1, -1, index)
-          else
-            visitFloat64StringParts(i.toString, -1, -1, index)
-        } else super.visitFloat64(d, index)
+        flushBuffer()
+        out.append(RenderUtils.renderDouble(d))
         flushBuffer()
     }
-
     out
   }
 

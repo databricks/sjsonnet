@@ -46,27 +46,9 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
 
   /** Render a double value directly into the byte buffer (no OutputStream return). */
   @inline private def renderDouble(d: Double): Unit = {
-    if (java.lang.Double.compare(d, -0.0) == 0) {
-      appendString("-0")
-      return
-    }
-    val i = d.toLong
-    if (d == i && d >= Long.MinValue.toDouble && d < 9223372036854775808.0) {
-      if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
-        appendString("-0")
-      } else {
-        writeLongDirect(i)
-      }
-    } else if (d % 1 == 0) {
-      appendString(
-        new java.math.BigDecimal(d)
-          .setScale(0, java.math.RoundingMode.HALF_EVEN)
-          .toBigInteger
-          .toString
-      )
-    } else {
-      appendString(d.toString)
-    }
+    val l = d.toLong
+    if (RenderUtils.isExactLongDouble(d, l)) writeLongDirect(l)
+    else appendString(RenderUtils.renderDouble(d))
   }
 
   override def flushBuffer(): Unit = {
