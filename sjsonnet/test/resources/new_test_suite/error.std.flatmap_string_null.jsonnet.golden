@@ -1,2 +1,1 @@
-sjsonnet.Error: [std.flatMap] std.flatMap on strings, provided function must return a string, got null
-    at [<root>].(error.std.flatmap_string_null.jsonnet:1:12)
+sjsonnet.Error: [std.flatMap] on strings, provided function must return a string, got null

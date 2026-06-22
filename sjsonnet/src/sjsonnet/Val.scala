@@ -469,7 +469,7 @@ object Val {
   }
   final case class Num(var pos: Position, private val num: Double) extends Literal {
     if (num.isInfinite) {
-      Error.fail("overflow")
+      Error.fail("Overflow")
     }
 
     def prettyName = "number"
@@ -486,11 +486,11 @@ object Val {
 
     def asPositiveInt: Int = {
       if (!num.isWhole || !num.isValidInt) {
-        Error.fail("index value is not a valid integer")
+        Error.fail("Index value is not a valid integer")
       }
 
       if (num.toInt < 0) {
-        Error.fail("index value is not a positive integer, got: " + num.toInt)
+        Error.fail("Index value is not a positive integer, got: " + num.toInt)
       }
       num.toInt
     }
@@ -499,18 +499,18 @@ object Val {
 
     def asSafeLong: Long = {
       if (num.isInfinite || num.isNaN) {
-        Error.fail("numeric value is not finite")
+        Error.fail("Numeric value is not finite")
       }
 
       if (num < DOUBLE_MIN_SAFE_INTEGER || num > DOUBLE_MAX_SAFE_INTEGER) {
-        Error.fail("numeric value outside safe integer range for bitwise operation")
+        Error.fail("Numeric value outside safe integer range for bitwise operation")
       }
       num.toLong
     }
 
     override def asDouble: Double = {
       if (num.isNaN) {
-        Error.fail("not a number")
+        Error.fail("Not a number")
       }
       num
     }
@@ -719,7 +719,7 @@ object Val {
       val leftLen = this.length
       val rhsLen = rhs.length
       val totalLenLong = leftLen.toLong + rhsLen.toLong
-      if (totalLenLong > Int.MaxValue) Error.fail("array too large")
+      if (totalLenLong > Int.MaxValue) Error.fail("Array too large")
       val totalLen = totalLenLong.toInt
       // Use lazy concat when the result is large enough that avoiding the
       // arraycopy is worthwhile. Limit to depth-1 (neither side is a concat view)
@@ -935,7 +935,7 @@ object Val {
     // materialize later anyway; eagerly copying here multiplies thunks and stresses young-gen GC.
     private val sourceLen = source.length
     private val totalLen = sourceLen.toLong * count.toLong
-    if (totalLen > Int.MaxValue) throw new IllegalArgumentException("array too large")
+    if (totalLen > Int.MaxValue) throw new IllegalArgumentException("Array too large")
     _length = totalLen.toInt
 
     override def value(i: Int): Val =
@@ -2633,13 +2633,13 @@ object Val {
             val idx = params.paramMap.getOrElse(
               namedNames(i),
               Error.fail(
-                s"has no parameter ${namedNames(i)}",
+                s"Has no parameter ${namedNames(i)}",
                 outerPos
               )
             )
             if (argVals(base + idx) != null)
               Error.fail(
-                s"binding parameter a second time: ${namedNames(i)}$functionNameSuffix",
+                s"Binding parameter a second time: ${namedNames(i)}$functionNameSuffix",
                 outerPos
               )
             argVals(base + idx) = argsL(j)
@@ -2672,7 +2672,7 @@ object Val {
           if (missing != null) {
             val plural = if (missing.size > 1) "s" else ""
             Error.fail(
-              s"parameter$plural ${missing.mkString(", ")} not bound in call",
+              s"Parameter$plural ${missing.mkString(", ")} not bound in call",
               outerPos
             )
           }
@@ -3055,7 +3055,7 @@ object TailCall {
           case unknown     =>
             val op = if (booleanIsAnd) "&&" else "||"
             Error.fail(
-              s"binary operator $op does not operate on ${unknown.prettyName}s.",
+              s"Binary operator $op does not operate on ${unknown.prettyName}s.",
               booleanPos
             )
         }

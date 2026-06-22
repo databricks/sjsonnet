@@ -1,2 +1,2 @@
-sjsonnet.Error: cannot test equality of functions
+sjsonnet.Error: Cannot test equality of functions
     at [<root>].(error.array_function_element_equality.jsonnet:3:7)

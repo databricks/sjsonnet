@@ -620,7 +620,7 @@ object Format {
         case _   =>
           if (valuesArr != null && i >= valuesArr.length) {
             Error.fail(
-              "Too few values to format: %d, expected at least %d".format(
+              "too few values to format: %d, expected at least %d".format(
                 valuesArr.length,
                 i + 1
               )
@@ -629,7 +629,8 @@ object Format {
           val key = if (labels == null) null else labels(idx)
           val raw =
             if (key == null) {
-              if (valuesArr == null) Error.fail("Invalid format values")
+              if (valuesArr == null)
+                Error.fail("format values must be an array or object")
               // Fast path: skip star checks when format has no * specifiers
               if (!parsed.hasAnyStar) valuesArr.value(i)
               else
@@ -639,10 +640,7 @@ object Format {
                     val width = valuesArr.value(i)
                     if (!width.isInstanceOf[Val.Num]) {
                       Error.fail(
-                        "A * was specified at position %d. An integer is expected for a width"
-                          .format(
-                            idx
-                          )
+                        "* width at position %d requires an integer".format(idx)
                       )
                     }
                     i += 1
@@ -652,8 +650,7 @@ object Format {
                     val precision = valuesArr.value(i)
                     if (!precision.isInstanceOf[Val.Num]) {
                       Error.fail(
-                        "A * was specified at position %d. An integer is expected for a precision"
-                          .format(idx)
+                        "* precision at position %d requires an integer".format(idx)
                       )
                     }
                     i += 1
@@ -663,18 +660,14 @@ object Format {
                     val width = valuesArr.value(i)
                     if (!width.isInstanceOf[Val.Num]) {
                       Error.fail(
-                        "A * was specified at position %d. An integer is expected for a width"
-                          .format(
-                            idx
-                          )
+                        "* width at position %d requires an integer".format(idx)
                       )
                     }
                     i += 1
                     val precision = valuesArr.value(i)
                     if (!precision.isInstanceOf[Val.Num]) {
                       Error.fail(
-                        "A * was specified at position %d. An integer is expected for a precision"
-                          .format(idx)
+                        "* precision at position %d requires an integer".format(idx)
                       )
                     }
                     i += 1
@@ -683,12 +676,12 @@ object Format {
                 }
             } else {
               if (formatted.widthStar)
-                Error.fail("Cannot use * width with object.", pos)
+                Error.fail("cannot use * width with named format", pos)
               if (formatted.precisionStar)
-                Error.fail("Cannot use * precision with object.", pos)
+                Error.fail("cannot use * precision with named format", pos)
               if (valuesArr != null) valuesArr.value(i)
               else if (valuesObj != null) valuesObj.value(key, pos)
-              else Error.fail("Invalid format values")
+              else Error.fail("format values must be an array or object")
             }
           // Direct Val dispatch: skip Materializer for common types (Str, Num, Bool, Null).
           // This avoids the overhead of materializing to ujson.Value and then matching on it,
@@ -697,10 +690,12 @@ object Format {
           if (resultAsciiSafe && !specOutputAsciiSafe(rawVal, formatted.conversion))
             resultAsciiSafe = false
           val formattedValue = rawVal match {
-            case f: Val.Func => Error.fail("Cannot format function value", f)
+            case f: Val.Func => Error.fail("cannot format function value", f)
             case vs: Val.Str =>
               if (formatted.conversion != 's' && formatted.conversion != 'c')
-                Error.fail("Format required a number at %d, got string".format(i))
+                Error.fail(
+                  "expected number at position %d, got string".format(i)
+                )
               widenRaw(formatted, vs.str)
             case vn: Val.Num =>
               val s = vn.asDouble
@@ -717,15 +712,17 @@ object Format {
                 case 'c'             =>
                   val codePoint = s.toInt
                   if (codePoint < 0)
-                    Error.fail("Codepoints must be >= 0, got " + codePoint)
+                    Error.fail("codepoints must be >= 0, got " + codePoint)
                   if (codePoint > 0x10ffff)
-                    Error.fail("Invalid unicode codepoint, got " + codePoint)
+                    Error.fail("invalid unicode codepoint, got " + codePoint)
                   val c = if (codePoint >= 0xd800 && codePoint <= 0xdfff) 0xfffd else codePoint
                   widenRaw(formatted, Character.toString(c))
                 case 's' =>
                   widenRaw(formatted, RenderUtils.renderDouble(s))
                 case _ =>
-                  Error.fail("Format required a %s at %d, got number".format(rawVal.prettyName, i))
+                  Error.fail(
+                    "unsupported format conversion at position %d, got number".format(i)
+                  )
               }
             case _: Val.True =>
               val b = 1
@@ -740,10 +737,12 @@ object Format {
                 case 'g'             => formatGeneric(formatted, b).toLowerCase
                 case 'G'             => formatGeneric(formatted, b)
                 case 'c'             =>
-                  Error.fail("%c expected number / string, got: boolean")
+                  Error.fail("%c expected number or string, got boolean")
                 case 's' => widenRaw(formatted, "true")
                 case _   =>
-                  Error.fail("Format required a %s at %d, got boolean".format(rawVal.prettyName, i))
+                  Error.fail(
+                    "expected number or string at position %d, got boolean".format(i)
+                  )
               }
             case _: Val.False =>
               val b = 0
@@ -758,17 +757,21 @@ object Format {
                 case 'g'             => formatGeneric(formatted, b).toLowerCase
                 case 'G'             => formatGeneric(formatted, b)
                 case 'c'             =>
-                  Error.fail("%c expected number / string, got: boolean")
+                  Error.fail("%c expected number or string, got boolean")
                 case 's' => widenRaw(formatted, "false")
                 case _   =>
-                  Error.fail("Format required a %s at %d, got boolean".format(rawVal.prettyName, i))
+                  Error.fail(
+                    "expected number or string at position %d, got boolean".format(i)
+                  )
               }
             case _: Val.Null =>
               formatted.conversion match {
                 case 's' => widenRaw(formatted, "null")
-                case 'c' => Error.fail("%c expected number / string, got: null")
+                case 'c' => Error.fail("%c expected number or string, got null")
                 case _   =>
-                  Error.fail("Format required number at %d, got null".format(i))
+                  Error.fail(
+                    "expected number or string at position %d, got null".format(i)
+                  )
               }
             case _ =>
               // Complex types (Arr, Obj): materialize via Renderer
@@ -792,7 +795,7 @@ object Format {
 
     if (valuesArr != null && i < valuesArr.length) {
       Error.fail(
-        "Too many values to format: %d, expected %d".format(valuesArr.length, i)
+        "too many values to format: %d, expected %d".format(valuesArr.length, i)
       )
     }
     val resultStr = if (singleSpecNoStatic) singleFormatted else output.toString()
@@ -910,7 +913,7 @@ object Format {
       case _: Val.True  => "true"
       case _: Val.False => "false"
       case _: Val.Null  => "null"
-      case f: Val.Func  => Error.fail("Cannot format function value", f)
+      case f: Val.Func  => Error.fail("cannot format function value", f)
       case other        =>
         // Complex types: materialize via Renderer
         val value = other match {

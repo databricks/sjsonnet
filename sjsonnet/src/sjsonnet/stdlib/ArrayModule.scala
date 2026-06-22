@@ -47,9 +47,11 @@ object ArrayModule extends AbstractFunctionModule {
   @inline private def isDefaultOnEmpty(v: Val): Boolean =
     v.asInstanceOf[AnyRef] eq DefaultOnEmpty
 
-  private def validateKeyF(keyF: Val, pos: Position)(implicit ev: EvalErrorScope): Unit = {
+  private def validateKeyF(callerName: String, keyF: Val, pos: Position)(implicit
+      ev: EvalErrorScope
+  ): Unit = {
     if (!isDefaultKeyF(keyF) && !keyF.isInstanceOf[Val.Func])
-      Error.fail("keyF must be a function, got " + keyF.prettyName, pos)
+      Error.fail(s"keyF must be a function, got ${keyF.prettyName}", pos)
   }
 
   private def applyArrayKey(keyF: Val, elem: Val, pos: Position, ev: EvalScope): Val =
@@ -180,11 +182,11 @@ object ArrayModule extends AbstractFunctionModule {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
-      validateKeyF(keyF, pos)(ev)
+      validateKeyF("minArray", keyF, pos)(ev)
       if (arr.length == 0) {
         val onEmpty = args(2).value
         if (isDefaultOnEmpty(onEmpty)) {
-          Error.fail("Expected at least one element in array. Got none")
+          Error.fail("expected at least one element in array, got none")
         } else {
           onEmpty
         }
@@ -227,11 +229,11 @@ object ArrayModule extends AbstractFunctionModule {
     override def evalRhs(args: Array[? <: Eval], ev: EvalScope, pos: Position): Val = {
       val arr = args(0).value.asArr
       val keyF = args(1).value
-      validateKeyF(keyF, pos)(ev)
+      validateKeyF("maxArray", keyF, pos)(ev)
       if (arr.length == 0) {
         val onEmpty = args(2).value
         if (isDefaultOnEmpty(onEmpty)) {
-          Error.fail("Expected at least one element in array. Got none")
+          Error.fail("expected at least one element in array, got none")
         } else {
           onEmpty
         }
@@ -475,7 +477,9 @@ object ArrayModule extends AbstractFunctionModule {
             case v: Val.Arr =>
               v.copyEvalTo(out)
             case x =>
-              Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
+              Error.fail(
+                "cannot concatenate — arrays contain incompatible types (got array and " + x.prettyName + ")"
+              )
           }
           i += 1
         }
@@ -490,9 +494,12 @@ object ArrayModule extends AbstractFunctionModule {
           case v: Val.Arr =>
             parts(i) = v
             totalLen += v.length
-            if (totalLen > Int.MaxValue) Error.fail("array too large", pos)(ev)
+            if (totalLen > Int.MaxValue)
+              Error.fail("array too large (" + totalLen + " elements)", pos)(ev)
           case x =>
-            Error.fail("binary operator + requires matching types, got array and " + x.prettyName)
+            Error.fail(
+              "cannot concatenate — arrays contain incompatible types (got array and " + x.prettyName + ")"
+            )
         }
         i += 1
       }
@@ -574,7 +581,7 @@ object ArrayModule extends AbstractFunctionModule {
             val secondArg = x.value match {
               case Val.Str(_, value) => value
               case n                 =>
-                Error.fail("std.member second argument must be a string, got " + n.prettyName)
+                Error.fail("second argument must be a string, got " + n.prettyName)
             }
             str.str.contains(secondArg)
           case a: Val.Arr =>
@@ -587,7 +594,7 @@ object ArrayModule extends AbstractFunctionModule {
             found
           case arr =>
             Error.fail(
-              "std.member first argument must be an array or a string, got " + arr.prettyName
+              "first argument must be an array or a string, got " + arr.prettyName
             )
         }
       )
@@ -604,7 +611,7 @@ object ArrayModule extends AbstractFunctionModule {
   private def requireInt(v: Val, name: String, pos: Position)(implicit ev: EvalErrorScope): Int = {
     val d = v.asDouble
     if (d.isNaN || d.isInfinite || Math.floor(d) != d)
-      Error.fail(s"std.range $name must be an integer, got $d", pos)
+      Error.fail(s"$name must be an integer, got $d", pos)
     d.toInt
   }
 
@@ -617,7 +624,7 @@ object ArrayModule extends AbstractFunctionModule {
       val size =
         if (sizeLong <= 0) 0
         else if (sizeLong > Int.MaxValue)
-          Error.fail("std.range result too large: " + sizeLong + " elements")
+          Error.fail("result too large: " + sizeLong + " elements")
         else sizeLong.toInt
       // Lazy range: O(1) creation, elements computed on demand.
       // Particularly beneficial for patterns like `std.range(1, 1000000) + [x]`
@@ -814,7 +821,7 @@ object ArrayModule extends AbstractFunctionModule {
           }
           current
 
-        case arr => Error.fail("Cannot call foldl on " + arr.prettyName)
+        case arr => Error.fail("cannot fold " + arr.prettyName)
       }
 
     }
@@ -860,7 +867,7 @@ object ArrayModule extends AbstractFunctionModule {
             )
           }
           current
-        case arr => Error.fail("Cannot call foldr on " + arr.prettyName)
+        case arr => Error.fail("cannot fold " + arr.prettyName)
       }
     }
   }
@@ -924,7 +931,7 @@ object ArrayModule extends AbstractFunctionModule {
                 totalLen += va.length
               case unknown =>
                 Error.fail(
-                  "std.flatMap on arrays, provided function must return an array, got " + unknown.prettyName
+                  "on arrays, provided function must return an array, got " + unknown.prettyName
                 )
             }
             i += 1
@@ -955,7 +962,7 @@ object ArrayModule extends AbstractFunctionModule {
                 case fstr: Val.Str => fstr.str
                 case x             =>
                   Error.fail(
-                    "std.flatMap on strings, provided function must return a string, got " + fres
+                    "on strings, provided function must return a string, got " + fres
                       .asInstanceOf[Val]
                       .value
                       .prettyName
@@ -966,7 +973,7 @@ object ArrayModule extends AbstractFunctionModule {
           }
           Val.Str(pos, builder.toString)
         case unknown =>
-          Error.fail("std.flatMap second param must be array / string, got " + unknown.prettyName)
+          Error.fail("second param must be array / string, got " + unknown.prettyName)
       }
       res
     },
@@ -1002,10 +1009,10 @@ object ArrayModule extends AbstractFunctionModule {
      */
     builtin("repeat", "what", "count") { (pos, ev, what: Val, count: Double) =>
       if (count.isNaN || count.isInfinite || Math.floor(count) != count)
-        Error.fail("std.repeat count must be an integer, got " + count, pos)(ev)
+        Error.fail("count must be an integer, got " + count, pos)(ev)
       val countInt = count.toInt
       if (countInt < 0) {
-        Error.fail("repeat requires count >= 0, got " + countInt)
+        Error.fail("count must be >= 0, got " + countInt)
       }
       val res: Val = what match {
         case Val.Str(_, str) =>
@@ -1014,9 +1021,15 @@ object ArrayModule extends AbstractFunctionModule {
           else Val.Str(pos, repeated)
         case a: Val.Arr =>
           if (a.length.toLong * countInt.toLong > Int.MaxValue)
-            Error.fail("array too large", pos)(ev)
+            Error.fail(
+              "array too large (" + a.length.toLong * countInt.toLong + " elements)",
+              pos
+            )(ev)
           Val.Arr.repeated(pos, a, countInt)
-        case x => Error.fail("std.repeat first argument must be an array or a string")
+        case x =>
+          Error.fail(
+            "first argument must be an array or a string, got " + x.prettyName
+          )
       }
       res
     },
@@ -1100,7 +1113,10 @@ object ArrayModule extends AbstractFunctionModule {
           if (!d.isWhole)
             Error.fail("idx must be an integer, got " + d, pos)(ev)
           if (d < 0 || d >= arr.length)
-            Error.fail("idx out of bounds", pos)(ev)
+            Error.fail(
+              "idx " + d.toInt + " out of bounds, array length " + arr.length,
+              pos
+            )(ev)
           d.toInt
         case _ =>
           Error.fail("idx must be a number, got " + idx.value.prettyName, pos)(ev)
@@ -1124,7 +1140,7 @@ object ArrayModule extends AbstractFunctionModule {
           while (i < arr.length) {
             arr.value(i) match {
               case n: Val.Num => sum += n.asDouble
-              case x          => Error.fail("std.sum expected number, got " + x.prettyName)
+              case x          => Error.fail("expected number, got " + x.prettyName)
             }
             i += 1
           }
@@ -1140,7 +1156,7 @@ object ArrayModule extends AbstractFunctionModule {
      */
     builtin("avg", "arr") { (_, _, arr: Val.Arr) =>
       if (arr.length == 0) {
-        Error.fail("Cannot calculate average of an empty array")
+        Error.fail("cannot calculate average of an empty array")
       }
       arr match {
         case r: Val.RangeArr =>
@@ -1153,7 +1169,7 @@ object ArrayModule extends AbstractFunctionModule {
           while (i < arr.length) {
             arr.value(i) match {
               case n: Val.Num => sum += n.asDouble
-              case x          => Error.fail("std.avg expected number, got " + x.prettyName)
+              case x          => Error.fail("expected number, got " + x.prettyName)
             }
             i += 1
           }

@@ -28,7 +28,7 @@ object TailCallOptimizationTests extends TestSuite {
           |factorial(1000)
           |""".stripMargin
       )
-      assert(err.contains("overflow"))
+      assert(err.contains("Overflow"))
     }
 
     test("tailstrictDeepRecursionSum") {

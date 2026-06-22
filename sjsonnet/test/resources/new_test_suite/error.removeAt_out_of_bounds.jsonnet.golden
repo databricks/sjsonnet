@@ -1,1 +1,1 @@
-sjsonnet.Error: [std.removeAt] idx out of bounds
+sjsonnet.Error: [std.removeAt] idx 10 out of bounds, array length 3

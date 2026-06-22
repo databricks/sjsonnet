@@ -46,7 +46,7 @@ object EvaluatorTests extends TestSuite {
       eval("[1, [2, 3], 4][1][0]") ==> ujson.Num(2)
       eval("([1, 2, 3] + [4, 5, 6])[3]") ==> ujson.Num(4)
       evalErr("[][0]") ==>
-      """sjsonnet.Error: array bounds error: array is empty
+      """sjsonnet.Error: Array bounds error: array is empty
         |at [<root>].(:1:3)""".stripMargin
       eval("std.slice(std.range(1,4), 0, null, 2)") ==> ujson
         .Arr(1, 3)
@@ -526,7 +526,7 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("parameter y not bound in call"))
+      assert(ex.getMessage.contains("Parameter y not bound in call"))
     }
 
     test("invalidParam") {
@@ -543,7 +543,7 @@ object EvaluatorTests extends TestSuite {
         )
       }
 
-      assert(ex.getMessage.contains("has no parameter hello"))
+      assert(ex.getMessage.contains("Has no parameter hello"))
     }
 
     test("unknownVariable") {
@@ -651,12 +651,12 @@ object EvaluatorTests extends TestSuite {
       val ex = assertThrows[Exception](
         eval("1 && 2")
       )
-      assert(ex.getMessage.contains("binary operator && does not operate on numbers."))
+      assert(ex.getMessage.contains("Binary operator && does not operate on numbers."))
 
       val ex2 = assertThrows[Exception](
         eval("1 || 2")
       )
-      assert(ex2.getMessage.contains("binary operator || does not operate on numbers."))
+      assert(ex2.getMessage.contains("Binary operator || does not operate on numbers."))
     }
     test("stdToString") {
       eval("""std.toString({k: "v"})""") ==> ujson.Str(
@@ -701,37 +701,37 @@ object EvaluatorTests extends TestSuite {
     test("formatNullErrors") {
       evalErr(
         "'%d' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%f' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%e' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%g' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%o' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%x' % null"
-      ) ==> "sjsonnet.Error: [std.format] Format required number at 0, got null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got null\nat [<root>].(:1:6)"
       evalErr(
         "'%c' % null"
-      ) ==> "sjsonnet.Error: [std.format] %c expected number / string, got: null\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] %c expected number or string, got null\nat [<root>].(:1:6)"
       eval("'%s' % null") ==> ujson.Str("null")
     }
     test("formatTypeErrorMessages") {
       evalErr(
         "'%a' % 42"
-      ) ==> "sjsonnet.Error: [std.format] Format required a number at 0, got number\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] unsupported format conversion at position 0, got number\nat [<root>].(:1:6)"
       evalErr(
         "'%a' % true"
-      ) ==> "sjsonnet.Error: [std.format] Format required a boolean at 0, got boolean\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean\nat [<root>].(:1:6)"
       evalErr(
         "'%a' % false"
-      ) ==> "sjsonnet.Error: [std.format] Format required a boolean at 0, got boolean\nat [<root>].(:1:6)"
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean\nat [<root>].(:1:6)"
     }
     test("strict") {
       eval("({ a: 1 } { b: 2 }).a", strict = false) ==> ujson
@@ -1002,7 +1002,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.substr('hello')")
         }
-        assert(ex.getMessage.contains("parameter"))
+        assert(ex.getMessage.contains("Parameter"))
         assert(ex.getMessage.contains("not bound in call"))
       }
 
@@ -1011,7 +1011,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.length(x=[1], noSuchParam=2)")
         }
-        assert(ex.getMessage.contains("has no parameter noSuchParam"))
+        assert(ex.getMessage.contains("Has no parameter noSuchParam"))
       }
 
       // Binding parameter a second time
@@ -1019,7 +1019,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("std.pow(2, x=3)")
         }
-        assert(ex.getMessage.contains("binding parameter a second time: x in function pow"))
+        assert(ex.getMessage.contains("Binding parameter a second time: x in function pow"))
       }
 
       // User-defined function should include function name from local binding
@@ -1031,7 +1031,7 @@ object EvaluatorTests extends TestSuite {
             """.stripMargin
           )
         }
-        assert(ex.getMessage.contains("parameter y not bound in call"))
+        assert(ex.getMessage.contains("Parameter y not bound in call"))
       }
 
       // User-defined function: too many args should include function name
@@ -1051,7 +1051,7 @@ object EvaluatorTests extends TestSuite {
         val ex = assertThrows[Exception] {
           eval("(function(x, y) x + y)('a')")
         }
-        assert(ex.getMessage.contains("parameter y not bound in call"))
+        assert(ex.getMessage.contains("Parameter y not bound in call"))
       }
 
       // Anonymous function: too many args should NOT include function name

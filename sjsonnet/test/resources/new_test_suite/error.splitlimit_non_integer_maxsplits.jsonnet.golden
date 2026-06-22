@@ -1,1 +1,1 @@
-sjsonnet.Error: [std.splitLimit] std.splitLimit third parameter must be an integer, got 1.5
+sjsonnet.Error: [std.splitLimit] third parameter must be an integer, got 1.5

@@ -1,3 +1,2 @@
-sjsonnet.Error: [std.member] std.member first argument must be an array or a string, got object
+sjsonnet.Error: [std.member] first argument must be an array or a string, got object
     at [<root>].(builtin_member_object_invalid.jsonnet:1:11)
-

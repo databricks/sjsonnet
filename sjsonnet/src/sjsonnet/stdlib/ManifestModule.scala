@@ -28,6 +28,15 @@ import scala.collection.mutable
 object ManifestModule extends AbstractFunctionModule {
   def name = "manifest"
 
+  private def ujsonTypeName(v: ujson.Value): String = v match {
+    case _: ujson.Str  => "string"
+    case _: ujson.Num  => "number"
+    case _: ujson.Arr  => "array"
+    case _: ujson.Obj  => "object"
+    case _: ujson.Bool => "boolean"
+    case ujson.Null    => "null"
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-manifestJson std.manifestJson(value)]].
    *
@@ -338,7 +347,8 @@ object ManifestModule extends AbstractFunctionModule {
     def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = {
       v1.value.asArr.foreach {
         case _: Val.Str | _: Val.Null => // donothing
-        case x                        => Error.fail("Cannot call .lines on " + x.value.prettyName)
+        case x                        =>
+          Error.fail("std.lines: expected string or null element, got " + x.value.prettyName)
       }
       Val.Str(
         pos,
@@ -380,7 +390,7 @@ object ManifestModule extends AbstractFunctionModule {
             var i = v.length - 1
             while (i >= 0) { q.push(v.eval(i)); i -= 1 }
           case s: Val.Str => out.write(s.str)
-          case s          => Error.fail("Cannot call deepJoin on " + s.prettyName)
+          case s => Error.fail("std.deepJoin: expected string or array, got " + s.prettyName)
         }
       }
       Val.Str(pos, out.toString)
@@ -426,7 +436,9 @@ object ManifestModule extends AbstractFunctionModule {
         case Val.True(_)  => true
         case _            =>
           Error.fail(
-            "indent_array_in_object has to be a boolean, got " + args(1).value.prettyName,
+            "std.manifestYamlDoc: indent_array_in_object has to be a boolean, got " + args(
+              1
+            ).value.prettyName,
             pos
           )(ev)
       }
@@ -434,7 +446,10 @@ object ManifestModule extends AbstractFunctionModule {
         case Val.False(_) => false
         case Val.True(_)  => true
         case _            =>
-          Error.fail("quote_keys has to be a boolean, got " + args(2).value.prettyName, pos)(ev)
+          Error.fail(
+            "std.manifestYamlDoc: quote_keys has to be a boolean, got " + args(2).value.prettyName,
+            pos
+          )(ev)
       }
       Materializer
         .apply0(
@@ -468,7 +483,9 @@ object ManifestModule extends AbstractFunctionModule {
         case Val.True(_)  => true
         case _            =>
           Error.fail(
-            "indent_array_in_object has to be a boolean, got " + args(1).value.prettyName,
+            "std.manifestYamlStream: indent_array_in_object has to be a boolean, got " + args(
+              1
+            ).value.prettyName,
             pos
           )(ev)
       }
@@ -477,7 +494,9 @@ object ManifestModule extends AbstractFunctionModule {
         case Val.True(_)  => true
         case _            =>
           Error.fail(
-            "c_document_end has to be a boolean, got " + args(2).value.prettyName,
+            "std.manifestYamlStream: c_document_end has to be a boolean, got " + args(
+              2
+            ).value.prettyName,
             pos
           )(ev)
       }
@@ -485,7 +504,12 @@ object ManifestModule extends AbstractFunctionModule {
         case Val.False(_) => false
         case Val.True(_)  => true
         case _            =>
-          Error.fail("quote_keys has to be a boolean, got " + args(3).value.prettyName, pos)(ev)
+          Error.fail(
+            "std.manifestYamlStream: quote_keys has to be a boolean, got " + args(
+              3
+            ).value.prettyName,
+            pos
+          )(ev)
       }
       v match {
         case arr: Val.Arr =>
@@ -508,7 +532,8 @@ object ManifestModule extends AbstractFunctionModule {
           if (arr.length == 0) sb.append("---\n\n")
           if (cDocumentEnd) sb.append("...\n")
           sb.toString
-        case _ => Error.fail("manifestYamlStream only takes arrays, got " + v.getClass)
+        case _ =>
+          Error.fail("std.manifestYamlStream: only takes arrays, got " + v.prettyName)
       }
     },
     /**
@@ -612,14 +637,17 @@ object ManifestModule extends AbstractFunctionModule {
                 case (k, ujson.False) => attr(k) := "false"
                 case (k, ujson.Null)  => attr(k) := "null"
 
-                case (k, v) => Error.fail("Cannot call manifestXmlJsonml on " + v.getClass)
+                case (k, v) =>
+                  Error.fail(
+                    "std.manifestXmlJsonml: unsupported attribute type " + ujsonTypeName(v)
+                  )
               }.toSeq,
               children.map(rec)
             )
           case ujson.Arr(mutable.Seq(ujson.Str(t), children @ _*)) =>
             tag(t)(children.map(rec).toSeq)
           case x =>
-            Error.fail("Cannot call manifestXmlJsonml on " + x.getClass)
+            Error.fail("std.manifestXmlJsonml: unsupported type " + ujsonTypeName(x))
         }
       }
       rec(Materializer(value)(ev)).render

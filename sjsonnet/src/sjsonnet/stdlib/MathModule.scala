@@ -101,11 +101,11 @@ object MathModule extends AbstractFunctionModule {
             case "x"      => 0
             case "minVal" => 1
             case "maxVal" => 2
-            case name     => Error.fail(s"has no parameter $name", outerPos)
+            case name     => Error.fail(s"std.clamp: has no parameter $name", outerPos)
           }
           if (args(paramIndex) != null) {
             Error.fail(
-              s"binding parameter a second time: ${namedNames(namedIndex)} in function clamp",
+              s"Binding parameter a second time: ${namedNames(namedIndex)} in function clamp",
               outerPos
             )
           }
@@ -127,7 +127,7 @@ object MathModule extends AbstractFunctionModule {
       }
       if (missingCount > 0) {
         val plural = if (missingCount > 1) "s" else ""
-        Error.fail(s"parameter$plural $missing not bound in call", outerPos)
+        Error.fail(s"Parameter$plural $missing not bound in call", outerPos)
       }
 
       if (tailstrictMode == TailstrictModeEnabled) args.foreach(_.value)
@@ -142,16 +142,16 @@ object MathModule extends AbstractFunctionModule {
       case (l: Val.Str, r: Val.Str)   => Util.compareStringsByCodepoint(l.str, r.str)
       case (l: Val.Arr, r: Val.Arr)   => compareArraysForClamp(l, r, pos)
       case (_: Val.Bool, _: Val.Bool) =>
-        Error.fail(s"binary operator $op does not operate on booleans.", pos)
+        Error.fail(s"Binary operator $op does not operate on booleans.", pos)
       case (_: Val.Null, _: Val.Null) =>
-        Error.fail(s"binary operator $op does not operate on null.", pos)
+        Error.fail(s"Binary operator $op does not operate on null.", pos)
       case (_: Val.Obj, _: Val.Obj) =>
-        Error.fail(s"binary operator $op does not operate on objects.", pos)
+        Error.fail(s"Binary operator $op does not operate on objects.", pos)
       case (_: Val.Func, _: Val.Func) =>
-        Error.fail(s"binary operator $op does not operate on functions.", pos)
+        Error.fail(s"Binary operator $op does not operate on functions.", pos)
       case _ =>
         Error.fail(
-          s"binary operator $op requires matching types, got ${left.prettyName} and ${right.prettyName}.",
+          s"Binary operator $op requires matching types, got ${left.prettyName} and ${right.prettyName}.",
           pos
         )
     }
@@ -164,7 +164,7 @@ object MathModule extends AbstractFunctionModule {
       case (l: Val.Str, r: Val.Str)   => Util.compareStringsByCodepoint(l.str, r.str)
       case (l: Val.Arr, r: Val.Arr)   => compareArraysForClamp(l, r, pos)
       case (_: Val.Null, _: Val.Null) =>
-        Error.fail("binary operator < does not operate on null.", pos)
+        Error.fail("Binary operator < does not operate on null.", pos)
       case (_: Val.Bool, _: Val.Bool) =>
         Error.fail("Values of type boolean are not comparable.", pos)
       case (_: Val.Obj, _: Val.Obj) =>
@@ -220,7 +220,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
       val r = math.sqrt(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.sqrt: not a number", pos)(ev)
       r
     },
     /**
@@ -293,7 +293,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("pow", "x", "n") { (pos, ev, x: Double, n: Double) =>
       val r = math.pow(x, n)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.pow: not a number", pos)(ev)
       r
     },
     /**
@@ -427,7 +427,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("asin", "x") { (pos, ev, x: Double) =>
       val r = math.asin(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.asin: not a number", pos)(ev)
       r
     },
     /**
@@ -439,7 +439,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("acos", "x") { (pos, ev, x: Double) =>
       val r = math.acos(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.acos: not a number", pos)(ev)
       r
     },
     /**
@@ -501,7 +501,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log", "x") { (pos, ev, x: Double) =>
       val r = math.log(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log: not a number", pos)(ev)
       r
     },
     /**
@@ -513,7 +513,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log2", "x") { (pos, ev, x: Double) =>
       val r = math.log(x) / math.log(2.0)
-      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log2: not a number", pos)(ev)
       r
     },
     /**
@@ -525,7 +525,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log10", "x") { (pos, ev, x: Double) =>
       val r = math.log10(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("Not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log10: not a number", pos)(ev)
       r
     },
     /**

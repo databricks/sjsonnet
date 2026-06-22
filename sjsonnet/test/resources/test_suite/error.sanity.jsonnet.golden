@@ -1,3 +1,2 @@
-sjsonnet.Error: [std.assertEqual] assertEqual failed: 1 != 2
+sjsonnet.Error: [std.assertEqual] 1 != 2
     at [<root>].(error.sanity.jsonnet:17:16)
-

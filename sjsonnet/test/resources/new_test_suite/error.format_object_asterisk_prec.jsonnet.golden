@@ -1,1 +1,1 @@
-sjsonnet.Error: [std.format] Cannot use * precision with object.
+sjsonnet.Error: [std.format] cannot use * precision with named format
