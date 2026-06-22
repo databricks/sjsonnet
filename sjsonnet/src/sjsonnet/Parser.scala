@@ -951,7 +951,7 @@ class Parser(
 
   def field[$: P](currentDepth: Int): P[Expr.Member.Field] = {
     P(
-      (Pos ~~ fieldname(currentDepth + 1) ~/ "+".!.? ~ ("(" ~ params(
+      (Pos ~~ fieldname(currentDepth + 1) ~/ "+".!.? ~ ("(" ~/ params(
         currentDepth + 1
       ) ~ ")").? ~ fieldKeySep ~/ expr(currentDepth + 1)).map { case (pos, name, plus, p, h2, e) =>
         Expr.Member.Field(pos, name, plus.nonEmpty, p.orNull, h2, e)
@@ -1045,18 +1045,27 @@ class Parser(
   def params[$: P]: P[Expr.Params] = params(0)
 
   def params[$: P](currentDepth: Int): P[Expr.Params] = {
-    P((id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".?).flatMapX { x =>
+    val ctx = implicitly[P[?]]
+    P(
+      (Pos ~~ id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".?
+    ).flatMapX { x =>
       val seen = collection.mutable.Set.empty[String]
-      var overlap: String = null
-      for ((k, _) <- x) {
-        if (seen(k)) overlap = k
-        else seen.add(k)
+      var overlap: (Position, String) = null
+      for ((pos, k, _) <- x) {
+        if (overlap == null) {
+          if (seen(k)) overlap = (pos, k)
+          else seen.add(k)
+        }
       }
       if (overlap == null) {
-        val names = x.map(_._1).toArray[String]
-        val exprs = x.map(_._2.orNull).toArray[Expr]
+        val names = x.map(_._2).toArray[String]
+        val exprs = x.map(_._3.orNull).toArray[Expr]
         Pass(Expr.Params(names, exprs))
-      } else Fail.opaque("no duplicate parameter: " + overlap)
+      } else {
+        ctx.cut = true
+        ctx.index = overlap._1.offset
+        Fail.opaque("no duplicate parameter: " + overlap._2)
+      }
     }
   }
 
