@@ -390,7 +390,7 @@ object sjsonnet extends VersionFileModule {
 
     object client extends JavaModule with SjsonnetPublishModule {
       def artifactName = "sjsonnet-server"
-      def javacOptions = super.javacOptions() ++ Seq("--release", "17")
+      def javacOptions = super.javacOptions() ++ Seq("--release", "17", "-Xlint:deprecation", "-Werror")
       object test extends JavaTests with TestModule.Junit4
     }
 
@@ -398,7 +398,7 @@ object sjsonnet extends VersionFileModule {
       def artifactName = "sjsonnet-server"
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
-      def scalacOptions = super.scalacOptions() ++ Seq("-release", "17")
+      def scalacOptions = super.scalacOptions() ++ Seq("-release", "17", "-deprecation", "-Werror")
       def javacOptions = super.javacOptions() ++ Seq("--release", "17")
 
       override def prependShellScript = mill.util.Jvm.universalScript(
