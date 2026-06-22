@@ -689,6 +689,9 @@ object EvaluatorTests extends TestSuite {
       eval("'%d' % -1e19") ==> ujson.Str(
         "-10000000000000000000"
       )
+      eval("'%d' % 9223372036854775808") ==> ujson.Str(
+        "9223372036854775808"
+      )
       eval("'%o' % 1e19") ==> ujson.Str(
         "1053071060221172000000"
       )

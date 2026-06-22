@@ -70,9 +70,8 @@ object DecimalFormat {
             else if (number >= 0) math.floor(number + 0.5)
             else math.ceil(number - 0.5)
           val prefix =
-            if (rounded.isInfinite || math.abs(rounded) > Long.MaxValue)
-              BigDecimal(rounded).toBigInt.toString
-            else rounded.toLong.toString
+            if (number != number) rounded.toLong.toString
+            else RenderUtils.truncatedDoubleToString(rounded)
           if (alternate) prefix + "." else prefix
         } else {
           val denominator = BigDecimal(10).pow(precision)
