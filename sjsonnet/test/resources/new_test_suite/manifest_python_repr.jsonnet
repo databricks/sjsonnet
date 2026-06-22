@@ -22,6 +22,7 @@ std.assertEqual(std.manifestPython(0.00012), "0.00012") &&
 std.assertEqual(std.manifestPython(3.141592653589793), "3.141592653589793") &&
 std.assertEqual(std.manifestPython(1e15), "1000000000000000") &&
 std.assertEqual(std.manifestPython(10000000000000000.0), "1e+16") &&
+std.assertEqual(std.manifestPython(9223372036854775808), "9.223372036854776e+18") &&
 // Fractional doubles — scientific outside [-4, 16). Lowercase "e", signed
 // exponent, zero-padded to 2 digits, mantissa stripped of trailing zeros.
 std.assertEqual(std.manifestPython(0.000001), "1e-06") &&

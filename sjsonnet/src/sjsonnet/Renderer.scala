@@ -175,10 +175,10 @@ class PythonRenderer(out: Writer = new StringBuilderWriter(), indent: Int = -1)
       case d                              =>
         val i = d.toLong
         val abs = math.abs(d)
-        if (d == i.toDouble && abs < 1e16) {
-          if (i == 0L && java.lang.Double.doubleToRawLongBits(d) != 0L) {
-            visitFloat64StringParts("-0", -1, -1, index)
-          } else writeLongDirect(i)
+        if (java.lang.Double.compare(d, -0.0) == 0) {
+          visitFloat64StringParts("-0", -1, -1, index)
+        } else if (RenderUtils.isExactLongDouble(d, i) && abs < 1e16) {
+          writeLongDirect(i)
         } else {
           // Non-integer double, or integer-valued double >= 1e16 (Python 3
           // repr() switches to scientific notation at 1e+16). Apply Python
@@ -658,6 +658,49 @@ object RenderUtils {
     l.toDouble == d &&
     d >= Long.MinValue.toDouble &&
     d < LongUpperExclusive
+
+  private final val DoubleFractionMask = 0x000fffffffffffffL
+  private final val DoubleHiddenBit = 0x0010000000000000L
+  private final val DoubleExponentMask = 0x7ffL
+  private final val DoubleMantissaBits = 52
+  private final val DoubleExponentBias = 1023
+
+  private[sjsonnet] def truncateDoubleToBigInt(d: Double): BigInt = {
+    val bits = java.lang.Double.doubleToRawLongBits(d)
+    val rawExponent = ((bits >>> DoubleMantissaBits) & DoubleExponentMask).toInt
+    if (rawExponent == DoubleExponentMask.toInt) {
+      throw new NumberFormatException("Infinite or NaN")
+    }
+
+    val fraction = bits & DoubleFractionMask
+    val (significand, shift) =
+      if (rawExponent == 0) (BigInt(fraction), -1074)
+      else
+        (BigInt(fraction | DoubleHiddenBit), rawExponent - DoubleExponentBias - DoubleMantissaBits)
+
+    val magnitude =
+      if (shift >= 0) significand << shift
+      else significand >> -shift
+
+    if (bits < 0 && magnitude.signum != 0) -magnitude else magnitude
+  }
+
+  private[sjsonnet] def truncatedDoubleDigits(d: Double, radix: Int): (Boolean, String) = {
+    val l = d.toLong
+    if (isExactLongDouble(d, l) && l != Long.MinValue) {
+      val negative = l < 0
+      val magnitude = if (negative) -l else l
+      (negative, java.lang.Long.toString(magnitude, radix))
+    } else {
+      val i = truncateDoubleToBigInt(d)
+      (i.signum < 0, i.abs.toString(radix))
+    }
+  }
+
+  private[sjsonnet] def truncatedDoubleToString(d: Double): String = {
+    val (negative, digits) = truncatedDoubleDigits(d, 10)
+    if (negative) "-" + digits else digits
+  }
 
   /** Maximum number of digits in a Long value (Long.MinValue = -9223372036854775808, 20 chars). */
   private final val MaxLongChars = 20
