@@ -24,16 +24,16 @@ object SetModule extends AbstractFunctionModule {
   def name = "set"
 
   private val DefaultKeyF = Val.Null(dummyPos)
-  private[this] final val SortKindOther = 0
-  private[this] final val SortKindString = 1
-  private[this] final val SortKindNumber = 2
-  private[this] final val SortKindArray = 3
-  private[this] final val SortKindBoolean = 4
-  private[this] final val SortKindObject = 5
-  private[this] final val SortKindNull = 6
-  private[this] final val SortKindFunction = 7
+  private final val SortKindOther = 0
+  private final val SortKindString = 1
+  private final val SortKindNumber = 2
+  private final val SortKindArray = 3
+  private final val SortKindBoolean = 4
+  private final val SortKindObject = 5
+  private final val SortKindNull = 6
+  private final val SortKindFunction = 7
 
-  @inline private[this] def sortKind(v: Val): Int = v match {
+  @inline private def sortKind(v: Val): Int = v match {
     case _: Val.Str  => SortKindString
     case _: Val.Num  => SortKindNumber
     case _: Val.Arr  => SortKindArray
@@ -44,7 +44,7 @@ object SetModule extends AbstractFunctionModule {
     case _           => SortKindOther
   }
 
-  @inline private[this] def allSameSortKind(values: Array[Val], kind: Int): Boolean = {
+  @inline private def allSameSortKind(values: Array[Val], kind: Int): Boolean = {
     var i = 1
     while (i < values.length) {
       if (sortKind(values(i)) != kind) return false
