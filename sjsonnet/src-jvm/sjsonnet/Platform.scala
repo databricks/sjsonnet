@@ -73,36 +73,56 @@ object Platform {
     xzBytes(s.getBytes(UTF_8), compressionLevel)
   }
 
-  private val Yaml12OctalPattern = java.util.regex.Pattern.compile("[-+]?0o[0-7][0-7_]*")
+  private val Yaml12OctalPattern = "[-+]?0o[0-7][0-7_]*".r
   private val YamlInvalidOctalDecimalPattern =
-    java.util.regex.Pattern.compile("[-+]?0[0-9]*[89][0-9]*")
-  private val YamlNonFiniteFloatPattern =
-    java.util.regex.Pattern.compile("[-+]?[.](?:inf|Inf|INF|nan|NaN|NAN)")
+    "[-+]?0[0-9]*[89][0-9]*".r
+  private val YamlNonFiniteInfPattern =
+    "[-+]?[.](?:inf|Inf|INF)".r
+  private val YamlNonFiniteNaNPattern =
+    "[.](?:nan|NaN|NAN)".r
+  private val YamlSignedNonFiniteNaNPattern =
+    "[-+][.](?:nan|NaN|NAN)".r
+
+  private def regexMatches(pattern: scala.util.matching.Regex, value: String): Boolean =
+    pattern.pattern.matcher(value).matches()
+
+  private def normalizeYamlNonFinite(value: String): String = value match {
+    case ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF" => ".inf"
+    case "-.inf" | "-.Inf" | "-.INF"                            => "-.inf"
+    case ".nan" | ".NaN" | ".NAN"                               => ".nan"
+    case other                                                  => other
+  }
+
+  private def isYamlNonFiniteCoreForm(value: String): Boolean =
+    regexMatches(YamlNonFiniteInfPattern, value) ||
+    regexMatches(YamlNonFiniteNaNPattern, value)
+
+  private def isSignedYamlNaN(value: String): Boolean =
+    regexMatches(YamlSignedNonFiniteNaNPattern, value)
 
   private def parseYamlDecimalLong(value: String): ujson.Num =
     ujson.Num(java.lang.Long.parseLong(value).toDouble)
 
-  private def yamlNodeToJson(node: Node): ujson.Value = node match {
+  private def yamlNodeToJson(node: Node, input: String): ujson.Value = node match {
     case sn: ScalarNode =>
       val value = sn.getValue
       val tag = sn.getTag
       val isPlain = sn.getScalarStyle == DumperOptions.ScalarStyle.PLAIN
+      val normalizedNonFinite = normalizeYamlNonFiniteScalar(sn, input)
 
-      if (isPlain && Yaml12OctalPattern.matcher(value).matches()) {
+      if (isPlain && regexMatches(Yaml12OctalPattern, value)) {
         val negative = value.charAt(0) == '-'
         val octalPart =
           if (negative || value.charAt(0) == '+') value.substring(3) else value.substring(2)
         val result = java.lang.Long.parseLong(octalPart.replace("_", ""), 8)
         val signed = if (negative) -result else result
         ujson.Num(signed.toDouble)
-      } else if (isPlain && YamlInvalidOctalDecimalPattern.matcher(value).matches()) {
+      } else if (isPlain && regexMatches(YamlInvalidOctalDecimalPattern, value)) {
         parseYamlDecimalLong(value)
       } else if (isPlain && value.contains(":") && (tag == Tag.INT || tag == Tag.FLOAT)) {
         ujson.Str(value)
-      } else if (
-        isPlain && tag == Tag.FLOAT && YamlNonFiniteFloatPattern.matcher(value).matches()
-      ) {
-        ujson.Str(value)
+      } else if (normalizedNonFinite.isDefined) {
+        ujson.Str(normalizedNonFinite.get)
       } else if (tag == Tag.INT) {
         val cleaned = value.replace("_", "")
         val result: Long =
@@ -131,16 +151,21 @@ object Platform {
             cleaned.toLong
           }
         ujson.Num(result.toDouble)
+      } else if (tag == Tag.FLOAT && isSignedYamlNaN(value) && !hasExplicitFloatTag(sn, input)) {
+        ujson.Str(value)
       } else if (tag == Tag.FLOAT) {
         val cleaned = value.replace("_", "")
         val result = cleaned match {
           case ".inf" | ".Inf" | ".INF"    => Double.PositiveInfinity
           case "+.inf" | "+.Inf" | "+.INF" => Double.PositiveInfinity
           case "-.inf" | "-.Inf" | "-.INF" => Double.NegativeInfinity
-          case ".nan" | ".NaN" | ".NAN"    => Double.NaN
-          case s                           => s.toDouble
+          case ".nan" | ".NaN" | ".NAN" | "+.nan" | "+.NaN" | "+.NAN" | "-.nan" | "-.NaN" |
+              "-.NAN" =>
+            Double.NaN
+          case s => s.toDouble
         }
-        if (java.lang.Double.isFinite(result)) ujson.Num(result) else ujson.Str(value)
+        if (java.lang.Double.isFinite(result)) ujson.Num(result)
+        else ujson.Str(normalizeYamlNonFinite(value))
       } else if (tag == Tag.BOOL) {
         ujson.Bool(value.toLowerCase match {
           case "true" | "yes" | "on"  => true
@@ -158,17 +183,17 @@ object Platform {
       buf.sizeHint(mn.getValue.size)
       for (tuple <- mn.getValue.asScala) {
         val key = tuple.getKeyNode match {
-          case sn: ScalarNode => sn.getValue
+          case sn: ScalarNode => yamlScalarKey(sn, input)
           case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
         }
-        buf(key) = yamlNodeToJson(tuple.getValueNode)
+        buf(key) = yamlNodeToJson(tuple.getValueNode, input)
       }
       ujson.Obj(buf)
 
     case sn: SequenceNode =>
       val buf = new mutable.ArrayBuffer[ujson.Value](sn.getValue.size)
       for (n <- sn.getValue.asScala) {
-        buf += yamlNodeToJson(n)
+        buf += yamlNodeToJson(n, input)
       }
       ujson.Arr(buf)
 
@@ -176,21 +201,186 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
+  private def yamlScalarKey(sn: ScalarNode, input: String): String =
+    normalizeYamlNonFiniteScalar(sn, input).getOrElse(sn.getValue)
+
+  private def normalizeYamlNonFiniteScalar(sn: ScalarNode, input: String): Option[String] = {
+    val value = sn.getValue
+    val tag = sn.getTag
+    val isPlain = sn.getScalarStyle == DumperOptions.ScalarStyle.PLAIN
+    val isCoreNonFinite = isYamlNonFiniteCoreForm(value)
+    val isExplicitSignedNaN =
+      tag == Tag.FLOAT && isSignedYamlNaN(value) && hasExplicitFloatTag(sn, input)
+    val canNormalizeResolvedFloat =
+      tag == Tag.FLOAT && (isCoreNonFinite || isExplicitSignedNaN)
+    val canNormalizePlainCoreString =
+      isCoreNonFinite && isPlain && tag == Tag.STR && !isQuotedScalar(sn, input) &&
+      !hasExplicitStringTag(sn, input)
+    if (canNormalizeResolvedFloat || canNormalizePlainCoreString) {
+      Some {
+        if (isExplicitSignedNaN) ".nan"
+        else normalizeYamlNonFinite(value)
+      }
+    } else {
+      None
+    }
+  }
+
+  private def isQuotedScalar(sn: ScalarNode, input: String): Boolean = {
+    val mark = sn.getStartMark
+    if (mark == null) false
+    else {
+      val offset = mark.getIndex
+      def isQuoteAt(i: Int): Boolean =
+        i >= 0 && i < input.length && {
+          val c = input.charAt(i)
+          c == '"' || c == '\''
+        }
+      isQuoteAt(offset) || isQuoteAt(offset - 1)
+    }
+  }
+
+  private def hasExplicitStringTag(sn: ScalarNode, input: String): Boolean = {
+    val mark = sn.getStartMark
+    if (mark == null) false
+    else hasExplicitStringTagAt(mark.getIndex, sn.getValue, input)
+  }
+
+  private def hasExplicitFloatTag(sn: ScalarNode, input: String): Boolean = {
+    val mark = sn.getStartMark
+    if (mark == null) false
+    else hasExplicitFloatTagAt(mark.getIndex, sn.getValue, input)
+  }
+
+  private def hasExplicitStringTagAt(offset: Int, value: String, input: String): Boolean = {
+    if (offset < 0 || offset > input.length) false
+    else {
+      val valueOffset =
+        if (value.isEmpty) offset
+        else {
+          val found = input.indexOf(value, offset)
+          if (found >= 0) found else offset
+        }
+      val scanEnd = math.max(0, math.min(valueOffset, input.length))
+      val lineStart = input.lastIndexOf('\n', math.max(0, math.min(offset, input.length) - 1)) + 1
+      val prefixStart = yamlScalarPrefixStart(input, lineStart, scanEnd)
+      containsExplicitStringTag(input.substring(prefixStart, scanEnd))
+    }
+  }
+
+  private def hasExplicitFloatTagAt(offset: Int, value: String, input: String): Boolean = {
+    if (offset < 0 || offset > input.length) false
+    else {
+      val valueOffset =
+        if (value.isEmpty) offset
+        else {
+          val found = input.indexOf(value, offset)
+          if (found >= 0) found else offset
+        }
+      val scanEnd = math.max(0, math.min(valueOffset, input.length))
+      val lineStart = input.lastIndexOf('\n', math.max(0, math.min(offset, input.length) - 1)) + 1
+      val prefixStart = yamlScalarPrefixStart(input, lineStart, scanEnd)
+      containsExplicitFloatTag(input.substring(prefixStart, scanEnd))
+    }
+  }
+
+  private def yamlScalarPrefixStart(input: String, from: Int, until: Int): Int = {
+    var i = from
+    var start = from
+    var inVerbatimTag = false
+    var quoted: Char = 0
+    while (i < until) {
+      val c = input.charAt(i)
+      if (quoted != 0) {
+        if (c == quoted) {
+          if (quoted == '\'' && i + 1 < until && input.charAt(i + 1) == '\'') i += 1
+          else if (quoted != '"' || !isEscapedDoubleQuote(input, i, from)) quoted = 0
+        }
+      } else if (inVerbatimTag) {
+        if (c == '>') inVerbatimTag = false
+      } else if ((c == '"' || c == '\'') && isYamlScalarQuoteStart(input, start, i)) {
+        quoted = c
+      } else if (c == '#' && (i == from || input.charAt(i - 1).isWhitespace)) {
+        return start
+      } else if (c == '<' && i > from && input.charAt(i - 1) == '!') {
+        inVerbatimTag = true
+      } else if (c == '[' || c == ']' || c == '{' || c == '}' || c == ',' || c == ':') {
+        start = i + 1
+      }
+      i += 1
+    }
+    start
+  }
+
+  private def isEscapedDoubleQuote(input: String, quoteIndex: Int, from: Int): Boolean = {
+    var i = quoteIndex - 1
+    var backslashes = 0
+    while (i >= from && input.charAt(i) == '\\') {
+      backslashes += 1
+      i -= 1
+    }
+    (backslashes & 1) == 1
+  }
+
+  private def isYamlScalarQuoteStart(input: String, scalarStart: Int, quoteIndex: Int): Boolean = {
+    var i = scalarStart
+    while (true) {
+      while (i < quoteIndex && input.charAt(i).isWhitespace) i += 1
+      if (i >= quoteIndex) return true
+
+      val tokenStart = i
+      while (i < quoteIndex && !input.charAt(i).isWhitespace) i += 1
+      val token = input.substring(tokenStart, i)
+      if (!isYamlNodePropertyToken(token)) return false
+    }
+    false
+  }
+
+  private def isYamlNodePropertyToken(token: String): Boolean = {
+    token.startsWith("!") || token.startsWith("&")
+  }
+
+  private def containsExplicitStringTag(prefix: String): Boolean =
+    containsExplicitTag(prefix, token => token.startsWith("!"))
+
+  private def containsExplicitFloatTag(prefix: String): Boolean =
+    containsExplicitTag(prefix, isExplicitFloatTagToken)
+
+  private def containsExplicitTag(prefix: String, matches: String => Boolean): Boolean = {
+    var i = 0
+    while (i < prefix.length) {
+      while (i < prefix.length && prefix.charAt(i).isWhitespace) i += 1
+      if (i >= prefix.length) return false
+      val start = i
+      while (i < prefix.length && !prefix.charAt(i).isWhitespace) i += 1
+      val token = prefix.substring(start, i)
+      if (token.startsWith("#")) return false
+      if (token.startsWith("!") && matches(token)) return true
+    }
+    false
+  }
+
+  private def isExplicitFloatTagToken(token: String): Boolean =
+    token == "!!float" ||
+    token == "!<tag:yaml.org,2002:float>" ||
+    // Shorthand handles are only accepted after SnakeYAML has resolved the node as Tag.FLOAT.
+    token.endsWith("!float")
+
   private val YamlDocStartPattern =
-    java.util.regex.Pattern.compile("\\A\\s*---(?:[ \\t\\n\\r]|\\z)")
+    "\\A\\s*---(?:[ \\t\\n\\r]|\\z)".r
 
   def yamlToJson(yamlString: String): ujson.Value = {
     try {
       val yaml = new Yaml(new LoaderOptions())
       val docs = yaml.composeAll(new java.io.StringReader(yamlString)).asScala.toSeq
-      val hasExplicitDocStart = YamlDocStartPattern.matcher(yamlString).find()
+      val hasExplicitDocStart = YamlDocStartPattern.findFirstIn(yamlString).isDefined
       docs.size match {
         case 0                         => ujson.Null
-        case 1 if !hasExplicitDocStart => yamlNodeToJson(docs.head)
+        case 1 if !hasExplicitDocStart => yamlNodeToJson(docs.head, yamlString)
         case _                         =>
           val buf = new mutable.ArrayBuffer[ujson.Value](docs.size)
           for (doc <- docs) {
-            buf += yamlNodeToJson(doc)
+            buf += yamlNodeToJson(doc, yamlString)
           }
           ujson.Arr(buf)
       }
