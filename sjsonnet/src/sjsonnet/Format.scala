@@ -696,6 +696,15 @@ object Format {
                 Error.fail(
                   "expected number at position %d, got string".format(i)
                 )
+              if (formatted.conversion == 'c') {
+                val s = vs.str
+                val cpCount = s.codePointCount(0, s.length)
+                if (cpCount != 1)
+                  Error.fail(
+                    "%%c expected 1-sized string got: %d".format(cpCount),
+                    pos
+                  )
+              }
               widenRaw(formatted, vs.str)
             case vn: Val.Num =>
               val s = vn.asDouble
