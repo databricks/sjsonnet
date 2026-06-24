@@ -32,6 +32,27 @@ local twoLevelSlotReentry = local arr = [x + x + y for x in [arr[2] + 1, 10] for
 // Empty outer arrays must not force invariant inner sources.
 local emptyOuter = std.length([x + y for x in [] for y in error "inner"]);
 
+// Pure range fast paths must still compute by accessed index, not by eager full expansion.
+local pureRangePartialError = local arr = [1 / x for x in std.range(0, 1)]; arr[1];
+local pureRangeLength = std.length([1 / x for x in std.range(0, 1)]);
+local pureTwoRangePartialError =
+  local arr = [1 / (x + y) for x in std.range(0, 1) for y in std.range(0, 1)];
+  arr[1];
+local pureRangeReverseLazy = local arr = [1 / x for x in std.range(0, 1)]; std.reverse(arr)[0];
+local pureRangeDoubleReverseLazy =
+  local arr = [1 / x for x in std.range(0, 1)];
+  std.reverse(std.reverse(arr))[1];
+local pureRangeAsSourceLazy = local arr = [1 / x for x in std.range(0, 1)]; [y for y in arr][1];
+local pureRangeConcatLazy =
+  local arr = [1 / x for x in std.range(0, 1)] + [2];
+  arr[1];
+local pureRangeSliceLazy =
+  local arr = [1 / x for x in std.range(0, 1)];
+  std.slice(arr, 1, 2, 1)[0];
+local pureRangeLargeSliceViewLazy =
+  local arr = [1 / x for x in std.range(0, 5000)];
+  std.slice(arr, 1, 5001, 1)[0];
+
 std.assertEqual(basic, 1) &&
 std.assertEqual(binop, 12) &&
 std.assertEqual(validId, 1) &&
@@ -42,4 +63,13 @@ std.assertEqual(recursiveSlot, 1) &&
 std.assertEqual(mutableSlotReentry, 42) &&
 std.assertEqual(twoLevelSlotReentry, 45) &&
 std.assertEqual(emptyOuter, 0) &&
+std.assertEqual(pureRangePartialError, 1) &&
+std.assertEqual(pureRangeLength, 2) &&
+std.assertEqual(pureTwoRangePartialError, 1) &&
+std.assertEqual(pureRangeReverseLazy, 1) &&
+std.assertEqual(pureRangeDoubleReverseLazy, 1) &&
+std.assertEqual(pureRangeAsSourceLazy, 1) &&
+std.assertEqual(pureRangeConcatLazy, 1) &&
+std.assertEqual(pureRangeSliceLazy, 1) &&
+std.assertEqual(pureRangeLargeSliceViewLazy, 1) &&
 true

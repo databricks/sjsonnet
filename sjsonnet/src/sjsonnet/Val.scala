@@ -895,6 +895,118 @@ object Val {
     }
   }
 
+  private[sjsonnet] abstract class PureIndexedArr(pos0: Position, size: Int)
+      extends Arr(pos0, null) {
+    _length = size
+
+    protected def computeValue(i: Int): Val
+
+    @inline private def checkIndex(i: Int): Unit =
+      if (i < 0 || i >= _length) throw new ArrayIndexOutOfBoundsException(i)
+
+    override def value(i: Int): Val = {
+      checkIndex(i)
+      computeValue(i)
+    }
+
+    override def eval(i: Int): Eval = {
+      checkIndex(i)
+      new LazyArrayElement(this, i)
+    }
+
+    override def asLazyArray: Array[Eval] = {
+      val len = _length
+      val result = new Array[Eval](len)
+      var i = 0
+      while (i < len) {
+        result(i) = new LazyArrayElement(this, i)
+        i += 1
+      }
+      result
+    }
+
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      val len = _length
+      var i = 0
+      while (i < len) {
+        out += new LazyArrayElement(this, i)
+        i += 1
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      val len = _length
+      var i = 0
+      while (i < len) {
+        dest(offset + i) = new LazyArrayElement(this, i)
+        i += 1
+      }
+      offset + len
+    }
+
+    override def reversed(newPos: Position): Arr =
+      new ReversedPureIndexedArr(newPos, this)
+  }
+
+  /**
+   * Reversed view over a PureIndexedArr.
+   *
+   * Pure indexed arrays intentionally do not cache values: each element is derived from its index
+   * without user-visible effects. A reversed view can therefore remap indices directly instead of
+   * allocating one LazyArrayElement per source element up front.
+   */
+  private final class ReversedPureIndexedArr(pos0: Position, private var source: PureIndexedArr)
+      extends Arr(pos0, null) {
+    _length = source.length
+
+    override def value(i: Int): Val =
+      if ((arr ne null) || isConcatView) super.value(i)
+      else source.value(_length - 1 - i)
+
+    override def eval(i: Int): Eval =
+      if ((arr ne null) || isConcatView) super.eval(i)
+      else source.eval(_length - 1 - i)
+
+    override def asLazyArray: Array[Eval] = {
+      if ((arr ne null) || isConcatView) super.asLazyArray
+      else {
+        val len = _length
+        val result = new Array[Eval](len)
+        copyEvalTo(result, 0)
+        arr = result
+        result
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(out: mutable.ArrayBuilder.ofRef[Eval]): Unit = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(out)
+      else {
+        var i = _length - 1
+        while (i >= 0) {
+          out += source.eval(i)
+          i -= 1
+        }
+      }
+    }
+
+    override private[sjsonnet] def copyEvalTo(dest: Array[Eval], offset: Int): Int = {
+      if ((arr ne null) || isConcatView) super.copyEvalTo(dest, offset)
+      else {
+        val len = _length
+        var i = 0
+        while (i < len) {
+          dest(offset + i) = source.eval(len - 1 - i)
+          i += 1
+        }
+        offset + len
+      }
+    }
+
+    override def reversed(newPos: Position): Arr =
+      if ((arr ne null) || isConcatView) super.reversed(newPos)
+      else source
+  }
+
   private final class ConstArr(pos0: Position, size: Int, private val elem: Eval)
       extends Arr(pos0, null) {
     _length = size
@@ -1568,7 +1680,7 @@ object Val {
       else
         source match {
           case _: RangeArr | _: ByteArr | _: RepeatedArr | _: LazyViewArr | _: ReversedLazyViewArr |
-              _: SliceArr =>
+              _: PureIndexedArr | _: ReversedPureIndexedArr | _: SliceArr =>
             true
           case _ =>
             // Plain flat/reversed/concat arrays may retain a large backing graph. Copy small

@@ -338,9 +338,14 @@ class Evaluator(
   def visitComp(e: Comp)(implicit scope: ValScope): Val = {
     if (e.rest.length == 0) {
       return visitExpr(e.first.cond)(scope) match {
-        case a: Val.Arr =>
-          if (debugStats != null) debugStats.arrayCompIterations += a.length
-          new SingleForCompArr(e.pos, a, scope, e.value)
+        case source: Val.RangeArr if source.isCompactRange =>
+          if (debugStats != null) debugStats.arrayCompIterations += source.length
+          val pureBody = compilePureCompBody(e.value, scope.length, -1)
+          if (pureBody != null) new PureSingleRangeCompArr(e.pos, source, pureBody)
+          else new SingleForCompArr(e.pos, source, scope, e.value)
+        case source: Val.Arr =>
+          if (debugStats != null) debugStats.arrayCompIterations += source.length
+          new SingleForCompArr(e.pos, source, scope, e.value)
         case r =>
           Error.fail(
             "In comprehension, can only iterate over array, not " + r.prettyName,
@@ -362,7 +367,21 @@ class Evaluator(
                   if (length > Int.MaxValue)
                     Error.fail("array too large (" + length + " elements)", e.pos)
                   if (debugStats != null) debugStats.arrayCompIterations += length
-                  new TwoForCompArr(e.pos, outer, inner, scope, e.value, length.toInt)
+                  val pureBody = (outer, inner) match {
+                    case (outerRange: Val.RangeArr, innerRange: Val.RangeArr)
+                        if outerRange.isCompactRange && innerRange.isCompactRange =>
+                      compilePureCompBody(e.value, scope.length, scope.length + 1)
+                    case _ => null
+                  }
+                  if (pureBody != null)
+                    new PureTwoRangeCompArr(
+                      e.pos,
+                      outer.asInstanceOf[Val.RangeArr],
+                      inner.asInstanceOf[Val.RangeArr],
+                      pureBody,
+                      length.toInt
+                    )
+                  else new TwoForCompArr(e.pos, outer, inner, scope, e.value, length.toInt)
                 case r =>
                   Error.fail(
                     "In comprehension, can only iterate over array, not " + r.prettyName,
@@ -437,6 +456,170 @@ class Evaluator(
 
     protected def errorScope: EvalErrorScope = Evaluator.this
   }
+
+  private final class PureSingleRangeCompArr(
+      pos0: Position,
+      source: Val.RangeArr,
+      body: PureCompBody)
+      extends Val.PureIndexedArr(pos0, source.length) {
+    protected def computeValue(i: Int): Val =
+      body.eval(source.doubleAt(i), 0.0)
+  }
+
+  private final class PureTwoRangeCompArr(
+      pos0: Position,
+      outer: Val.RangeArr,
+      inner: Val.RangeArr,
+      body: PureCompBody,
+      size: Int)
+      extends Val.PureIndexedArr(pos0, size) {
+    private val innerLen = inner.length
+
+    protected def computeValue(i: Int): Val = {
+      val outerIdx = i / innerLen
+      val innerIdx = i - outerIdx * innerLen
+      body.eval(outer.doubleAt(outerIdx), inner.doubleAt(innerIdx))
+    }
+  }
+
+  private sealed abstract class PureCompBody {
+    def eval(first: Double, second: Double): Val
+  }
+
+  private final class PureLiteralBody(value: Val) extends PureCompBody {
+    def eval(first: Double, second: Double): Val = value
+  }
+
+  private final class PureDoubleBody(pos: Position, value: PureDoubleExpr) extends PureCompBody {
+    def eval(first: Double, second: Double): Val =
+      Val.cachedNum(pos, value.eval(first, second))
+  }
+
+  private final class PureCompareBody(op: Int, lhs: PureDoubleExpr, rhs: PureDoubleExpr)
+      extends PureCompBody {
+    def eval(first: Double, second: Double): Val = {
+      val l = lhs.eval(first, second)
+      val r = rhs.eval(first, second)
+      (op: @switch) match {
+        case Expr.BinaryOp.OP_<  => Val.bool(l < r)
+        case Expr.BinaryOp.OP_>  => Val.bool(l > r)
+        case Expr.BinaryOp.OP_<= => Val.bool(l <= r)
+        case Expr.BinaryOp.OP_>= => Val.bool(l >= r)
+        case Expr.BinaryOp.OP_== => Val.bool(l == r)
+        case Expr.BinaryOp.OP_!= => Val.bool(l != r)
+      }
+    }
+  }
+
+  private sealed abstract class PureDoubleExpr {
+    def eval(first: Double, second: Double): Double
+  }
+
+  private final class PureConstDouble(value: Double) extends PureDoubleExpr {
+    def eval(first: Double, second: Double): Double = value
+  }
+
+  private object PureFirstDouble extends PureDoubleExpr {
+    def eval(first: Double, second: Double): Double = first
+  }
+
+  private object PureSecondDouble extends PureDoubleExpr {
+    def eval(first: Double, second: Double): Double = second
+  }
+
+  private final class PureUnaryDouble(op: Int, pos: Position, value: PureDoubleExpr)
+      extends PureDoubleExpr {
+    def eval(first: Double, second: Double): Double =
+      (op: @switch) match {
+        case Expr.UnaryOp.OP_+ => value.eval(first, second)
+        case Expr.UnaryOp.OP_- => checkedPureDouble(-value.eval(first, second), pos)
+      }
+  }
+
+  private final class PureBinaryDouble(
+      op: Int,
+      pos: Position,
+      lhs: PureDoubleExpr,
+      rhs: PureDoubleExpr)
+      extends PureDoubleExpr {
+    def eval(first: Double, second: Double): Double = {
+      val l = lhs.eval(first, second)
+      val r = rhs.eval(first, second)
+      (op: @switch) match {
+        case Expr.BinaryOp.OP_* => checkedPureDouble(l * r, pos)
+        case Expr.BinaryOp.OP_+ => checkedPureDouble(l + r, pos)
+        case Expr.BinaryOp.OP_- => checkedPureDouble(l - r, pos)
+        case Expr.BinaryOp.OP_/ =>
+          if (r == 0) Error.fail("Division by zero.", pos)(Evaluator.this)
+          checkedPureDouble(l / r, pos)
+        case Expr.BinaryOp.OP_% =>
+          if (r == 0) Error.fail("Division by zero.", pos)(Evaluator.this)
+          checkedPureDouble(l % r, pos)
+      }
+    }
+  }
+
+  private def compilePureCompBody(e: Expr, firstSlot: Int, secondSlot: Int): PureCompBody =
+    if (e == null) null
+    else
+      e match {
+        case v: Val.Num                           => new PureLiteralBody(v)
+        case v: Val.Str                           => new PureLiteralBody(v)
+        case v: Val.Bool                          => new PureLiteralBody(v)
+        case v: Val.Null                          => new PureLiteralBody(v)
+        case b: BinaryOp if isPureCompareOp(b.op) =>
+          val lhs = compilePureDoubleExpr(b.lhs, firstSlot, secondSlot)
+          if (lhs == null) null
+          else {
+            val rhs = compilePureDoubleExpr(b.rhs, firstSlot, secondSlot)
+            if (rhs == null) null else new PureCompareBody(b.op, lhs, rhs)
+          }
+        case _ =>
+          val numeric = compilePureDoubleExpr(e, firstSlot, secondSlot)
+          if (numeric == null) null else new PureDoubleBody(e.pos, numeric)
+      }
+
+  private def compilePureDoubleExpr(e: Expr, firstSlot: Int, secondSlot: Int): PureDoubleExpr =
+    e match {
+      case n: Val.Num => new PureConstDouble(n.rawDouble)
+      case v: ValidId =>
+        if (v.nameIdx == firstSlot) PureFirstDouble
+        else if (v.nameIdx == secondSlot) PureSecondDouble
+        else null
+      case u: UnaryOp if u.op == Expr.UnaryOp.OP_+ || u.op == Expr.UnaryOp.OP_- =>
+        val value = compilePureDoubleExpr(u.value, firstSlot, secondSlot)
+        if (value == null) null else new PureUnaryDouble(u.op, u.pos, value)
+      case b: BinaryOp if isPureArithmeticOp(b.op) =>
+        val lhs = compilePureDoubleExpr(b.lhs, firstSlot, secondSlot)
+        if (lhs == null) null
+        else {
+          val rhs = compilePureDoubleExpr(b.rhs, firstSlot, secondSlot)
+          if (rhs == null) null else new PureBinaryDouble(b.op, b.pos, lhs, rhs)
+        }
+      case _ => null
+    }
+
+  @inline private def checkedPureDouble(value: Double, pos: Position): Double = {
+    if (value.isNaN) Error.fail("Not a number", pos)(Evaluator.this)
+    if (value.isInfinite) Error.fail("Overflow", pos)(Evaluator.this)
+    value
+  }
+
+  @inline private def isPureArithmeticOp(op: Int): Boolean =
+    (op: @switch) match {
+      case Expr.BinaryOp.OP_* | Expr.BinaryOp.OP_+ | Expr.BinaryOp.OP_- | Expr.BinaryOp.OP_/ |
+          Expr.BinaryOp.OP_% =>
+        true
+      case _ => false
+    }
+
+  @inline private def isPureCompareOp(op: Int): Boolean =
+    (op: @switch) match {
+      case Expr.BinaryOp.OP_< | Expr.BinaryOp.OP_> | Expr.BinaryOp.OP_<= | Expr.BinaryOp.OP_>= |
+          Expr.BinaryOp.OP_== | Expr.BinaryOp.OP_!= =>
+        true
+      case _ => false
+    }
 
   private def computeImmediateBody(e: Expr)(implicit scope: ValScope): Val = {
     val eager = tryEagerEval(e)
