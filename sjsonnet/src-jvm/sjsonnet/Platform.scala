@@ -86,6 +86,52 @@ object Platform {
   private def regexMatches(pattern: scala.util.matching.Regex, value: String): Boolean =
     pattern.pattern.matcher(value).matches()
 
+  /**
+   * Detects whether a LITERAL or FOLDED block scalar uses clip chomping (the default). SnakeYAML
+   * does not expose the chomping indicator, so we inspect the raw YAML input. The block scalar
+   * header is `|` or `>` optionally followed by an indentation digit and/or a chomping indicator
+   * (`+` for keep, `-` for strip). If neither `+` nor `-` appears, the chomping is clip (default).
+   */
+  private def isClipChompedBlockScalar(sn: ScalarNode, input: String): Boolean = {
+    val style = sn.getScalarStyle
+    if (
+      style != DumperOptions.ScalarStyle.LITERAL &&
+      style != DumperOptions.ScalarStyle.FOLDED
+    ) {
+      return false
+    }
+    val mark = sn.getStartMark
+    if (mark == null) return true // default to clip when position is unavailable
+    val startIdx = mark.getIndex
+    // Search backwards from startIdx (inclusive — SnakeYAML may place the start mark
+    // at the `|`/`>` indicator itself) to find the block scalar indicator.
+    var i = startIdx
+    while (i >= 0 && input.charAt(i) != '|' && input.charAt(i) != '>') {
+      i -= 1
+    }
+    if (i < 0) return true // indicator not found; assume clip
+    // Scan forward from after `|`/`>` to the end of the header, ignoring any comment.
+    var j = i + 1
+    while (j < input.length && input.charAt(j) != '\n' && input.charAt(j) != '\r') {
+      val c = input.charAt(j)
+      if (c == '#') return true
+      if (c == '+' || c == '-') return false // keep or strip chomping
+      j += 1
+    }
+    true // no chomping indicator found → clip (default)
+  }
+
+  /**
+   * Ensures a clip-chomped block scalar value ends with exactly one trailing newline, as required
+   * by the YAML spec. SnakeYAML 2.x strips the trailing newline from clip-chomped block scalars,
+   * which is incorrect.
+   */
+  private def fixClipChomping(value: String): String = {
+    if (value.isEmpty) value
+    else if (value.charAt(value.length - 1) == '\n') value
+    else value + "\n"
+  }
+
   private def normalizeYamlNonFinite(value: String): String = value match {
     case ".inf" | ".Inf" | ".INF" | "+.inf" | "+.Inf" | "+.INF" => ".inf"
     case "-.inf" | "-.Inf" | "-.INF"                            => "-.inf"
@@ -105,7 +151,13 @@ object Platform {
 
   private def yamlNodeToJson(node: Node, input: String): ujson.Value = node match {
     case sn: ScalarNode =>
-      val value = sn.getValue
+      val rawValue = sn.getValue
+      // SnakeYAML 2.x strips the trailing newline from clip-chomped block scalars
+      // (literal `|` and folded `>` with no explicit chomping indicator).
+      // The YAML spec requires clip chomping to preserve exactly one trailing newline.
+      val value =
+        if (isClipChompedBlockScalar(sn, input)) fixClipChomping(rawValue)
+        else rawValue
       val tag = sn.getTag
       val isPlain = sn.getScalarStyle == DumperOptions.ScalarStyle.PLAIN
       val normalizedNonFinite = normalizeYamlNonFiniteScalar(sn, input)
@@ -221,8 +273,13 @@ object Platform {
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
   }
 
-  private def yamlScalarKey(sn: ScalarNode, input: String): String =
-    normalizeYamlNonFiniteScalar(sn, input).getOrElse(sn.getValue)
+  private def yamlScalarKey(sn: ScalarNode, input: String): String = {
+    val rawValue = sn.getValue
+    val value =
+      if (isClipChompedBlockScalar(sn, input)) fixClipChomping(rawValue)
+      else rawValue
+    normalizeYamlNonFiniteScalar(sn, input).getOrElse(value)
+  }
 
   private def normalizeYamlNonFiniteScalar(sn: ScalarNode, input: String): Option[String] = {
     val value = sn.getValue
