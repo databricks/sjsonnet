@@ -336,11 +336,72 @@ class Evaluator(
   }
 
   def visitComp(e: Comp)(implicit scope: ValScope): Val = {
+    if (e.rest.length == 0) {
+      return visitExpr(e.first.cond)(scope) match {
+        case a: Val.Arr =>
+          if (debugStats != null) debugStats.arrayCompIterations += a.length
+          new SingleForCompArr(e.pos, a, scope, e.value)
+        case r =>
+          Error.fail(
+            "In comprehension, can only iterate over array, not " + r.prettyName,
+            e.first
+          )
+      }
+    }
+
     val results = new collection.mutable.ArrayBuilder.ofRef[Eval]
     results.sizeHint(16)
     visitCompFused(e.first :: e.rest.toList, scope, e.value, results)
     Val.Arr(e.pos, results.result())
   }
+
+  private final class SingleForCompArr(pos0: Position, source: Val.Arr, scope: ValScope, body: Expr)
+      extends Val.LazyIndexedArr(pos0, source.length) {
+    private val immediateBody = isImmediateCompBody(body)
+    private val mutableScope = if (immediateBody) scope.extendBy(1) else scope
+    private val mutableSlot = scope.length
+
+    protected def computeValue(i: Int): Val =
+      if (immediateBody) {
+        val bindings = mutableScope.bindings
+        val previous = bindings(mutableSlot)
+        bindings(mutableSlot) = source.eval(i)
+        try {
+          val eager = tryEagerEval(body)(mutableScope)
+          if (eager != null) eager
+          else visitExpr(body)(mutableScope)
+        } finally {
+          bindings(mutableSlot) = previous
+        }
+      } else {
+        visitExpr(body)(scope.extendSimple(source.eval(i)))
+      }
+
+    protected def errorScope: EvalErrorScope = Evaluator.this
+  }
+
+  private def isImmediateCompBody(e: Expr): Boolean =
+    e == null || ((e.tag: @switch) match {
+      case ExprTags.ValidId  => true
+      case ExprTags.BinaryOp =>
+        val b = e.asInstanceOf[BinaryOp]
+        isImmediateCompBody(b.lhs) && isImmediateCompBody(b.rhs)
+      case ExprTags.UnaryOp =>
+        isImmediateCompBody(e.asInstanceOf[UnaryOp].value)
+      case ExprTags.And =>
+        val a = e.asInstanceOf[And]
+        isImmediateCompBody(a.lhs) && isImmediateCompBody(a.rhs)
+      case ExprTags.Or =>
+        val o = e.asInstanceOf[Or]
+        isImmediateCompBody(o.lhs) && isImmediateCompBody(o.rhs)
+      case ExprTags.IfElse =>
+        val ie = e.asInstanceOf[IfElse]
+        isImmediateCompBody(ie.cond) && isImmediateCompBody(ie.`then`) && isImmediateCompBody(
+          ie.`else`
+        )
+      case _ =>
+        e.isInstanceOf[Val.Literal]
+    })
 
   /**
    * Fused scope-building + body evaluation: eliminates intermediate scope array allocation. Instead
