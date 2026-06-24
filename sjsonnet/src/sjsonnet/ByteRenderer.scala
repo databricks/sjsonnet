@@ -28,11 +28,32 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   // Track empty state per nesting level. Bit i = 1 means level i has seen a value.
   // Uses BitSet (auto-growing) instead of a Long bitmask, which only supported 64 levels
   // and caused silent corruption at depth >= 64 due to Java's shift masking (1L << 64 == 1L << 0).
-  private val emptyBits = new java.util.BitSet()
+  // Growable bitmask supporting arbitrary nesting depth (each Long holds 64 bits).
+  // Replaces the previous Long-only bitmask which overflowed at depth >= 64.
+  private var emptyBits: Array[Long] = new Array[Long](2) // supports up to 128 levels initially
 
-  @inline private def markNonEmpty(): Unit = emptyBits.set(depth)
-  @inline private def isEmpty: Boolean = !emptyBits.get(depth)
-  @inline private def resetEmpty(): Unit = emptyBits.clear(depth)
+  @inline private def ensureCapacity(d: Int): Unit = {
+    val idx = d >> 6
+    if (idx >= emptyBits.length) {
+      val newArr = new Array[Long](math.max(idx + 1, emptyBits.length * 2))
+      System.arraycopy(emptyBits, 0, newArr, 0, emptyBits.length)
+      emptyBits = newArr
+    }
+  }
+
+  @inline private def markNonEmpty(): Unit = {
+    ensureCapacity(depth)
+    emptyBits(depth >> 6) |= (1L << (depth & 63))
+  }
+  @inline private def isEmpty: Boolean = {
+    val idx = depth >> 6
+    idx >= emptyBits.length || (emptyBits(idx) & (1L << (depth & 63))) == 0L
+  }
+  @inline private def resetEmpty(): Unit = {
+    val idx = depth >> 6
+    if (idx < emptyBits.length)
+      emptyBits(idx) &= ~(1L << (depth & 63))
+  }
 
   private var stringValueCount = 0
   private var stringValueCacheKeys: Array[String] = null
