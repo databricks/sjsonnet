@@ -51,7 +51,7 @@ class TomlRenderer(
     if (s == null) {
       visitNull(index)
     } else {
-      BaseRenderer.escape(out, s, unicode = true)
+      BaseRenderer.escape(out, s, unicode = false)
       flush
     }
   }
@@ -161,7 +161,7 @@ object TomlRenderer {
 
   def writeEscapedKey(out: StringBuilderWriter, key: CharSequence): Unit = {
     if (isBareKey(key)) out.write(key.toString)
-    else BaseRenderer.escape(out, key, unicode = true)
+    else BaseRenderer.escape(out, key, unicode = false)
   }
 
   def escapeKey(key: String): String = if (isBareKey(key)) key

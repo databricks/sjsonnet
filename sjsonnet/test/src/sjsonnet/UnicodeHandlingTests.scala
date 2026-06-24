@@ -294,7 +294,7 @@ object UnicodeHandlingTests extends TestSuite {
 
       // TOML manifest:
       eval(s"std.manifestTomlEx($testObject, '  ')") ==>
-      ujson.Str("a = 1\nz = 2\n\"\\uffff\" = 3\n\"\\ud800\\udc00\" = 4")
+      ujson.Str("a = 1\nz = 2\n\"\uFFFF\" = 3\n\"\uD800\uDC00\" = 4")
     }
 
     test("findSubstr") {
