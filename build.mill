@@ -87,6 +87,8 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
             else Seq("-Xfatal-warnings", "-Ywarn-unused:-nowarn"))
     else Seq[String]("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all")
   )
+  def scalaDocOptions =
+    super.scalaDocOptions().filterNot(o => o == "-Werror" || o == "-Xfatal-warnings")
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.5")
     def testSandboxWorkingDir = false
