@@ -182,11 +182,31 @@ object Platform {
       val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
       buf.sizeHint(mn.getValue.size)
       for (tuple <- mn.getValue.asScala) {
-        val key = tuple.getKeyNode match {
-          case sn: ScalarNode => yamlScalarKey(sn, input)
-          case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
+        val keyNode = tuple.getKeyNode
+        if (keyNode.getTag == Tag.MERGE) {
+          // YAML merge key (<<): merge referenced mapping(s) with lower priority.
+          // Convert to JSON first so nested merge keys are resolved recursively.
+          val mergeObjs: Seq[ujson.Obj] = tuple.getValueNode match {
+            case mapNode: MappingNode =>
+              Seq(yamlNodeToJson(mapNode, input).asInstanceOf[ujson.Obj])
+            case seqNode: SequenceNode =>
+              seqNode.getValue.asScala.map { node =>
+                yamlNodeToJson(node, input).asInstanceOf[ujson.Obj]
+              }.toSeq
+            case other => Error.fail("Invalid YAML merge value: " + other.getTag)
+          }
+          for (obj <- mergeObjs; (k, v) <- obj.value) {
+            if (!buf.contains(k)) {
+              buf(k) = v
+            }
+          }
+        } else {
+          val key = keyNode match {
+            case sn: ScalarNode => yamlScalarKey(sn, input)
+            case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
+          }
+          buf(key) = yamlNodeToJson(tuple.getValueNode, input)
         }
-        buf(key) = yamlNodeToJson(tuple.getValueNode, input)
       }
       ujson.Obj(buf)
 
