@@ -247,6 +247,36 @@ object RendererTests extends TestSuite {
       escape(sb, unicode = true) ==> "\"a\\nb\""
       escape(new java.lang.StringBuilder("plain"), unicode = true) ==> "\"plain\""
     }
+    test("byteRendererDeepNestingBeyond64") {
+      def buildNested(depth: Int): ujson.Value = {
+        var v: ujson.Value = ujson.Str("leaf")
+        for (_ <- 0 until depth) { v = ujson.Obj("k" -> v) }
+        v
+      }
+      val nested100 = buildNested(100)
+      val out = new ByteArrayOutputStream()
+      ujson.transform(nested100, new ByteRenderer(out, indent = 3))
+      val rendered = new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+      val lines = rendered.split('\n')
+      val closingBraceLines = lines.filter(_.trim == "}")
+      assert(closingBraceLines.length >= 99)
+      assert(rendered.contains("\"leaf\""))
+      assert(!lines.exists(_.trim.contains("} }")))
+    }
+
+    test("byteRendererDeepNesting200") {
+      def buildNestedArr(depth: Int): ujson.Value = {
+        var v: ujson.Value = ujson.Num(42)
+        for (_ <- 0 until depth) { v = ujson.Arr(v) }
+        v
+      }
+      val nested200 = buildNestedArr(200)
+      val out = new ByteArrayOutputStream()
+      ujson.transform(nested200, new ByteRenderer(out, indent = 2))
+      val rendered = new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+      val closingBracketLines = rendered.split('\n').filter(_.trim == "]")
+      assert(closingBracketLines.length == 200)
+    }
 
   }
 
