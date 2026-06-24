@@ -55,11 +55,17 @@ object MainTests extends TestSuite {
     }
 
     val streamedOut =
-      """--- 1
-        |--- 2
-        |--- 3
-        |--- 4
-        |--- 5
+      """---
+        |1
+        |---
+        |2
+        |---
+        |3
+        |---
+        |4
+        |---
+        |5
+        |...
         |""".stripMargin
 
     val expectedWorldDestStr =
@@ -72,7 +78,7 @@ object MainTests extends TestSuite {
     test("yamlStream") {
       val source = testSuiteRoot / "db" / "stream.jsonnet"
       val (res, out, err) = runMain(source, "--yaml-stream")
-      assert((res, out, err) == ((0, streamedOut + "\n", "")))
+      assert((res, out, err) == ((0, streamedOut, "")))
     }
 
     test("exec") {
@@ -104,6 +110,18 @@ object MainTests extends TestSuite {
       assert((res, out, err) == ((0, "", "")))
       val destStr = os.read(dest)
       assert(destStr == streamedOut)
+    }
+
+    test("yamlStreamNonArray") {
+      val (res, out, err) = runMain("--yaml-stream", "--exec", """{"a": 1}""")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("stream mode: top-level object was a object"))
+    }
+
+    test("yamlStreamEmptyArray") {
+      val (res, out, err) = runMain("--yaml-stream", "--exec", "[]")
+      assert((res, out, err) == ((0, "", "")))
     }
 
     test("multi") {
