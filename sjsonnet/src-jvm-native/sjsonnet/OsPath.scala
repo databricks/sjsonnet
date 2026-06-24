@@ -2,16 +2,19 @@ package sjsonnet
 
 import scala.collection.mutable
 
-final case class OsPath(p: os.Path) extends Path {
+final case class OsPath(p: os.Path, originalPath: Option[String] = None) extends Path {
   def relativeToString(other: Path): String = p.relativeTo(other.asInstanceOf[OsPath].p).toString
+
+  override def thisFileRepr(wd: Path): String = originalPath.getOrElse(relativeToString(wd))
+
   def parent(): OsPath = OsPath(p / os.up)
   def segmentCount(): Int = p.segmentCount
   def last: String = p.last
   def /(s: String): Path = OsPath(p / s)
 
   override def equals(other: Any): Boolean = other match {
-    case OsPath(p2) => p == p2
-    case _          => false
+    case OsPath(p2, _) => p == p2
+    case _             => false
   }
 
   override def hashCode: Int = p.hashCode()

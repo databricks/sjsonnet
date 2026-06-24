@@ -113,7 +113,7 @@ object StdLibModule {
       "thisFile",
       new Val.Obj.Member(false, Visibility.Hidden, cached = false, deprecatedSkipAsserts = true) {
         def invoke(self: Val.Obj, sup: Val.Obj, fs: FileScope, ev: EvalScope): Val =
-          Val.Str(self.pos, fs.currentFile.relativeToString(ev.wd))
+          Val.Str(self.pos, fs.currentFile.thisFileRepr(ev.wd))
       }
     ),
     /**

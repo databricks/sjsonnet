@@ -309,7 +309,7 @@ object SjsonnetMainBase {
       config: Config,
       interp: Interpreter,
       jsonnetCode: String,
-      path: os.Path,
+      path: OsPath,
       wd: os.Path,
       getCurrentPosition: () => Position,
       stdoutStream: OutputStream) = {
@@ -322,7 +322,7 @@ object SjsonnetMainBase {
           try {
             val buf = new BufferedOutputStream(out, SjsonnetMainBase.OutputBufferSize)
             val renderer = new ByteRenderer(buf, indent = config.indent)
-            val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+            val res = interp.interpret0(jsonnetCode, path, renderer)
             buf.flush()
             res.map(_ => "")
           } finally out.close()
@@ -331,14 +331,14 @@ object SjsonnetMainBase {
         // Byte[] fast path for stdout: render directly to OutputStream,
         // bypassing StringWriter → String → println chain.
         val renderer = new ByteRenderer(stdoutStream, indent = config.indent)
-        val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+        val res = interp.interpret0(jsonnetCode, path, renderer)
         stdoutStream.flush()
         // Return sentinel to signal main0 that output was already written.
         res.map(_ => ByteRenderedSentinel)
       case _ =>
         writeToFile(config, wd) { writer =>
           val renderer = rendererForConfig(writer, config, getCurrentPosition)
-          val res = interp.interpret0(jsonnetCode, OsPath(path), renderer)
+          val res = interp.interpret0(jsonnetCode, path, renderer)
           if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
           res
         }
@@ -397,14 +397,18 @@ object SjsonnetMainBase {
       stdoutStream: OutputStream = null): Either[String, String] = {
 
     val (jsonnetCode, path) =
-      if (config.exec.value) (file, wd / Util.wrapInLessThanGreaterThan("exec"))
+      if (config.exec.value)
+        (file, OsPath(wd / Util.wrapInLessThanGreaterThan("exec"), Some("exec")))
       // TODO: Get rid of the /dev/stdin special-casing (everywhere!) once we use scala-native
       // with https://github.com/scala-native/scala-native/issues/4384 fixed.
       else if (file == "-" || file == "/dev/stdin")
-        (io.Source.stdin.mkString, wd / Util.wrapInLessThanGreaterThan("<stdin>"))
+        (
+          io.Source.stdin.mkString,
+          OsPath(wd / Util.wrapInLessThanGreaterThan("<stdin>"), Some("<stdin>"))
+        )
       else {
         val p = os.Path(file, wd)
-        (os.read(p), p)
+        (os.read(p), OsPath(p, Some(file)))
       }
 
     val extBinding = parseBindings(
@@ -469,7 +473,7 @@ object SjsonnetMainBase {
     val result = (config.multi, config.yamlStream.value) match {
       case (Some(multiPath), _) =>
         val trailingNewline = !config.noTrailingNewline.value
-        interp.interpret(jsonnetCode, OsPath(path)).flatMap {
+        interp.interpret(jsonnetCode, path).flatMap {
           case obj: ujson.Obj =>
             val renderedFiles: Seq[Either[String, os.FilePath]] =
               obj.value.toSeq.map { case (f, v) =>
@@ -503,7 +507,7 @@ object SjsonnetMainBase {
       case (None, true) =>
         // YAML stream (--no-trailing-newline is already rejected above for yaml-stream)
 
-        interp.interpret(jsonnetCode, OsPath(path)).flatMap {
+        interp.interpret(jsonnetCode, path).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd) { writer =>
               arr.value.toSeq match {
