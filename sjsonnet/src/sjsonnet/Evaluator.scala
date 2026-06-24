@@ -349,6 +349,36 @@ class Evaluator(
       }
     }
 
+    if (e.rest.length == 1 && isImmediateCompBody(e.value)) {
+      e.rest(0) match {
+        case innerFor: ForSpec if isInvariantExpr(innerFor.cond, scope.length) =>
+          return visitExpr(e.first.cond)(scope) match {
+            case outer: Val.Arr =>
+              if (outer.length == 0) return Val.Arr(e.pos, Evaluator.emptyLazyArray)
+              visitExpr(innerFor.cond)(scope) match {
+                case inner: Val.Arr =>
+                  if (inner.length == 0) return Val.Arr(e.pos, Evaluator.emptyLazyArray)
+                  val length = outer.length.toLong * inner.length.toLong
+                  if (length > Int.MaxValue)
+                    Error.fail("array too large (" + length + " elements)", e.pos)
+                  if (debugStats != null) debugStats.arrayCompIterations += length
+                  new TwoForCompArr(e.pos, outer, inner, scope, e.value, length.toInt)
+                case r =>
+                  Error.fail(
+                    "In comprehension, can only iterate over array, not " + r.prettyName,
+                    innerFor
+                  )
+              }
+            case r =>
+              Error.fail(
+                "In comprehension, can only iterate over array, not " + r.prettyName,
+                e.first
+              )
+          }
+        case _ =>
+      }
+    }
+
     val results = new collection.mutable.ArrayBuilder.ofRef[Eval]
     results.sizeHint(16)
     visitCompFused(e.first :: e.rest.toList, scope, e.value, results)
@@ -366,11 +396,8 @@ class Evaluator(
         val bindings = mutableScope.bindings
         val previous = bindings(mutableSlot)
         bindings(mutableSlot) = source.eval(i)
-        try {
-          val eager = tryEagerEval(body)(mutableScope)
-          if (eager != null) eager
-          else visitExpr(body)(mutableScope)
-        } finally {
+        try computeImmediateBody(body)(mutableScope)
+        finally {
           bindings(mutableSlot) = previous
         }
       } else {
@@ -378,6 +405,43 @@ class Evaluator(
       }
 
     protected def errorScope: EvalErrorScope = Evaluator.this
+  }
+
+  private final class TwoForCompArr(
+      pos0: Position,
+      outer: Val.Arr,
+      inner: Val.Arr,
+      scope: ValScope,
+      body: Expr,
+      size: Int)
+      extends Val.LazyIndexedArr(pos0, size) {
+    private val mutableScope = scope.extendBy(2)
+    private val outerSlot = scope.length
+    private val innerSlot = outerSlot + 1
+    private val innerLen = inner.length
+
+    protected def computeValue(i: Int): Val = {
+      val outerIdx = i / innerLen
+      val innerIdx = i - outerIdx * innerLen
+      val bindings = mutableScope.bindings
+      val previousOuter = bindings(outerSlot)
+      val previousInner = bindings(innerSlot)
+      bindings(outerSlot) = outer.eval(outerIdx)
+      bindings(innerSlot) = inner.eval(innerIdx)
+      try computeImmediateBody(body)(mutableScope)
+      finally {
+        bindings(outerSlot) = previousOuter
+        bindings(innerSlot) = previousInner
+      }
+    }
+
+    protected def errorScope: EvalErrorScope = Evaluator.this
+  }
+
+  private def computeImmediateBody(e: Expr)(implicit scope: ValScope): Val = {
+    val eager = tryEagerEval(e)
+    if (eager != null) eager
+    else visitExpr(e)
   }
 
   private def isImmediateCompBody(e: Expr): Boolean =
@@ -399,9 +463,61 @@ class Evaluator(
         isImmediateCompBody(ie.cond) && isImmediateCompBody(ie.`then`) && isImmediateCompBody(
           ie.`else`
         )
+      case ExprTags.Select =>
+        isImmediateCompBody(e.asInstanceOf[Select].value)
+      case ExprTags.Lookup =>
+        val l = e.asInstanceOf[Lookup]
+        isImmediateCompBody(l.value) && isImmediateCompBody(l.index)
       case _ =>
         e.isInstanceOf[Val.Literal]
     })
+
+  private def isInvariantExpr(e: Expr, maxIdx: Int): Boolean =
+    e == null || ((e.tag: @switch) match {
+      case ExprTags.`Val.Literal` | ExprTags.`Val.Func` => true
+      case ExprTags.ValidId                             => e.asInstanceOf[ValidId].nameIdx < maxIdx
+      case ExprTags.BinaryOp                            =>
+        val b = e.asInstanceOf[BinaryOp]
+        isInvariantExpr(b.lhs, maxIdx) && isInvariantExpr(b.rhs, maxIdx)
+      case ExprTags.UnaryOp =>
+        isInvariantExpr(e.asInstanceOf[UnaryOp].value, maxIdx)
+      case ExprTags.Select =>
+        isInvariantExpr(e.asInstanceOf[Select].value, maxIdx)
+      case ExprTags.And =>
+        val a = e.asInstanceOf[And]
+        isInvariantExpr(a.lhs, maxIdx) && isInvariantExpr(a.rhs, maxIdx)
+      case ExprTags.Or =>
+        val o = e.asInstanceOf[Or]
+        isInvariantExpr(o.lhs, maxIdx) && isInvariantExpr(o.rhs, maxIdx)
+      case ExprTags.ApplyBuiltin0 =>
+        isHoistSafeBuiltin(e.asInstanceOf[ApplyBuiltin0].func)
+      case ExprTags.ApplyBuiltin1 =>
+        val ab = e.asInstanceOf[ApplyBuiltin1]
+        isHoistSafeBuiltin(ab.func) && isInvariantExpr(ab.a1, maxIdx)
+      case ExprTags.ApplyBuiltin2 =>
+        val ab = e.asInstanceOf[ApplyBuiltin2]
+        isHoistSafeBuiltin(ab.func) && isInvariantExpr(ab.a1, maxIdx) &&
+        isInvariantExpr(ab.a2, maxIdx)
+      case ExprTags.ApplyBuiltin3 =>
+        val ab = e.asInstanceOf[ApplyBuiltin3]
+        isHoistSafeBuiltin(ab.func) && isInvariantExpr(ab.a1, maxIdx) && isInvariantExpr(
+          ab.a2,
+          maxIdx
+        ) && isInvariantExpr(
+          ab.a3,
+          maxIdx
+        )
+      case ExprTags.ApplyBuiltin4 =>
+        val ab = e.asInstanceOf[ApplyBuiltin4]
+        isHoistSafeBuiltin(ab.func) && isInvariantExpr(ab.a1, maxIdx) && isInvariantExpr(
+          ab.a2,
+          maxIdx
+        ) && isInvariantExpr(ab.a3, maxIdx) && isInvariantExpr(ab.a4, maxIdx)
+      case _ => false
+    })
+
+  private def isHoistSafeBuiltin(f: Val.Builtin): Boolean =
+    f.staticSafe && f.functionName == "range"
 
   /**
    * Fused scope-building + body evaluation: eliminates intermediate scope array allocation. Instead

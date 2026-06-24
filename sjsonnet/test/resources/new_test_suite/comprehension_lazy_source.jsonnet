@@ -26,6 +26,12 @@ local recursiveSlot = local arr = [if x == 0 then arr[1] + x else x for x in [0,
 // Immediate bodies use a reused scope slot; reentrant source evaluation must restore it.
 local mutableSlotReentry = local arr = [x + x for x in [arr[1] + 1, 10]]; arr[0];
 
+// Two-level immediate comprehensions also reuse slots; reentrant source evaluation must restore them.
+local twoLevelSlotReentry = local arr = [x + x + y for x in [arr[2] + 1, 10] for y in [1, 2]]; arr[0];
+
+// Empty outer arrays must not force invariant inner sources.
+local emptyOuter = std.length([x + y for x in [] for y in error "inner"]);
+
 std.assertEqual(basic, 1) &&
 std.assertEqual(binop, 12) &&
 std.assertEqual(validId, 1) &&
@@ -34,4 +40,6 @@ std.assertEqual(len, 3) &&
 std.assertEqual(sliced, [1]) &&
 std.assertEqual(recursiveSlot, 1) &&
 std.assertEqual(mutableSlotReentry, 42) &&
+std.assertEqual(twoLevelSlotReentry, 45) &&
+std.assertEqual(emptyOuter, 0) &&
 true
