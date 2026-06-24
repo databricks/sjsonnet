@@ -12,7 +12,9 @@ object FileTests extends BaseFileTests {
         "error.recursive_import.jsonnet",
         "error.recursive_function_nonterm.jsonnet",
         "error.function_infinite_default.jsonnet",
-        "error.obj_recursive.jsonnet"
+        "error.obj_recursive.jsonnet",
+        // YAML merge key support is JVM-only (SnakeYAML specific)
+        "parseyaml_merge_keys.jsonnet"
       )
     else Set.empty[String]
 
