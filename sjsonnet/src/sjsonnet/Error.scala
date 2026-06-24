@@ -112,33 +112,29 @@ object Error {
       val namedFrames = allFrames.filter(_.exprErrorString != null)
       val rawFrames = if (namedFrames.nonEmpty) namedFrames else allFrames
 
-      // Compute enclosing function scope for each frame by scanning from
-      // outermost to innermost. Each frame's callee name tells us what function
-      // was entered; builtin calls (std.*) are transparent and don't change scope.
-      val scopeNames = new Array[String](rawFrames.length)
-      var currentScope: String = rootName
-      var si = rawFrames.length - 1
-      while (si >= 0) {
-        scopeNames(si) = currentScope
-        val frameName = rawFrames(si).exprErrorString
-        if (frameName != null && !isBuiltinName(frameName)) {
-          currentScope = frameName
-        }
-        si -= 1
-      }
-      if (rawFrames.nonEmpty) {
-        scopeNames(0) = Option(rawFrames(0).exprErrorString).getOrElse(rootName)
+      // Label each frame with its own identity (function name or root).
+      // This replaces the old scope-chain approach which incorrectly labeled
+      // parent frames with their child function's name.
+      val displayNames = new Array[String](rawFrames.length)
+      var di = 0
+      while (di < rawFrames.length) {
+        displayNames(di) = Option(rawFrames(di).exprErrorString).getOrElse(rootName)
+        di += 1
       }
 
-      // Deduplicate consecutive same-scope frames, keeping the innermost (first)
+      // Deduplicate consecutive frames with the same function name.
+      // Only deduplicates named frames — unnamed frames (null exprErrorString)
+      // are always preserved.
       val frames = new java.util.ArrayList[(Frame, String)](rawFrames.length)
-      si = 0
-      while (si < rawFrames.length) {
-        val name = scopeNames(si)
-        if (frames.isEmpty || frames.get(frames.size - 1)._2 != name) {
-          frames.add((rawFrames(si), name))
+      di = 0
+      while (di < rawFrames.length) {
+        val name = displayNames(di)
+        val frameId = rawFrames(di).exprErrorString
+        val lastFrameId = if (frames.isEmpty) null else frames.get(frames.size - 1)._1.exprErrorString
+        if (frameId == null || frameId != lastFrameId) {
+          frames.add((rawFrames(di), name))
         }
-        si += 1
+        di += 1
       }
 
       var msg = err.getMessage
