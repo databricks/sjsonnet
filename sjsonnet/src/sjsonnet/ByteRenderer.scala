@@ -26,12 +26,13 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   var newlineBuffered = false
 
   // Track empty state per nesting level. Bit i = 1 means level i has seen a value.
-  // Supports up to 64 levels of nesting (realistic JSON rarely exceeds ~20).
-  private var emptyBits: Long = 0L
+  // Uses BitSet (auto-growing) instead of a Long bitmask, which only supported 64 levels
+  // and caused silent corruption at depth >= 64 due to Java's shift masking (1L << 64 == 1L << 0).
+  private val emptyBits = new java.util.BitSet()
 
-  @inline private def markNonEmpty(): Unit = emptyBits |= (1L << depth)
-  @inline private def isEmpty: Boolean = (emptyBits & (1L << depth)) == 0L
-  @inline private def resetEmpty(): Unit = emptyBits &= ~(1L << depth)
+  @inline private def markNonEmpty(): Unit = emptyBits.set(depth)
+  @inline private def isEmpty: Boolean = !emptyBits.get(depth)
+  @inline private def resetEmpty(): Unit = emptyBits.clear(depth)
 
   private var stringValueCount = 0
   private var stringValueCacheKeys: Array[String] = null
