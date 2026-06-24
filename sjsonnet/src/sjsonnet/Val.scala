@@ -71,13 +71,18 @@ final class LazyExpr(
     private var scope: ValScope,
     private var ev: Evaluator)
     extends Lazy {
+  private var evaluating: Boolean = false
   def value: Val = {
     if (ev == null) exprOrVal.asInstanceOf[Val]
-    else {
+    else if (evaluating) {
+      Error.fail("Infinite recursion detected (self-referential thunk)")
+    } else {
+      evaluating = true
       val r = ev.visitExpr(exprOrVal.asInstanceOf[Expr])(scope)
       exprOrVal = r // cache result
       scope = null.asInstanceOf[sjsonnet.ValScope] // allow GC
       ev = null // sentinel: marks as computed
+      evaluating = false
       r
     }
   }
