@@ -1,1 +1,2 @@
-""
+sjsonnet.Error: [std.format] %c expected 1-sized string got: 0
+    at [<root>].(error.format_c_empty_string.jsonnet:5:6)

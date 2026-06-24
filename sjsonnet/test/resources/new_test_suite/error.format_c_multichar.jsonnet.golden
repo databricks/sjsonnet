@@ -1,1 +1,2 @@
-"AB"
+sjsonnet.Error: [std.format] %c expected 1-sized string got: 2
+    at [<root>].(error.format_c_multichar.jsonnet:5:6)
