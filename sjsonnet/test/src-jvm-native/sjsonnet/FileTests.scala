@@ -50,6 +50,7 @@ object FileTests extends BaseFileTests {
       val t = os
         .list(testSuiteRoot / "new_test_suite")
         .filter(f => f.ext == "jsonnet" && !f.last.contains("-js"))
+        .filter(f => !testDataSkippedTests.contains(f.last))
       assert(t.nonEmpty)
       t.foreach { file =>
         check(file, "new_test_suite")

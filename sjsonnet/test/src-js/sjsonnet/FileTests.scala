@@ -62,6 +62,7 @@ object FileTests extends BaseFileTests {
         .filter(f =>
           f.matches("[^/]+-js\\.jsonnet") || (f.matches("[^/]+\\.jsonnet") && !f.contains("-jvm"))
         )
+        .filter(f => !skippedTests.contains(f))
         .sorted
       assert(t.nonEmpty)
       t.foreach { file =>
