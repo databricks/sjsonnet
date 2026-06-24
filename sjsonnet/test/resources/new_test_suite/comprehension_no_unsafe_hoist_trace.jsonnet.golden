@@ -1,0 +1,3 @@
+TRACE: comprehension_no_unsafe_hoist_trace.jsonnet comp-no-hoist 1
+TRACE: comprehension_no_unsafe_hoist_trace.jsonnet comp-no-hoist 1
+true
