@@ -102,7 +102,7 @@ abstract class Materializer {
       visitor: Visitor[T, T],
       depth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): T = {
-    if (!ctx.enterObject(obj))
+    if (!ctx.enterContainer(obj))
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
     try {
       storePos(obj.pos)
@@ -131,7 +131,7 @@ abstract class Materializer {
         ov.visitEnd(-1)
       }
     } finally {
-      ctx.exitObject(obj)
+      ctx.exitContainer(obj)
     }
   }
 
@@ -277,17 +277,28 @@ abstract class Materializer {
       case _ =>
     }
     val len = xs.length
-    val av = visitor.visitArray(len, -1)
-    var i = 0
-    while (i < len) {
-      val childVal = xs.value(i)
-      av.visitValue(
-        materializeRecursiveChild(childVal, av.subVisitor.asInstanceOf[Visitor[T, T]], depth, ctx),
-        -1
-      )
-      i += 1
+    if (!ctx.enterContainer(xs))
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", xs.pos)
+    try {
+      val av = visitor.visitArray(len, -1)
+      var i = 0
+      while (i < len) {
+        val childVal = xs.value(i)
+        av.visitValue(
+          materializeRecursiveChild(
+            childVal,
+            av.subVisitor.asInstanceOf[Visitor[T, T]],
+            depth,
+            ctx
+          ),
+          -1
+        )
+        i += 1
+      }
+      av.visitEnd(-1)
+    } finally {
+      ctx.exitContainer(xs)
     }
-    av.visitEnd(-1)
   }
 
   private def materializeRecursiveChild[T](
@@ -359,89 +370,98 @@ abstract class Materializer {
       Math.max(16, Math.min(ctx.recursiveDepthLimit * 4, 8192))
     )
 
-    // Push the initial container frame
-    v match {
-      case obj: Val.Obj => pushObjFrame(obj, visitor, stack, ctx)
-      case xs: Val.Arr  => pushArrFrame(xs, visitor, stack, ctx)
-      case _            => () // unreachable
-    }
+    try {
+      // Push the initial container frame
+      v match {
+        case obj: Val.Obj => pushObjFrame(obj, visitor, stack, ctx)
+        case xs: Val.Arr  => pushArrFrame(xs, visitor, stack, ctx)
+        case _            => () // unreachable
+      }
 
-    while (true) {
-      stack.peekFirst() match {
-        case frame: Materializer.MaterializeObjFrame[T @unchecked] =>
-          val keys = frame.keys
-          val ov = frame.objVisitor
-          if (frame.index < keys.length) {
-            val key = keys(frame.index)
-            val childVal = frame.obj.value(key, ctx.emptyPos)
-            storePos(childVal)
+      while (true) {
+        stack.peekFirst() match {
+          case frame: Materializer.MaterializeObjFrame[T @unchecked] =>
+            val keys = frame.keys
+            val ov = frame.objVisitor
+            if (frame.index < keys.length) {
+              val key = keys(frame.index)
+              val childVal = frame.obj.value(key, ctx.emptyPos)
+              storePos(childVal)
 
-            if (frame.sort) {
-              if (frame.prevKey != null && Util.compareStringsByCodepoint(key, frame.prevKey) <= 0)
-                Error.fail(
-                  s"""Internal error: Unexpected key "$key" after "${frame.prevKey}" in sorted object materialization""",
-                  childVal.pos
+              if (frame.sort) {
+                if (
+                  frame.prevKey != null && Util.compareStringsByCodepoint(key, frame.prevKey) <= 0
                 )
-              frame.prevKey = key
+                  Error.fail(
+                    s"""Internal error: Unexpected key "$key" after "${frame.prevKey}" in sorted object materialization""",
+                    childVal.pos
+                  )
+                frame.prevKey = key
+              }
+
+              ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
+              frame.index += 1
+
+              val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
+              materializeChild(childVal, sub, ov, stack, ctx)
+            } else {
+              ctx.exitContainer(frame.obj)
+              val result = ov.visitEnd(-1)
+              stack.removeFirst()
+              if (stack.isEmpty) return result
+              feedResult(stack.peekFirst(), result)
             }
 
-            ov.visitKeyValue(ov.visitKey(-1).visitString(key, -1))
-            frame.index += 1
-
-            val sub = ov.subVisitor.asInstanceOf[Visitor[T, T]]
-            materializeChild(childVal, sub, ov, stack, ctx)
-          } else {
-            ctx.exitObject(frame.obj)
-            val result = ov.visitEnd(-1)
-            stack.removeFirst()
-            if (stack.isEmpty) return result
-            feedResult(stack.peekFirst(), result)
-          }
-
-        case frame: Materializer.MaterializeArrFrame[T @unchecked] =>
-          val arr = frame.arr
-          val av = frame.arrVisitor
-          // Fast paths for compact numeric arrays: emit all elements directly.
-          if (frame.index == 0) {
-            arr match {
-              case range: Val.RangeArr if range.isCompactRange =>
-                val len = range.length
-                var i = 0
-                val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
-                while (i < len) {
-                  av.visitValue(sub.visitFloat64(range.doubleAt(i), -1), -1)
-                  i += 1
-                }
-                frame.index = len // mark as done
-              case ba: Val.ByteArr =>
-                val bytes = ba.rawBytes
-                val len = bytes.length
-                var i = 0
-                while (i < len) {
+          case frame: Materializer.MaterializeArrFrame[T @unchecked] =>
+            val arr = frame.arr
+            val av = frame.arrVisitor
+            // Fast paths for compact numeric arrays: emit all elements directly.
+            if (frame.index == 0) {
+              arr match {
+                case range: Val.RangeArr if range.isCompactRange =>
+                  val len = range.length
+                  var i = 0
                   val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
-                  av.visitValue(sub.visitFloat64((bytes(i) & 0xff).toDouble, -1), -1)
-                  i += 1
-                }
-                frame.index = len // mark as done
-              case _ =>
+                  while (i < len) {
+                    av.visitValue(sub.visitFloat64(range.doubleAt(i), -1), -1)
+                    i += 1
+                  }
+                  frame.index = len // mark as done
+                case ba: Val.ByteArr =>
+                  val bytes = ba.rawBytes
+                  val len = bytes.length
+                  var i = 0
+                  val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
+                  while (i < len) {
+                    av.visitValue(sub.visitFloat64((bytes(i) & 0xff).toDouble, -1), -1)
+                    i += 1
+                  }
+                  frame.index = len // mark as done
+                case _ =>
+              }
             }
-          }
-          if (frame.index < arr.length) {
-            val childVal = arr.value(frame.index)
-            frame.index += 1
+            if (frame.index < arr.length) {
+              val childVal = arr.value(frame.index)
+              frame.index += 1
 
-            val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
-            materializeChild(childVal, sub, av, stack, ctx)
-          } else {
-            val result = av.visitEnd(-1)
-            stack.removeFirst()
-            if (stack.isEmpty) return result
-            feedResult(stack.peekFirst(), result)
-          }
+              val sub = av.subVisitor.asInstanceOf[Visitor[T, T]]
+              materializeChild(childVal, sub, av, stack, ctx)
+            } else {
+              ctx.exitContainer(frame.arr)
+              val result = av.visitEnd(-1)
+              stack.removeFirst()
+              if (stack.isEmpty) return result
+              feedResult(stack.peekFirst(), result)
+            }
+        }
+      }
+
+      null.asInstanceOf[T] // unreachable — while(true) exits via return
+    } finally {
+      while (!stack.isEmpty) {
+        exitFrameContainer(stack.removeFirst(), ctx)
       }
     }
-
-    null.asInstanceOf[T] // unreachable — while(true) exits via return
   }
 
   // Materialize a child value in iterative mode. Single match dispatches leaf values directly
@@ -496,17 +516,23 @@ abstract class Materializer {
       stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     checkDepth(obj.pos, stack.size, ctx.maxDepth)
-    if (!ctx.enterObject(obj))
+    if (!ctx.enterContainer(obj))
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
-    storePos(obj.pos)
-    obj.triggerAllAsserts(ctx.brokenAssertionLogic)
-    val keyNames =
-      if (ctx.sort) obj.sortedVisibleKeyNames
-      else obj.visibleKeyNames
-    val objVisitor = visitor.visitObject(keyNames.length, jsonableKeys = true, -1)
-    stack.push(
-      new Materializer.MaterializeObjFrame[T](objVisitor, keyNames, obj, ctx.sort, 0, null)
-    )
+    var pushed = false
+    try {
+      storePos(obj.pos)
+      obj.triggerAllAsserts(ctx.brokenAssertionLogic)
+      val keyNames =
+        if (ctx.sort) obj.sortedVisibleKeyNames
+        else obj.visibleKeyNames
+      val objVisitor = visitor.visitObject(keyNames.length, jsonableKeys = true, -1)
+      stack.push(
+        new Materializer.MaterializeObjFrame[T](objVisitor, keyNames, obj, ctx.sort, 0, null)
+      )
+      pushed = true
+    } finally {
+      if (!pushed) ctx.exitContainer(obj)
+    }
   }
 
   @inline private def pushArrFrame[T](
@@ -515,10 +541,26 @@ abstract class Materializer {
       stack: java.util.ArrayDeque[Materializer.MaterializeFrame],
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     checkDepth(xs.pos, stack.size, ctx.maxDepth)
-    storePos(xs.pos)
-    val arrVisitor = visitor.visitArray(xs.length, -1)
-    stack.push(new Materializer.MaterializeArrFrame[T](arrVisitor, xs, 0))
+    if (!ctx.enterContainer(xs))
+      Error.fail("Stackoverflow while materializing, possibly due to recursive value", xs.pos)
+    var pushed = false
+    try {
+      storePos(xs.pos)
+      val arrVisitor = visitor.visitArray(xs.length, -1)
+      stack.push(new Materializer.MaterializeArrFrame[T](arrVisitor, xs, 0))
+      pushed = true
+    } finally {
+      if (!pushed) ctx.exitContainer(xs)
+    }
   }
+
+  @inline private def exitFrameContainer(
+      frame: Materializer.MaterializeFrame,
+      ctx: Materializer.MaterializeContext): Unit =
+    frame match {
+      case f: Materializer.MaterializeObjFrame[_] => ctx.exitContainer(f.obj)
+      case f: Materializer.MaterializeArrFrame[_] => ctx.exitContainer(f.arr)
+    }
 
   // Feed a completed child result into the parent frame's visitor.
   @inline private def feedResult[T](parentFrame: Materializer.MaterializeFrame, result: T): Unit =
@@ -965,19 +1007,18 @@ object Materializer extends Materializer {
       val recursiveDepthLimit: Int,
       val maxDepth: Int) {
 
-    // Tracks objects currently being materialized on the current path (entry → exit).
-    // Used to detect cycles like `{ x: self }` early, before any significant output
-    // is written. Uses identity equality so structurally equal but distinct objects
-    // can still be materialized independently.
-    val visitedObjects: java.util.IdentityHashMap[Val.Obj, java.lang.Boolean] =
-      new java.util.IdentityHashMap[Val.Obj, java.lang.Boolean]()
+    // Tracks containers currently being materialized on the current path (entry → exit).
+    // Uses identity equality so shared but acyclic arrays/objects can still be materialized
+    // independently, while true cycles fail before recursive output grows without bound.
+    val visitedContainers: java.util.IdentityHashMap[Val, java.lang.Boolean] =
+      new java.util.IdentityHashMap[Val, java.lang.Boolean]()
 
-    /** Returns true if `obj` was NOT already being materialized (safe to proceed). */
-    @inline def enterObject(obj: Val.Obj): Boolean =
-      visitedObjects.put(obj, java.lang.Boolean.TRUE) eq null
+    /** Returns true if `container` was NOT already being materialized (safe to proceed). */
+    @inline def enterContainer(container: Val): Boolean =
+      visitedContainers.put(container, java.lang.Boolean.TRUE) eq null
 
-    @inline def exitObject(obj: Val.Obj): Unit =
-      visitedObjects.remove(obj)
+    @inline def exitContainer(container: Val): Unit =
+      visitedContainers.remove(container)
   }
 
   private[sjsonnet] object MaterializeContext {
