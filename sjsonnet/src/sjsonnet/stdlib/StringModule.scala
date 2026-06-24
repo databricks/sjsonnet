@@ -1013,12 +1013,14 @@ object StringModule extends AbstractFunctionModule {
   private object ParseInt extends Val.Builtin1("parseInt", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       val s = str.value.asString
-      if (s.isEmpty || s == "-") {
+      if (s.isEmpty || s == "-" || s == "+") {
         Error.fail("Cannot parse '" + s + "' as an integer in base 10")
       }
       if (s.charAt(0) == '-') {
         val result = parseNat(s, 1, 10, "base 10")
         Val.cachedNum(pos, if (result == 0.0) 0.0 else -result)
+      } else if (s.charAt(0) == '+') {
+        Val.cachedNum(pos, parseNat(s, 1, 10, "base 10"))
       } else Val.cachedNum(pos, parseNat(s, 0, 10, "base 10"))
     }
   }
