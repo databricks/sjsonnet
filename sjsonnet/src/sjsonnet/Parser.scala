@@ -311,10 +311,10 @@ class Parser(
         SingleChar./.flatMapX {
           case '\"' => literalDoubleString
           case '\'' => literalSingleString
-          case _    => Fail
+          case _    => Fail.opaque("verbatim string literal (@\" or @')")
         }
       case '|' => maybeChompedTripleBarString
-      case _   => Fail
+      case _   => Fail.opaque("string literal")
     }
   ).map(_.mkString)
 
@@ -693,7 +693,7 @@ class Parser(
             }
           case '{' =>
             Pass ~ (objinside(i, currentDepth + 1) ~ "}").map(x => Expr.ObjExtend(i, _: Expr, x))
-          case _ => Fail
+          case _ => Fail.opaque("expression")
         }
       }
     )
@@ -792,7 +792,7 @@ class Parser(
               SingleChar./.flatMapX {
                 case '\"' => literalDoubleString.map(constructString(pos, _))
                 case '\'' => literalSingleString.map(constructString(pos, _))
-                case _    => Fail
+                case _    => Fail.opaque("verbatim string literal (@\" or @')")
               }
             case '|' => maybeChompedTripleBarString.map(constructString(pos, _))
             case '$' => Pass(Expr.$(pos))
@@ -817,7 +817,7 @@ class Parser(
                   case x           => Pass(Expr.Id(pos, x))
                 }
               }
-              else Fail
+              else Fail.opaque("expression")
           }
         }
       }
