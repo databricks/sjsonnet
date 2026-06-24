@@ -220,7 +220,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("sqrt", "x") { (pos, ev, x: Double) =>
       val r = math.sqrt(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.sqrt: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.sqrt: Not a number", pos)(ev)
       r
     },
     /**
@@ -293,7 +293,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("pow", "x", "n") { (pos, ev, x: Double, n: Double) =>
       val r = math.pow(x, n)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.pow: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.pow: Not a number", pos)(ev)
       r
     },
     /**
@@ -432,7 +432,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("asin", "x") { (pos, ev, x: Double) =>
       val r = math.asin(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.asin: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.asin: Not a number", pos)(ev)
       r
     },
     /**
@@ -444,7 +444,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("acos", "x") { (pos, ev, x: Double) =>
       val r = math.acos(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.acos: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.acos: Not a number", pos)(ev)
       r
     },
     /**
@@ -506,7 +506,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log", "x") { (pos, ev, x: Double) =>
       val r = math.log(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.log: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log: Not a number", pos)(ev)
       r
     },
     /**
@@ -518,7 +518,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log2", "x") { (pos, ev, x: Double) =>
       val r = math.log(x) / math.log(2.0)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.log2: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log2: Not a number", pos)(ev)
       r
     },
     /**
@@ -530,7 +530,7 @@ object MathModule extends AbstractFunctionModule {
      */
     builtin("log10", "x") { (pos, ev, x: Double) =>
       val r = math.log10(x)
-      if (java.lang.Double.isNaN(r)) Error.fail("std.log10: not a number", pos)(ev)
+      if (java.lang.Double.isNaN(r)) Error.fail("std.log10: Not a number", pos)(ev)
       r
     },
     /**

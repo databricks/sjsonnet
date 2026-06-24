@@ -39,23 +39,23 @@ object StdMathTests extends TestSuite {
       evalErr("std.exponent(std.pow(2, 1024))")
     }
     test("sqrt rejects negative input") {
-      // go-jsonnet: makeDoubleCheck returns "not a number" for NaN results
+      // go-jsonnet: makeDoubleCheck returns "Not a number" for NaN results
       val err = evalErr("std.sqrt(-1)")
-      assert(err.contains("not a number"))
+      assert(err.contains("Not a number"))
       val err2 = evalErr("std.sqrt(-0.001)")
-      assert(err2.contains("not a number"))
+      assert(err2.contains("Not a number"))
       // sqrt(0) and sqrt(positive) must still work
       eval("std.sqrt(0)") ==> ujson.Num(0.0)
       eval("std.sqrt(4)") ==> ujson.Num(2.0)
     }
     test("log and log2 reject negative and zero input") {
-      // go-jsonnet: makeDoubleCheck returns "not a number" for NaN, Val.Num catches Infinity as "overflow"
+      // go-jsonnet: makeDoubleCheck returns "Not a number" for NaN, Val.Num catches Infinity as "overflow"
       val errLog = evalErr("std.log(-1)")
-      assert(errLog.contains("not a number"))
+      assert(errLog.contains("Not a number"))
       val errLog2 = evalErr("std.log2(-1)")
-      assert(errLog2.contains("not a number"))
+      assert(errLog2.contains("Not a number"))
       val errLog10 = evalErr("std.log10(-1)")
-      assert(errLog10.contains("not a number"))
+      assert(errLog10.contains("Not a number"))
       val errLog0 = evalErr("std.log(0)")
       assert(errLog0.contains("Overflow"))
       val errLog2Zero = evalErr("std.log2(0)")

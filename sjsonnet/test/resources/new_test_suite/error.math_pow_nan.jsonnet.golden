@@ -1,2 +1,2 @@
-sjsonnet.Error: [std.pow] not a number
+sjsonnet.Error: [std.pow] Not a number
     at [<root>].(error.math_pow_nan.jsonnet:2:8)
