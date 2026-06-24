@@ -14,7 +14,9 @@ object FileTests extends BaseFileTests {
     "error.function_infinite_default.jsonnet",
     "error.obj_recursive.jsonnet",
     // Merge keys fix is JVM-only (SnakeYAML specific)
-    "parseyaml_merge_keys.jsonnet"
+    "parseyaml_merge_keys.jsonnet",
+    // Block scalar clip chomping fix is JVM-only (SnakeYAML specific)
+    "parseyaml_block_scalar_chomping.jsonnet"
   )
 
   val goTestDataSkippedTests: Set[String] = Set(
