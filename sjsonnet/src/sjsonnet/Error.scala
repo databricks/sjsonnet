@@ -130,7 +130,8 @@ object Error {
       while (di < rawFrames.length) {
         val name = displayNames(di)
         val frameId = rawFrames(di).exprErrorString
-        val lastFrameId = if (frames.isEmpty) null else frames.get(frames.size - 1)._1.exprErrorString
+        val lastFrameId =
+          if (frames.isEmpty) null else frames.get(frames.size - 1)._1.exprErrorString
         if (frameId == null || frameId != lastFrameId) {
           frames.add((rawFrames(di), name))
         }
