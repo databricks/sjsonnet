@@ -1,0 +1,2 @@
+sjsonnet.Error: Infinite recursion detected (self-referential thunk)
+    at [<root>].(error.self_referential_thunk.jsonnet:1:7)
