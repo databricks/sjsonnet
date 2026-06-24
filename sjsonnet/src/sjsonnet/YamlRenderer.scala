@@ -23,7 +23,7 @@ class YamlRenderer(
           null,
           YamlRenderer.this.elemBuilder,
           s,
-          escapeUnicode = true,
+          escapeUnicode = false,
           wrapQuotes = true
         )
       } else {
@@ -65,7 +65,7 @@ class YamlRenderer(
         null,
         elemBuilder,
         s,
-        escapeUnicode = true,
+        escapeUnicode = false,
         wrapQuotes = true
       )
     }
