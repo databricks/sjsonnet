@@ -180,10 +180,6 @@ object Error {
       }
   }
 
-  private def isBuiltinName(name: String): Boolean =
-    name.startsWith("std.") || name == "default" ||
-    name == "object comprehension" || name == "array comprehension"
-
   private def stripDuplicateMessagePrefix(msg: String, name: String): String = {
     if (name == null || !msg.startsWith(name) || msg.length <= name.length) msg
     else {
