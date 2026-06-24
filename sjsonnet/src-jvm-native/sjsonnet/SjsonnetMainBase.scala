@@ -262,6 +262,8 @@ object SjsonnetMainBase {
           wr.write(s.toString)
           wr
         }
+        override def visitNull(index: Int): Writer =
+          throw new upickle.core.Abort(s"$expectedMsg got null")
       }
     else new Renderer(wr, indent = config.indent)
 

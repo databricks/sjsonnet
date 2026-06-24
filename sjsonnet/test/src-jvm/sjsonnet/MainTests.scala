@@ -166,6 +166,32 @@ object MainTests extends TestSuite {
       assert((res, out, err) == ((0, "hello\n", "")))
     }
 
+    test("execStringRejectsNull") {
+      // Regression: --string must error on null, matching C++/go/jrsonnet behavior
+      val (res, out, err) = runMain("null", "--exec", "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("expected string result got null"))
+    }
+
+    test("execStringRejectsNonStringTypes") {
+      // Numbers
+      val (res1, out1, err1) = runMain("42", "--exec", "--string")
+      assert(res1 == 1, out1.isEmpty, err1.contains("expected string result"))
+
+      // Booleans
+      val (res2, out2, err2) = runMain("true", "--exec", "--string")
+      assert(res2 == 1, out2.isEmpty, err2.contains("expected string result"))
+
+      // Arrays
+      val (res3, out3, err3) = runMain("[1, 2]", "--exec", "--string")
+      assert(res3 == 1, out3.isEmpty, err3.contains("expected string result"))
+
+      // Objects
+      val (res4, out4, err4) = runMain("{a: 1}", "--exec", "--string")
+      assert(res4 == 1, out4.isEmpty, err4.contains("expected string result"))
+    }
+
     test("multiStringOutput") {
       val source = testSuiteRoot / "db" / "multi_string.jsonnet"
       val multiDest = os.temp.dir()
