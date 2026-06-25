@@ -28,6 +28,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 
   protected val elemBuilder = new upickle.core.ByteBuilder
   private val unicodeCharBuilder = new upickle.core.CharBuilder
+  private val longScratchBuf: Array[Byte] = new Array[Byte](20)
 
   def flushByteBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 8192)
@@ -182,7 +183,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
     var abs = if (negative) -v else v
     // Write digits backward into a small local buffer, then bulk-copy.
     // Max Long digits = 19, plus sign = 20.
-    val buf = BaseByteRenderer.scratchBuf
+    val buf = longScratchBuf
     var pos = 20
     while (abs >= 100) {
       val q = abs / 100
@@ -543,12 +544,6 @@ object BaseByteRenderer {
     'e'.toByte,
     'f'.toByte
   )
-
-  /**
-   * Reusable scratch buffer for writeLongDirect (max 20 bytes for Long.MinValue). Not thread-safe,
-   * but renderers are single-threaded.
-   */
-  private[sjsonnet] val scratchBuf: Array[Byte] = new Array[Byte](20)
 
   /**
    * Digit-pair lookup tables for two-digits-at-a-time integer rendering. DIGIT_TENS(i) gives the
