@@ -15,12 +15,6 @@ object BaseCharRenderer {
    */
   final val MaxCachedDepth = 32
 
-  /**
-   * Reusable scratch buffer for writeLongDirect (max 20 chars for Long.MinValue). Not thread-safe,
-   * but renderers are single-threaded.
-   */
-  private[sjsonnet] val scratchBuf: Array[Char] = new Array[Char](20)
-
   /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
   private[sjsonnet] val DIGIT_TENS: Array[Char] = {
     val a = new Array[Char](100)
@@ -59,6 +53,8 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
   def flushCharBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
+
+  private val longScratchBuf: Array[Char] = new Array[Char](20)
 
   protected var depth: Int = 0
 
@@ -239,7 +235,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     var abs = if (negative) -v else v
     // Write digits backward into a small local buffer, then bulk-copy.
     // Max Long digits = 19, plus sign = 20.
-    val buf = BaseCharRenderer.scratchBuf
+    val buf = longScratchBuf
     var pos = 20
     while (abs >= 100) {
       val q = abs / 100
