@@ -1,2 +1,0 @@
-sjsonnet.Error: [std.format] expected number or string at position 0, got boolean
-    at [<root>].(error.format_o_boolean.jsonnet:1:6)

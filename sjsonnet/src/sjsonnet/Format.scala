@@ -734,21 +734,41 @@ object Format {
                   )
               }
             case _: Val.True =>
+              val b = 1
               formatted.conversion match {
-                case 's' => widenRaw(formatted, "true")
-                case 'c' =>
+                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
+                case 'o'             => formatOctal(formatted, b)
+                case 'x'             => formatHexadecimal(formatted, b)
+                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
+                case 'e'             => formatExponent(formatted, b).toLowerCase
+                case 'E'             => formatExponent(formatted, b)
+                case 'f' | 'F'       => formatFloat(formatted, b)
+                case 'g'             => formatGeneric(formatted, b).toLowerCase
+                case 'G'             => formatGeneric(formatted, b)
+                case 'c'             =>
                   Error.fail("%c expected number or string, got boolean")
-                case _ =>
+                case 's' => widenRaw(formatted, "true")
+                case _   =>
                   Error.fail(
                     "expected number or string at position %d, got boolean".format(i)
                   )
               }
             case _: Val.False =>
+              val b = 0
               formatted.conversion match {
-                case 's' => widenRaw(formatted, "false")
-                case 'c' =>
+                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
+                case 'o'             => formatOctal(formatted, b)
+                case 'x'             => formatHexadecimal(formatted, b)
+                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
+                case 'e'             => formatExponent(formatted, b).toLowerCase
+                case 'E'             => formatExponent(formatted, b)
+                case 'f' | 'F'       => formatFloat(formatted, b)
+                case 'g'             => formatGeneric(formatted, b).toLowerCase
+                case 'G'             => formatGeneric(formatted, b)
+                case 'c'             =>
                   Error.fail("%c expected number or string, got boolean")
-                case _ =>
+                case 's' => widenRaw(formatted, "false")
+                case _   =>
                   Error.fail(
                     "expected number or string at position %d, got boolean".format(i)
                   )
