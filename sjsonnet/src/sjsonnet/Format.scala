@@ -262,10 +262,11 @@ object Format {
       else if (lhs2.isEmpty) mhs + rhs
       else lhs2 + mhs + rhs
     } else {
+      val zeroPad = formatted.zeroPadded && !formatted.leftAdjusted && numeric
       val padding =
-        if (formatted.zeroPadded && numeric) Platform.repeatString("0", missingWidth)
+        if (zeroPad) Platform.repeatString("0", missingWidth)
         else Platform.repeatString(" ", missingWidth)
-      if (formatted.zeroPadded && numeric) lhs2 + mhs + padding + rhs
+      if (zeroPad) lhs2 + mhs + padding + rhs
       else if (formatted.leftAdjusted) lhs2 + mhs + rhs + padding
       else padding + lhs2 + mhs + rhs
     }

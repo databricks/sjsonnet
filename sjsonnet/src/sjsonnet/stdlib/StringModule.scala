@@ -1253,8 +1253,8 @@ object StringModule extends AbstractFunctionModule {
       Format.format(str.value.asString, vals.value, pos)(ev)
     override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) =
       args match {
-        case Array(str, fmt: Val.Str) =>
-          try { (new Format.PartialApplyFmt(fmt.str), Array(str)) }
+        case Array(fmtStr: Val.Str, vals) =>
+          try { (new Format.PartialApplyFmt(fmtStr.str), Array(vals)) }
           catch { case _: Exception => null }
         case _ => null
       }

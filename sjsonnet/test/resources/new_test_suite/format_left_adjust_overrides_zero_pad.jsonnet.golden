@@ -1,0 +1,10 @@
+{
+   "leftJustifyInt": "42   ",
+   "leftJustifyZeroPadFloat": "3.14    ",
+   "leftJustifyZeroPadInt": "42   ",
+   "leftJustifyZeroPadNeg": "-42  ",
+   "leftJustifyZeroPadPercentOperator": "42   ",
+   "leftJustifyZeroPadPlus": "+42  ",
+   "leftJustifyZeroPadWide": "42        ",
+   "zeroPadInt": "00042"
+}
