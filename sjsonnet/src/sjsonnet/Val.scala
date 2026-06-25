@@ -1855,6 +1855,37 @@ object Val {
       }
       new Obj(pos, m, false, null, null)
     }
+
+    /**
+     * Like [[mk]], but eagerly caches the value of every constant ([[ConstMember]]) field at
+     * construction so that subsequent field lookups never mutate the instance.
+     *
+     * This is for the process-wide shared `std` module: an [[Interpreter]]'s default `std` is a
+     * singleton ([[sjsonnet.stdlib.StdLibModule.Default]]) read concurrently by independent
+     * interpreters. On the normal lazy path the first `std.foo` lookup calls `putCache`, racing on
+     * the inline cache (`ck1/cv1`) and the lazily-allocated `valueCache` HashMap across threads —
+     * which can return the wrong builtin or corrupt the map (#1047). Pre-filling makes every lookup
+     * of a constant field a read-only cache hit. Non-constant members (e.g. `std.thisFile`, whose
+     * value depends on the file being evaluated) are intentionally left uncached; they carry
+     * `cached = false` and so never write on lookup either, leaving the instance immutable — and
+     * thus safe to publish across threads — after construction.
+     */
+    def mkWithConstCache(
+        pos: Position,
+        sizeHint: Int,
+        membersArray: Iterable[(String, Obj.Member)]*): Obj = {
+      val m = Util.preSizedJavaLinkedHashMap[String, Obj.Member](sizeHint)
+      val cache = Util.preSizedJavaHashMap[Any, Val](sizeHint)
+      for (members <- membersArray; (k, v) <- members) {
+        m.put(k, v)
+        v match {
+          // ConstMember.invoke ignores its arguments and returns its constant value.
+          case cm: ConstMember if cm.cached => cache.put(k, cm.invoke(null, null, null, null))
+          case _                            =>
+        }
+      }
+      new Obj(pos, m, false, null, null, cache, null)
+    }
   }
 
   /**
@@ -1965,6 +1996,14 @@ object Val {
       }
       r
     }
+
+    /**
+     * Test-only: the already-cached value for `k`, or null if not cached. Used to assert that
+     * shared modules built via [[Obj.mkWithConstCache]] (e.g. the process-wide `std`) pre-populate
+     * their value cache at construction, so concurrent first access only ever reads it (#1047).
+     */
+    private[sjsonnet] def cachedValueForTest(k: Any): Val =
+      if (valueCache != null) valueCache.get(k) else null
 
     /**
      * When true, field caching can be skipped during materialization because no field body
@@ -2533,7 +2572,7 @@ object Val {
         )
     }
     val fieldSet = new StaticObjectFieldSet(keys)
-    new Val.Obj(
+    val obj = new Val.Obj(
       pos,
       null,
       true,
@@ -2542,6 +2581,16 @@ object Val {
       cache,
       internedKeyMaps.getOrElseUpdate(fieldSet, allKeys)
     )
+    // Static objects are interned and shared across threads: StaticOptimizer folds them into the
+    // parse-cached AST, which a worker shares across parallel evaluator threads. Eagerly populate
+    // the sorted-key-name cache here (single-threaded, at static-optimization time) so concurrent
+    // sorted materialization (e.g. std.manifestJsonEx, which sorts keys) only ever *reads* a
+    // fully-built array. The lazy `sortedVisibleKeyNames` path writes a non-volatile field; its
+    // unsafe publication would otherwise let one thread observe a half-sorted array and emit
+    // corrupt key order/count. This mirrors the eagerly-prefilled `valueCache`/`allKeys` above and
+    // is safely published via the parse cache's happens-before, like the rest of the instance.
+    val _ = obj.sortedVisibleKeyNames
+    obj
   }
 
   abstract class Func(var pos: Position, val defSiteValScope: ValScope, val params: Params)

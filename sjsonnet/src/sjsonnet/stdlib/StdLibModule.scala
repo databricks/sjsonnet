@@ -28,7 +28,7 @@ final class StdLibModule(
     ("trace" -> traceFunction) +
     ("extVar" -> extVarFunction)
 
-  val module: Val.Obj = Val.Obj.mk(
+  val module: Val.Obj = Val.Obj.mkWithConstCache(
     null,
     functions.size + additionalStdMembers.size,
     functions.view.map { case (k, v) =>
