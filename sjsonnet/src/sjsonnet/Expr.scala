@@ -451,8 +451,8 @@ object Expr {
        * == null). Computed from the first instance and reused by subsequent ones, avoiding per-object
        * allKeyNames/visibleKeyNames allocation.
        */
-      var _cachedAllKeyNames: Array[String] = null
-      var _cachedVisibleKeyNames: Array[String] = null
+      @volatile var _cachedAllKeyNames: Array[String] = null
+      @volatile var _cachedVisibleKeyNames: Array[String] = null
 
       /** True if all fields have compile-time fixed names (no computed/Dyn field names). */
       lazy val allFieldNamesFixed: Boolean =
