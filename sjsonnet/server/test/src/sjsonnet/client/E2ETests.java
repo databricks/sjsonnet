@@ -27,15 +27,14 @@ import static org.junit.Assert.*;
 public class E2ETests {
 
     private static Path tmpRoot;
-    private static Path lockBase;
     private static String classpath;
     private static String version;
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        tmpRoot = Files.createTempDirectory("sjsonnet-e2e-");
-        lockBase = tmpRoot.resolve("lock");
-        Files.createDirectories(lockBase);
+        tmpRoot = Util.isWindows
+                ? Files.createTempDirectory("sjsonnet-e2e-")
+                : Files.createTempDirectory(Path.of("/tmp"), "sj-");
 
         classpath = System.getProperty("java.class.path");
         assertNotNull("java.class.path must be set", classpath);
@@ -49,6 +48,7 @@ public class E2ETests {
     @AfterClass
     public static void tearDownClass() throws Exception {
         if (tmpRoot == null) return;
+        stopServersForRoot();
         try (var paths = Files.walk(tmpRoot)) {
             paths.sorted(Comparator.reverseOrder()).forEach(p -> {
                 try { Files.deleteIfExists(p); } catch (IOException ignored) {}
@@ -57,27 +57,34 @@ public class E2ETests {
     }
 
     /**
-     * Scenario 1: first client invocation — server must be spawned, UDS
-     * connection established, jsonnet evaluated, exit code 0 returned.
+     * Scenario 1: client invocation against a real server JVM — UDS connection
+     * must be established, jsonnet evaluated, exit code 0 returned.
      */
     @Test
-    public void firstClientSpawnsServerAndEvaluates() throws Exception {
+    public void clientConnectsToServerAndEvaluates() throws Exception {
+        Path home = newHome("scenario1-home");
         Path program = Files.writeString(
                 tmpRoot.resolve("scenario1.jsonnet"),
                 "{ hello: \"world\", sum: std.foldl(function(a,b) a+b, [1,2,3,4,5], 0) }\n");
 
-        ClientResult r = runClient(program, tmpRoot.resolve("scenario1.stdout"),
-                tmpRoot.resolve("scenario1.stderr"));
+        Process server = startServer(home, version);
+        try {
+            ClientResult r = runClient(home, program, tmpRoot.resolve("scenario1.stdout"),
+                    tmpRoot.resolve("scenario1.stderr"));
 
-        assertEquals("client exit code\nstderr=" + r.stderr, 0, r.exitCode);
-        assertTrue("expected hello:world in stdout, got: " + r.stdout,
-                r.stdout.contains("\"hello\"") && r.stdout.contains("\"world\""));
-        assertTrue("expected sum:15 in stdout, got: " + r.stdout,
-                r.stdout.contains("15"));
+            assertEquals("client exit code\nstderr=" + r.stderr, 0, r.exitCode);
+            assertTrue("expected hello:world in stdout, got: " + r.stdout,
+                    r.stdout.contains("\"hello\"") && r.stdout.contains("\"world\""));
+            assertTrue("expected sum:15 in stdout, got: " + r.stdout,
+                    r.stdout.contains("15"));
 
-        // Server must have left a lockBase footprint (pid file, log, etc.)
-        assertTrue("server pid lock file expected",
-                Files.exists(lockBase.resolve("pid")));
+            // Server must have left a lockBase footprint (pid file, log, etc.)
+            assertTrue("server pid lock file expected",
+                    Files.exists(lockBaseForHome(home).resolve("pid")));
+        } finally {
+            stopServer(server);
+            stopServersForHome(home);
+        }
     }
 
     /**
@@ -86,20 +93,27 @@ public class E2ETests {
      */
     @Test
     public void secondInvocationReusesServer() throws Exception {
+        Path home = newHome("scenario2-home");
         Path program = Files.writeString(
                 tmpRoot.resolve("scenario2.jsonnet"),
                 "{ arr: [x * x for x in std.range(1, 4)] }\n");
 
-        ClientResult a = runClient(program, tmpRoot.resolve("scenario2a.stdout"),
-                tmpRoot.resolve("scenario2a.stderr"));
-        ClientResult b = runClient(program, tmpRoot.resolve("scenario2b.stdout"),
-                tmpRoot.resolve("scenario2b.stderr"));
+        Process server = startServer(home, version);
+        try {
+            ClientResult a = runClient(home, program, tmpRoot.resolve("scenario2a.stdout"),
+                    tmpRoot.resolve("scenario2a.stderr"));
+            ClientResult b = runClient(home, program, tmpRoot.resolve("scenario2b.stdout"),
+                    tmpRoot.resolve("scenario2b.stderr"));
 
-        assertEquals("first run exit", 0, a.exitCode);
-        assertEquals("second run exit", 0, b.exitCode);
-        assertEquals("both runs produce same JSON",
-                a.stdout.stripTrailing(), b.stdout.stripTrailing());
-        assertTrue("expected arr in output", a.stdout.contains("\"arr\""));
+            assertEquals("first run exit", 0, a.exitCode);
+            assertEquals("second run exit", 0, b.exitCode);
+            assertEquals("both runs produce same JSON",
+                    a.stdout.stripTrailing(), b.stdout.stripTrailing());
+            assertTrue("expected arr in output", a.stdout.contains("\"arr\""));
+        } finally {
+            stopServer(server);
+            stopServersForHome(home);
+        }
     }
 
     /**
@@ -108,14 +122,21 @@ public class E2ETests {
      */
     @Test
     public void malformedJsonnetReturnsNonZeroExit() throws Exception {
+        Path home = newHome("bad-home");
         Path program = Files.writeString(
                 tmpRoot.resolve("bad.jsonnet"),
                 "this is not valid jsonnet {{{\n");
 
-        ClientResult r = runClient(program, tmpRoot.resolve("bad.stdout"),
-                tmpRoot.resolve("bad.stderr"));
+        Process server = startServer(home, version);
+        try {
+            ClientResult r = runClient(home, program, tmpRoot.resolve("bad.stdout"),
+                    tmpRoot.resolve("bad.stderr"));
 
-        assertNotEquals("non-zero exit for bad syntax", 0, r.exitCode);
+            assertNotEquals("non-zero exit for bad syntax", 0, r.exitCode);
+        } finally {
+            stopServer(server);
+            stopServersForHome(home);
+        }
     }
 
     /**
@@ -124,35 +145,47 @@ public class E2ETests {
      */
     @Test
     public void versionMismatchRestartsServer() throws Exception {
+        Path home = newHome("version-home");
         Path program = Files.writeString(
                 tmpRoot.resolve("version.jsonnet"),
                 "\"ok\"\n");
 
-        // First run with the real version — seeds a server.
-        ClientResult a = runClient(program, tmpRoot.resolve("version1.stdout"),
-                tmpRoot.resolve("version1.stderr"));
-        assertEquals("first run exit", 0, a.exitCode);
+        Process server = startServer(home, version);
+        try {
+            // First run with the real version — seeds a server.
+            ClientResult a = runClient(home, program, tmpRoot.resolve("version1.stdout"),
+                    tmpRoot.resolve("version1.stderr"));
+            assertEquals("first run exit", 0, a.exitCode);
 
-        // Second run with a fake version — server should restart.
-        ClientResult b = runClientWithVersion(program, "0.0.0-fake-for-test",
-                tmpRoot.resolve("version2.stdout"),
-                tmpRoot.resolve("version2.stderr"));
-        // Either the new server starts successfully, or the mismatch message is printed.
-        // Both are acceptable; the invariant is "no hang / no crash-without-output".
-        assertNotNull("stdout captured", b.stdout);
-        assertNotNull("stderr captured", b.stderr);
+            // Second run with a fake version — server should restart.
+            ClientResult b = runClientWithVersion(home, program, "0.0.0-fake-for-test",
+                    tmpRoot.resolve("version2.stdout"),
+                    tmpRoot.resolve("version2.stderr"));
+            // Either the new server starts successfully, or the mismatch message is printed.
+            // Both are acceptable; the invariant is "no hang / no crash-without-output".
+            assertNotNull("stdout captured", b.stdout);
+            assertNotNull("stderr captured", b.stderr);
+        } finally {
+            stopServer(server);
+            stopServersForHome(home);
+        }
     }
 
     // ---- helpers ----
 
-    private ClientResult runClient(Path program, Path stdoutPath, Path stderrPath)
-            throws Exception {
-        return runClientWithVersion(program, version, stdoutPath, stderrPath);
+    private static Path newHome(String name) throws IOException {
+        Path home = tmpRoot.resolve(name);
+        Files.createDirectories(home);
+        return home;
     }
 
-    private ClientResult runClientWithVersion(Path program, String sjsonnetVersion,
-                                              Path stdoutPath, Path stderrPath)
-            throws Exception {
+    private static Path lockBaseForHome(Path home) {
+        return home.resolve(".sjsonnet").resolve("out").resolve("mill-worker-1");
+    }
+
+    private static Process startServer(Path home, String sjsonnetVersion) throws Exception {
+        Path lockBase = lockBaseForHome(home);
+        Files.createDirectories(lockBase);
         List<String> serverCmd = new ArrayList<>(Arrays.asList(
                 javaExecutable(),
                 "-DSJSONNET_VERSION=" + sjsonnetVersion,
@@ -162,13 +195,40 @@ public class E2ETests {
                 lockBase.toString()
         ));
 
-        Process serverProc = new ProcessBuilder(serverCmd)
+        Process server = new ProcessBuilder(serverCmd)
                 .redirectOutput(lockBase.resolve("logs").toFile())
                 .redirectError(lockBase.resolve("logs").toFile())
                 .start();
+        waitForServerSocket(lockBase, server);
+        return server;
+    }
 
+    private static void waitForServerSocket(Path lockBase, Process server) throws Exception {
+        Path socket = lockBase.resolve("io");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(socket)) return;
+            if (!server.isAlive()) {
+                fail("server exited before socket was ready\nserver log=" +
+                        readIfExists(lockBase.resolve("logs")));
+            }
+            Thread.sleep(10);
+        }
+        fail("server socket was not ready within 10s\nserver log=" +
+                readIfExists(lockBase.resolve("logs")));
+    }
+
+    private ClientResult runClient(Path home, Path program, Path stdoutPath, Path stderrPath)
+            throws Exception {
+        return runClientWithVersion(home, program, version, stdoutPath, stderrPath);
+    }
+
+    private ClientResult runClientWithVersion(Path home, Path program, String sjsonnetVersion,
+                                              Path stdoutPath, Path stderrPath)
+            throws Exception {
         List<String> clientCmd = new ArrayList<>(Arrays.asList(
                 javaExecutable(),
+                "-Duser.home=" + home,
                 "-DSJSONNET_EXECUTABLE=" + classpath,
                 "-DSJSONNET_VERSION=" + sjsonnetVersion,
                 "-cp", classpath,
@@ -185,19 +245,64 @@ public class E2ETests {
         boolean clientDone = clientProc.waitFor(30, TimeUnit.SECONDS);
         int exitCode = clientDone ? clientProc.exitValue() : -1;
 
-        // Give server a moment to release locks before the next test.
-        Thread.sleep(200);
-        serverProc.destroy();
-        serverProc.waitFor(5, TimeUnit.SECONDS);
-
         if (!clientDone) {
             clientProc.destroyForcibly();
-            fail("client did not complete within 30s");
+            fail("client did not complete within 30s\nstdout=" +
+                    readIfExists(stdoutPath) + "\nstderr=" + readIfExists(stderrPath) +
+                    "\nserver log=" + readIfExists(lockBaseForHome(home).resolve("logs")));
         }
 
         String stdout = Files.readString(stdoutPath, StandardCharsets.UTF_8);
         String stderr = Files.readString(stderrPath, StandardCharsets.UTF_8);
         return new ClientResult(exitCode, stdout, stderr);
+    }
+
+    private static String readIfExists(Path path) {
+        try {
+            return Files.exists(path) ? Files.readString(path, StandardCharsets.UTF_8) : "";
+        } catch (IOException e) {
+            return "<failed to read " + path + ": " + e + ">";
+        }
+    }
+
+    private static void stopServersForRoot() {
+        if (tmpRoot == null) return;
+        stopServersMatching(tmpRoot.toString());
+    }
+
+    private static void stopServersForHome(Path home) {
+        stopServersMatching(lockBaseForHome(home).toString());
+    }
+
+    private static void stopServersMatching(String marker) {
+        ProcessHandle.allProcesses()
+                .filter(process -> process.info().commandLine()
+                        .map(command -> command.contains("sjsonnet.SjsonnetServerRealMain") &&
+                                command.contains(marker))
+                        .orElse(false))
+                .forEach(E2ETests::stopServer);
+    }
+
+    private static void stopServer(ProcessHandle process) {
+        try {
+            process.destroy();
+            process.onExit().get(5, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+            process.destroyForcibly();
+        }
+    }
+
+    private static void stopServer(Process process) {
+        try {
+            if (process == null) return;
+            process.destroy();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                process.waitFor(5, TimeUnit.SECONDS);
+            }
+        } catch (Exception ignored) {
+            if (process != null) process.destroyForcibly();
+        }
     }
 
     private static String javaExecutable() {
