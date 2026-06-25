@@ -347,6 +347,8 @@ object SjsonnetMainBase {
     }
   }
 
+  private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+
   def parseBindings(
       strs: Seq[String],
       strFiles: Seq[String],
@@ -509,56 +511,32 @@ object SjsonnetMainBase {
 
         interp.interpret(jsonnetCode, path).flatMap {
           case arr: ujson.Arr =>
-            def renderYamlStream(writer: Writer): Either[String, Unit] = {
-              val docs = arr.value.toSeq
-              if (docs.nonEmpty) {
-                for (v <- docs) {
-                  writer.write("---\n")
-                  val renderer = new Renderer(writer, indent = config.indent)
-                  v.transform(renderer)
-                  writer.write('\n')
-                }
-                writer.write("...\n")
+            writeToFile(config, wd) { writer =>
+              arr.value.toSeq match {
+                case Nil         => // donothing
+                case Seq(single) =>
+                  val renderer = rendererForConfig(writer, config, () => currentPos)
+                  single.transform(renderer)
+                  writer.write(if (isScalar(single)) "\n..." else "")
+                case multiple =>
+                  for ((v, i) <- multiple.zipWithIndex) {
+                    if (i > 0) writer.write('\n')
+                    if (isScalar(v)) writer.write("--- ")
+                    else if (i != 0) writer.write("---\n")
+                    val renderer = rendererForConfig(
+                      writer,
+                      config.copy(yamlOut = mainargs.Flag(true)),
+                      () => currentPos
+                    )
+                    v.transform(renderer)
+                  }
               }
-              Right(())
+              writer.write('\n')
+              Right("")
             }
 
-            config.outputFile match {
-              case None =>
-                // Write directly to stdout stream; return "" so main0 does not add
-                // an extra trailing newline (the stream already ends with \n).
-                val wr = new OutputStreamWriter(stdoutStream, StandardCharsets.UTF_8)
-                renderYamlStream(wr)
-                wr.flush()
-                Right("")
-              case Some(f) =>
-                handleWriteFile(
-                  os.write.over
-                    .outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
-                ).flatMap { out =>
-                  try {
-                    val buf = new BufferedOutputStream(out)
-                    val wr = new OutputStreamWriter(buf, StandardCharsets.UTF_8)
-                    renderYamlStream(wr)
-                    wr.flush()
-                    Right("")
-                  } finally out.close()
-                }
-            }
-
-          case other =>
-            val typeName = other match {
-              case _: ujson.Obj  => "object"
-              case _: ujson.Str  => "string"
-              case _: ujson.Num  => "number"
-              case _: ujson.Bool => "boolean"
-              case ujson.Null    => "null"
-              case _             => "unknown"
-            }
-            Left(
-              s"stream mode: top-level object was a $typeName, should be an array " +
-              "whose elements hold the JSON for each document in the stream."
-            )
+          case _ =>
+            renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
         }
       case _ =>
         renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
