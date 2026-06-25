@@ -175,6 +175,12 @@ Shared and platform-specific sources are split across directories:
 - **Parse caching**: `ParseCache` / `DefaultParseCache` caches parsed ASTs to avoid re-parsing imports.
 - **Platform abstraction**: `Path` and `Importer` traits abstract filesystem access across JVM/JS/Native.
 
+### Threading Model
+
+- **No internal multithreading requirement**: A single `Interpreter` does not need to evaluate a program using multiple threads.
+- **Independent interpreters should not interfere**: Applications should be able to run multiple independent `Interpreter` instances concurrently on platforms that support concurrency, without one interpreter affecting another.
+- **Shared mutable state is exceptional**: State should belong to an interpreter or evaluation unless it has an explicit concurrency contract and tests.
+
 ## Dependencies
 
 Key runtime dependencies:
