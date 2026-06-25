@@ -1225,11 +1225,17 @@ object StringModule extends AbstractFunctionModule {
    */
   private object DecodeUTF8 extends Val.Builtin1("decodeUTF8", "arr") {
     def evalRhs(arr: Eval, ev: EvalScope, pos: Position): Val = {
-      for ((v, idx) <- arr.value.asArr.iterator.zipWithIndex) {
-        if (!v.isInstanceOf[Val.Num] || !v.asDouble.isWhole || v.asInt < 0 || v.asInt > 255) {
-          throw Error.fail(
-            "std.decodeUTF8: element " + idx + " is not an integer in range [0,255], got " + v.value.prettyName
-          )
+      for (v <- arr.value.asArr.iterator) {
+        v match {
+          case n: Val.Num =>
+            val d = n.asDouble
+            if (!d.isWhole)
+              throw Error.fail("Expected an integer, but got " + d)
+            val i = d.toInt
+            if (i < 0 || i > 255)
+              throw Error.fail("Bytes must be integers in range [0, 255], got " + i)
+          case _ =>
+            throw Error.fail("Unexpected type " + v.value.prettyName + ", expected number")
         }
       }
       Val.Str(

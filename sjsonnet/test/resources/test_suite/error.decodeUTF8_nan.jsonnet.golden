@@ -1,2 +1,2 @@
-sjsonnet.Error: [std.decodeUTF8] element 0 is not an integer in range [0,255], got string
+sjsonnet.Error: [std.decodeUTF8] Unexpected type string, expected number
     at [<root>].(error.decodeUTF8_nan.jsonnet:1:15)
