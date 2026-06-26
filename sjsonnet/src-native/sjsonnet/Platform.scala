@@ -7,10 +7,18 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import scala.scalanative.regex.Pattern
 import scala.annotation.nowarn
+import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import org.virtuslab.yaml.*
 
 object Platform {
+  private[sjsonnet] type ParseCacheMap =
+    TrieMap[(Path, String), Either[Error, (Expr, FileScope)]]
+  private[sjsonnet] type ParseCacheValue = Either[Error, (Expr, FileScope)]
+
+  def newParseCacheMap(): ParseCacheMap =
+    TrieMap.empty[(Path, String), ParseCacheValue]
+
   private val hexChars = "0123456789abcdef".toCharArray
 
   private def repeatCapacity(s: String, count: Int): Int =

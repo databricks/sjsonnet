@@ -264,6 +264,41 @@ object ParallelManifestRaceTests extends TestSuite {
 
     // ---- Fix 4: shared MemberList key-name caches (parse cache) ----
 
+    test("defaultParseCacheConcurrentColdSharedInterpreters") {
+      // End-to-end guard: independent interpreters share a cold DefaultParseCache and all parse the
+      // same root at once. This exercises CachedResolver.parse -> ParseCache.getOrElseUpdate under
+      // contention, not just direct cache calls.
+      val src =
+        """local base = { hidden:: 1, visible: 2 };
+          |{
+          |  fields: std.objectFields(base),
+          |  mapped: std.map(function(x) x * 3, [1, 2, 3]),
+          |  nested: { c: 3, a: 1, b: 2 },
+          |}
+          |""".stripMargin
+      val path = DummyPath("root", "cold-shared.jsonnet")
+      val expected =
+        new Interpreter(Map(), Map(), DummyPath("root"), Importer.empty, new DefaultParseCache)
+          .interpret(src, path)
+      assert(expected.isRight)
+
+      val sharedCache = new DefaultParseCache
+      val failure = stress { _ =>
+        var n = 0
+        while (n < 60) {
+          val got =
+            new Interpreter(Map(), Map(), DummyPath("root"), Importer.empty, sharedCache)
+              .interpret(src, path)
+          if (got != expected) {
+            throw new java.lang.AssertionError(s"unexpected interpret result: $got")
+          }
+          n += 1
+        }
+      }
+      failure.foreach(throw _)
+      assert(sharedCache.keySet.size == 1)
+    }
+
     test("sharedMemberListConcurrentVisibleKeys") {
       // A non-static object (fields reference a local, so it is NOT folded to a Val.staticObject) with
       // interleaved hidden/visible fields, evaluated by independent interpreters that SHARE one parse

@@ -14,12 +14,20 @@ import org.yaml.snakeyaml.{DumperOptions, LoaderOptions, Yaml}
 import org.yaml.snakeyaml.nodes.{MappingNode, Node, ScalarNode, SequenceNode, Tag}
 
 import scala.annotation.nowarn
+import scala.collection.concurrent.TrieMap
 import scala.collection.compat.*
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 object Platform {
   private val hexFormat = HexFormat.of()
+
+  private[sjsonnet] type ParseCacheMap =
+    TrieMap[(Path, String), Either[Error, (Expr, FileScope)]]
+  private[sjsonnet] type ParseCacheValue = Either[Error, (Expr, FileScope)]
+
+  def newParseCacheMap(): ParseCacheMap =
+    TrieMap.empty[(Path, String), ParseCacheValue]
 
   def repeatString(s: String, count: Int): String =
     if (count <= 0) "" else s.repeat(count)
