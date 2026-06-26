@@ -16,6 +16,18 @@ object Platform {
   def newParseCacheMap(): ParseCacheMap =
     new JsParseCacheMap
 
+  private[sjsonnet] type ImporterFileCacheMap =
+    JsImporterFileCacheMap
+
+  def newImporterFileCacheMap(): ImporterFileCacheMap =
+    new JsImporterFileCacheMap
+
+  private[sjsonnet] type ImporterResolveCacheMap =
+    JsImporterResolveCacheMap
+
+  def newImporterResolveCacheMap(): ImporterResolveCacheMap =
+    new JsImporterResolveCacheMap
+
   private[sjsonnet] final class JsParseCacheMap {
     private[this] val cache = mutable.HashMap.empty[(Path, String), ParseCacheValue]
 
@@ -36,6 +48,41 @@ object Platform {
 
     def keySet: scala.collection.Set[(Path, String)] =
       cache.keySet
+  }
+
+  private[sjsonnet] final class JsImporterFileCacheMap {
+    private[this] val cache = mutable.HashMap.empty[(Path, Boolean), ResolvedFile]
+
+    def get(key: (Path, Boolean)): Option[ResolvedFile] =
+      cache.get(key)
+
+    def putIfAbsent(key: (Path, Boolean), value: ResolvedFile): Option[ResolvedFile] = {
+      cache.get(key) match {
+        case existing @ Some(_) => existing
+        case None               =>
+          cache.put(key, value)
+          None
+      }
+    }
+
+    def update(key: (Path, Boolean), value: ResolvedFile): Unit =
+      cache.update(key, value)
+  }
+
+  private[sjsonnet] final class JsImporterResolveCacheMap {
+    private[this] val cache = mutable.HashMap.empty[(Path, String), Option[Path]]
+
+    def get(key: (Path, String)): Option[Option[Path]] =
+      cache.get(key)
+
+    def putIfAbsent(key: (Path, String), value: Option[Path]): Option[Option[Path]] = {
+      cache.get(key) match {
+        case existing @ Some(_) => existing
+        case None               =>
+          cache.put(key, value)
+          None
+      }
+    }
   }
 
   private def repeatCapacity(s: String, count: Int): Int =

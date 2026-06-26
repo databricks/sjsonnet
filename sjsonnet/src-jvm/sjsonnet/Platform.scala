@@ -29,6 +29,18 @@ object Platform {
   def newParseCacheMap(): ParseCacheMap =
     TrieMap.empty[(Path, String), ParseCacheValue]
 
+  private[sjsonnet] type ImporterFileCacheMap =
+    TrieMap[(Path, Boolean), ResolvedFile]
+
+  def newImporterFileCacheMap(): ImporterFileCacheMap =
+    TrieMap.empty[(Path, Boolean), ResolvedFile]
+
+  private[sjsonnet] type ImporterResolveCacheMap =
+    TrieMap[(Path, String), Option[Path]]
+
+  def newImporterResolveCacheMap(): ImporterResolveCacheMap =
+    TrieMap.empty[(Path, String), Option[Path]]
+
   def repeatString(s: String, count: Int): String =
     if (count <= 0) "" else s.repeat(count)
 
