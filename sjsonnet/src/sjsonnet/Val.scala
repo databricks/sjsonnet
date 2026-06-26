@@ -78,12 +78,15 @@ final class LazyExpr(
       Error.fail("Infinite recursion detected (self-referential thunk)")
     } else {
       evaluating = true
-      val r = ev.visitExpr(exprOrVal.asInstanceOf[Expr])(scope)
-      exprOrVal = r // cache result
-      scope = null.asInstanceOf[sjsonnet.ValScope] // allow GC
-      ev = null // sentinel: marks as computed
-      evaluating = false
-      r
+      try {
+        val r = ev.visitExpr(exprOrVal.asInstanceOf[Expr])(scope)
+        exprOrVal = r // cache result
+        scope = null.asInstanceOf[sjsonnet.ValScope] // allow GC
+        ev = null // sentinel: marks as computed
+        r
+      } finally {
+        evaluating = false
+      }
     }
   }
 }
