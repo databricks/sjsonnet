@@ -115,6 +115,73 @@ object ParallelManifestRaceTests extends TestSuite {
   private def newInterpreter(): Interpreter =
     new Interpreter(Map(), Map(), DummyPath(), Importer.empty, parseCache = new DefaultParseCache)
 
+  /**
+   * Parse + StaticOptimize `src` on `interp` and return the optimized root Expr WITHOUT evaluating it.
+   * Used both as a deterministic guard (inspect the folded AST node) and to warm a shared parse cache
+   * with a COLD folded constant (no thunk/array/object cache forced yet).
+   */
+  private def parseOptimized(interp: Interpreter, src: String): Expr = {
+    val path = DummyPath("(memory)")
+    interp.resolver.cache((path, false)) = StaticResolvedFile(src)
+    interp.resolver.parse(path, StaticResolvedFile(src))(interp.evaluator) match {
+      case Right((expr, _)) => expr
+      case Left(err)        => throw new Exception(Error.formatError(err))
+    }
+  }
+
+  /**
+   * Each round builds ONE fresh DefaultParseCache and, on thread 0, parses+optimizes `src` into it
+   * WITHOUT evaluating — so the StaticOptimizer-folded constants embedded in the cached AST (e.g. a
+   * folded `std.objectValues` array, or a static object whose `value0` is built lazily by getValue0)
+   * are COLD. A barrier then releases all threads to evaluate via independent interpreters sharing
+   * that one cache at the same instant — the worst case for a lazily-populated cache on a shared,
+   * parse-cached Val. A second barrier keeps rounds in lockstep (no thread races ahead to the next,
+   * freshly-cold round while a peer still uses this one).
+   */
+  private def stressFreshSharedParseCache(rounds: Int, src: String)(
+      check: ujson.Value => Unit): Option[Throwable] = {
+    val path = DummyPath("(memory)")
+    val pool = Executors.newFixedThreadPool(Threads)
+    val barrier = new CyclicBarrier(Threads)
+    val shared = new AtomicReference[DefaultParseCache](null)
+    val failure = new AtomicReference[Throwable](null)
+    try {
+      val futures = (0 until Threads).map { t =>
+        pool.submit(new Runnable {
+          def run(): Unit =
+            try {
+              var n = 0
+              while (n < rounds && failure.get() == null) {
+                if (t == 0) {
+                  val cache = new DefaultParseCache
+                  parseOptimized(new Interpreter(Map(), Map(), DummyPath(), Importer.empty, cache), src)
+                  shared.set(cache)
+                }
+                barrier.await(30, TimeUnit.SECONDS) // cold folded AST is cached and shared
+                // Build the (heavy) interpreter BEFORE the next barrier so the cold shared Val is
+                // forced by all threads at the same instant, not staggered by interpreter construction.
+                val interp = new Interpreter(Map(), Map(), DummyPath(), Importer.empty, shared.get())
+                barrier.await(30, TimeUnit.SECONDS) // all interpreters built — now force together
+                interp.interpret(src, path) match {
+                  case Right(v)  => check(v)
+                  case Left(err) => throw new java.lang.AssertionError("eval failed: " + err)
+                }
+                barrier.await(30, TimeUnit.SECONDS) // end of round
+                n += 1
+              }
+            } catch {
+              case _: BrokenBarrierException | _: TimeoutException => // a peer failed; just exit
+              case th: Throwable =>
+                failure.compareAndSet(null, th)
+                barrier.reset() // unblock peers waiting at the barrier
+            }
+        })
+      }
+      futures.foreach(_.get(120, TimeUnit.SECONDS))
+    } finally pool.shutdownNow()
+    Option(failure.get())
+  }
+
   def tests: Tests = Tests {
 
     // ---- Fix 1: process-global renderer scratch buffer in writeLongDirect ----
@@ -335,6 +402,97 @@ object ParallelManifestRaceTests extends TestSuite {
         }
       }
       failure.foreach(throw _)
+    }
+
+    // ---- Fix 5: StaticOptimizer folding a lazy array into the shared AST ----
+
+    test("optimizerFoldsObjectValuesToEagerArray") {
+      // std.objectValues(constObj) is a staticSafe builtin applied to a constant, so StaticOptimizer
+      // folds it via tryStaticApply and embeds the result in the parse-cached AST shared across worker
+      // threads. The fix materializes it to a plain eager Val.Arr instead of a LazyIndexedArr
+      // (ObjectValuesArr), whose mutable per-index `slots` cache races across threads — the symptom
+      // was a spurious "Infinite recursion detected" thrown from std.member iterating the shared array.
+      val expr = parseOptimized(newInterpreter(), """std.objectValues({ a: 1, b: 2, c: 3 })""")
+      assert(expr.isInstanceOf[Val.Arr])
+      assert(!expr.isInstanceOf[Val.LazyIndexedArr]) // regression: a lazy array would still race
+      // directBackingArray is non-null only for a plain, fully-materialized array (not lazy/concat/reversed)
+      assert(expr.asInstanceOf[Val.Arr].directBackingArray != null)
+    }
+
+    test("optimizerFoldsArrayConcatToEagerArray") {
+      // Constant array concat folds at optimization time. The fix folds to a plain eager Val.Arr, NOT a
+      // lazy concat view, whose materialize() writes `arr` via a non-volatile, unsafely-published store
+      // — racy when the folded view is shared across threads via the parse cache.
+      val expr = parseOptimized(newInterpreter(), """[1, 2, 3] + [4, 5, 6]""")
+      assert(expr.isInstanceOf[Val.Arr])
+      val arr = expr.asInstanceOf[Val.Arr]
+      assert(arr.directBackingArray != null) // materialized, not a concat view
+      assert(arr.length == 6)
+    }
+
+    test("sharedFoldedObjectValuesConcurrentMember") {
+      // Concurrent smoke companion to optimizerFoldsObjectValuesToEagerArray (the authoritative,
+      // deterministic regression guard). A constant object's std.objectValues folds to ONE array shared
+      // via the parse-cached AST; std.member forces its elements; many interpreters force the COLD
+      // folded array together. NOTE: the LazyIndexedArr `slots` Computing-window for a static-object
+      // element is tiny, so this seldom fails in-process even pre-fix — the production race needed
+      // hundreds of concurrent compilations. It guards that the shared (eager, post-fix) array path
+      // stays correct and consistent under load.
+      val scopeFields = (0 until 16).map(i => s""""s$i": "v$i"""").mkString(", ")
+      // Probe a value NOT present so std.member must force EVERY element (widest race window); the
+      // result is always false.
+      val src = s"""local scopes = { $scopeFields }; std.member(std.objectValues(scopes), "absent")"""
+      val failure = stressFreshSharedParseCache(rounds = 200, src) { v =>
+        if (v != ujson.Bool(false))
+          throw new java.lang.AssertionError("unexpected std.member result: " + v)
+      }
+      failure.foreach(throw _)
+    }
+
+    // ---- Fix 6: shared static-object value0 unsafe publication (getValue0) ----
+
+    test("sharedFoldedStaticObjectConcurrentAddSuper") {
+      // A constant object folds to a shared Val.staticObject. Using it as an operand of `+` (object
+      // merge) calls addSuper -> getValue0 on the shared static object, which lazily builds and
+      // publishes value0; many interpreters trigger that cold build concurrently and @volatile value0
+      // makes the publication safe. Like sharedMemberListConcurrentVisibleKeys this is a weak-memory
+      // HARDENING / smoke test: on a strong (TSO) model such as x86 the unsafe publication is masked,
+      // so it rarely fails pre-fix here — it guards the shared static-object merge path stays correct
+      // and consistent (and matters on weak models, e.g. ARM). Assert every thread gets the same merge.
+      val baseFields = (0 until 16).map(i => s""""k$i": $i""").mkString(", ")
+      val src = s"""local base = { $baseFields }; { extra: 1 } + base"""
+      val expected = newInterpreter().interpret(src, DummyPath("(memory)")) match {
+        case Right(v)  => v
+        case Left(err) => throw new Exception(err)
+      }
+      val failure = stressFreshSharedParseCache(rounds = 200, src) { v =>
+        if (v != expected) throw new java.lang.AssertionError("unexpected merge result: " + v)
+      }
+      failure.foreach(throw _)
+    }
+
+    // ---- Fix 7: LazyExpr re-entrancy flag poisoning on exception ----
+
+    test("lazyExprResetsEvaluatingFlagOnException") {
+      // A LazyExpr whose computation throws must reset its `evaluating` re-entrancy flag (try/finally).
+      // Otherwise a thunk reused across evaluations (e.g. a magic-import thunk a Bazel bundle worker
+      // re-forces per context on one thread) stays poisoned and reports a spurious "self-referential
+      // thunk" on every later force instead of re-raising the real error. Deterministic — no
+      // concurrency needed: force the SAME thunk twice and require the real error both times.
+      val interp = newInterpreter()
+      val errExpr = parseOptimized(interp, """error "boom-marker"""")
+      val thunk = new LazyExpr(errExpr, ValScope.empty, interp.evaluator)
+      def force(): Throwable =
+        try { thunk.value; null }
+        catch { case t: Throwable => t }
+      val first = force()
+      assert(first != null)
+      assert(String.valueOf(first.getMessage).contains("boom-marker"))
+      val second = force() // re-force the would-be-poisoned thunk
+      assert(second != null)
+      // Regression: a poisoned thunk reports "self-referential thunk" here instead of the real error.
+      assert(!String.valueOf(second.getMessage).contains("self-referential"))
+      assert(String.valueOf(second.getMessage).contains("boom-marker")) // re-raises the real error
     }
   }
 }

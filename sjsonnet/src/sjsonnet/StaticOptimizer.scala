@@ -329,8 +329,12 @@ class StaticOptimizer(
         i += 1
       }
       val tailstrictMode = if (tailstrict) TailstrictModeEnabled else TailstrictModeDisabled
-      try f.apply(vargs, null, pos)(ev, tailstrictMode).asInstanceOf[Expr]
-      catch { case _: Exception => null }
+      try {
+        f.apply(vargs, null, pos)(ev, tailstrictMode) match {
+          case arr: Val.Arr => Val.Arr(pos, arr.asStrictArray).asInstanceOf[Expr]
+          case other        => other.asInstanceOf[Expr]
+        }
+      } catch { case _: Exception => null }
     } else null
   }
 
@@ -466,7 +470,7 @@ class StaticOptimizer(
           (lhs, rhs) match {
             case (Val.Num(_, l), Val.Num(_, r)) => Val.Num(pos, l + r)
             case (Val.Str(_, l), Val.Str(_, r)) => Val.Str(pos, l + r)
-            case (l: Val.Arr, r: Val.Arr)       => l.concat(pos, r)
+            case (l: Val.Arr, r: Val.Arr)       => Val.Arr(pos, l.concat(pos, r).asStrictArray)
             case _                              => fallback
           }
         case BinaryOp.OP_- =>
