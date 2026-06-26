@@ -24,16 +24,20 @@ object ParseCache {
   }
 }
 
-// A default implementation based on a mutable HashMap. This implementation is not thread-safe.
+// A default implementation backed by the platform cache store.
 class DefaultParseCache extends ParseCache {
-  val cache =
-    new scala.collection.mutable.HashMap[(Path, String), Either[Error, (Expr, FileScope)]]()
+  private val cache = Platform.newParseCacheMap()
 
   // parseCache.getOrElseUpdate((path, txt), {...})
   override def getOrElseUpdate(
       key: (Path, String),
       defaultValue: => Either[Error, (Expr, FileScope)]): Either[Error, (Expr, FileScope)] = {
-    cache.getOrElseUpdate(key, defaultValue)
+    cache.get(key) match {
+      case Some(value) => value
+      case None        =>
+        val value = defaultValue
+        cache.putIfAbsent(key, value).getOrElse(value)
+    }
   }
 
   // parseCache.valuesIterator.map(_.getOrElse(???)).map(_._1).toSeq
@@ -43,6 +47,6 @@ class DefaultParseCache extends ParseCache {
 
   // parseCache.keySet.toIndexedSeq
   def keySet: scala.collection.Set[(Path, String)] = {
-    cache.keySet
+    cache.keySet.toSet
   }
 }

@@ -7,6 +7,37 @@ import java.util.regex.Pattern
 import scala.collection.mutable
 
 object Platform {
+  // Scala.js/Wasm cannot link scala.collection.concurrent.TrieMap; the JS runtime is
+  // single-threaded, so the parse cache only needs TrieMap-like method names here.
+  private[sjsonnet] type ParseCacheMap =
+    JsParseCacheMap
+  private[sjsonnet] type ParseCacheValue = Either[Error, (Expr, FileScope)]
+
+  def newParseCacheMap(): ParseCacheMap =
+    new JsParseCacheMap
+
+  private[sjsonnet] final class JsParseCacheMap {
+    private[this] val cache = mutable.HashMap.empty[(Path, String), ParseCacheValue]
+
+    def get(key: (Path, String)): Option[ParseCacheValue] =
+      cache.get(key)
+
+    def putIfAbsent(key: (Path, String), value: ParseCacheValue): Option[ParseCacheValue] = {
+      cache.get(key) match {
+        case existing @ Some(_) => existing
+        case None               =>
+          cache.put(key, value)
+          None
+      }
+    }
+
+    def valuesIterator: Iterator[ParseCacheValue] =
+      cache.valuesIterator
+
+    def keySet: scala.collection.Set[(Path, String)] =
+      cache.keySet
+  }
+
   private def repeatCapacity(s: String, count: Int): Int =
     if (count > 0 && s.length <= Int.MaxValue / count) s.length * count else 0
 
