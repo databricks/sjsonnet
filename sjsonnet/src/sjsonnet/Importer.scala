@@ -198,30 +198,54 @@ final case class StaticBinaryResolvedFile(content: Array[Byte]) extends Resolved
 }
 
 class CachedImporter(parent: Importer) extends Importer {
-  val cache: mutable.HashMap[(Path, Boolean), ResolvedFile] =
-    mutable.HashMap.empty[(Path, Boolean), ResolvedFile]
+  val cache: Platform.ImporterFileCacheMap =
+    Platform.newImporterFileCacheMap()
 
   // Memoize path resolution by (docBase, importName). resolve() runs on every visitImport — before
   // the evaluator's by-path Val cache is consulted — and each call stats candidate paths
   // (docBase + every jpath) via os.isFile. Resolution is deterministic within a run, so caching it
   // turns repeated imports (and re-evaluated import exprs) into a HashMap lookup, eliminating
   // redundant filesystem stats. Mirrors the existing read cache.
-  private val resolveCache: mutable.HashMap[(Path, String), Option[Path]] =
-    mutable.HashMap.empty[(Path, String), Option[Path]]
+  private val resolveCache: Platform.ImporterResolveCacheMap =
+    Platform.newImporterResolveCacheMap()
 
-  def resolve(docBase: Path, importName: String): Option[Path] =
-    resolveCache.getOrElseUpdate((docBase, importName), parent.resolve(docBase, importName))
+  def resolve(docBase: Path, importName: String): Option[Path] = {
+    val key = (docBase, importName)
+    resolveCache.get(key) match {
+      case Some(v) => v
+      case None    =>
+        val v = parent.resolve(docBase, importName)
+        resolveCache.putIfAbsent(key, v).getOrElse(v)
+    }
+  }
 
   def read(path: Path, binaryData: Boolean): Option[ResolvedFile] = {
     val key = (path, binaryData)
     cache.get(key) match {
       case s @ Some(x) =>
-        if (x == null) None else s
+        if (x eq CachedImporter.MissingResolvedFile) None else s
       case None =>
         val x = parent.read(path, binaryData)
-        cache.put(key, x.orNull)
-        x
+        val cachedValue = x.getOrElse(CachedImporter.MissingResolvedFile)
+        cache.putIfAbsent(key, cachedValue) match {
+          case s @ Some(existing) =>
+            if (existing eq CachedImporter.MissingResolvedFile) None else s
+          case None => x
+        }
     }
+  }
+}
+
+object CachedImporter {
+  private object MissingResolvedFile extends ResolvedFile {
+    def getParserInput(): ParserInput =
+      throw new IllegalStateException("missing resolved file cache sentinel")
+    def readString(): String =
+      throw new IllegalStateException("missing resolved file cache sentinel")
+    def contentHash(): String =
+      throw new IllegalStateException("missing resolved file cache sentinel")
+    def readRawBytes(): Array[Byte] =
+      throw new IllegalStateException("missing resolved file cache sentinel")
   }
 }
 
