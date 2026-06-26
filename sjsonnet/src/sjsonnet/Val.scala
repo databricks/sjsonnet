@@ -1918,7 +1918,7 @@ object Val {
    */
   final class Obj(
       var pos: Position,
-      private var value0: util.LinkedHashMap[String, Obj.Member],
+      @volatile private var value0: util.LinkedHashMap[String, Obj.Member],
       private val static: Boolean,
       private val triggerAsserts: (Val.Obj, Val.Obj) => Unit,
       `super`: Obj,
@@ -2057,7 +2057,8 @@ object Val {
           allKeys.forEach { (k, _) =>
             value0.put(k, new Val.Obj.ConstMember(false, Visibility.Normal, valueCache.get(k)))
           }
-          // Only assign to field after initialization is complete to allow unsynchronized multi-threaded use:
+          // Assign only after the map is fully built; `value0` is @volatile so this write is safely
+          // published to other worker threads sharing this static object via the parse-cached AST.
           this.value0 = value0
         }
       }
