@@ -523,6 +523,9 @@ object Platform {
     throw new Exception("SHA3 not implemented in Scala.js")
   }
 
+  def hashBytes(bytes: Array[Byte]): String =
+    scala.util.hashing.MurmurHash3.bytesHash(bytes).toHexString
+
   private val regexCache = new util.concurrent.ConcurrentHashMap[String, Pattern]
   private val namedGroupPattern = Pattern.compile("\\(\\?<(.+?)>.*?\\)")
   private val namedGroupPatternReplace = Pattern.compile("(\\(\\?P<)(.+?>.*?\\))")

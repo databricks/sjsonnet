@@ -186,15 +186,55 @@ final case class StaticResolvedFile(content: String) extends ResolvedFile {
   override def readRawBytes(): Array[Byte] = content.getBytes(StandardCharsets.UTF_8)
 }
 
-final case class StaticBinaryResolvedFile(content: Array[Byte]) extends ResolvedFile {
+final class StaticBinaryResolvedFile(content0: Array[Byte])
+    extends ResolvedFile
+    with Product
+    with Serializable {
+  private val bytes: Array[Byte] = content0.clone()
+
   def getParserInput(): ParserInput = throw new NotImplementedError("Not used for binary imports")
 
   def readString(): String = throw new NotImplementedError("Not used for binary imports")
 
-  // We just cheat, the content hash can be the content itself for static imports
-  def contentHash(): String = content.hashCode().toString
+  def content: Array[Byte] = bytes
 
-  override def readRawBytes(): Array[Byte] = content
+  private lazy val contentHashValue: String = Platform.hashBytes(bytes)
+
+  def contentHash(): String = contentHashValue
+
+  override def readRawBytes(): Array[Byte] = bytes
+
+  def copy(content: Array[Byte] = this.content): StaticBinaryResolvedFile =
+    new StaticBinaryResolvedFile(content)
+
+  def productArity: Int = 1
+
+  def productElement(n: Int): Any =
+    if (n == 0) content else throw new IndexOutOfBoundsException(n.toString)
+
+  def canEqual(that: Any): Boolean = that.isInstanceOf[StaticBinaryResolvedFile]
+
+  override def productPrefix: String = "StaticBinaryResolvedFile"
+
+  override def equals(that: Any): Boolean = that match {
+    case other: StaticBinaryResolvedFile =>
+      (this eq other) || (other.canEqual(this) && java.util.Arrays.equals(bytes, other.bytes))
+    case _ => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
+
+  override def toString: String = productIterator.mkString(productPrefix + "(", ",", ")")
+}
+
+object StaticBinaryResolvedFile
+    extends scala.runtime.AbstractFunction1[Array[Byte], StaticBinaryResolvedFile]
+    with Serializable {
+  def apply(content: Array[Byte]): StaticBinaryResolvedFile =
+    new StaticBinaryResolvedFile(content)
+
+  def unapply(file: StaticBinaryResolvedFile): Option[Array[Byte]] =
+    if (file == null) None else Some(file.content)
 }
 
 class CachedImporter(parent: Importer) extends Importer {

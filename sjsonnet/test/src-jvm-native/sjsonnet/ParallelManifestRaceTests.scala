@@ -11,6 +11,8 @@ import java.util.concurrent.{
   TimeUnit
 }
 import java.util.concurrent.atomic.AtomicReference
+import scala.collection.mutable
+import sjsonnet.stdlib.ArrayModule
 import sjsonnet.stdlib.StdLibModule
 import utest._
 
@@ -114,6 +116,34 @@ object ParallelManifestRaceTests extends TestSuite {
 
   private def newInterpreter(): Interpreter =
     new Interpreter(Map(), Map(), DummyPath(), Importer.empty, parseCache = new DefaultParseCache)
+
+  private val noEvalScope: EvalScope = new EvalScope {
+    def extVars: String => Option[Expr] = _ => None
+    def importer: CachedImporter = new CachedImporter(Importer.empty)
+    def wd: Path = DummyPath()
+    def visitExpr(expr: Expr)(implicit scope: ValScope): Val =
+      throw new UnsupportedOperationException("not used")
+    def materialize(v: Val): ujson.Value =
+      throw new UnsupportedOperationException("not used")
+    def equal(x: Val, y: Val): Boolean = x == y
+    def compare(x: Val, y: Val): Int = 0
+    def settings: Settings = Settings.default
+    def debugStats: DebugStats = null
+    def trace(msg: String): Unit = ()
+    def warn(e: Error): Unit = ()
+  }
+
+  private def directOptimizer(): StaticOptimizer =
+    new StaticOptimizer(
+      noEvalScope,
+      _ => None,
+      new StdLibModule().module,
+      new mutable.HashMap[String, String],
+      new mutable.HashMap[
+        Val.StaticObjectFieldSet,
+        java.util.LinkedHashMap[String, java.lang.Boolean]
+      ]
+    )
 
   /**
    * Parse + StaticOptimize `src` on `interp` and return the optimized root Expr WITHOUT evaluating it.
@@ -284,6 +314,15 @@ object ParallelManifestRaceTests extends TestSuite {
       }
     }
 
+    test("functionModulesPrefillConstCacheAtConstruction") {
+      val module = ArrayModule.module
+      for ((name, expected) <- ArrayModule.functions.take(8)) {
+        val cached = module.cachedValueForTest(name)
+        assert(cached != null)
+        assert(cached eq expected)
+      }
+    }
+
     test("sharedStdModuleConcurrentFirstAccess") {
       // Independent interpreters share one std module (Interpreter's default std is a singleton). The
       // StaticOptimizer folds `std.fn` by calling std.value(fn), so concurrent first access to a cold
@@ -428,6 +467,69 @@ object ParallelManifestRaceTests extends TestSuite {
       val arr = expr.asInstanceOf[Val.Arr]
       assert(arr.directBackingArray != null) // materialized, not a concat view
       assert(arr.length == 6)
+    }
+
+    test("optimizerReusesSharedValsWithoutMutatingPositions") {
+      val std = new StdLibModule().module
+      assert(std.pos == null)
+      val stdInterp =
+        new Interpreter(Map(), Map(), DummyPath(), Importer.empty, new DefaultParseCache, std = std)
+      assert(parseOptimized(stdInterp, "if true then std else {}") eq std)
+      assert(std.pos == null)
+
+      val truePos = Val.staticTrue.pos
+      val falsePos = Val.staticFalse.pos
+      val cachedThree = Val.cachedNum(new Position(null, -1), 3)
+      val cachedThreePos = cachedThree.pos
+      val sharedAsciiStr = Val.Str.asciiSafe(new Position(null, -1), "abc")
+      val sharedAsciiStrPos = sharedAsciiStr.pos
+      val staticNullPos = Val.staticNull.pos
+
+      val foldedTrue = parseOptimized(newInterpreter(), "if true then std.all([]) else false")
+      assert(foldedTrue.isInstanceOf[Val.True])
+      assert(foldedTrue eq Val.staticTrue)
+      assert(Val.staticTrue.pos eq truePos)
+
+      val foldedFalse = parseOptimized(newInterpreter(), "if true then std.any([]) else true")
+      assert(foldedFalse.isInstanceOf[Val.False])
+      assert(foldedFalse eq Val.staticFalse)
+      assert(Val.staticFalse.pos eq falsePos)
+
+      val foldedNum = parseOptimized(newInterpreter(), """if true then std.length("abc") else 0""")
+      assert(foldedNum.isInstanceOf[Val.Num])
+      assert(foldedNum eq cachedThree)
+      assert(cachedThree.pos eq cachedThreePos)
+
+      val foldedStr = directOptimizer().optimize(
+        Expr.IfElse(new Position(null, 123), Val.True(new Position(null, 124)), sharedAsciiStr, null)
+      )
+      assert(foldedStr.isInstanceOf[Val.AsciiSafeStr])
+      assert(foldedStr.asInstanceOf[Val.Str].str == "abc")
+      assert(foldedStr eq sharedAsciiStr)
+      assert(sharedAsciiStr.pos eq sharedAsciiStrPos)
+
+      val foldedNull = directOptimizer().optimize(
+        Expr.IfElse(new Position(null, 125), Val.True(new Position(null, 126)), Val.staticNull, null)
+      )
+      assert(foldedNull.isInstanceOf[Val.Null])
+      assert(foldedNull eq Val.staticNull)
+      assert(Val.staticNull.pos eq staticNullPos)
+
+      val lhsFalse = Val.False(new Position(null, 127))
+      val lhsFalsePos = lhsFalse.pos
+      val foldedAnd = directOptimizer().optimize(
+        Expr.And(new Position(null, 128), lhsFalse, Val.Str(new Position(null, 129), "ignored"))
+      )
+      assert(foldedAnd eq lhsFalse)
+      assert(lhsFalse.pos eq lhsFalsePos)
+
+      val lhsTrue = Val.True(new Position(null, 130))
+      val lhsTruePos = lhsTrue.pos
+      val foldedOr = directOptimizer().optimize(
+        Expr.Or(new Position(null, 131), lhsTrue, Val.Str(new Position(null, 132), "ignored"))
+      )
+      assert(foldedOr eq lhsTrue)
+      assert(lhsTrue.pos eq lhsTruePos)
     }
 
     test("sharedFoldedObjectValuesConcurrentMember") {

@@ -34,7 +34,11 @@ trait FunctionModule extends FunctionBuilder {
    *   the module object
    */
   def moduleFromFunctions(functions: (String, Val.Func)*): Val.Obj = {
-    Val.Obj.mk(dummyPos, functions.map { case (k, v) => (k, memberOf(v)) }: _*)
+    Val.Obj.mkWithConstCache(
+      dummyPos,
+      functions.size,
+      functions.map { case (k, v) => (k, memberOf(v)) }
+    )
   }
 
   /**
@@ -46,7 +50,11 @@ trait FunctionModule extends FunctionBuilder {
    *   the module object
    */
   def moduleFromModules(subModules: FunctionModule*): Val.Obj = {
-    Val.Obj.mk(dummyPos, subModules.map { module => (module.name, memberOf(module.module)) }: _*)
+    Val.Obj.mkWithConstCache(
+      dummyPos,
+      subModules.size,
+      subModules.map { module => (module.name, memberOf(module.module)) }
+    )
   }
 
   /**
