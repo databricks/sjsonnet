@@ -258,12 +258,32 @@ object SjsonnetMainBase {
     else if (config.expectString.value)
       new SimpleVisitor[Writer, Writer] {
         val expectedMsg = "expected string result"
+        private def rejectType(tpe: String): Nothing =
+          throw new Error(s"$expectedMsg, got: $tpe")
         override def visitString(s: CharSequence, index: Int): Writer = {
           wr.write(s.toString)
           wr
         }
-        override def visitNull(index: Int): Writer =
-          throw new upickle.core.Abort(s"$expectedMsg got null")
+        override def visitNull(index: Int): Writer = rejectType("null")
+        override def visitFalse(index: Int): Writer = rejectType("boolean")
+        override def visitTrue(index: Int): Writer = rejectType("boolean")
+        override def visitFloat64(d: Double, index: Int): Writer = rejectType("number")
+        override def visitFloat32(d: Float, index: Int): Writer = rejectType("number")
+        override def visitInt32(i: Int, index: Int): Writer = rejectType("number")
+        override def visitInt64(i: Long, index: Int): Writer = rejectType("number")
+        override def visitUInt64(i: Long, index: Int): Writer = rejectType("number")
+        override def visitFloat64StringParts(
+            s: CharSequence,
+            decIndex: Int,
+            expIndex: Int,
+            index: Int): Writer = rejectType("number")
+        override def visitFloat64String(s: String, index: Int): Writer = rejectType("number")
+        override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[Writer, Writer] =
+          rejectType("array")
+        override def visitObject(
+            length: Int,
+            jsonableKeys: Boolean,
+            index: Int): upickle.core.ObjVisitor[Writer, Writer] = rejectType("object")
       }
     else new Renderer(wr, indent = config.indent)
 
@@ -271,6 +291,13 @@ object SjsonnetMainBase {
     Try(f).toEither.left.map {
       case _: NoSuchFileException => s"open $f: no such file or directory"
       case e                      => e.toString
+    }
+
+  private def handleRenderError[T](f: => T): Either[String, T] =
+    try Right(f)
+    catch {
+      case e: Error if e.stack.isEmpty => Left(s"sjsonnet.Error: ${e.getMessage}")
+      case e: Error                    => Left(Error.formatError(e))
     }
 
   private def writeFile(
@@ -483,8 +510,10 @@ object SjsonnetMainBase {
                   rendered <- {
                     val writer = new StringWriter()
                     val renderer = rendererForConfig(writer, config, () => currentPos)
-                    ujson.transform(v, renderer)
-                    Right(writer.toString)
+                    handleRenderError {
+                      ujson.transform(v, renderer)
+                      writer.toString
+                    }
                   }
                   relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
                   _ <- writeFile(config, relPath.resolveFrom(wd), rendered, trailingNewline)
@@ -512,27 +541,29 @@ object SjsonnetMainBase {
         interp.interpret(jsonnetCode, path).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd) { writer =>
-              arr.value.toSeq match {
-                case Nil         => // donothing
-                case Seq(single) =>
-                  val renderer = rendererForConfig(writer, config, () => currentPos)
-                  single.transform(renderer)
-                  writer.write(if (isScalar(single)) "\n..." else "")
-                case multiple =>
-                  for ((v, i) <- multiple.zipWithIndex) {
-                    if (i > 0) writer.write('\n')
-                    if (isScalar(v)) writer.write("--- ")
-                    else if (i != 0) writer.write("---\n")
-                    val renderer = rendererForConfig(
-                      writer,
-                      config.copy(yamlOut = mainargs.Flag(true)),
-                      () => currentPos
-                    )
-                    v.transform(renderer)
-                  }
+              handleRenderError {
+                arr.value.toSeq match {
+                  case Nil         => // donothing
+                  case Seq(single) =>
+                    val renderer = rendererForConfig(writer, config, () => currentPos)
+                    single.transform(renderer)
+                    writer.write(if (isScalar(single)) "\n..." else "")
+                  case multiple =>
+                    for ((v, i) <- multiple.zipWithIndex) {
+                      if (i > 0) writer.write('\n')
+                      if (isScalar(v)) writer.write("--- ")
+                      else if (i != 0) writer.write("---\n")
+                      val renderer = rendererForConfig(
+                        writer,
+                        config.copy(yamlOut = mainargs.Flag(true)),
+                        () => currentPos
+                      )
+                      v.transform(renderer)
+                    }
+                }
+                writer.write('\n')
+                ""
               }
-              writer.write('\n')
-              Right("")
             }
 
           case _ =>

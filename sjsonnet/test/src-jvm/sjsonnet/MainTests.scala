@@ -54,6 +54,21 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("stringModeNonStringReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+          "cli_string_non_string.jsonnet"
+      val source = workspaceRoot / sourceRel
+      val golden = os.read(os.Path(source.toString + ".golden"))
+      val sourceArg: os.Shellable = sourceRel
+      val (res, out, err) = runMain("--string", sourceArg)
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalizeOutput(err) == normalizeOutput(golden))
+      assert(!err.contains("Internal error"))
+      assert(!err.contains("upickle.core.Abort"))
+    }
+
     val streamedOut =
       """--- 1
         |--- 2
@@ -171,25 +186,29 @@ object MainTests extends TestSuite {
       val (res, out, err) = runMain("null", "--exec", "--string")
       assert(res == 1)
       assert(out.isEmpty)
-      assert(err.contains("expected string result got null"))
+      assertStringModeTypeError(err, "null")
     }
 
     test("execStringRejectsNonStringTypes") {
       // Numbers
       val (res1, out1, err1) = runMain("42", "--exec", "--string")
-      assert(res1 == 1, out1.isEmpty, err1.contains("expected string result"))
+      assert(res1 == 1, out1.isEmpty)
+      assertStringModeTypeError(err1, "number")
 
       // Booleans
       val (res2, out2, err2) = runMain("true", "--exec", "--string")
-      assert(res2 == 1, out2.isEmpty, err2.contains("expected string result"))
+      assert(res2 == 1, out2.isEmpty)
+      assertStringModeTypeError(err2, "boolean")
 
       // Arrays
       val (res3, out3, err3) = runMain("[1, 2]", "--exec", "--string")
-      assert(res3 == 1, out3.isEmpty, err3.contains("expected string result"))
+      assert(res3 == 1, out3.isEmpty)
+      assertStringModeTypeError(err3, "array")
 
       // Objects
       val (res4, out4, err4) = runMain("{a: 1}", "--exec", "--string")
-      assert(res4 == 1, out4.isEmpty, err4.contains("expected string result"))
+      assert(res4 == 1, out4.isEmpty)
+      assertStringModeTypeError(err4, "object")
     }
 
     test("multiStringOutput") {
@@ -204,6 +223,22 @@ object MainTests extends TestSuite {
 
       val barDestStr = os.read(multiDest / "bar.txt")
       assert(barDestStr == "bar\n")
+    }
+
+    test("multiStringRejectsNonStringValues") {
+      val multiDest = os.temp.dir()
+      val (res, out, err) =
+        runMain("""{"bad.txt": 42}""", "--exec", "--multi", multiDest, "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assertStringModeTypeError(err, "number")
+    }
+
+    test("yamlStreamStringRejectsSingleNonStringValue") {
+      val (res, out, err) = runMain("[42]", "--exec", "--yaml-stream", "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assertStringModeTypeError(err, "number")
     }
 
     // -- No trailing newline behavior --
@@ -487,6 +522,17 @@ object MainTests extends TestSuite {
 
   def runMain(args: os.Shellable*): (Int, String, String) =
     runMainWithEnv(jsonnetPathEnv = "", args*)
+
+  private def normalizeOutput(s: String): String =
+    s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+
+  private def assertStringModeTypeError(err: String, tpe: String): Unit = {
+    assert(err.contains(s"expected string result, got: $tpe"))
+    assert(!err.contains("Internal error"))
+    assert(!err.contains("upickle.core.Abort"))
+    assert(!err.contains("\tat "))
+    assert(!err.contains("SjsonnetMainBase"))
+  }
 
   def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) = {
     val err = new ByteArrayOutputStream()
