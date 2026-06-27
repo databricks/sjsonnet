@@ -54,6 +54,30 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("missingInputFileReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+          "cli_missing_input_file_does_not_exist.jsonnet"
+      val golden = os.read(testSuiteRoot / "db" / "cli_missing_input_file.golden")
+      val sourceArg: os.Shellable = sourceRel
+      val (res, out, err) = runMain(sourceArg)
+      def normalize(s: String): String =
+        s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalize(err) == normalize(golden))
+      assert(!err.contains("NoSuchFileException"))
+    }
+
+    test("malformedBindingFileReportsCleanError") {
+      val (res, out, err) = runMain("--exec", "--ext-str-file", "x=\u0000", "1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("Opening binding file:"))
+      assert(!err.contains("InvalidPathException"))
+      assert(!err.contains("IllegalArgumentException"))
+    }
+
     val streamedOut =
       """--- 1
         |--- 2

@@ -398,36 +398,67 @@ object SjsonnetMainBase {
       profileOpt: Option[String] = None,
       stdoutStream: OutputStream = null): Either[String, String] = {
 
-    val (jsonnetCode, path) =
+    val loadedInput =
       if (config.exec.value)
-        (file, OsPath(wd / Util.wrapInLessThanGreaterThan("exec"), Some("exec")))
+        Right((file, OsPath(wd / Util.wrapInLessThanGreaterThan("exec"), Some("exec"))))
       // TODO: Get rid of the /dev/stdin special-casing (everywhere!) once we use scala-native
       // with https://github.com/scala-native/scala-native/issues/4384 fixed.
       else if (file == "-" || file == "/dev/stdin")
-        (
-          io.Source.stdin.mkString,
-          OsPath(wd / Util.wrapInLessThanGreaterThan("<stdin>"), Some("<stdin>"))
+        Right(
+          (
+            io.Source.stdin.mkString,
+            OsPath(wd / Util.wrapInLessThanGreaterThan("<stdin>"), Some("<stdin>"))
+          )
         )
       else {
-        val p = os.Path(file, wd)
-        (os.read(p), OsPath(p, Some(file)))
+        try {
+          val p = os.Path(file, wd)
+          Right((os.read(p), OsPath(p, Some(file))))
+        } catch {
+          case _: NoSuchFileException =>
+            Left(s"Opening input file: $file: no such file or directory")
+          case e: java.io.IOException      => Left(s"Opening input file: $file: ${e.getMessage}")
+          case e: IllegalArgumentException => Left(s"Opening input file: $file: ${e.getMessage}")
+        }
       }
 
-    val extBinding = parseBindings(
-      config.extStr,
-      config.extStrFile,
-      config.extCode,
-      config.extCodeFile,
-      wd
-    )
+    val (jsonnetCode, path) = loadedInput match {
+      case Right(v)  => v
+      case Left(err) => return Left(err)
+    }
 
-    val tlaBinding = parseBindings(
-      config.tlaStr,
-      config.tlaStrFile,
-      config.tlaCode,
-      config.tlaCodeFile,
-      wd
-    )
+    val bindingResult: Either[String, (Map[String, String], Map[String, String])] =
+      try {
+        Right(
+          (
+            parseBindings(
+              config.extStr,
+              config.extStrFile,
+              config.extCode,
+              config.extCodeFile,
+              wd
+            ),
+            parseBindings(
+              config.tlaStr,
+              config.tlaStrFile,
+              config.tlaCode,
+              config.tlaCodeFile,
+              wd
+            )
+          )
+        )
+      } catch {
+        case e: NoSuchFileException =>
+          Left(s"Opening binding file: ${e.getFile}: no such file or directory")
+        case e: java.io.IOException =>
+          Left(s"Opening binding file: ${e.getMessage}")
+        case e: IllegalArgumentException =>
+          Left(s"Opening binding file: ${e.getMessage}")
+      }
+    val (extBinding, tlaBinding) = bindingResult match {
+      case Right(v)  => v
+      case Left(err) => return Left(err)
+    }
 
     val (profileFormat, profileFile) = profileOpt match {
       case Some(s) if s.startsWith("flamegraph:") =>
