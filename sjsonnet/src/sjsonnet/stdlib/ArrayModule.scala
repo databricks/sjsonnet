@@ -616,6 +616,11 @@ object ArrayModule extends AbstractFunctionModule {
   }
 
   private object Range extends Val.Builtin2("range", "from", "to") {
+    // Not static-safe: constant folding would call asStrictArray on the result, eagerly
+    // materializing the lazy RangeArr at optimization time. That defeats the lazy RangeArr /
+    // ConcatView / sharedConcatPrefixLength fast path (e.g. `std.range(1, N) + [x] < ... + [y]`
+    // collapses from O(1) to O(N) materialization on every evaluation).
+    override def staticSafe: Boolean = false
     def evalRhs(from: Eval, to: Eval, ev: EvalScope, pos: Position): Val = {
       val fromInt = requireInt(from.value, "from", pos)(ev)
       val toInt = requireInt(to.value, "to", pos)(ev)
