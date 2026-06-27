@@ -4,8 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 pushd "$ROOT_DIR" || exit 1
 
-./mill show "sjsonnet.jvm[3.3.7].assembly"
-SJSONNET="out/sjsonnet/jvm/3.3.7/assembly.dest/out.jar"
+# Use the same Scala version the bench actually runs under (scalaVersions.head) so
+# goldens never drift from the runtime. Pinning a fixed version here previously broke
+# refreshes once that version stopped building.
+SCALA_VERSION="$(./mill show bench.scalaVersion 2>/dev/null | tr -d '"[:space:]')"
+echo "Using Scala $SCALA_VERSION (bench.scalaVersion)"
+./mill show "sjsonnet.jvm[$SCALA_VERSION].assembly"
+SJSONNET="out/sjsonnet/jvm/$SCALA_VERSION/assembly.dest/out.jar"
 
 for suite in bench/resources/*_suite; do
   suite_name=$(basename "$suite")
