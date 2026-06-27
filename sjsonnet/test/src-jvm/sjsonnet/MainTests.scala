@@ -54,6 +54,52 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("missingOutputFileParentReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+          "cli_missing_output_file_parent.jsonnet"
+      val source = workspaceRoot / sourceRel
+      val outputDirRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+          "cli_missing_output_file_parent_dir"
+      val outputRel = outputDirRel / "out.json"
+      os.remove.all(workspaceRoot / outputDirRel)
+
+      val golden = os.read(os.Path(source.toString + ".golden"))
+      val sourceArg: os.Shellable = sourceRel
+      val outputArg: os.Shellable = outputRel
+      val (res, out, err) = runMain("--output-file", outputArg, sourceArg)
+      def normalize(s: String): String =
+        s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalize(err) == normalize(golden))
+      assert(!err.contains("NoSuchFileException"))
+    }
+
+    test("malformedOutputFileReportsCleanError") {
+      val (res, out, err) = runMain("--exec", "--output-file", "\u0000", "1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("open \u0000:"))
+      assert(!err.contains("InvalidPathException"))
+      assert(!err.contains("IllegalArgumentException"))
+    }
+
+    test("multiMissingOutputFileParentReportsCleanError") {
+      val source = testSuiteRoot / "db" / "multi.jsonnet"
+      val multiDest = os.temp.dir()
+      val outputDir = os.temp.dir()
+      os.remove.all(outputDir)
+      val outputRel = outputDir / "out.json"
+      val (res, out, err) =
+        runMain(source, "--multi", multiDest, "--output-file", outputRel.toString)
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("no such file or directory"))
+      assert(!err.contains("NoSuchFileException"))
+    }
+
     val streamedOut =
       """--- 1
         |--- 2

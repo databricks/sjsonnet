@@ -12,6 +12,7 @@ import java.io.{
   Writer
 }
 import java.nio.charset.StandardCharsets
+import java.nio.file.InvalidPathException
 import java.nio.file.NoSuchFileException
 import scala.annotation.unused
 import scala.util.Try
@@ -233,6 +234,7 @@ object SjsonnetMainBase {
             }
           } else if (rawOutputStream != null) rawOutputStream.flush()
           else stdout.flush()
+          0
         } else if (str.nonEmpty) {
           config.outputFile match {
             case None =>
@@ -241,10 +243,14 @@ object SjsonnetMainBase {
               // affects the content written to the output files, not the file list.
               if (config.multi.isDefined || !config.noTrailingNewline.value) stdout.println(str)
               else stdout.print(str)
-            case Some(f) => os.write.over(os.Path(f, wd), str)
+              0
+            case Some(f) =>
+              handleWriteFile(f)(os.write.over(os.Path(f, wd), str)) match {
+                case Left(err) => stderr.println(err); 1
+                case Right(_)  => 0
+              }
           }
-        }
-        0
+        } else 0
     }
   }
 
@@ -267,10 +273,12 @@ object SjsonnetMainBase {
       }
     else new Renderer(wr, indent = config.indent)
 
-  private def handleWriteFile[T](f: => T): Either[String, T] =
+  private def handleWriteFile[T](path: String)(f: => T): Either[String, T] =
     Try(f).toEither.left.map {
-      case _: NoSuchFileException => s"open $f: no such file or directory"
-      case e                      => e.toString
+      case _: NoSuchFileException  => s"open $path: no such file or directory"
+      case e: InvalidPathException => s"open $path: ${e.getMessage}"
+      case e: java.io.IOException  => s"open $path: ${e.getMessage}"
+      case e                       => e.toString
     }
 
   private def writeFile(
@@ -278,7 +286,7 @@ object SjsonnetMainBase {
       f: os.Path,
       contents: String,
       trailingNewline: Boolean): Either[String, Unit] =
-    handleWriteFile(
+    handleWriteFile(f.toString)(
       os.write.over(
         f,
         if (trailingNewline) contents + "\n" else contents,
@@ -293,7 +301,7 @@ object SjsonnetMainBase {
         val sw = new StringWriter
         materialize(sw).map(_ => sw.toString)
       case Some(f) =>
-        handleWriteFile(
+        handleWriteFile(f)(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
         ).flatMap { out =>
           try {
@@ -318,7 +326,7 @@ object SjsonnetMainBase {
     config.outputFile match {
       case Some(f) if !config.yamlOut.value && !config.expectString.value =>
         // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
-        handleWriteFile(
+        handleWriteFile(f)(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
         ).flatMap { out =>
           try {
