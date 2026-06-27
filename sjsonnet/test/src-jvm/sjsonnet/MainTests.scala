@@ -54,6 +54,30 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("missingExtStrFileErrorsAsImport") {
+      checkCliStderrGolden(
+        "cli_missing_ext_str_file.jsonnet",
+        "--ext-str-file",
+        "missing=sjsonnet/test/resources/db/cli_missing_ext_str_file_input.txt"
+      )
+    }
+
+    test("unusedMissingExtStrFileIsLazy") {
+      checkCliStdoutGolden(
+        "cli_missing_ext_str_file_unused.jsonnet",
+        "--ext-str-file",
+        "missing=sjsonnet/test/resources/db/cli_missing_ext_str_file_input.txt"
+      )
+    }
+
+    test("extStrFileReadsRelativePath") {
+      checkCliStdoutGolden(
+        "cli_ext_str_file_relative.jsonnet",
+        "--ext-str-file",
+        "contents=sjsonnet/test/resources/db/cli_ext_str_file_relative_input.txt"
+      )
+    }
+
     val streamedOut =
       """--- 1
         |--- 2
@@ -487,6 +511,30 @@ object MainTests extends TestSuite {
 
   def runMain(args: os.Shellable*): (Int, String, String) =
     runMainWithEnv(jsonnetPathEnv = "", args*)
+
+  private def checkCliStderrGolden(fileName: String, args: os.Shellable*): Unit = {
+    val sourceRel = os.RelPath("sjsonnet") / "test" / "resources" / "db" / fileName
+    val source = workspaceRoot / sourceRel
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = sourceRel
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 1)
+    assert(out.isEmpty)
+    def normalizeStderr(s: String) =
+      s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+    assert(normalizeStderr(err) == normalizeStderr(golden))
+  }
+
+  private def checkCliStdoutGolden(fileName: String, args: os.Shellable*): Unit = {
+    val sourceRel = os.RelPath("sjsonnet") / "test" / "resources" / "db" / fileName
+    val source = workspaceRoot / sourceRel
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = sourceRel
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 0)
+    assert(err.isEmpty)
+    assert(out.replace("\r\n", "\n") == golden.replace("\r\n", "\n"))
+  }
 
   def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) = {
     val err = new ByteArrayOutputStream()

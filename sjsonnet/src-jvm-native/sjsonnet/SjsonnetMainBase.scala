@@ -349,12 +349,17 @@ object SjsonnetMainBase {
 
   private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
+  /**
+   * Parse CLI binding arguments.
+   * @param wd
+   *   ignored since bindings now use importstr/import; retained for binary compatibility
+   */
   def parseBindings(
       strs: Seq[String],
       strFiles: Seq[String],
       codes: Seq[String],
       codeFiles: Seq[String],
-      wd: os.Path): Map[String, String] = {
+      @unused wd: os.Path): Map[String, String] = {
 
     def split(s: String) = {
       val idx = s.indexOf('=')
@@ -364,12 +369,13 @@ object SjsonnetMainBase {
 
     def splitMap(s: Seq[String], f: String => String) =
       s.map(split).map { case (x, v) => (x, f(v)) }
-    def readPath(v: String) =
-      if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString else os.read(os.Path(v, wd))
+    def importStrPath(v: String) =
+      if (v == "-" || v == "/dev/stdin") ujson.write(io.Source.stdin.mkString)
+      else s"importstr @'${v.replace("'", "''")}'"
 
     Map() ++
     splitMap(strs, v => ujson.write(v)) ++
-    splitMap(strFiles, v => ujson.write(readPath(v))) ++
+    splitMap(strFiles, importStrPath) ++
     splitMap(codes, identity) ++
     splitMap(
       codeFiles,
