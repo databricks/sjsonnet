@@ -23,6 +23,9 @@ object SjsonnetMainBase {
    */
   private val ByteRenderedSentinel = "\u0000"
   private final val OutputBufferSize = 256 * 1024
+  private final class CliError(msg: String) extends RuntimeException(msg) {
+    override def fillInStackTrace(): Throwable = this
+  }
 
   class SimpleImporter(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
@@ -349,34 +352,51 @@ object SjsonnetMainBase {
 
   private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
-  def parseBindings(
+  private def parseBindings(
       strs: Seq[String],
       strFiles: Seq[String],
       codes: Seq[String],
       codeFiles: Seq[String],
       wd: os.Path): Map[String, String] = {
 
-    def split(s: String) = {
-      val idx = s.indexOf('=')
-      if (idx < 0) (s, System.getenv(s))
-      else (s.substring(0, idx), s.substring(idx + 1))
+    if (strs.isEmpty && strFiles.isEmpty && codes.isEmpty && codeFiles.isEmpty)
+      return Map.empty
+
+    val bindings = collection.mutable.HashMap.empty[String, String]
+
+    def appendBindings(s: Seq[String], f: String => String): Unit = {
+      val it = s.iterator
+      while (it.hasNext) {
+        val binding = it.next()
+        val idx = binding.indexOf('=')
+        val key =
+          if (idx < 0) binding
+          else binding.substring(0, idx)
+        val value =
+          if (idx < 0) {
+            val envValue = System.getenv(binding)
+            // Matches C++/go-jsonnet error format
+            if (envValue == null)
+              throw new CliError(s"ERROR: environment variable $binding was undefined")
+            envValue
+          } else binding.substring(idx + 1)
+        bindings.update(key, f(value))
+      }
     }
 
-    def splitMap(s: Seq[String], f: String => String) =
-      s.map(split).map { case (x, v) => (x, f(v)) }
     def readPath(v: String) =
       if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString else os.read(os.Path(v, wd))
 
-    Map() ++
-    splitMap(strs, v => ujson.write(v)) ++
-    splitMap(strFiles, v => ujson.write(readPath(v))) ++
-    splitMap(codes, identity) ++
-    splitMap(
+    appendBindings(strs, v => ujson.write(v))
+    appendBindings(strFiles, v => ujson.write(readPath(v)))
+    appendBindings(codes, identity)
+    appendBindings(
       codeFiles,
       v =>
         if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString
         else s"import @'${v.replace("'", "''")}'"
     )
+    bindings.toMap
   }
 
   /**
@@ -413,21 +433,22 @@ object SjsonnetMainBase {
         (os.read(p), OsPath(p, Some(file)))
       }
 
-    val extBinding = parseBindings(
-      config.extStr,
-      config.extStrFile,
-      config.extCode,
-      config.extCodeFile,
-      wd
-    )
+    val parsedBindings: Either[String, (Map[String, String], Map[String, String])] =
+      try {
+        Right(
+          (
+            parseBindings(config.extStr, config.extStrFile, config.extCode, config.extCodeFile, wd),
+            parseBindings(config.tlaStr, config.tlaStrFile, config.tlaCode, config.tlaCodeFile, wd)
+          )
+        )
+      } catch {
+        case e: CliError => Left(e.getMessage)
+      }
 
-    val tlaBinding = parseBindings(
-      config.tlaStr,
-      config.tlaStrFile,
-      config.tlaCode,
-      config.tlaCodeFile,
-      wd
-    )
+    val (extBinding, tlaBinding) = parsedBindings match {
+      case Right(bindings) => bindings
+      case Left(err)       => return Left(err)
+    }
 
     val (profileFormat, profileFile) = profileOpt match {
       case Some(s) if s.startsWith("flamegraph:") =>

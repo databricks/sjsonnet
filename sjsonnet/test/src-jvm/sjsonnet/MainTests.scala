@@ -54,6 +54,38 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("undefinedEnvExtStr") {
+      checkCliErrorGolden(
+        "cli_undefined_env_ext_str.jsonnet",
+        "--ext-str",
+        "SJSONNET_TEST_UNDEFINED_EXT_STR_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvExtCode") {
+      checkCliErrorGolden(
+        "cli_undefined_env_ext_code.jsonnet",
+        "--ext-code",
+        "SJSONNET_TEST_UNDEFINED_EXT_CODE_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvTlaStr") {
+      checkCliErrorGolden(
+        "cli_undefined_env_tla_str.jsonnet",
+        "--tla-str",
+        "SJSONNET_TEST_UNDEFINED_TLA_STR_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvTlaCode") {
+      checkCliErrorGolden(
+        "cli_undefined_env_tla_code.jsonnet",
+        "--tla-code",
+        "SJSONNET_TEST_UNDEFINED_TLA_CODE_D0C4E3A8"
+      )
+    }
+
     val streamedOut =
       """--- 1
         |--- 2
@@ -483,6 +515,16 @@ object MainTests extends TestSuite {
       assert(res == 0)
       assert(out.trim == "\"from_d\"")
     }
+  }
+
+  private def checkCliErrorGolden(fileName: String, args: os.Shellable*): Unit = {
+    val source = testSuiteRoot / "db" / fileName
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = source
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 1)
+    assert(out.isEmpty)
+    assert(err.replace("\r\n", "\n") == golden.replace("\r\n", "\n"))
   }
 
   def runMain(args: os.Shellable*): (Int, String, String) =
