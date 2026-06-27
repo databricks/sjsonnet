@@ -138,11 +138,11 @@ class StaticOptimizer(
       case e @ UnaryOp(pos, op, v: Val) => tryFoldUnaryOp(pos, op, v, e)
 
       // Branch elimination: constant condition in if-else
-      case IfElse(pos, _: Val.True, thenExpr, _) =>
-        thenExpr.pos = pos; thenExpr
-      case IfElse(pos, _: Val.False, _, elseExpr) =>
-        if (elseExpr == null) Val.Null(pos)
-        else { elseExpr.pos = pos; elseExpr }
+      case IfElse(_, _: Val.True, thenExpr, _) =>
+        thenExpr
+      case IfElse(_, _: Val.False, _, elseExpr) =>
+        if (elseExpr == null) Val.staticNull
+        else elseExpr
 
       // Short-circuit elimination for And/Or with constant lhs.
       //
@@ -152,10 +152,12 @@ class StaticOptimizer(
       // into just `rhs` without the Bool guard, we silently remove that runtime type check,
       // causing programs like `true && "hello"` to return "hello" instead of erroring.
       // See: Evaluator.visitAnd / Evaluator.visitOr for the authoritative runtime semantics.
-      case And(pos, _: Val.True, rhs: Val.Bool) => rhs.pos = pos; rhs
-      case And(pos, _: Val.False, _)            => Val.False(pos)
-      case Or(pos, _: Val.True, _)              => Val.True(pos)
-      case Or(pos, _: Val.False, rhs: Val.Bool) => rhs.pos = pos; rhs
+      // The lhs-result cases return lhs itself to keep the selected boolean's position and avoid
+      // turning the already-created literal/folded lhs into garbage.
+      case And(_, _: Val.True, rhs: Val.Bool) => rhs
+      case And(_, lhs: Val.False, _)          => lhs
+      case Or(_, lhs: Val.True, _)            => lhs
+      case Or(_, _: Val.False, rhs: Val.Bool) => rhs
 
       // Identity-equivalent function recognition. Cheap pattern match here keeps the runtime
       // fast path (`Val.Func.isEffectivelyIdentity`) at single-field cost.

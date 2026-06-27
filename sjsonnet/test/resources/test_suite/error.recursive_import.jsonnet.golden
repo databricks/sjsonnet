@@ -1,2 +1,2 @@
 sjsonnet.Error: Max stack frames exceeded.
-    at [<root>].(error.recursive_import.jsonnet:17:1)
+    at [<root>].(error.recursive_import.jsonnet:17:15)

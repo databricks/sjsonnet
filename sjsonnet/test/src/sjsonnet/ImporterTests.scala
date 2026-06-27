@@ -33,5 +33,33 @@ object ImporterTests extends TestSuite {
       importer.read(DummyPath("missing.libsonnet"), binaryData = false) ==> None
       readCalls ==> 1
     }
+
+    test("StaticBinaryResolvedFile protects cached bytes") {
+      val original = Array[Byte](1, 2, 3)
+      val file = StaticBinaryResolvedFile(original)
+      val expected = Array[Byte](1, 2, 3)
+      val expectedHash = Platform.hashBytes(expected)
+      val fromConstructor = new StaticBinaryResolvedFile(expected)
+      val fromFunction = (StaticBinaryResolvedFile: Array[Byte] => StaticBinaryResolvedFile)(expected)
+
+      // Constructor defensively copies, so mutating the input does not affect the file.
+      original(0) = 9
+      file.readRawBytes().toSeq ==> expected.toSeq
+      file.contentHash() ==> expectedHash
+      fromConstructor.readRawBytes().toSeq ==> expected.toSeq
+      fromFunction.readRawBytes().toSeq ==> expected.toSeq
+
+      // contentHash is cached (lazy val): same reference on repeated calls.
+      assert(file.contentHash() eq file.contentHash())
+
+      file.productArity ==> 1
+      file.productElement(0).asInstanceOf[Array[Byte]].toSeq ==> expected.toSeq
+
+      StaticBinaryResolvedFile.unapply(null) ==> None
+
+      val copied = file.copy()
+      copied.readRawBytes().toSeq ==> expected.toSeq
+      copied ==> file
+    }
   }
 }
