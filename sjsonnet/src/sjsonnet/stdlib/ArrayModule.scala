@@ -585,13 +585,30 @@ object ArrayModule extends AbstractFunctionModule {
             }
             str.str.contains(secondArg)
           case a: Val.Arr =>
-            var i = 0
-            var found = false
-            while (i < a.length && !found) {
-              if (ev.equal(a.value(i), x.value)) found = true
-              i += 1
+            val target = x.value
+            val len = a.length
+            // Num fast path: compare doubles directly, avoiding equal() dispatch
+            // (ref equality check + isInstanceOf[Val.Func] + pattern match chain)
+            target match {
+              case Val.Num(_, targetD) =>
+                var i = 0
+                var found = false
+                while (i < len && !found) {
+                  val elem = a.value(i)
+                  if (elem.isInstanceOf[Val.Num] && elem.asInstanceOf[Val.Num].asDouble == targetD)
+                    found = true
+                  i += 1
+                }
+                found
+              case _ =>
+                var i = 0
+                var found = false
+                while (i < len && !found) {
+                  if (ev.equal(a.value(i), target)) found = true
+                  i += 1
+                }
+                found
             }
-            found
           case arr =>
             Error.fail(
               "first argument must be an array or a string, got " + arr.prettyName
