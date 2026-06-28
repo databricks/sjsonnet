@@ -1386,24 +1386,36 @@ class Evaluator(
       case Expr.BinaryOp.OP_+ =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        (l, r) match {
-          case (Val.Num(_, l), Val.Num(_, r)) =>
-            val result = l + r
-            if (result.isNaN) Error.fail("Not a number", pos)
-            if (result.isInfinite) Error.fail("Overflow", pos)
-            Val.cachedNum(pos, result)
-          case (l: Val.Str, r: Val.Str) => Val.Str.concat(pos, l, r)
-          case (n: Val.Num, r: Val.Str) =>
-            Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)), r)
-          case (l: Val.Str, n: Val.Num) =>
-            Val.Str.concat(pos, l, Val.Str(pos, RenderUtils.renderDouble(n.asDouble)))
-          case (l: Val.Str, r) =>
-            Val.Str.concat(pos, l, Val.Str(pos, Materializer.stringify(r)))
-          case (l, r: Val.Str) =>
-            Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(l)), r)
-          case (l: Val.Obj, r: Val.Obj) => r.addSuper(pos, l)
-          case (l: Val.Arr, r: Val.Arr) => l.concat(pos, r)
-          case _                        => failBinOp(l, e.op, r, pos)
+        l match {
+          case Val.Num(_, ld) =>
+            r match {
+              case Val.Num(_, rd) =>
+                val result = ld + rd
+                if (result.isNaN) Error.fail("Not a number", pos)
+                if (result.isInfinite) Error.fail("Overflow", pos)
+                Val.cachedNum(pos, result)
+              case _: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, RenderUtils.renderDouble(ld)), r.asInstanceOf[Val.Str])
+              case _ => failBinOp(l, e.op, r, pos)
+            }
+          case ls: Val.Str =>
+            r match {
+              case rs: Val.Str => Val.Str.concat(pos, ls, rs)
+              case Val.Num(_, rd) =>
+                Val.Str.concat(pos, ls, Val.Str(pos, RenderUtils.renderDouble(rd)))
+              case _ => Val.Str.concat(pos, ls, Val.Str(pos, Materializer.stringify(r)))
+            }
+          case _ =>
+            r match {
+              case _: Val.Str =>
+                Val.Str.concat(pos, Val.Str(pos, Materializer.stringify(l)), r.asInstanceOf[Val.Str])
+              case _ =>
+                (l, r) match {
+                  case (lo: Val.Obj, ro: Val.Obj) => ro.addSuper(pos, lo)
+                  case (la: Val.Arr, ra: Val.Arr) => la.concat(pos, ra)
+                  case _                          => failBinOp(l, e.op, r, pos)
+                }
+            }
         }
 
       // Shift ops: pure numeric with safe-integer range check
@@ -1480,20 +1492,36 @@ class Evaluator(
           case _ => failBinOp(l, e.op, r, pos)
         }
 
-      // Equality ops
+      // Equality ops: Num fast path avoids equal() dispatch (ref check + pattern match chain)
       case Expr.BinaryOp.OP_== =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
-          Error.fail("Cannot test equality of functions", pos)
-        Val.bool(equal(l, r))
+        l match {
+          case Val.Num(_, ld) =>
+            r match {
+              case Val.Num(_, rd) => Val.bool(ld == rd)
+              case _              => Val.bool(false)
+            }
+          case _ =>
+            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+              Error.fail("Cannot test equality of functions", pos)
+            Val.bool(equal(l, r))
+        }
 
       case Expr.BinaryOp.OP_!= =>
         val l = visitExpr(e.lhs)
         val r = visitExpr(e.rhs)
-        if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
-          Error.fail("Cannot test equality of functions", pos)
-        Val.bool(!equal(l, r))
+        l match {
+          case Val.Num(_, ld) =>
+            r match {
+              case Val.Num(_, rd) => Val.bool(ld != rd)
+              case _              => Val.bool(true)
+            }
+          case _ =>
+            if (l.isInstanceOf[Val.Func] && r.isInstanceOf[Val.Func])
+              Error.fail("Cannot test equality of functions", pos)
+            Val.bool(!equal(l, r))
+        }
 
       // Bitwise ops: pure numeric with safe-integer range check
       case Expr.BinaryOp.OP_& =>
