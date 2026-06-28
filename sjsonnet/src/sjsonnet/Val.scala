@@ -1816,12 +1816,11 @@ object Val {
     private[sjsonnet] var currentDebugStats: DebugStats = _
 
     /**
-     * Field count at/below which `valueRaw` resolves an inline-array object by linear scan. Above
-     * it (e.g. large imported strict-JSON objects, whose inline arrays are uncapped — see
-     * Importer), `valueRaw` instead lazily builds the `value0` LinkedHashMap via `getValue0` for
-     * O(1) lookups. This keeps the scan for small objects (and never builds a map for the
-     * import-and-emit path, which materializes via direct inline iteration) while avoiding O(N^2)
-     * when a large imported object gains a `super` and must be resolved per-key.
+     * Field count at/below which inline-array object key lookups use a linear scan. Above it (e.g.
+     * large imported strict-JSON objects, whose inline arrays are uncapped — see Importer), lookups
+     * lazily build the `value0` LinkedHashMap via `getValue0` for O(1) probes. This keeps the scan
+     * for small objects (and never builds a map for the import-and-emit path, which materializes
+     * via direct inline iteration) while avoiding O(N^2) repeated per-key lookups.
      */
     private[sjsonnet] final val InlineScanMax = 8
 
@@ -2301,7 +2300,9 @@ object Val {
 
     @inline def containsKey(k: String): Boolean = {
       if (singleFieldKey != null && `super` == null) singleFieldKey.equals(k)
-      else if (inlineFieldKeys != null && `super` == null) {
+      else if (
+        inlineFieldKeys != null && `super` == null && inlineFieldKeys.length <= Obj.InlineScanMax
+      ) {
         val keys = inlineFieldKeys
         val n = keys.length
         var i = 0
@@ -2319,7 +2320,7 @@ object Val {
     @inline def containsVisibleKey(k: String): Boolean = {
       if (static || `super` != null) {
         getAllKeys.get(k) == java.lang.Boolean.FALSE
-      } else if (inlineFieldKeys != null) {
+      } else if (inlineFieldKeys != null && inlineFieldKeys.length <= Obj.InlineScanMax) {
         val keys = inlineFieldKeys
         val members = inlineFieldMembers
         val n = keys.length
