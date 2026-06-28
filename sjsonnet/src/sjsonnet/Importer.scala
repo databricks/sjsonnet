@@ -380,7 +380,19 @@ object CachedResolver {
       case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
           _: JsonParseDepthExceeded | _: NumberFormatException =>
         None
+      case e: Exception if isInvalidJsonSurrogateException(e) =>
+        None
     }
+  }
+
+  private def isInvalidJsonSurrogateException(e: Exception): Boolean = {
+    if (e.getClass != classOf[Exception]) return false
+    val message = e.getMessage
+    message != null && (
+      message.startsWith("Unexpected character following high surrogate") ||
+      message.startsWith("Duplicate high surrogate") ||
+      message.startsWith("Un-paired low surrogate")
+    )
   }
 
   private final class JsonImportVisitor(

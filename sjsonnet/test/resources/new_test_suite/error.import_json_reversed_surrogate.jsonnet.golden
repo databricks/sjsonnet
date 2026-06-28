@@ -1,0 +1,2 @@
+sjsonnet.ParseError: Expected "\"":1:10, found "\\uDE00\\uD8"
+    at [<root>].(error.import_json_reversed_surrogate.jsonnet:1:1)

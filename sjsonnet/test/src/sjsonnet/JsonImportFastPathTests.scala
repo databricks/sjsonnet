@@ -97,6 +97,35 @@ object JsonImportFastPathTests extends TestSuite {
       }
     }
 
+    test("invalid unicode surrogate exceptions fall back without internal errors") {
+      val inputs = Map(
+        "high-before-non-low-escape.json" -> "{\"key\":\"\\uD800\\u0041\"}",
+        "duplicate-high.json" -> "{\"key\":\"\\uD800\\uD801\"}",
+        "lone-low.json" -> "{\"key\":\"before\\uDC00after\"}",
+        "reversed.json" -> "{\"key\":\"\\uDE00\\uD83D\"}"
+      )
+
+      inputs.foreach { case (fileName, json) =>
+        val result = eval(Map(fileName -> json), s"""import "$fileName"""")
+        assert(result.isLeft)
+        result match {
+          case Left(error) =>
+            assert(error.startsWith("sjsonnet.ParseError"))
+            assert(!error.contains("Internal Error"))
+          case Right(_)    => assert(false)
+        }
+      }
+    }
+
+    test("valid unicode surrogate pairs stay on the json fast path") {
+      val files = Map(
+        "unicode.json" -> "{\"emoji\":\"\\uD83D\\uDE00\"}"
+      )
+
+      eval(files, """import "unicode.json"""") ==>
+      Right(ujson.Obj("emoji" -> "\uD83D\uDE00"))
+    }
+
     test("deep json imports keep parser recursion guard") {
       val files = Map("deep.json" -> """[[[]]]""")
 

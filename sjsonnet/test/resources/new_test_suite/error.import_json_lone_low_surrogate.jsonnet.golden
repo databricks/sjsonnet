@@ -1,0 +1,2 @@
+sjsonnet.ParseError: Expected "\"":1:16, found "\\uDC00afte"
+    at [<root>].(error.import_json_lone_low_surrogate.jsonnet:1:1)
