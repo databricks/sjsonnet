@@ -461,9 +461,21 @@ object Base64Tests extends TestSuite {
     // Error handling
     // ================================================================
     test("errors") {
+      val highCodepointBase64 = 0x0100.toChar.toString + "Q="
+
       test("invalidBase64Char") {
         val err = evalErr("""std.base64Decode("!!!!")""")
         assert(err.contains("failed to decode"))
+      }
+      test("highCodepointInvalidChar") {
+        val err = evalErr("std.base64Decode(\"" + highCodepointBase64 + "\")")
+        assert(err.contains("failed to decode"))
+        assert(!err.contains("Wrong length found"))
+      }
+      test("decodeBytesHighCodepointInvalidChar") {
+        val err = evalErr("std.base64DecodeBytes(\"" + highCodepointBase64 + "\")")
+        assert(err.contains("failed to decode"))
+        assert(!err.contains("Wrong length found"))
       }
       test("invalidByteArrayValue") {
         val err = evalErr("""std.base64([256])""")

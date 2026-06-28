@@ -6,6 +6,20 @@ package sjsonnet.stdlib
  */
 object Base64Validation {
 
+  def hasStrictPaddingLengthError(input: String): Boolean = {
+    val len = input.length
+    if (len == 0 || len % 4 == 0) false
+    else {
+      var allAscii = true
+      var i = 0
+      while (i < len && allAscii) {
+        if (input.charAt(i) > 127) allAscii = false
+        i += 1
+      }
+      allAscii
+    }
+  }
+
   /**
    * Validate strict RFC 4648 padding: reject ASCII input whose length is not a multiple of 4.
    *
@@ -20,19 +34,10 @@ object Base64Validation {
    * bytes (so "ĀQ=" is 4 bytes, passes the length check, and fails on the invalid character).
    */
   def requireStrictPadding(input: String): Unit = {
-    val len = input.length
-    if (len > 0 && len % 4 != 0) {
-      var allAscii = true
-      var i = 0
-      while (i < len && allAscii) {
-        if (input.charAt(i) > 127) allAscii = false
-        i += 1
-      }
-      if (allAscii) {
-        throw new IllegalArgumentException(
-          "Last unit does not have enough valid bits"
-        )
-      }
+    if (hasStrictPaddingLengthError(input)) {
+      throw new IllegalArgumentException(
+        "Last unit does not have enough valid bits"
+      )
     }
   }
 }

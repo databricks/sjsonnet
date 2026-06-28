@@ -118,7 +118,7 @@ object EncodingModule extends AbstractFunctionModule {
          else Val.Str(pos, value)): Val
       } catch {
         case e: IllegalArgumentException =>
-          if (str.length % 4 != 0)
+          if (Base64Validation.hasStrictPaddingLengthError(str))
             Error.fail(
               s"input string appears not to be a base64 encoded string. Wrong length found (${str.length})"
             )
@@ -140,7 +140,7 @@ object EncodingModule extends AbstractFunctionModule {
         Val.Arr.fromBytes(pos, PlatformBase64.decode(str))
       } catch {
         case e: IllegalArgumentException =>
-          if (str.length % 4 != 0)
+          if (Base64Validation.hasStrictPaddingLengthError(str))
             Error.fail(
               s"input string appears not to be a base64 encoded string. Wrong length found (${str.length})"
             )

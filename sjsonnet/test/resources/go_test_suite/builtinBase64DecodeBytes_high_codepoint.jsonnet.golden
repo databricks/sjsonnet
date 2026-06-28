@@ -1,2 +1,2 @@
-sjsonnet.Error: [std.base64DecodeBytes] input string appears not to be a base64 encoded string. Wrong length found (3)
+sjsonnet.Error: [std.base64DecodeBytes] failed to decode: Illegal base64 character 3f
     at [<root>].(builtinBase64DecodeBytes_high_codepoint.jsonnet:1:22)
