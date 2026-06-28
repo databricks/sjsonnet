@@ -1998,14 +1998,27 @@ object Val {
      */
     private[sjsonnet] var _sortedInlineOrder: Array[Int] = null
 
-    private[sjsonnet] var _sortedVisibleKeyNames: Array[String] = null
+    @volatile private[sjsonnet] var _sortedVisibleKeyNames: Array[String] = null
+    @volatile private[sjsonnet] var _sortedAllKeyNames: Array[String] = null
 
+    /** Returns a shared read-only sorted key array. Callers must not mutate it. */
     private[sjsonnet] def sortedVisibleKeyNames: Array[String] = {
       var r = _sortedVisibleKeyNames
       if (r == null) {
         r = visibleKeyNames.clone()
         Util.sortStringsByCodepointInPlace(r)
         _sortedVisibleKeyNames = r
+      }
+      r
+    }
+
+    /** Returns a shared read-only sorted key array. Callers must not mutate it. */
+    private[sjsonnet] def sortedAllKeyNames: Array[String] = {
+      var r = _sortedAllKeyNames
+      if (r == null) {
+        r = allKeyNames.clone()
+        Util.sortStringsByCodepointInPlace(r)
+        _sortedAllKeyNames = r
       }
       r
     }
@@ -2599,13 +2612,12 @@ object Val {
     )
     // Static objects are interned and shared across threads: StaticOptimizer folds them into the
     // parse-cached AST, which a worker shares across parallel evaluator threads. Eagerly populate
-    // the sorted-key-name cache here (single-threaded, at static-optimization time) so concurrent
-    // sorted materialization (e.g. std.manifestJsonEx, which sorts keys) only ever *reads* a
-    // fully-built array. The lazy `sortedVisibleKeyNames` path writes a non-volatile field; its
-    // unsafe publication would otherwise let one thread observe a half-sorted array and emit
-    // corrupt key order/count. This mirrors the eagerly-prefilled `valueCache`/`allKeys` above and
-    // is safely published via the parse cache's happens-before, like the rest of the instance.
-    val _ = obj.sortedVisibleKeyNames
+    // the sorted-key-name caches here (single-threaded, at static-optimization time) so concurrent
+    // sorted materialization or reflection avoids duplicate lazy sorts and only ever reads
+    // fully-built arrays. This mirrors the eagerly-prefilled `valueCache`/`allKeys` above and is
+    // safely published via the parse cache's happens-before, like the rest of the instance.
+    obj.sortedVisibleKeyNames
+    obj.sortedAllKeyNames
     obj
   }
 

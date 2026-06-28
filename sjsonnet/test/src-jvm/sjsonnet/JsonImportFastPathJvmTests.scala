@@ -39,11 +39,25 @@ object JsonImportFastPathJvmTests extends TestSuite {
           }
       }
       val parseCache = new ConcurrentParseCache
+      val warmCode =
+        """local d = import "data.json";
+          |{whole: d, pick: d.arr[1].x}
+          |""".stripMargin
       val code =
         """local d = import "data.json";
           |{whole: d, pick: d.arr[1].x, fields: std.objectFields(d), singleFields: std.objectFields(d.a)}
           |""".stripMargin
       val path = DummyPath("root", "main.jsonnet")
+      val warmExpected = Right(
+        ujson.Obj(
+          "whole" -> ujson.Obj(
+            "a" -> ujson.Obj("b" -> ujson.Arr(1, 2, 3)),
+            "arr" -> ujson.Arr(ujson.Obj("x" -> "one"), ujson.Obj("x" -> "two")),
+            "z" -> true
+          ),
+          "pick" -> "two"
+        )
+      )
       val expected = Right(
         ujson.Obj(
           "whole" -> ujson.Obj(
@@ -63,8 +77,8 @@ object JsonImportFastPathJvmTests extends TestSuite {
         DummyPath("root"),
         importer,
         parseCache = parseCache
-      ).interpret(code, path)
-      assert(warm == expected)
+      ).interpret(warmCode, path)
+      assert(warm == warmExpected)
 
       val threads = new Array[Thread](8)
       val start = new CountDownLatch(1)
