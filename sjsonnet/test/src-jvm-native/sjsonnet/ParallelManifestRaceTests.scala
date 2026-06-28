@@ -263,7 +263,9 @@ object ParallelManifestRaceTests extends TestSuite {
         case Left(err) => throw new Exception(Error.formatError(err))
       }
       val keys = obj._sortedVisibleKeyNames
+      val allKeys = obj.sortedAllKeyNames
       assert(keys != null)
+      assert(allKeys eq keys)
       assert(keys.length == 20)
       var i = 1
       while (i < keys.length) {
