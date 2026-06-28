@@ -1,0 +1,9 @@
+{
+   "roundHalfUp": 1,
+   "roundNegHalf": -1,
+   "roundNegSmall": -0,
+   "roundNegZero": -0,
+   "roundPosZero": 0,
+   "signNegZero": true,
+   "signPosZero": true
+}
