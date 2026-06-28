@@ -54,6 +54,165 @@ object MainTests extends TestSuite {
       assert(err1.nonEmpty, err3.nonEmpty)
     }
 
+    test("shortVOnlyAliasesExtStr") {
+      val (_, _, err) = runMain("--help")
+      val shortVLines = err.linesIterator.filter(_.startsWith("  -V --")).toSeq
+      assert(shortVLines.length == 1)
+      assert(shortVLines.head.contains("--ext-str"))
+    }
+
+    test("shortVBindsExtStr") {
+      val source = testSuiteRoot / "db" / "cli_short_v_ext_str.jsonnet"
+      val (res, out, err) = runMain("-V", "x=1", "--ext-code", "codeX=1", source)
+      val expected = os.read(os.Path(source.toString + ".golden"))
+      assert((res, out, err) == ((0, expected, "")))
+    }
+
+    test("shortVDoesNotBindTlaCode") {
+      val source = testSuiteRoot / "db" / "cli_short_v_not_tla_code.jsonnet"
+      val (res, out, err) = runMain("-V", "x=1", source)
+      val expected = os.read(os.Path(source.toString + ".golden")).stripLineEnd
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.startsWith(expected))
+    }
+
+    test("stringModeNonStringReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+        "cli_string_non_string.jsonnet"
+      val source = workspaceRoot / sourceRel
+      val golden = os.read(os.Path(source.toString + ".golden"))
+      val sourceArg: os.Shellable = sourceRel
+      val (res, out, err) = runMain("--string", sourceArg)
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalizeOutput(err) == normalizeOutput(golden))
+      assert(!err.contains("Internal error"))
+      assert(!err.contains("upickle.core.Abort"))
+    }
+
+    test("missingOutputFileParentReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+        "cli_missing_output_file_parent.jsonnet"
+      val source = workspaceRoot / sourceRel
+      val outputDirRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+        "cli_missing_output_file_parent_dir"
+      val outputRel = outputDirRel / "out.json"
+      os.remove.all(workspaceRoot / outputDirRel)
+
+      val golden = os.read(os.Path(source.toString + ".golden"))
+      val sourceArg: os.Shellable = sourceRel
+      val outputArg: os.Shellable = outputRel
+      val (res, out, err) = runMain("--output-file", outputArg, sourceArg)
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalizeOutput(err) == normalizeOutput(golden))
+    }
+
+    test("missingInputFileReportsCleanError") {
+      val sourceRel =
+        os.RelPath("sjsonnet") / "test" / "resources" / "db" /
+        "cli_missing_input_file_does_not_exist.jsonnet"
+      val golden = os.read(testSuiteRoot / "db" / "cli_missing_input_file.golden")
+      val sourceArg: os.Shellable = sourceRel
+      val (res, out, err) = runMain(sourceArg)
+      def normalize(s: String): String =
+        s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(normalize(err) == normalize(golden))
+      assert(!err.contains("NoSuchFileException"))
+    }
+
+    test("malformedOutputFileReportsCleanError") {
+      val (res, out, err) = runMain("--exec", "--output-file", "\u0000", "1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("open \u0000:"))
+    }
+
+    test("malformedBindingFileReportsCleanError") {
+      val (res, out, err) = runMain("--exec", "--ext-str-file", "x=\u0000", "1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("Opening binding file:"))
+      assert(!err.contains("InvalidPathException"))
+      assert(!err.contains("IllegalArgumentException"))
+    }
+
+    test("multiMissingOutputFileParentReportsCleanError") {
+      val source = testSuiteRoot / "db" / "multi.jsonnet"
+      val multiDest = os.temp.dir()
+      val outputDir = os.temp.dir()
+      os.remove.all(outputDir)
+      val outputRel = outputDir / "out.json"
+      val (res, out, err) =
+        runMain(source, "--multi", multiDest, "--output-file", outputRel.toString)
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("no such file or directory"))
+      assert(!err.contains("NoSuchFileException"))
+    }
+
+    test("missingExtStrFileErrorsAsImport") {
+      checkCliStderrGolden(
+        "cli_missing_ext_str_file.jsonnet",
+        "--ext-str-file",
+        "missing=sjsonnet/test/resources/db/cli_missing_ext_str_file_input.txt"
+      )
+    }
+
+    test("unusedMissingExtStrFileIsLazy") {
+      checkCliStdoutGolden(
+        "cli_missing_ext_str_file_unused.jsonnet",
+        "--ext-str-file",
+        "missing=sjsonnet/test/resources/db/cli_missing_ext_str_file_input.txt"
+      )
+    }
+
+    test("extStrFileReadsRelativePath") {
+      checkCliStdoutGolden(
+        "cli_ext_str_file_relative.jsonnet",
+        "--ext-str-file",
+        "contents=sjsonnet/test/resources/db/cli_ext_str_file_relative_input.txt"
+      )
+    }
+
+    test("undefinedEnvExtStr") {
+      checkCliErrorGolden(
+        "cli_undefined_env_ext_str.jsonnet",
+        "--ext-str",
+        "SJSONNET_TEST_UNDEFINED_EXT_STR_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvExtCode") {
+      checkCliErrorGolden(
+        "cli_undefined_env_ext_code.jsonnet",
+        "--ext-code",
+        "SJSONNET_TEST_UNDEFINED_EXT_CODE_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvTlaStr") {
+      checkCliErrorGolden(
+        "cli_undefined_env_tla_str.jsonnet",
+        "--tla-str",
+        "SJSONNET_TEST_UNDEFINED_TLA_STR_D0C4E3A8"
+      )
+    }
+
+    test("undefinedEnvTlaCode") {
+      checkCliErrorGolden(
+        "cli_undefined_env_tla_code.jsonnet",
+        "--tla-code",
+        "SJSONNET_TEST_UNDEFINED_TLA_CODE_D0C4E3A8"
+      )
+    }
+
     val streamedOut =
       """--- 1
         |--- 2
@@ -171,25 +330,29 @@ object MainTests extends TestSuite {
       val (res, out, err) = runMain("null", "--exec", "--string")
       assert(res == 1)
       assert(out.isEmpty)
-      assert(err.contains("expected string result got null"))
+      assertStringModeTypeError(err, "null")
     }
 
     test("execStringRejectsNonStringTypes") {
       // Numbers
       val (res1, out1, err1) = runMain("42", "--exec", "--string")
-      assert(res1 == 1, out1.isEmpty, err1.contains("expected string result"))
+      assert(res1 == 1, out1.isEmpty)
+      assertStringModeTypeError(err1, "number")
 
       // Booleans
       val (res2, out2, err2) = runMain("true", "--exec", "--string")
-      assert(res2 == 1, out2.isEmpty, err2.contains("expected string result"))
+      assert(res2 == 1, out2.isEmpty)
+      assertStringModeTypeError(err2, "boolean")
 
       // Arrays
       val (res3, out3, err3) = runMain("[1, 2]", "--exec", "--string")
-      assert(res3 == 1, out3.isEmpty, err3.contains("expected string result"))
+      assert(res3 == 1, out3.isEmpty)
+      assertStringModeTypeError(err3, "array")
 
       // Objects
       val (res4, out4, err4) = runMain("{a: 1}", "--exec", "--string")
-      assert(res4 == 1, out4.isEmpty, err4.contains("expected string result"))
+      assert(res4 == 1, out4.isEmpty)
+      assertStringModeTypeError(err4, "object")
     }
 
     test("multiStringOutput") {
@@ -204,6 +367,22 @@ object MainTests extends TestSuite {
 
       val barDestStr = os.read(multiDest / "bar.txt")
       assert(barDestStr == "bar\n")
+    }
+
+    test("multiStringRejectsNonStringValues") {
+      val multiDest = os.temp.dir()
+      val (res, out, err) =
+        runMain("""{"bad.txt": 42}""", "--exec", "--multi", multiDest, "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assertStringModeTypeError(err, "number")
+    }
+
+    test("yamlStreamStringRejectsSingleNonStringValue") {
+      val (res, out, err) = runMain("[42]", "--exec", "--yaml-stream", "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assertStringModeTypeError(err, "number")
     }
 
     // -- No trailing newline behavior --
@@ -485,8 +664,53 @@ object MainTests extends TestSuite {
     }
   }
 
+  private def checkCliErrorGolden(fileName: String, args: os.Shellable*): Unit = {
+    val source = testSuiteRoot / "db" / fileName
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = source
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 1)
+    assert(out.isEmpty)
+    assert(err.replace("\r\n", "\n") == golden.replace("\r\n", "\n"))
+  }
+
   def runMain(args: os.Shellable*): (Int, String, String) =
     runMainWithEnv(jsonnetPathEnv = "", args*)
+
+  private def normalizeOutput(s: String): String =
+    s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+
+  private def assertStringModeTypeError(err: String, tpe: String): Unit = {
+    assert(err.contains(s"expected string result, got: $tpe"))
+    assert(!err.contains("Internal error"))
+    assert(!err.contains("upickle.core.Abort"))
+    assert(!err.contains("\tat "))
+    assert(!err.contains("SjsonnetMainBase"))
+  }
+
+  private def checkCliStderrGolden(fileName: String, args: os.Shellable*): Unit = {
+    val sourceRel = os.RelPath("sjsonnet") / "test" / "resources" / "db" / fileName
+    val source = workspaceRoot / sourceRel
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = sourceRel
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 1)
+    assert(out.isEmpty)
+    def normalizeStderr(s: String) =
+      s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
+    assert(normalizeStderr(err) == normalizeStderr(golden))
+  }
+
+  private def checkCliStdoutGolden(fileName: String, args: os.Shellable*): Unit = {
+    val sourceRel = os.RelPath("sjsonnet") / "test" / "resources" / "db" / fileName
+    val source = workspaceRoot / sourceRel
+    val golden = os.read(os.Path(source.toString + ".golden"))
+    val sourceArg: os.Shellable = sourceRel
+    val (res, out, err) = runMain((args :+ sourceArg)*)
+    assert(res == 0)
+    assert(err.isEmpty)
+    assert(out.replace("\r\n", "\n") == golden.replace("\r\n", "\n"))
+  }
 
   def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) = {
     val err = new ByteArrayOutputStream()

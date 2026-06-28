@@ -12,7 +12,7 @@ import java.io.{
   Writer
 }
 import java.nio.charset.StandardCharsets
-import java.nio.file.NoSuchFileException
+import java.nio.file.{InvalidPathException, NoSuchFileException}
 import scala.annotation.unused
 import scala.util.Try
 
@@ -23,6 +23,9 @@ object SjsonnetMainBase {
    */
   private val ByteRenderedSentinel = "\u0000"
   private final val OutputBufferSize = 256 * 1024
+  private final class CliError(msg: String) extends RuntimeException(msg) {
+    override def fillInStackTrace(): Throwable = this
+  }
 
   class SimpleImporter(
       searchRoots0: Seq[Path], // Evaluated in order, first occurrence wins
@@ -233,6 +236,7 @@ object SjsonnetMainBase {
             }
           } else if (rawOutputStream != null) rawOutputStream.flush()
           else stdout.flush()
+          0
         } else if (str.nonEmpty) {
           config.outputFile match {
             case None =>
@@ -241,10 +245,14 @@ object SjsonnetMainBase {
               // affects the content written to the output files, not the file list.
               if (config.multi.isDefined || !config.noTrailingNewline.value) stdout.println(str)
               else stdout.print(str)
-            case Some(f) => os.write.over(os.Path(f, wd), str)
+              0
+            case Some(f) =>
+              handleWriteFile(f)(os.write.over(os.Path(f, wd), str)) match {
+                case Left(err) => stderr.println(err); 1
+                case Right(_)  => 0
+              }
           }
-        }
-        0
+        } else 0
     }
   }
 
@@ -258,19 +266,48 @@ object SjsonnetMainBase {
     else if (config.expectString.value)
       new SimpleVisitor[Writer, Writer] {
         val expectedMsg = "expected string result"
+        private def rejectType(tpe: String): Nothing =
+          throw new Error(s"$expectedMsg, got: $tpe")
         override def visitString(s: CharSequence, index: Int): Writer = {
           wr.write(s.toString)
           wr
         }
-        override def visitNull(index: Int): Writer =
-          throw new upickle.core.Abort(s"$expectedMsg got null")
+        override def visitNull(index: Int): Writer = rejectType("null")
+        override def visitFalse(index: Int): Writer = rejectType("boolean")
+        override def visitTrue(index: Int): Writer = rejectType("boolean")
+        override def visitFloat64(d: Double, index: Int): Writer = rejectType("number")
+        override def visitFloat32(d: Float, index: Int): Writer = rejectType("number")
+        override def visitInt32(i: Int, index: Int): Writer = rejectType("number")
+        override def visitInt64(i: Long, index: Int): Writer = rejectType("number")
+        override def visitUInt64(i: Long, index: Int): Writer = rejectType("number")
+        override def visitFloat64StringParts(
+            s: CharSequence,
+            decIndex: Int,
+            expIndex: Int,
+            index: Int): Writer = rejectType("number")
+        override def visitFloat64String(s: String, index: Int): Writer = rejectType("number")
+        override def visitArray(length: Int, index: Int): upickle.core.ArrVisitor[Writer, Writer] =
+          rejectType("array")
+        override def visitObject(
+            length: Int,
+            jsonableKeys: Boolean,
+            index: Int): upickle.core.ObjVisitor[Writer, Writer] = rejectType("object")
       }
     else new Renderer(wr, indent = config.indent)
 
-  private def handleWriteFile[T](f: => T): Either[String, T] =
+  private def handleWriteFile[T](path: String)(f: => T): Either[String, T] =
     Try(f).toEither.left.map {
-      case _: NoSuchFileException => s"open $f: no such file or directory"
-      case e                      => e.toString
+      case _: NoSuchFileException  => s"open $path: no such file or directory"
+      case e: InvalidPathException => s"open $path: ${e.getMessage}"
+      case e: java.io.IOException  => s"open $path: ${e.getMessage}"
+      case e                       => e.toString
+    }
+
+  private def handleRenderError[T](f: => T): Either[String, T] =
+    try Right(f)
+    catch {
+      case e: Error if e.stack.isEmpty => Left(s"sjsonnet.Error: ${e.getMessage}")
+      case e: Error                    => Left(Error.formatError(e))
     }
 
   private def writeFile(
@@ -278,7 +315,7 @@ object SjsonnetMainBase {
       f: os.Path,
       contents: String,
       trailingNewline: Boolean): Either[String, Unit] =
-    handleWriteFile(
+    handleWriteFile(f.toString)(
       os.write.over(
         f,
         if (trailingNewline) contents + "\n" else contents,
@@ -293,7 +330,7 @@ object SjsonnetMainBase {
         val sw = new StringWriter
         materialize(sw).map(_ => sw.toString)
       case Some(f) =>
-        handleWriteFile(
+        handleWriteFile(f)(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
         ).flatMap { out =>
           try {
@@ -318,7 +355,7 @@ object SjsonnetMainBase {
     config.outputFile match {
       case Some(f) if !config.yamlOut.value && !config.expectString.value =>
         // Byte[] fast path: render directly to OutputStream, bypassing OutputStreamWriter.
-        handleWriteFile(
+        handleWriteFile(f)(
           os.write.over.outputStream(os.Path(f, wd), createFolders = config.createDirs.value)
         ).flatMap { out =>
           try {
@@ -349,34 +386,64 @@ object SjsonnetMainBase {
 
   private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
 
-  def parseBindings(
+  /**
+   * Parse CLI binding arguments.
+   * @param wd
+   *   ignored since bindings now use importstr/import; retained for binary compatibility
+   */
+  private def parseBindings(
       strs: Seq[String],
       strFiles: Seq[String],
       codes: Seq[String],
       codeFiles: Seq[String],
-      wd: os.Path): Map[String, String] = {
+      @unused wd: os.Path): Map[String, String] = {
 
-    def split(s: String) = {
-      val idx = s.indexOf('=')
-      if (idx < 0) (s, System.getenv(s))
-      else (s.substring(0, idx), s.substring(idx + 1))
+    if (strs.isEmpty && strFiles.isEmpty && codes.isEmpty && codeFiles.isEmpty)
+      return Map.empty
+
+    val bindings = collection.mutable.HashMap.empty[String, String]
+
+    def appendBindings(s: Seq[String], f: String => String): Unit = {
+      val it = s.iterator
+      while (it.hasNext) {
+        val binding = it.next()
+        val idx = binding.indexOf('=')
+        val key =
+          if (idx < 0) binding
+          else binding.substring(0, idx)
+        val value =
+          if (idx < 0) {
+            val envValue = System.getenv(binding)
+            // Matches C++/go-jsonnet error format
+            if (envValue == null)
+              throw new CliError(s"ERROR: environment variable $binding was undefined")
+            envValue
+          } else binding.substring(idx + 1)
+        bindings.update(key, f(value))
+      }
     }
 
-    def splitMap(s: Seq[String], f: String => String) =
-      s.map(split).map { case (x, v) => (x, f(v)) }
-    def readPath(v: String) =
-      if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString else os.read(os.Path(v, wd))
+    def validateFilePath(v: String): Unit =
+      try java.nio.file.Paths.get(v)
+      catch {
+        case _: InvalidPathException =>
+          throw new CliError(s"Opening binding file: $v: no such file or directory")
+      }
 
-    Map() ++
-    splitMap(strs, v => ujson.write(v)) ++
-    splitMap(strFiles, v => ujson.write(readPath(v))) ++
-    splitMap(codes, identity) ++
-    splitMap(
+    def importStrPath(v: String) =
+      if (v == "-" || v == "/dev/stdin") ujson.write(io.Source.stdin.mkString)
+      else { validateFilePath(v); s"importstr @'${v.replace("'", "''")}'" }
+
+    appendBindings(strs, v => ujson.write(v))
+    appendBindings(strFiles, importStrPath)
+    appendBindings(codes, identity)
+    appendBindings(
       codeFiles,
       v =>
         if (v == "-" || v == "/dev/stdin") io.Source.stdin.mkString
-        else s"import @'${v.replace("'", "''")}'"
+        else { validateFilePath(v); s"import @'${v.replace("'", "''")}'" }
     )
+    bindings.toMap
   }
 
   /**
@@ -398,36 +465,51 @@ object SjsonnetMainBase {
       profileOpt: Option[String] = None,
       stdoutStream: OutputStream = null): Either[String, String] = {
 
-    val (jsonnetCode, path) =
+    val loadedInput =
       if (config.exec.value)
-        (file, OsPath(wd / Util.wrapInLessThanGreaterThan("exec"), Some("exec")))
+        Right((file, OsPath(wd / Util.wrapInLessThanGreaterThan("exec"), Some("exec"))))
       // TODO: Get rid of the /dev/stdin special-casing (everywhere!) once we use scala-native
       // with https://github.com/scala-native/scala-native/issues/4384 fixed.
       else if (file == "-" || file == "/dev/stdin")
-        (
-          io.Source.stdin.mkString,
-          OsPath(wd / Util.wrapInLessThanGreaterThan("<stdin>"), Some("<stdin>"))
+        Right(
+          (
+            io.Source.stdin.mkString,
+            OsPath(wd / Util.wrapInLessThanGreaterThan("<stdin>"), Some("<stdin>"))
+          )
         )
       else {
-        val p = os.Path(file, wd)
-        (os.read(p), OsPath(p, Some(file)))
+        try {
+          val p = os.Path(file, wd)
+          Right((os.read(p), OsPath(p, Some(file))))
+        } catch {
+          case _: NoSuchFileException =>
+            Left(s"Opening input file: $file: no such file or directory")
+          case e: java.io.IOException      => Left(s"Opening input file: $file: ${e.getMessage}")
+          case e: IllegalArgumentException => Left(s"Opening input file: $file: ${e.getMessage}")
+        }
       }
 
-    val extBinding = parseBindings(
-      config.extStr,
-      config.extStrFile,
-      config.extCode,
-      config.extCodeFile,
-      wd
-    )
+    val (jsonnetCode, path) = loadedInput match {
+      case Right(v)  => v
+      case Left(err) => return Left(err)
+    }
 
-    val tlaBinding = parseBindings(
-      config.tlaStr,
-      config.tlaStrFile,
-      config.tlaCode,
-      config.tlaCodeFile,
-      wd
-    )
+    val parsedBindings: Either[String, (Map[String, String], Map[String, String])] =
+      try {
+        Right(
+          (
+            parseBindings(config.extStr, config.extStrFile, config.extCode, config.extCodeFile, wd),
+            parseBindings(config.tlaStr, config.tlaStrFile, config.tlaCode, config.tlaCodeFile, wd)
+          )
+        )
+      } catch {
+        case e: CliError => Left(e.getMessage)
+      }
+
+    val (extBinding, tlaBinding) = parsedBindings match {
+      case Right(bindings) => bindings
+      case Left(err)       => return Left(err)
+    }
 
     val (profileFormat, profileFile) = profileOpt match {
       case Some(s) if s.startsWith("flamegraph:") =>
@@ -480,11 +562,11 @@ object SjsonnetMainBase {
             val renderedFiles: Seq[Either[String, os.FilePath]] =
               obj.value.toSeq.map { case (f, v) =>
                 for {
-                  rendered <- {
+                  rendered <- handleRenderError {
                     val writer = new StringWriter()
                     val renderer = rendererForConfig(writer, config, () => currentPos)
                     ujson.transform(v, renderer)
-                    Right(writer.toString)
+                    writer.toString
                   }
                   relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
                   _ <- writeFile(config, relPath.resolveFrom(wd), rendered, trailingNewline)
@@ -512,27 +594,29 @@ object SjsonnetMainBase {
         interp.interpret(jsonnetCode, path).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd) { writer =>
-              arr.value.toSeq match {
-                case Nil         => // donothing
-                case Seq(single) =>
-                  val renderer = rendererForConfig(writer, config, () => currentPos)
-                  single.transform(renderer)
-                  writer.write(if (isScalar(single)) "\n..." else "")
-                case multiple =>
-                  for ((v, i) <- multiple.zipWithIndex) {
-                    if (i > 0) writer.write('\n')
-                    if (isScalar(v)) writer.write("--- ")
-                    else if (i != 0) writer.write("---\n")
-                    val renderer = rendererForConfig(
-                      writer,
-                      config.copy(yamlOut = mainargs.Flag(true)),
-                      () => currentPos
-                    )
-                    v.transform(renderer)
-                  }
+              handleRenderError {
+                arr.value.toSeq match {
+                  case Nil         => // donothing
+                  case Seq(single) =>
+                    val renderer = rendererForConfig(writer, config, () => currentPos)
+                    single.transform(renderer)
+                    writer.write(if (isScalar(single)) "\n..." else "")
+                  case multiple =>
+                    for ((v, i) <- multiple.zipWithIndex) {
+                      if (i > 0) writer.write('\n')
+                      if (isScalar(v)) writer.write("--- ")
+                      else if (i != 0) writer.write("---\n")
+                      val renderer = rendererForConfig(
+                        writer,
+                        config.copy(yamlOut = mainargs.Flag(true)),
+                        () => currentPos
+                      )
+                      v.transform(renderer)
+                    }
+                }
+                writer.write('\n')
+                ""
               }
-              writer.write('\n')
-              Right("")
             }
 
           case _ =>

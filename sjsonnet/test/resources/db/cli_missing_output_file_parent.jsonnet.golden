@@ -1,0 +1,1 @@
+open sjsonnet/test/resources/db/cli_missing_output_file_parent_dir/out.json: no such file or directory
