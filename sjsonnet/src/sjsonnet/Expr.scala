@@ -447,9 +447,9 @@ object Expr {
       @volatile var _noSelfRef: java.lang.Boolean = null
 
       /**
-       * Cached key-name arrays shared across all Val.Obj instances from this MemberList (when super
-       * == null). Computed from the first instance and reused by subsequent ones, avoiding per-object
-       * allKeyNames/visibleKeyNames allocation.
+       * Cached key-name arrays shared across all Val.Obj instances from this MemberList (when there
+       * is no super). Computed from the first instance and reused by subsequent ones, avoiding
+       * per-object allKeyNames/visibleKeyNames allocation.
        */
       @volatile var _cachedAllKeyNames: Array[String] = null
       @volatile var _cachedVisibleKeyNames: Array[String] = null

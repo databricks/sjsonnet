@@ -442,8 +442,8 @@ object PrettyYamlRenderer {
    *
    * Originally implemented via FastParse; that worked correctly but was a major hotspot because
    * each invocation eagerly materialized parse-failure messages (Lazy[String] thunks). Profiling
-   * the Scala Native build on the kube-prometheus workload showed `Parsed$Failure.formatMsg` /
-   * `Parsed$Failure.msg` consuming ~27% of total CPU. This hand-rolled scanner reproduces the
+   * the Scala Native build on the kube-prometheus workload showed `Parsed.Failure.formatMsg` /
+   * `Parsed.Failure.msg` consuming ~27% of total CPU. This hand-rolled scanner reproduces the
    * original grammar exactly while avoiding any allocation or backtracking overhead.
    *
    * The original FastParse implementation is preserved in the commit message / PR description; the

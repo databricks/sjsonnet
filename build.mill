@@ -91,7 +91,11 @@ trait SjsonnetCrossModule extends CrossScalaModule with ScalafmtModule {
     )
   )
   def scalaDocOptions =
-    super.scalaDocOptions().filterNot(o => o == "-Werror" || o == "-Xfatal-warnings")
+    super.scalaDocOptions().filterNot(o => o == "-Werror" || o == "-Xfatal-warnings") ++
+      Seq("-no-link-warnings") ++ (
+        if (JvmWorkerUtil.isScala3(scalaVersion())) Seq.empty
+        else Seq("-Wconf:msg=discarding unmoored doc comment:s")
+      )
   trait CrossTests extends ScalaModule with TestModule.Utest {
     def mvnDeps = Seq(mvn"com.lihaoyi::utest::0.9.5")
     def testSandboxWorkingDir = false
