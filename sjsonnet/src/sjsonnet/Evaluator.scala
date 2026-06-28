@@ -155,10 +155,10 @@ class Evaluator(
    * `new LazyFunc(() => visitExpr(e))`:
    *
    *   1. [[Val]] literals — already evaluated, return as-is (zero cost).
-   *   2. [[ValidId]] (variable reference) where the binding slot is non-null — reuse the existing
-   *      [[Eval]] from scope directly (zero allocation). Covers ~18% of calls. When the slot IS
-   *      null (self-recursive local, e.g. `local a = [a[1], 0]`), the binding hasn't been written
-   *      yet, so we must create a deferred thunk to defer the lookup.
+   *   2. [[Expr.ValidId]] (variable reference) where the binding slot is non-null — reuse the
+   *      existing [[Eval]] from scope directly (zero allocation). Covers ~18% of calls. When the
+   *      slot IS null (self-recursive local, e.g. `local a = [a[1], 0]`), the binding hasn't been
+   *      written yet, so we must create a deferred thunk to defer the lookup.
    *   3. All other expressions — [[LazyExpr]] stores (Expr, ValScope, Evaluator) as fields instead
    *      of capturing them in a closure: 1 JVM object vs 2. Covers ~76% of calls (dominated by
    *      BinaryOp).
