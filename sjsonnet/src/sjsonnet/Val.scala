@@ -1816,6 +1816,16 @@ object Val {
     private[sjsonnet] var currentDebugStats: DebugStats = _
 
     /**
+     * Field count at/below which `valueRaw` resolves an inline-array object by linear scan. Above
+     * it (e.g. large imported strict-JSON objects, whose inline arrays are uncapped — see
+     * Importer), `valueRaw` instead lazily builds the `value0` LinkedHashMap via `getValue0` for
+     * O(1) lookups. This keeps the scan for small objects (and never builds a map for the
+     * import-and-emit path, which materializes via direct inline iteration) while avoiding O(N^2)
+     * when a large imported object gains a `super` and must be resolved per-key.
+     */
+    private[sjsonnet] final val InlineScanMax = 8
+
+    /**
      * @param add
      *   whether this field was defined the "+:", "+::" or "+:::" separators, corresponding to the
      *   "nested field inheritance" language feature; see
@@ -2479,8 +2489,10 @@ object Val {
           } else {
             if (s == null) null else s.valueRaw(k, self, pos, cacheOwner, cacheKey)
           }
-        } else if (inlineFieldKeys != null) {
-          // Inline multi-field fast path: linear scan over small arrays
+        } else if (inlineFieldKeys != null && inlineFieldKeys.length <= Obj.InlineScanMax) {
+          // Inline multi-field fast path: linear scan over small arrays. Large inline objects
+          // (uncapped imported strict-JSON) fall through to the getValue0 path below, which lazily
+          // builds an O(1) lookup map instead of scanning O(N) per key.
           val keys = inlineFieldKeys
           val members = inlineFieldMembers
           val n = keys.length
