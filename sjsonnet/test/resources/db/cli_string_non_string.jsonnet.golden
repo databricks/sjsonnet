@@ -1,0 +1,2 @@
+sjsonnet.Error: expected string result, got: object
+    at [<root>].(sjsonnet/test/resources/db/cli_string_non_string.jsonnet:1:1)

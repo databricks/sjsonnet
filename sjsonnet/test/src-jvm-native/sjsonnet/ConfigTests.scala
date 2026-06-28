@@ -6,6 +6,24 @@ object ConfigTests extends TestSuite {
   private val sep = java.io.File.pathSeparator
 
   val tests: Tests = Tests {
+    test("shortVParsesAsExtStr") {
+      val result = mainargs
+        .ParserForClass[Config]
+        .constructEither(
+          IndexedSeq("-V", "x=1", "test.jsonnet"),
+          allowRepeats = true,
+          autoPrintHelpAndExit = None
+        )
+      val config = result match {
+        case Right(config) => config
+        case Left(error)   => throw new java.lang.AssertionError(error)
+      }
+      assert(config.extStr == Seq("x=1"))
+      assert(config.extCode.isEmpty)
+      assert(config.tlaStr.isEmpty)
+      assert(config.tlaCode.isEmpty)
+    }
+
     test("jsonnetPathEntries") {
       test("null") {
         assert(Config.jsonnetPathEntries(null) == Nil)

@@ -1,0 +1,3 @@
+sjsonnet.Error: Couldn't import file: "sjsonnet/test/resources/db/cli_missing_ext_str_file_input.txt"
+    at [std.extVar].(<ext-var missing> offset:0)
+    at [<root>].(sjsonnet/test/resources/db/cli_missing_ext_str_file.jsonnet:1:11)

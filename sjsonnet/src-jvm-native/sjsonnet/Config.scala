@@ -59,7 +59,6 @@ final case class Config(
     extStrFile: Seq[String] = Nil,
     @arg(
       name = "ext-code",
-      short = 'V',
       doc =
         "<var>[=<code>] Provide 'external' variable as Jsonnet code. If <code> is omitted, get from environment var <var>"
     )
@@ -83,7 +82,6 @@ final case class Config(
     tlaStrFile: Seq[String] = Nil,
     @arg(
       name = "tla-code",
-      short = 'V',
       doc =
         "<var>[=<val>] Provide top-level arguments as Jsonnet code. 'If <val> is omitted, get from environment var <var>"
     )
