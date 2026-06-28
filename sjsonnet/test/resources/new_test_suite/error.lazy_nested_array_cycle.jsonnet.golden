@@ -1,0 +1,2 @@
+sjsonnet.Error: Stackoverflow while materializing, possibly due to recursive value
+    at [<root>].(error.lazy_nested_array_cycle.jsonnet:1:7)

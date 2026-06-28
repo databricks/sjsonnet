@@ -273,7 +273,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       obj: Val.Obj,
       matDepth: Int,
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
-    if (!ctx.enterObject(obj))
+    if (!ctx.enterContainer(obj))
       Error.fail("Stackoverflow while materializing, possibly due to recursive value", obj.pos)
     try {
       obj.triggerAllAsserts(ctx.brokenAssertionLogic)
@@ -287,7 +287,7 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
         materializeDirectGenericObj(obj, matDepth, ctx)
       }
     } finally {
-      ctx.exitObject(obj)
+      ctx.exitContainer(obj)
     }
   }
 
@@ -495,15 +495,10 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     val len = xs.length
 
-    // Inline of visitArray — open bracket
-    elemBuilder.append('[')
-    newlineBuffered = true
-    depth += 1
-    resetEmpty()
-
     // Fast paths for compact numeric arrays: emit numbers directly without per-element dispatch.
     xs match {
       case range: Val.RangeArr if range.isCompactRange =>
+        openArrBracket()
         var i = 0
         while (i < len) {
           markNonEmpty()
@@ -512,7 +507,9 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
           commaBuffered = true
           i += 1
         }
+        closeArrBracket()
       case ba: Val.ByteArr =>
+        openArrBracket()
         val bytes = ba.rawBytes
         var i = 0
         while (i < len) {
@@ -522,23 +519,42 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
           commaBuffered = true
           i += 1
         }
+        closeArrBracket()
       case _ =>
-        var i = 0
-        while (i < len) {
-          val childVal = xs.value(i)
+        if (!ctx.enterContainer(xs))
+          Error.fail("Stackoverflow while materializing, possibly due to recursive value", xs.pos)
+        try {
+          openArrBracket()
+          var i = 0
+          while (i < len) {
+            val childVal = xs.value(i)
 
-          markNonEmpty()
-          flushBuffer()
+            markNonEmpty()
+            flushBuffer()
 
-          // Render element directly — no flush overhead
-          materializeChild(childVal, matDepth, ctx)
+            // Render element directly — no flush overhead
+            materializeChild(childVal, matDepth, ctx)
 
-          commaBuffered = true
-          i += 1
+            commaBuffered = true
+            i += 1
+          }
+          closeArrBracket()
+        } finally {
+          ctx.exitContainer(xs)
         }
     }
+  }
 
-    // Inline of visitEnd — close bracket
+  /** Open an array bracket and initialize depth/empty state. */
+  @inline private def openArrBracket(): Unit = {
+    elemBuilder.append('[')
+    newlineBuffered = true
+    depth += 1
+    resetEmpty()
+  }
+
+  /** Close an array bracket, handling empty vs non-empty formatting. */
+  @inline private def closeArrBracket(): Unit = {
     commaBuffered = false
     newlineBuffered = false
     val wasEmpty = isEmpty
