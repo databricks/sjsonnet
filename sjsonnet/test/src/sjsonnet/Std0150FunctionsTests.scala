@@ -95,6 +95,10 @@ object Std0150FunctionsTests extends TestSuite {
       eval("""std.splitLimitR("::a::", "::", 1)""") ==> ujson.Arr("::a", "")
       eval("""std.splitLimitR("aaaa", "aa", 1)""") ==> ujson.Arr("aa", "")
       eval("""std.splitLimitR("aaa", "aa", -1)""") ==> ujson.Arr("", "a")
+      eval("""std.splitLimitR("aaaaaaaaaa", "aaaaaaaaab", 1)""") ==> ujson.Arr("aaaaaaaaaa")
+      eval("""std.splitLimitR("aaaaaaaaaa", "baaaaaaaaa", 1)""") ==> ujson.Arr("aaaaaaaaaa")
+      eval("""std.splitLimitR("ab" + std.repeat("a", 20), "ab", 1)""") ==>
+      ujson.Arr("", "aaaaaaaaaaaaaaaaaaaa")
       assert(
         evalErr("""std.splitLimitR("aaa", "aa", -2)""").contains("should be -1 or non-negative")
       )

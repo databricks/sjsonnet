@@ -815,34 +815,73 @@ object StringModule extends AbstractFunctionModule {
   }
 
   private final val SplitLimitRPreallocMaxSplits = 4096
+  private final val SplitLimitRNaiveProbeMax = 16
 
-  @inline private def lastSplitIndex(str: String, cStr: String, cLen: Int, from: Int): Int = {
-    var i = if (from < str.length - cLen) from else str.length - cLen
-    if (cLen == 1) {
-      val ch = cStr.charAt(0)
-      while (i >= 0) {
-        if (str.charAt(i) == ch) return i
-        i -= 1
+  private def reverseKmpTable(cStr: String, cLen: Int): Array[Int] = {
+    val table = new Array[Int](cLen)
+    var i = 1
+    var matched = 0
+    while (i < cLen) {
+      val ch = cStr.charAt(cLen - 1 - i)
+      while (matched > 0 && ch != cStr.charAt(cLen - 1 - matched)) {
+        matched = table(matched - 1)
       }
-    } else if (cLen == 2) {
-      val ch0 = cStr.charAt(0)
-      val ch1 = cStr.charAt(1)
-      while (i >= 0) {
-        if (str.charAt(i) == ch0 && str.charAt(i + 1) == ch1) return i
-        i -= 1
+      if (ch == cStr.charAt(cLen - 1 - matched)) matched += 1
+      table(i) = matched
+      i += 1
+    }
+    table
+  }
+
+  @inline private def lastSplitIndexKmp(
+      str: String,
+      cStr: String,
+      cLen: Int,
+      safeFrom: Int,
+      reverseTable: Array[Int]): Int = {
+    var matched = 0
+    var i = safeFrom + cLen - 1
+    while (i >= 0) {
+      val ch = str.charAt(i)
+      while (matched > 0 && ch != cStr.charAt(cLen - 1 - matched)) {
+        matched = reverseTable(matched - 1)
       }
-    } else {
-      val ch0 = cStr.charAt(0)
-      while (i >= 0) {
-        if (str.charAt(i) == ch0) {
-          var j = 1
-          while (j < cLen && str.charAt(i + j) == cStr.charAt(j)) j += 1
-          if (j == cLen) return i
-        }
-        i -= 1
-      }
+      if (ch == cStr.charAt(cLen - 1 - matched)) matched += 1
+      if (matched == cLen) return i
+      i -= 1
     }
     -1
+  }
+
+  @inline private def lastSplitIndex(
+      str: String,
+      cStr: String,
+      cLen: Int,
+      from: Int,
+      reverseTable: Array[Int]): Int = {
+    val safeFrom = math.min(from, str.length - cLen)
+    if (safeFrom < 0) -1
+    else if (cLen == 1) str.lastIndexOf(cStr.charAt(0), safeFrom)
+    else {
+      val first = cStr.charAt(0)
+      val last = cStr.charAt(cLen - 1)
+
+      var i = str.lastIndexOf(first, safeFrom)
+      if (i < 0) return -1
+      if (str.lastIndexOf(last, safeFrom + cLen - 1) < cLen - 1) return -1
+
+      var probes = 0
+      while (i >= 0 && probes < SplitLimitRNaiveProbeMax) {
+        if (str.charAt(i + cLen - 1) == last) {
+          var j = 1
+          while (j < cLen - 1 && str.charAt(i + j) == cStr.charAt(j)) j += 1
+          if (j == cLen - 1) return i
+        }
+        probes += 1
+        i = str.lastIndexOf(first, i - 1)
+      }
+      if (i < 0) -1 else lastSplitIndexKmp(str, cStr, cLen, safeFrom, reverseTable)
+    }
   }
 
   private def splitLimitR(
@@ -865,18 +904,19 @@ object StringModule extends AbstractFunctionModule {
 
     val b = new mutable.ArrayBuilder.ofRef[Eval]
     val cLen = cStr.length
+    val reverseTable = if (cLen == 1) null else reverseKmpTable(cStr, cLen)
     var sz = 0
     var end = str.length
-    var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
+    var next = lastSplitIndex(str, cStr, cLen, end - cLen, reverseTable)
 
-    while (next >= 0 && (maxSplits < 0 || sz < maxSplits)) {
+    while (next >= 0 && sz < maxSplits) {
       val piece = str.substring(next + cLen, end)
       b += (if (asciiSafe) Val.Str.asciiSafe(pos, piece) else Val.Str(pos, piece))
       end = next
       sz += 1
       next =
-        if (maxSplits >= 0 && sz >= maxSplits) -1
-        else lastSplitIndex(str, cStr, cLen, end - cLen)
+        if (sz >= maxSplits) -1
+        else lastSplitIndex(str, cStr, cLen, end - cLen, reverseTable)
     }
     val head = str.substring(0, end)
     b += (if (asciiSafe) Val.Str.asciiSafe(pos, head) else Val.Str(pos, head))
@@ -900,12 +940,16 @@ object StringModule extends AbstractFunctionModule {
       cStr: String,
       maxSplits: Int,
       asciiSafe: Boolean): Array[Eval] = {
+    if (maxSplits == 0) {
+      return Array(if (asciiSafe) Val.Str.asciiSafe(pos, str) else Val.Str(pos, str))
+    }
     val cLen = cStr.length
+    val reverseTable = if (cLen == 1) null else reverseKmpTable(cStr, cLen)
     val result = new Array[Eval](maxSplits + 1)
     var out = maxSplits
     var sz = 0
     var end = str.length
-    var next = if (maxSplits == 0) -1 else lastSplitIndex(str, cStr, cLen, end - cLen)
+    var next = lastSplitIndex(str, cStr, cLen, end - cLen, reverseTable)
 
     while (next >= 0 && sz < maxSplits) {
       val piece = str.substring(next + cLen, end)
@@ -915,7 +959,7 @@ object StringModule extends AbstractFunctionModule {
       sz += 1
       next =
         if (sz >= maxSplits) -1
-        else lastSplitIndex(str, cStr, cLen, end - cLen)
+        else lastSplitIndex(str, cStr, cLen, end - cLen, reverseTable)
     }
     val head = str.substring(0, end)
     result(out) = if (asciiSafe) Val.Str.asciiSafe(pos, head) else Val.Str(pos, head)
