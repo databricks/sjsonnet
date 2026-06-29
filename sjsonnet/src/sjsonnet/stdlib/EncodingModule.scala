@@ -118,7 +118,12 @@ object EncodingModule extends AbstractFunctionModule {
          else Val.Str(pos, value)): Val
       } catch {
         case e: IllegalArgumentException =>
-          Error.fail("Invalid base64 string: " + e.getMessage)
+          if (Base64Validation.hasStrictPaddingLengthError(str))
+            Error.fail(
+              s"input string appears not to be a base64 encoded string. Wrong length found (${str.length})"
+            )
+          else
+            Error.fail("failed to decode: " + e.getMessage)
       }
     },
     /**
@@ -135,7 +140,12 @@ object EncodingModule extends AbstractFunctionModule {
         Val.Arr.fromBytes(pos, PlatformBase64.decode(str))
       } catch {
         case e: IllegalArgumentException =>
-          Error.fail("Invalid base64 string: " + e.getMessage)
+          if (Base64Validation.hasStrictPaddingLengthError(str))
+            Error.fail(
+              s"input string appears not to be a base64 encoded string. Wrong length found (${str.length})"
+            )
+          else
+            Error.fail("failed to decode: " + e.getMessage)
       }
     },
     /**

@@ -1,3 +1,2 @@
-sjsonnet.Error: [std.base64DecodeBytes] Invalid base64 string: Last unit does not have enough valid bits
+sjsonnet.Error: [std.base64DecodeBytes] input string appears not to be a base64 encoded string. Wrong length found (5)
     at [<root>].(builtinBase64DecodeBytes_invalid_base64_data.jsonnet:1:22)
-

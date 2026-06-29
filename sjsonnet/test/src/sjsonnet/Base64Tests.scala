@@ -461,9 +461,21 @@ object Base64Tests extends TestSuite {
     // Error handling
     // ================================================================
     test("errors") {
+      val highCodepointBase64 = 0x0100.toChar.toString + "Q="
+
       test("invalidBase64Char") {
         val err = evalErr("""std.base64Decode("!!!!")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("failed to decode"))
+      }
+      test("highCodepointInvalidChar") {
+        val err = evalErr("std.base64Decode(\"" + highCodepointBase64 + "\")")
+        assert(err.contains("failed to decode"))
+        assert(!err.contains("Wrong length found"))
+      }
+      test("decodeBytesHighCodepointInvalidChar") {
+        val err = evalErr("std.base64DecodeBytes(\"" + highCodepointBase64 + "\")")
+        assert(err.contains("failed to decode"))
+        assert(!err.contains("Wrong length found"))
       }
       test("invalidByteArrayValue") {
         val err = evalErr("""std.base64([256])""")
@@ -502,22 +514,22 @@ object Base64Tests extends TestSuite {
       test("missingTwoPads") {
         // "YQ" should be "YQ==" — both go-jsonnet and C++ jsonnet reject this
         val err = evalErr("""std.base64Decode("YQ")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("appears not to be a base64 encoded string"))
       }
       test("missingOnePad") {
         // "YWI" should be "YWI=" — rejected by both official implementations
         val err = evalErr("""std.base64Decode("YWI")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("appears not to be a base64 encoded string"))
       }
       test("singleChar") {
         // Single character is never valid base64
         val err = evalErr("""std.base64Decode("A")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("appears not to be a base64 encoded string"))
       }
       test("fiveChars") {
         // "wrong" (5 chars) — the go_test_suite canonical test case
         val err = evalErr("""std.base64Decode("wrong")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("appears not to be a base64 encoded string"))
       }
       test("validPaddedStillWorks") {
         // Properly padded input must still work
@@ -536,7 +548,7 @@ object Base64Tests extends TestSuite {
       // DecodeBytes also enforces strict padding
       test("decodeBytesUnpadded") {
         val err = evalErr("""std.base64DecodeBytes("YQ")""")
-        assert(err.contains("Invalid base64"))
+        assert(err.contains("appears not to be a base64 encoded string"))
       }
     }
 
