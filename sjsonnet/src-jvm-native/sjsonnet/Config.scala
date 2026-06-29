@@ -107,6 +107,12 @@ final case class Config(
     )
     strict: Flag = Flag(),
     @arg(
+      name = "strict-format-boolean-conversions",
+      doc =
+        "Reject boolean values for numeric std.format/% conversion codes instead of coercing true/false to 1/0"
+    )
+    strictFormatBooleanConversions: Flag = Flag(),
+    @arg(
       name = "yaml-out",
       doc = "Write output as a YAML document"
     )

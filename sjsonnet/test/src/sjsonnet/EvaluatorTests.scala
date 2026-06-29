@@ -725,6 +725,30 @@ object EvaluatorTests extends TestSuite {
       ) ==> "sjsonnet.Error: [std.format] %c expected number or string, got null\nat [<root>].(:1:6)"
       eval("'%s' % null") ==> ujson.Str("null")
     }
+    test("formatBooleanNumericConversionsDefault") {
+      eval("'%d' % true") ==> ujson.Str("1")
+      eval("'%f' % false") ==> ujson.Str("0.000000")
+      eval("'%x' % true") ==> ujson.Str("1")
+      eval("'%s' % true") ==> ujson.Str("true")
+    }
+    test("formatBooleanNumericConversionsStrict") {
+      evalErr(
+        "'%d' % true",
+        strictFormatBooleanConversions = true
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean\nat [<root>].(:1:6)"
+      evalErr(
+        "'%f' % false",
+        strictFormatBooleanConversions = true
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean\nat [<root>].(:1:6)"
+      evalErr(
+        "'%x' % true",
+        strictFormatBooleanConversions = true
+      ) ==> "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean\nat [<root>].(:1:6)"
+      eval(
+        "'%s' % true",
+        strictFormatBooleanConversions = true
+      ) ==> ujson.Str("true")
+    }
     test("formatTypeErrorMessages") {
       evalErr(
         "'%a' % 42"

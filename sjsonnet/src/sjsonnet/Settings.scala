@@ -12,7 +12,8 @@ final case class Settings(
     brokenAssertionLogic: Boolean = false,
     maxMaterializeDepth: Int = 1000,
     materializeRecursiveDepthLimit: Int = 128,
-    maxStack: Int = 500
+    maxStack: Int = 500,
+    strictFormatBooleanConversions: Boolean = false
 )
 
 object Settings {

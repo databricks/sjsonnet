@@ -636,6 +636,23 @@ object MainTests extends TestSuite {
       assert(!err.contains("sjsonnet debug stats"))
     }
 
+    test("strictFormatBooleanConversions") {
+      val (defaultRes, defaultOut, defaultErr) = runMain("'%d' % true", "--exec")
+      assert(defaultRes == 0)
+      assert(defaultOut.trim == "\"1\"")
+      assert(defaultErr.isEmpty)
+
+      val (strictRes, strictOut, strictErr) =
+        runMain("'%d' % true", "--exec", "--strict-format-boolean-conversions")
+      assert(strictRes == 1)
+      assert(strictOut.isEmpty)
+      assert(
+        normalizeOutput(strictErr).contains(
+          "sjsonnet.Error: [std.format] expected number or string at position 0, got boolean"
+        )
+      )
+    }
+
     test("jsonnetPathReverseJpathsPriority") {
       // With --reverse-jpaths-priority, rightmost -J wins, but -J still beats JSONNET_PATH
       val libDirEnv = os.temp.dir()
