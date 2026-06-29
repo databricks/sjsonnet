@@ -13,8 +13,8 @@ Expected Signature: Sjsonnet 0.7.0
 usage: sjsonnet [sjsonnet-options] script-file
   -A --tla-str <str>                  <var>[=<val>] Provide top-level arguments as string. 'If <val>
                                       is omitted, get from environment var <var>
-  -J --jpath <str>                    Specify an additional library search dir (left-most wins
-                                      unless reverse-jpaths-priority is set)
+  -J --jpath <str>                    Specify an additional library search dir (right-most wins,
+                                      matching go-jsonnet)
   -S --string                         Expect a string, manifest as plain text
   -V --ext-str <str>                  <var>[=<val>] Provide 'external' variable as string. 'If <val>
                                       is omitted, get from environment var <var>
@@ -44,9 +44,11 @@ usage: sjsonnet [sjsonnet-options] script-file
   --profile <str>                     Profile evaluation and write results to a file. Format:
                                       --profile <file> or --profile <format>:<file> where format is
                                       'text' (default) or 'flamegraph'
-  --reverse-jpaths-priority           If set, reverses the import order of specified jpaths (so that the
-                                      rightmost wins)
+  --reverse-jpaths-priority           Deprecated compatibility flag; --jpath already uses
+                                      right-most-wins priority
   -s --max-stack <int>                Number of allowed stack frames (default 500)
+  -t --max-trace <int>                Max length of stack trace before cropping (default 20, 0 means
+                                      unlimited)
   --strict                            Enforce some additional syntax limitations
   --throw-error-for-invalid-sets      Throw an error if a set operation is used on a non-set
   --tla-code <str>                    <var>[=<val>] Provide top-level arguments as Jsonnet code. 'If
@@ -55,6 +57,7 @@ usage: sjsonnet [sjsonnet-options] script-file
                                       code from the file
   --tla-str-file <str>                <var>=<file> Provide top-level arguments variable as string from
                                       the file
+  --version                           Print version
   -y --yaml-stream                    Write output as a YAML stream of JSON documents
   --yaml-debug                        Generate source line comments in the output YAML doc to make it
                                       easier to figure out where values come from.

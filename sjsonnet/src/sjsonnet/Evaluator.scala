@@ -46,7 +46,7 @@ class Evaluator(
       Error.fail("Max stack frames exceeded.", pos)
   }
 
-  @inline private[sjsonnet] final def checkStackDepth(pos: Position, expr: Expr): Unit = {
+  @inline private[sjsonnet] final override def checkStackDepth(pos: Position, expr: Expr): Unit = {
     stackDepth += 1
     if (stackDepth > maxStack)
       Error.fail("Max stack frames exceeded.", pos)
@@ -58,7 +58,7 @@ class Evaluator(
       Error.fail("Max stack frames exceeded.", pos)
   }
 
-  @inline private[sjsonnet] final def decrementStackDepth(): Unit = {
+  @inline private[sjsonnet] final override def decrementStackDepth(): Unit = {
     stackDepth -= 1
   }
 

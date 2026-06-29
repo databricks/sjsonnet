@@ -7,8 +7,7 @@ final case class Config(
     @arg(
       name = "jpath",
       short = 'J',
-      doc =
-        "Specify an additional library search dir (left-most wins unless reverse-jpaths-priority is set)"
+      doc = "Specify an additional library search dir (right-most wins, matching go-jsonnet)"
     )
     private val jpaths: List[String] = Nil,
     @arg(
@@ -140,7 +139,7 @@ final case class Config(
     throwErrorForInvalidSets: Flag = Flag(),
     @arg(
       name = "reverse-jpaths-priority",
-      doc = """If set, reverses the import order of specified jpaths (so that the rightmost wins)"""
+      doc = """Deprecated compatibility flag; --jpath already uses right-most-wins priority"""
     )
     reverseJpathsPriority: Flag = Flag(),
     @arg(
@@ -166,11 +165,22 @@ final case class Config(
     )
     debugStats: Flag = Flag(),
     @arg(
+      name = "version",
+      doc = "Print version"
+    )
+    version: Flag = Flag(),
+    @arg(
       name = "max-stack",
       short = 's',
       doc = "Number of allowed stack frames (default 500)"
     )
     maxStack: Int = 500,
+    @arg(
+      name = "max-trace",
+      short = 't',
+      doc = "Max length of stack trace before cropping (default 20, 0 means unlimited)"
+    )
+    maxTrace: Int = 20,
     @arg(
       name = "profile",
       doc =
@@ -188,16 +198,15 @@ final case class Config(
    * Returns the sequence of jpaths, combining command-line flags and the JSONNET_PATH environment
    * variable.
    *
-   * JSONNET_PATH directories always have lower priority than --jpath flags. Within JSONNET_PATH,
-   * the left-most entry has the highest priority, matching the behavior of the C++ and Go
-   * implementations.
+   * JSONNET_PATH directories always have lower priority than --jpath flags. Command-line --jpath
+   * flags use right-most-wins priority, while JSONNET_PATH keeps left-most-wins priority, matching
+   * the behavior of the C++ and Go implementations.
    *
-   * The --reverse-jpaths-priority flag only affects the ordering of --jpath flags (reversing them
-   * so that the rightmost wins, matching go-jsonnet behavior). JSONNET_PATH entries are always
-   * appended after the (possibly reversed) --jpath flags.
+   * The --reverse-jpaths-priority flag is retained for CLI compatibility and no longer changes
+   * ordering because sjsonnet now matches go-jsonnet by default. JSONNET_PATH entries are always
+   * appended after --jpath flags.
    *
-   * For example, `JSONNET_PATH=a:b sjsonnet -J c -J d` results in search order: c, d, a, b (default
-   * mode). With --reverse-jpaths-priority, the order becomes: d, c, a, b.
+   * For example, `JSONNET_PATH=a:b sjsonnet -J c -J d` results in search order: d, c, a, b.
    *
    * See [[https://jsonnet-libs.github.io/jsonnet-training-course/lesson2.html#jsonnet_path]] for
    * details.
@@ -215,8 +224,7 @@ final case class Config(
   def getOrderedJpaths(jsonnetPathEnv: Option[String]): Seq[String] = {
     val envValue = jsonnetPathEnv.getOrElse(System.getenv("JSONNET_PATH"))
     val envPaths = Config.jsonnetPathEntries(envValue)
-    val orderedJpaths = if (reverseJpathsPriority.value) jpaths.reverse else jpaths
-    orderedJpaths ++ envPaths
+    jpaths.reverse ++ envPaths
   }
 }
 

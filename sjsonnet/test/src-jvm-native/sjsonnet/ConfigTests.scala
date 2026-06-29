@@ -53,12 +53,12 @@ object ConfigTests extends TestSuite {
 
     test("getOrderedJpaths") {
       test("jpathsOnlyDefaultOrder") {
-        // Without JSONNET_PATH env set, getOrderedJpaths should return jpaths in original order
+        // Matches go-jsonnet: right-most -J has highest priority
         val config = Config(jpaths = List("/x", "/y", "/z"), file = "test.jsonnet")
         val result = config.getOrderedJpaths(jsonnetPathEnv = Some(""))
-        assert(result == Seq("/x", "/y", "/z"))
+        assert(result == Seq("/z", "/y", "/x"))
       }
-      test("jpathsOnlyReversed") {
+      test("reverseJpathsPriorityIsCompatibilityNoop") {
         import mainargs.Flag
         val config = Config(
           jpaths = List("/x", "/y", "/z"),
@@ -71,8 +71,8 @@ object ConfigTests extends TestSuite {
       test("envPathsAppendedAfterJpaths") {
         val config = Config(jpaths = List("/c", "/d"), file = "test.jsonnet")
         val result = config.getOrderedJpaths(jsonnetPathEnv = Some(s"/a$sep/b"))
-        // -J paths first, then JSONNET_PATH entries in original order
-        assert(result == Seq("/c", "/d", "/a", "/b"))
+        // -J paths first using right-most priority, then JSONNET_PATH entries in original order
+        assert(result == Seq("/d", "/c", "/a", "/b"))
       }
       test("envPathsWithReverse") {
         import mainargs.Flag
@@ -82,7 +82,7 @@ object ConfigTests extends TestSuite {
           file = "test.jsonnet"
         )
         val result = config.getOrderedJpaths(jsonnetPathEnv = Some(s"/a$sep/b"))
-        // reversed -J paths first, then JSONNET_PATH entries in original order
+        // compatibility flag is now a no-op; default already matches go-jsonnet
         assert(result == Seq("/d", "/c", "/a", "/b"))
       }
       test("envPathsOnlyNoJpaths") {

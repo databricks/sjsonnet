@@ -3288,42 +3288,47 @@ object TailCall {
    * Error frames preserve the original call-site expression name (e.g. "Apply2") so that TCO does
    * not alter user-visible stack traces.
    */
-  def resolve(current: Val)(implicit ev: EvalScope): Val = resolve(current, false, null, null)
-
-  @tailrec
-  private def resolve(
-      current: Val,
-      booleanIsAnd: Boolean,
-      booleanPos: Position,
-      errorValuePos: Position)(implicit ev: EvalScope): Val =
-    current match {
-      case tc: TailCall =>
+  def resolve(current: Val)(implicit ev: EvalScope): Val = {
+    var enteredStackFrames = 0
+    var next = current
+    var booleanIsAnd = false
+    var booleanPos: Position = null
+    var errorValuePos: Position = null
+    val countStackFrames = ev.settings.countTailCallStackFrames
+    try {
+      while (next.isInstanceOf[TailCall]) {
+        val tc = next.asInstanceOf[TailCall]
         val tcErrorPos = tc.resultErrorValuePos
         val tcBooleanPos = tc.resultBooleanPos
+        if (countStackFrames) {
+          enteredStackFrames += 1
+          ev.checkStackDepth(tc.callSiteExpr.pos, tc.callSiteExpr)
+        }
         if (tcErrorPos ne null) {
           // Inner error throws before any outer continuation can run.
-          resolve(
-            resolveNext(tc),
-            tc.resultBooleanIsAnd,
-            tcBooleanPos,
-            tcErrorPos
-          )
+          next = resolveNext(tc)
+          booleanIsAnd = tc.resultBooleanIsAnd
+          booleanPos = tcBooleanPos
+          errorValuePos = tcErrorPos
         } else if (tcBooleanPos ne null) {
           // If the inner boolean check passes, outer boolean checks necessarily pass on the same
           // boolean value. Preserve only an outer error, which still runs after the inner check.
-          resolve(
-            resolveNext(tc),
-            tc.resultBooleanIsAnd,
-            tcBooleanPos,
-            errorValuePos
-          )
+          next = resolveNext(tc)
+          booleanIsAnd = tc.resultBooleanIsAnd
+          booleanPos = tcBooleanPos
         } else {
-          resolve(resolveNext(tc), booleanIsAnd, booleanPos, errorValuePos)
+          next = resolveNext(tc)
         }
-      case result =>
-        if ((booleanPos eq null) && (errorValuePos eq null)) result
-        else applyResultChecks(result, booleanIsAnd, booleanPos, errorValuePos)
+      }
+      if ((booleanPos eq null) && (errorValuePos eq null)) next
+      else applyResultChecks(next, booleanIsAnd, booleanPos, errorValuePos)
+    } finally {
+      while (enteredStackFrames > 0) {
+        ev.decrementStackDepth()
+        enteredStackFrames -= 1
+      }
     }
+  }
 }
 
 /**
@@ -3346,6 +3351,9 @@ abstract class EvalScope extends EvalErrorScope with Ordering[Val] {
   def debugStats: DebugStats
   def trace(msg: String): Unit
   def warn(e: Error): Unit
+
+  private[sjsonnet] def checkStackDepth(pos: Position, expr: Expr): Unit = ()
+  private[sjsonnet] def decrementStackDepth(): Unit = ()
 
   /**
    * The format cache used by the `%` operator and `std.format` to avoid re-parsing format strings.
