@@ -130,6 +130,8 @@ object ManifestModule extends AbstractFunctionModule {
       } catch {
         case e: ujson.ParseException =>
           throw Error.fail("Invalid JSON: " + e.getMessage, pos)(ev)
+        case _: ujson.IncompleteParseException =>
+          throw Error.fail("Invalid JSON: unexpected end of JSON input", pos)(ev)
       }
     }
   }
