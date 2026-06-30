@@ -1783,7 +1783,7 @@ class Evaluator(
     var inlineKeys: Array[String] = null
     var inlineMembers: Array[Val.Obj.Member] = null
     var fieldCount = 0
-    val maxInlineFields = 8
+    val maxInlineFields = Val.Obj.InlineScanMax
 
     // Shared field-tracking logic: manages singleKey → inlineKeys → builder transitions.
     // Handles duplicate key detection at each tier.

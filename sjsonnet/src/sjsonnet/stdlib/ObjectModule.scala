@@ -209,7 +209,7 @@ object ObjectModule extends AbstractFunctionModule {
           singleFieldKey = keys(0),
           singleFieldMember = new MapWithKeyMember(func, obj, keys(0), pos)
         )
-      } else if (n <= 8) {
+      } else if (n <= Val.Obj.InlineScanMax) {
         val members = new Array[Val.Obj.Member](n)
         var i = 0
         while (i < n) {
