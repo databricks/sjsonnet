@@ -27,6 +27,14 @@ object JsonImportFastPathTests extends TestSuite {
       settings: Settings = Settings.default): Either[String, ujson.Value] =
     interpreter(files, settings).interpret(code, DummyPath("root", "main.jsonnet"))
 
+  private def assertSorted(keys: Array[String]): Unit = {
+    var i = 1
+    while (i < keys.length) {
+      assert(Util.compareStringsByCodepoint(keys(i - 1), keys(i)) < 0)
+      i += 1
+    }
+  }
+
   def tests: Tests = Tests {
     test("strict json imports produce normal Jsonnet values") {
       val files = Map(
@@ -42,6 +50,30 @@ object JsonImportFastPathTests extends TestSuite {
           "n" -> 9.007199254740992e15
         )
       )
+    }
+
+    test("strict json import sorted key caches are lazy and reusable") {
+      val fields = (0 until 20).map(i => s""""k${19 - i}":$i""").mkString("{", ",", "}")
+      val obj = interpreter(Map("data.json" -> fields), Settings.default)
+        .evaluate("""import "data.json"""", DummyPath("root", "main.jsonnet")) match {
+        case Right(v)  => v.asObj
+        case Left(err) => throw new Exception(Error.formatError(err))
+      }
+
+      assert(obj._sortedVisibleKeyNames == null)
+      assert(obj._sortedAllKeyNames == null)
+
+      val visible = obj.sortedVisibleKeyNames
+      val all = obj.sortedAllKeyNames
+      assert(visible != null)
+      assert(all != null)
+      assert(visible.length == 20)
+      assert(all.length == 20)
+      assert(visible.sameElements(all))
+      assertSorted(visible)
+      assertSorted(all)
+      assert(obj.sortedVisibleKeyNames eq visible)
+      assert(obj.sortedAllKeyNames eq all)
     }
 
     test("invalid json can still fall back to Jsonnet syntax") {
