@@ -735,45 +735,21 @@ object Format {
                   )
               }
             case _: Val.True =>
-              val b = 1
-              formatted.conversion match {
-                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
-                case 'o'             => formatOctal(formatted, b)
-                case 'x'             => formatHexadecimal(formatted, b)
-                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
-                case 'e'             => formatExponent(formatted, b).toLowerCase
-                case 'E'             => formatExponent(formatted, b)
-                case 'f' | 'F'       => formatFloat(formatted, b)
-                case 'g'             => formatGeneric(formatted, b).toLowerCase
-                case 'G'             => formatGeneric(formatted, b)
-                case 'c'             =>
-                  Error.fail("%c expected number or string, got boolean")
-                case 's' => widenRaw(formatted, "true")
-                case _   =>
-                  Error.fail(
-                    "expected number or string at position %d, got boolean".format(i)
-                  )
-              }
+              formatBoolean(
+                formatted,
+                i,
+                "true",
+                numericValue = 1,
+                evaluator.settings.strictFormatBooleanConversions
+              )
             case _: Val.False =>
-              val b = 0
-              formatted.conversion match {
-                case 'd' | 'i' | 'u' => formatInteger(formatted, b)
-                case 'o'             => formatOctal(formatted, b)
-                case 'x'             => formatHexadecimal(formatted, b)
-                case 'X'             => formatHexadecimal(formatted, b).toUpperCase
-                case 'e'             => formatExponent(formatted, b).toLowerCase
-                case 'E'             => formatExponent(formatted, b)
-                case 'f' | 'F'       => formatFloat(formatted, b)
-                case 'g'             => formatGeneric(formatted, b).toLowerCase
-                case 'G'             => formatGeneric(formatted, b)
-                case 'c'             =>
-                  Error.fail("%c expected number or string, got boolean")
-                case 's' => widenRaw(formatted, "false")
-                case _   =>
-                  Error.fail(
-                    "expected number or string at position %d, got boolean".format(i)
-                  )
-              }
+              formatBoolean(
+                formatted,
+                i,
+                "false",
+                numericValue = 0,
+                evaluator.settings.strictFormatBooleanConversions
+              )
             case _: Val.Null =>
               formatted.conversion match {
                 case 's' => widenRaw(formatted, "null")
@@ -811,6 +787,42 @@ object Format {
     val resultStr = if (singleSpecNoStatic) singleFormatted else output.toString()
     if (resultAsciiSafe) Val.Str.asciiSafe(pos, resultStr) else Val.Str(pos, resultStr)
   }
+
+  private def formatBoolean(
+      formatted: FormatSpec,
+      index: Int,
+      textValue: String,
+      numericValue: Int,
+      strict: Boolean): String =
+    if (strict) formatStrictBoolean(formatted, index, textValue)
+    else
+      formatted.conversion match {
+        case 'd' | 'i' | 'u' => formatInteger(formatted, numericValue)
+        case 'o'             => formatOctal(formatted, numericValue)
+        case 'x'             => formatHexadecimal(formatted, numericValue)
+        case 'X'             => formatHexadecimal(formatted, numericValue).toUpperCase
+        case 'e'             => formatExponent(formatted, numericValue).toLowerCase
+        case 'E'             => formatExponent(formatted, numericValue)
+        case 'f' | 'F'       => formatFloat(formatted, numericValue)
+        case 'g'             => formatGeneric(formatted, numericValue).toLowerCase
+        case 'G'             => formatGeneric(formatted, numericValue)
+        case 'c'             => Error.fail("%c expected number or string, got boolean")
+        case 's'             => widenRaw(formatted, textValue)
+        case _               =>
+          Error.fail(
+            "expected number or string at position %d, got boolean".format(index)
+          )
+      }
+
+  private def formatStrictBoolean(formatted: FormatSpec, index: Int, value: String): String =
+    formatted.conversion match {
+      case 's' => widenRaw(formatted, value)
+      case 'c' => Error.fail("%c expected number or string, got boolean")
+      case _   =>
+        Error.fail(
+          "expected number or string at position %d, got boolean".format(index)
+        )
+    }
 
   /**
    * Super-fast path for format strings where ALL specs are simple `%(key)s` with a `Val.Obj`. This

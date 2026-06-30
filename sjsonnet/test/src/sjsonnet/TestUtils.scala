@@ -9,7 +9,8 @@ object TestUtils {
       strict: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
-      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default)
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default,
+      strictFormatBooleanConversions: Boolean = false)
       : Either[String, Value] = {
     new Interpreter(
       Map(),
@@ -20,6 +21,7 @@ object TestUtils {
       new Settings(
         preserveOrder = preserveOrder,
         strict = strict,
+        strictFormatBooleanConversions = strictFormatBooleanConversions,
         throwErrorForInvalidSets = true,
         brokenAssertionLogic = brokenAssertionLogic,
         maxStack = maxStack
@@ -34,14 +36,16 @@ object TestUtils {
       strict: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
-      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): Value = {
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default,
+      strictFormatBooleanConversions: Boolean = false): Value = {
     eval0(
       s,
       preserveOrder,
       strict,
       brokenAssertionLogic,
       maxStack,
-      std
+      std,
+      strictFormatBooleanConversions
     ) match {
       case Right(x) => x
       case Left(e)  => throw new Exception(e)
@@ -54,14 +58,16 @@ object TestUtils {
       strict: Boolean = false,
       brokenAssertionLogic: Boolean = false,
       maxStack: Int = 500,
-      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default): String = {
+      std: sjsonnet.stdlib.StdLibModule = sjsonnet.stdlib.StdLibModule.Default,
+      strictFormatBooleanConversions: Boolean = false): String = {
     eval0(
       s,
       preserveOrder,
       strict,
       brokenAssertionLogic,
       maxStack,
-      std
+      std,
+      strictFormatBooleanConversions
     ) match {
       case Left(err) =>
         err.split('\n').map(_.trim).mkString("\n") // normalize inconsistent indenation on JVM vs JS

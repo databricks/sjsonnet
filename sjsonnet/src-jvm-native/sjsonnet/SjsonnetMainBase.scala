@@ -190,6 +190,7 @@ object SjsonnetMainBase {
         new Settings(
           preserveOrder = config.preserveOrder.value,
           strict = config.strict.value,
+          strictFormatBooleanConversions = config.strictFormatBooleanConversions.value,
           throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
           maxParserRecursionDepth = config.maxParserRecursionDepth,
           brokenAssertionLogic = config.brokenAssertionLogic.value,
