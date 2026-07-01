@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 60
     name: Sjsonnet jvm build
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # 7.0.0
       - uses: ./.github/actions/setup-build
         with:
           sbt: 'true'
@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
     name: Sjsonnet Graal Native build
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # 7.0.0
       - uses: ./.github/actions/setup-build
       - name: Run Native Image Test Suites
         run: sjsonnet/test/graalvm/run_test_suites.py
@@ -50,7 +50,7 @@ jobs:
         lang: ['js', 'wasm', 'native']
     name: Sjsonnet ${{ matrix.lang }} build
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # 7.0.0
       - uses: ./.github/actions/setup-build
         with:
           node: ${{ matrix.lang == 'js' || matrix.lang == 'wasm' }}
