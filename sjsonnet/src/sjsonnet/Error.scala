@@ -103,7 +103,9 @@ object Error {
 
   private val rootName = Util.wrapInLessThanGreaterThan("root")
 
-  def formatError(e: Throwable): String = e match {
+  def formatError(e: Throwable): String = formatError(e, maxTrace = 0)
+
+  def formatError(e: Throwable, maxTrace: Int): String = e match {
     case err: Error if err.stack.nonEmpty =>
       val sb = new StringBuilder
       sb.append(err.getClass.getName).append(": ")
@@ -148,11 +150,33 @@ object Error {
       }
 
       sb.append(msg)
-      var i = frameStart
-      while (i < frames.size) {
-        val (f, name) = frames.get(i)
-        appendFrame(sb, f, name)
-        i += 1
+      val traceSize = frames.size - frameStart
+      if (maxTrace > 0 && traceSize > maxTrace) {
+        val headCount = maxTrace / 2
+        val tailCount = maxTrace - 1 - headCount
+
+        var i = frameStart
+        while (i < frameStart + headCount) {
+          val (f, name) = frames.get(i)
+          appendFrame(sb, f, name)
+          i += 1
+        }
+
+        sb.append("\n    ...")
+
+        i = frames.size - tailCount
+        while (i < frames.size) {
+          val (f, name) = frames.get(i)
+          appendFrame(sb, f, name)
+          i += 1
+        }
+      } else {
+        var i = frameStart
+        while (i < frames.size) {
+          val (f, name) = frames.get(i)
+          appendFrame(sb, f, name)
+          i += 1
+        }
       }
       if (err.getCause != null) {
         sb.append("\nCaused by: ")
