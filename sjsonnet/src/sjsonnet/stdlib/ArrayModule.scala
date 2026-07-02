@@ -531,20 +531,11 @@ object ArrayModule extends AbstractFunctionModule {
       val arr = value0.asInstanceOf[Val.Arr]
       val out = new mutable.ArrayBuilder.ofRef[Eval]
       out.sizeHint(arr.length)
-      val q = new java.util.ArrayDeque[Eval](arr.length)
-      var initialIdx = 0
-      while (initialIdx < arr.length) {
-        q.add(arr.eval(initialIdx))
-        initialIdx += 1
-      }
-      while (!q.isEmpty) {
-        q.removeFirst().value match {
-          case v: Val.Arr =>
-            var i = v.length - 1
-            while (i >= 0) { q.push(v.eval(i)); i -= 1 }
-          case x => out += x
-        }
-      }
+      DeepArrayTraversal.appendFlattened(
+        arr,
+        out,
+        math.max(ev.settings.maxMaterializeDepth, ev.settings.maxStack)
+      )
       Val.Arr(pos, out.result())
     }
   }

@@ -245,6 +245,27 @@ object MainTests extends TestSuite {
           |""".stripMargin
       assert((res, out, err) == ((0, expectedJson, "")))
     }
+
+    test("maxStackControlsDeepArrayTraversal") {
+      val source =
+        """local nest(n, x) = if n == 0 then x else [nest(n - 1, x)];
+          |{
+          |  deepJoin: std.deepJoin(nest(1100, "x")),
+          |  flattenDeepArray: std.flattenDeepArray(nest(1100, "x")),
+          |}
+          |""".stripMargin
+      val (res, out, err) = runMain(source, "--exec", "--max-stack", "1200")
+      val expectedJson =
+        """{
+          |   "deepJoin": "x",
+          |   "flattenDeepArray": [
+          |      "x"
+          |   ]
+          |}
+          |""".stripMargin
+      assert((res, out, err) == ((0, expectedJson, "")))
+    }
+
     test("execYaml") {
       val source = "local x = [1]; local y = [2]; x + y"
       val (res, out, err) = runMain(source, "--exec", "--yaml-out")

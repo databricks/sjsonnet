@@ -1,0 +1,28 @@
+{
+   "deepJoin": "xyxy",
+   "deepJoinConcatView": "abc",
+   "deepJoinDeep": "z",
+   "deepJoinLazyConcatView": "bc",
+   "flattenConcatView": [
+      "a",
+      "b",
+      "c"
+   ],
+   "flattenDeepArray": [
+      "x",
+      "y",
+      "x",
+      "y"
+   ],
+   "flattenDeepArrayDeep": [
+      "z"
+   ],
+   "flattenLazyConcatView": [
+      "b",
+      "c"
+   ],
+   "flattenReverseView": [
+      "r1",
+      "r2"
+   ]
+}
