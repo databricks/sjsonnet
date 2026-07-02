@@ -1,0 +1,8 @@
+{
+   "deepJoinFlat": 20000,
+   "deepJoinNested": 1000,
+   "flattenFlat": 20000,
+   "flattenNested": 1000,
+   "sharedViewDeepJoin": 600,
+   "sharedViewFlatten": 600
+}

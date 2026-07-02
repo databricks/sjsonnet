@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.deepJoin] max stack frames exceeded
+    at [<root>].(error.deepjoin_nested_recursive_array.jsonnet:1:13)

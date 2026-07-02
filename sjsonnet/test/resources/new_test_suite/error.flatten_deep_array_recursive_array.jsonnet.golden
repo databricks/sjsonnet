@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.flattenDeepArray] max stack frames exceeded
+    at [<root>].(error.flatten_deep_array_recursive_array.jsonnet:1:21)
