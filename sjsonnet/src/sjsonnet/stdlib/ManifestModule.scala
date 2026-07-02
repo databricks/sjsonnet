@@ -380,22 +380,21 @@ object ManifestModule extends AbstractFunctionModule {
    */
   private object DeepJoin extends Val.Builtin1("deepJoin", "arr") {
     def evalRhs(value: Eval, ev: EvalScope, pos: Position): Val = {
-      // Use the unsynchronized StringBuilderWriter: each Val.Str chunk triggers
-      // out.write(...) in a tight loop, and StringWriter's backing StringBuffer
-      // pays a monitor enter/exit per call. Same swap pattern as TomlRenderer (#875).
-      val out = new StringBuilderWriter()
-      val q = new java.util.ArrayDeque[Eval]()
-      q.add(value)
-      while (!q.isEmpty) {
-        q.removeFirst().value match {
-          case v: Val.Arr =>
-            var i = v.length - 1
-            while (i >= 0) { q.push(v.eval(i)); i -= 1 }
-          case s: Val.Str => out.write(s.str)
-          case s => Error.fail("std.deepJoin: expected string or array, got " + s.prettyName)
-        }
+      value.value match {
+        case s: Val.Str   => Val.Str(pos, s.str)
+        case arr: Val.Arr =>
+          // Use the unsynchronized StringBuilderWriter: each Val.Str chunk triggers
+          // out.write(...) in a tight loop, and StringWriter's backing StringBuffer
+          // pays a monitor enter/exit per call. Same swap pattern as TomlRenderer (#875).
+          val out = new StringBuilderWriter()
+          DeepArrayTraversal.appendDeepJoined(
+            arr,
+            out,
+            math.max(ev.settings.maxMaterializeDepth, ev.settings.maxStack)
+          )
+          Val.Str(pos, out.toString)
+        case s => Error.fail("std.deepJoin: expected string or array, got " + s.prettyName)
       }
-      Val.Str(pos, out.toString)
     }
   }
 
