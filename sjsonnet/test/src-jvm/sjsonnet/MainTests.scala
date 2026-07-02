@@ -8,8 +8,6 @@ import java.util
 object MainTests extends TestSuite {
   val workspaceRoot: os.Path = sys.env.get("MILL_WORKSPACE_ROOT").map(os.Path(_)).getOrElse(os.pwd)
   val testSuiteRoot: os.Path = workspaceRoot / "sjsonnet" / "test" / "resources"
-  // stdout mode uses println so it has an extra platform-specific line separator at the end
-  val eol: String = java.lang.System.lineSeparator()
 
   val tests: Tests = Tests {
     // Compare writing to stdout with writing to a file
@@ -42,7 +40,7 @@ object MainTests extends TestSuite {
 
       // println(stdoutBytes.map(_.toInt).mkString(","))
       // println(fileBytes.map(_.toInt).mkString(","))
-      assert(util.Arrays.equals(fileBytes ++ eol.getBytes, stdoutBytes))
+      assert(util.Arrays.equals(fileBytes, stdoutBytes))
     }
 
     test("warnings") {
@@ -55,8 +53,10 @@ object MainTests extends TestSuite {
     }
 
     test("shortVOnlyAliasesExtStr") {
-      val (_, _, err) = runMain("--help")
-      val shortVLines = err.linesIterator.filter(_.startsWith("  -V --")).toSeq
+      val (res, out, err) = runMain("--help")
+      val shortVLines = out.linesIterator.filter(_.startsWith("  -V --")).toSeq
+      assert(res == 0)
+      assert(err.isEmpty)
       assert(shortVLines.length == 1)
       assert(shortVLines.head.contains("--ext-str"))
     }
@@ -75,6 +75,120 @@ object MainTests extends TestSuite {
       assert(res == 1)
       assert(out.isEmpty)
       assert(err.startsWith(expected))
+    }
+
+    test("versionDoesNotRequireInputFile") {
+      val (res, out, err) = runMain("--version")
+      assert(res == 0)
+      assert(out.startsWith("Sjsonnet "))
+      assert(err.isEmpty)
+
+      val (resShort, outShort, errShort) = runMain("-v")
+      assert(resShort == 0)
+      assert(outShort == out)
+      assert(errShort.isEmpty)
+
+      val (resWithFile, outWithFile, errWithFile) = runMain("--version", "ignored.jsonnet")
+      assert(resWithFile == 0)
+      assert(outWithFile == out)
+      assert(errWithFile.isEmpty)
+    }
+
+    test("shortOptionClustersAreExpanded") {
+      val (res, out, err) = runMain("-eS", """"hello"""")
+      assert((res, out, err) == ((0, "hello\n", "")))
+
+      val (resReversed, outReversed, errReversed) = runMain("-Se", """"hello"""")
+      assert((resReversed, outReversed, errReversed) == ((0, "hello\n", "")))
+    }
+
+    test("doubleDashStopsOptionProcessing") {
+      val (resExec, outExec, errExec) = runMain("-e", "--", "1")
+      assert((resExec, outExec, errExec) == ((0, "1\n", "")))
+
+      val fileName = "-sjsonnet-cli-double-dash-test.jsonnet"
+      val file = workspaceRoot / fileName
+      os.write.over(file, "1")
+      try {
+        val (resFile, outFile, errFile) = runMain("--", fileName)
+        assert((resFile, outFile, errFile) == ((0, "1\n", "")))
+      } finally os.remove(file)
+
+      val (resVersionFile, outVersionFile, errVersionFile) = runMain("--", "--version")
+      assert(resVersionFile == 1)
+      assert(outVersionFile.isEmpty)
+      assert(errVersionFile.contains("Opening input file: --version"))
+
+      val (resExtraHelp, outExtraHelp, errExtraHelp) = runMain("--", fileName, "-h")
+      assert(resExtraHelp == 1)
+      assert(outExtraHelp.isEmpty)
+      assert(errExtraHelp.contains("only one filename is allowed"))
+    }
+
+    test("helpIncludesMaxTrace") {
+      val (res, out, err) = runMain("--help")
+      assert(res == 0)
+      assert(out.contains("-t --max-trace"))
+      assert(out.contains("--version"))
+      assert(!out.contains("Missing argument"))
+      assert(!out.contains("Unknown argument"))
+      assert(err.isEmpty)
+    }
+
+    test("maxStackCountsNonTailRecursiveCalls") {
+      val (res, out, err) = runMain(
+        "--exec",
+        "--max-stack",
+        "2",
+        "local f(n) = if n == 0 then 0 else 1 + f(n - 1); f(3)"
+      )
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("Max stack frames exceeded."))
+    }
+
+    test("maxStackDoesNotCountTailRecursiveCalls") {
+      val (res, out, err) = runMain(
+        "--exec",
+        "--max-stack",
+        "2",
+        "local f(n) = if n == 0 then 0 else f(n - 1); f(3)"
+      )
+      assert((res, out, err) == ((0, "0\n", "")))
+    }
+
+    test("defaultMaxStackDoesNotCountTailRecursiveCalls") {
+      val (res, out, err) = runMain(
+        "--exec",
+        "local f(n) = if n == 0 then 0 else f(n - 1); f(1000)"
+      )
+      assert((res, out, err) == ((0, "0\n", "")))
+    }
+
+    test("controlFlagsAreSkippedWhenTheyAreOptionValues") {
+      val wd = os.temp.dir()
+
+      val (resVersion, outVersion, errVersion) =
+        runMainInWd(wd, "--output-file", "--version", "--exec", "1")
+      assert((resVersion, outVersion, errVersion) == ((0, "", "")))
+      assert(os.read(wd / "--version") == "1\n")
+
+      val (resHelp, outHelp, errHelp) =
+        runMainInWd(wd, "--output-file", "--help", "--exec", "1")
+      assert((resHelp, outHelp, errHelp) == ((0, "", "")))
+      assert(os.read(wd / "--help") == "1\n")
+
+      val (resShortVersion, outShortVersion, errShortVersion) =
+        runMainInWd(wd, "-o", "-v", "--exec", "1")
+      assert((resShortVersion, outShortVersion, errShortVersion) == ((0, "", "")))
+      assert(os.read(wd / "-v") == "1\n")
+
+      val (resMaxTrace, outMaxTrace, errMaxTrace) =
+        runMainInWd(wd, "--max-trace", "--version", "--exec", "1")
+      assert(resMaxTrace == 1)
+      assert(outMaxTrace.isEmpty)
+      assert(errMaxTrace.nonEmpty)
+      assert(!outMaxTrace.startsWith("Sjsonnet "))
     }
 
     test("stringModeNonStringReportsCleanError") {
@@ -157,6 +271,34 @@ object MainTests extends TestSuite {
       assert(!err.contains("NoSuchFileException"))
     }
 
+    test("createOutputDirsCreatesOutputFileParents") {
+      val outputDir = os.temp.dir() / "missing" / "parents"
+      val outputFile = outputDir / "out.json"
+      val (res, out, err) =
+        runMain("--exec", "1", "--output-file", outputFile, "--create-output-dirs")
+      assert((res, out, err) == ((0, "", "")))
+      assert(os.read(outputFile) == "1\n")
+    }
+
+    test("createOutputDirsCreatesMultiAndOutputFileParents") {
+      val source = testSuiteRoot / "db" / "multi.jsonnet"
+      val root = os.temp.dir()
+      val multiDest = root / "missing" / "multi"
+      val outputFile = root / "missing" / "lists" / "files.txt"
+      val (res, out, err) =
+        runMain(source, "--multi", multiDest, "--output-file", outputFile, "--create-output-dirs")
+      assert((res, out, err) == ((0, "", "")))
+      assert(os.read(outputFile) == s"$multiDest/hello\n$multiDest/world")
+      val expectedWorld =
+        """[
+          |   2,
+          |   "three",
+          |   true
+          |]""".stripMargin
+      assert(os.read(multiDest / "hello") == "1\n")
+      assert(os.read(multiDest / "world") == expectedWorld + "\n")
+    }
+
     test("missingExtStrFileErrorsAsImport") {
       checkCliStderrGolden(
         "cli_missing_ext_str_file.jsonnet",
@@ -214,11 +356,17 @@ object MainTests extends TestSuite {
     }
 
     val streamedOut =
-      """--- 1
-        |--- 2
-        |--- 3
-        |--- 4
-        |--- 5
+      """---
+        |1
+        |---
+        |2
+        |---
+        |3
+        |---
+        |4
+        |---
+        |5
+        |...
         |""".stripMargin
 
     val expectedWorldDestStr =
@@ -231,7 +379,7 @@ object MainTests extends TestSuite {
     test("yamlStream") {
       val source = testSuiteRoot / "db" / "stream.jsonnet"
       val (res, out, err) = runMain(source, "--yaml-stream")
-      assert((res, out, err) == ((0, streamedOut + "\n", "")))
+      assert((res, out, err) == ((0, streamedOut, "")))
     }
 
     test("exec") {
@@ -254,6 +402,44 @@ object MainTests extends TestSuite {
           |
           |""".stripMargin
       assert((res, out, err) == ((0, expectedYaml, "")))
+    }
+
+    test("maxTraceCropsStackTrace") {
+      val source =
+        """local f8() = error "boom";
+          |local f7() = f8();
+          |local f6() = f7();
+          |local f5() = f6();
+          |local f4() = f5();
+          |local f3() = f4();
+          |local f2() = f3();
+          |local f1() = f2();
+          |f1()""".stripMargin
+      val (res, out, err) = runMain(source, "--exec", "--max-trace", "3")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("boom"))
+      assert(err.contains("\n    ...\n"))
+      assert(err.linesIterator.count(_.startsWith("    at ")) <= 2)
+    }
+
+    test("maxTraceZeroDisablesStackTraceCropping") {
+      val source =
+        """local f8() = error "boom";
+          |local f7() = f8();
+          |local f6() = f7();
+          |local f5() = f6();
+          |local f4() = f5();
+          |local f3() = f4();
+          |local f2() = f3();
+          |local f1() = f2();
+          |f1()""".stripMargin
+      val (res, out, err) = runMain(source, "--exec", "--max-trace", "0")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("boom"))
+      assert(!err.contains("\n    ...\n"))
+      assert(err.linesIterator.count(_.startsWith("    at ")) > 2)
     }
 
     test("yamlStreamOutputFile") {
@@ -378,11 +564,16 @@ object MainTests extends TestSuite {
       assertStringModeTypeError(err, "number")
     }
 
-    test("yamlStreamStringRejectsSingleNonStringValue") {
+    test("yamlStreamStringFlagDoesNotRequireStringElements") {
       val (res, out, err) = runMain("[42]", "--exec", "--yaml-stream", "--string")
+      assert((res, out, err) == ((0, "---\n42\n...\n", "")))
+    }
+
+    test("yamlStreamRejectsNonArrayTopLevel") {
+      val (res, out, err) = runMain("{a: 1}", "--exec", "--yaml-stream")
       assert(res == 1)
       assert(out.isEmpty)
-      assertStringModeTypeError(err, "number")
+      assert(err.contains("stream mode: top-level object was a object"))
     }
 
     // -- No trailing newline behavior --
@@ -468,13 +659,13 @@ object MainTests extends TestSuite {
     }
 
     test("noTrailingNewlineOutputFile") {
-      // Default output-file — file has content without trailing newline (file mode)
+      // Default output-file — file has a trailing newline, matching go-jsonnet
       val source = "42"
       val destDefault = os.temp()
       val (resDefault, _, _) = runMain(source, "--exec", "--output-file", destDefault)
       assert(resDefault == 0)
       val defaultContent = os.read(destDefault)
-      assert(defaultContent == "42")
+      assert(defaultContent == "42\n")
 
       // No trailing newline output-file — same behavior
       val dest = os.temp()
@@ -574,6 +765,21 @@ object MainTests extends TestSuite {
         runMainWithEnv(jsonnetPathEnv = libDirEnv.toString, "-J", libDirJ, mainFile)
       assert(res == 0)
       assert(out.trim == "\"from_jflag\"")
+    }
+
+    test("jsonnetPathJpathRightMostWinsByDefault") {
+      val libDirC = os.temp.dir()
+      val libDirD = os.temp.dir()
+
+      os.write(libDirC / "mylib.libsonnet", """{ x: "from_c" }""")
+      os.write(libDirD / "mylib.libsonnet", """{ x: "from_d" }""")
+
+      val mainFile = os.temp(suffix = ".jsonnet")
+      os.write.over(mainFile, """local lib = import 'mylib.libsonnet'; lib.x""")
+
+      val (res, out, _) = runMain("-J", libDirC, "-J", libDirD, mainFile)
+      assert(res == 0)
+      assert(out.trim == "\"from_d\"")
     }
 
     test("debugStats") {
@@ -694,6 +900,9 @@ object MainTests extends TestSuite {
   def runMain(args: os.Shellable*): (Int, String, String) =
     runMainWithEnv(jsonnetPathEnv = "", args*)
 
+  def runMainInWd(wd: os.Path, args: os.Shellable*): (Int, String, String) =
+    runMainWithEnvInWd(jsonnetPathEnv = "", wd, args*)
+
   private def normalizeOutput(s: String): String =
     s.replace("\r\n", "\n").replaceAll("\n+\\z", "")
 
@@ -729,7 +938,13 @@ object MainTests extends TestSuite {
     assert(out.replace("\r\n", "\n") == golden.replace("\r\n", "\n"))
   }
 
-  def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) = {
+  def runMainWithEnv(jsonnetPathEnv: String, args: os.Shellable*): (Int, String, String) =
+    runMainWithEnvInWd(jsonnetPathEnv, workspaceRoot, args*)
+
+  def runMainWithEnvInWd(
+      jsonnetPathEnv: String,
+      wd: os.Path,
+      args: os.Shellable*): (Int, String, String) = {
     val err = new ByteArrayOutputStream()
     val perr = new PrintStream(err, true, "UTF-8")
     val out = new ByteArrayOutputStream()
@@ -740,7 +955,7 @@ object MainTests extends TestSuite {
       System.in,
       pout,
       perr,
-      workspaceRoot,
+      wd,
       None,
       jsonnetPathEnv = Some(jsonnetPathEnv)
     )

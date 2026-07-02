@@ -161,13 +161,27 @@ object SjsonnetMainBase {
         |    JSONNET_PATH=a:b sjsonnet -J c -J d
         |    JSONNET_PATH=d:c:a:b sjsonnet
         |    sjsonnet -J b -J a -J c -J d""".stripMargin
+    val normalizedArgs = normalizeCliArgs(args)
+    if (hasHelp(normalizedArgs.args)) {
+      val helpText = parser.helpText(customName = name, customDoc = doc)
+      stdout.println(helpText + envVarsDoc)
+      return 0
+    }
+    if (hasVersion(normalizedArgs.args)) {
+      stdout.println(name)
+      return 0
+    }
 
     var statsToReport: DebugStats = null
 
     val result = for {
-      config <- parser
+      _ <- {
+        if (normalizedArgs.extraArgsAfterDoubleDash) Left("ERROR: only one filename is allowed")
+        else Right(())
+      }
+      config0 <- parser
         .constructEither(
-          args.toIndexedSeq,
+          normalizedArgs.args.toIndexedSeq,
           allowRepeats = true,
           customName = name,
           customDoc = doc,
@@ -175,9 +189,10 @@ object SjsonnetMainBase {
         )
         .left
         .map(_ + envVarsDoc)
+      config = normalizedArgs.forcedFile.fold(config0)(f => config0.copy(file = f))
       _ <- {
         if (config.noTrailingNewline.value && config.yamlStream.value)
-          Left("error: cannot use --no-trailing-newline with --yaml-stream")
+          Left("ERROR: cannot use --no-trailing-newline with --yaml-stream")
         else Right(())
       }
       file <- Right(config.file)
@@ -194,7 +209,9 @@ object SjsonnetMainBase {
           throwErrorForInvalidSets = config.throwErrorForInvalidSets.value,
           maxParserRecursionDepth = config.maxParserRecursionDepth,
           brokenAssertionLogic = config.brokenAssertionLogic.value,
-          maxStack = config.maxStack
+          maxStack = config.maxStack,
+          countTailCallStackFrames = false,
+          maxTrace = config.maxTrace
         ),
         parseCache,
         wd,
@@ -244,17 +261,110 @@ object SjsonnetMainBase {
               // In multi mode, the file list on stdout always ends with a newline,
               // matching go-jsonnet/C++ jsonnet behavior. --no-trailing-newline only
               // affects the content written to the output files, not the file list.
-              if (config.multi.isDefined || !config.noTrailingNewline.value) stdout.println(str)
+              if (config.yamlStream.value) stdout.print(str)
+              else if (config.multi.isDefined || !config.noTrailingNewline.value)
+                stdout.println(str)
               else stdout.print(str)
               0
             case Some(f) =>
-              handleWriteFile(f)(os.write.over(os.Path(f, wd), str)) match {
+              handleWriteFile(f)(
+                os.write.over(os.Path(f, wd), str, createFolders = config.createDirs.value)
+              ) match {
                 case Left(err) => stderr.println(err); 1
                 case Right(_)  => 0
               }
           }
         } else 0
     }
+  }
+
+  private final case class NormalizedArgs(
+      args: Array[String],
+      forcedFile: Option[String],
+      extraArgsAfterDoubleDash: Boolean)
+  private final val DoubleDashFilePlaceholder = "__sjsonnet_file_after_double_dash__"
+  private val ValueTakingLongOptions = Set(
+    "--ext-code",
+    "--ext-code-file",
+    "--ext-str",
+    "--ext-str-file",
+    "--jpath",
+    "--max-parser-recursion-depth",
+    "--max-stack",
+    "--max-trace",
+    "--multi",
+    "--output-file",
+    "--profile",
+    "--tla-code",
+    "--tla-code-file",
+    "--tla-str",
+    "--tla-str-file",
+    "--indent"
+  )
+  private val ValueTakingShortOptions = Set('A', 'J', 'V', 'm', 'n', 'o', 's', 't')
+
+  private def hasHelp(args: Array[String]): Boolean =
+    hasControlFlag(args, arg => arg == "--help" || arg == "-h")
+
+  private def hasVersion(args: Array[String]): Boolean =
+    hasControlFlag(args, arg => arg == "--version" || arg == "-v")
+
+  private def hasControlFlag(args: Array[String], matches: String => Boolean): Boolean = {
+    var i = 0
+    while (i < args.length) {
+      val arg = args(i)
+      if (optionTakesFollowingValue(arg)) i += 2
+      else {
+        if (matches(arg)) return true
+        i += 1
+      }
+    }
+    false
+  }
+
+  private def optionTakesFollowingValue(arg: String): Boolean =
+    if (arg.startsWith("--")) {
+      val eqIndex = arg.indexOf('=')
+      val optionName = if (eqIndex < 0) arg else arg.substring(0, eqIndex)
+      eqIndex < 0 && ValueTakingLongOptions(optionName)
+    } else arg.length == 2 && arg.charAt(0) == '-' && ValueTakingShortOptions(arg.charAt(1))
+
+  private def normalizeCliArgs(args: Array[String]): NormalizedArgs = {
+    val expanded = Array.newBuilder[String]
+    var i = 0
+    var forcedFile: Option[String] = None
+    var extraArgsAfterDoubleDash = false
+    var expectingValue = false
+    while (i < args.length) {
+      val arg = args(i)
+      if (expectingValue) {
+        expanded += arg
+        expectingValue = false
+      } else if (arg == "--") {
+        if (i + 1 < args.length) {
+          forcedFile = Some(args(i + 1))
+          expanded += DoubleDashFilePlaceholder
+          extraArgsAfterDoubleDash = i + 2 < args.length
+        }
+        i = args.length
+      } else if (arg == "-" || arg.startsWith("--") || arg.length <= 2) {
+        expanded += arg
+        expectingValue = optionTakesFollowingValue(arg)
+      } else if (arg.charAt(0) == '-') {
+        var j = 1
+        var lastExpanded: String = null
+        while (j < arg.length) {
+          lastExpanded = "-" + arg.charAt(j)
+          expanded += lastExpanded
+          j += 1
+        }
+        expectingValue = optionTakesFollowingValue(lastExpanded)
+      } else {
+        expanded += arg
+      }
+      i += 1
+    }
+    NormalizedArgs(expanded.result(), forcedFile, extraArgsAfterDoubleDash)
   }
 
   private def rendererForConfig(wr: Writer, config: Config, getCurrentPosition: () => Position) =
@@ -304,11 +414,11 @@ object SjsonnetMainBase {
       case e                       => e.toString
     }
 
-  private def handleRenderError[T](f: => T): Either[String, T] =
+  private def handleRenderError[T](maxTrace: Int)(f: => T): Either[String, T] =
     try Right(f)
     catch {
       case e: Error if e.stack.isEmpty => Left(s"sjsonnet.Error: ${e.getMessage}")
-      case e: Error                    => Left(Error.formatError(e))
+      case e: Error                    => Left(Error.formatError(e, maxTrace))
     }
 
   private def writeFile(
@@ -363,6 +473,7 @@ object SjsonnetMainBase {
             val buf = new BufferedOutputStream(out, SjsonnetMainBase.OutputBufferSize)
             val renderer = new ByteRenderer(buf, indent = config.indent)
             val res = interp.interpret0(jsonnetCode, path, renderer)
+            if (res.isRight && !config.noTrailingNewline.value) buf.write('\n')
             buf.flush()
             res.map(_ => "")
           } finally out.close()
@@ -380,12 +491,24 @@ object SjsonnetMainBase {
           val renderer = rendererForConfig(writer, config, getCurrentPosition)
           val res = interp.interpret0(jsonnetCode, path, renderer)
           if (config.yamlOut.value && !config.noTrailingNewline.value) writer.write('\n')
+          else if (
+            config.outputFile.isDefined &&
+            !config.noTrailingNewline.value &&
+            !config.yamlStream.value
+          ) writer.write('\n')
           res
         }
     }
   }
 
-  private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+  private def jsonTypeName(v: ujson.Value): String = v match {
+    case _: ujson.Obj  => "object"
+    case _: ujson.Arr  => "array"
+    case _: ujson.Str  => "string"
+    case _: ujson.Num  => "number"
+    case _: ujson.Bool => "boolean"
+    case ujson.Null    => "null"
+  }
 
   /**
    * Parse CLI binding arguments.
@@ -563,7 +686,7 @@ object SjsonnetMainBase {
             val renderedFiles: Seq[Either[String, os.FilePath]] =
               obj.value.toSeq.map { case (f, v) =>
                 for {
-                  rendered <- handleRenderError {
+                  rendered <- handleRenderError(config.maxTrace) {
                     val writer = new StringWriter()
                     val renderer = rendererForConfig(writer, config, () => currentPos)
                     ujson.transform(v, renderer)
@@ -595,33 +718,28 @@ object SjsonnetMainBase {
         interp.interpret(jsonnetCode, path).flatMap {
           case arr: ujson.Arr =>
             writeToFile(config, wd) { writer =>
-              handleRenderError {
-                arr.value.toSeq match {
-                  case Nil         => // donothing
-                  case Seq(single) =>
-                    val renderer = rendererForConfig(writer, config, () => currentPos)
-                    single.transform(renderer)
-                    writer.write(if (isScalar(single)) "\n..." else "")
-                  case multiple =>
-                    for ((v, i) <- multiple.zipWithIndex) {
-                      if (i > 0) writer.write('\n')
-                      if (isScalar(v)) writer.write("--- ")
-                      else if (i != 0) writer.write("---\n")
-                      val renderer = rendererForConfig(
-                        writer,
-                        config.copy(yamlOut = mainargs.Flag(true)),
-                        () => currentPos
-                      )
-                      v.transform(renderer)
-                    }
+              handleRenderError(config.maxTrace) {
+                val values = arr.value.toSeq
+                if (values.nonEmpty) {
+                  for (v <- values) {
+                    writer.write("---\n")
+                    val renderer = new Renderer(writer, indent = config.indent)
+                    v.transform(renderer)
+                    writer.write('\n')
+                  }
+                  writer.write("...\n")
                 }
-                writer.write('\n')
                 ""
               }
             }
 
-          case _ =>
-            renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
+          case other =>
+            Left(
+              "RUNTIME ERROR: stream mode: top-level object was a " +
+              jsonTypeName(other) +
+              ", should be an array whose elements hold the JSON for each document in the stream.\n" +
+              "\tDuring manifestation\t\n"
+            )
         }
       case _ =>
         renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)

@@ -180,7 +180,7 @@ class Interpreter(
     (for {
       v <- evaluate(txt, path)
       r <- materialize(v, visitor)
-    } yield r).left.map(e => Error.formatError(ensureRootFrame(e)))
+    } yield r).left.map(e => Error.formatError(ensureRootFrame(e), settings.maxTrace))
 
   private def handleException[T](f: => T): Either[Error, T] = {
     try Right(f)

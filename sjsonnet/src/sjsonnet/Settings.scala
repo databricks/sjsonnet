@@ -13,7 +13,9 @@ final case class Settings(
     maxMaterializeDepth: Int = 1000,
     materializeRecursiveDepthLimit: Int = 128,
     maxStack: Int = 500,
-    strictFormatBooleanConversions: Boolean = false
+    strictFormatBooleanConversions: Boolean = false,
+    countTailCallStackFrames: Boolean = false,
+    maxTrace: Int = 0
 )
 
 object Settings {

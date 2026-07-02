@@ -382,6 +382,84 @@ object sjsonnet extends VersionFileModule {
     def forkArgs =
       Seq("-Xss" + stackSize, "--enable-native-access=ALL-UNNAMED")
 
+    override def prependShellScript = mill.util.Jvm.universalScript(
+      shellCommands =
+        s"""if [ -z "$$JAVA_HOME" ] ; then
+           |  JAVACMD="java"
+           |else
+           |  JAVACMD="$$JAVA_HOME/bin/java"
+           |fi
+           |SJSONNET_JAVA_OPTS=""
+           |if "$$JAVACMD" --sun-misc-unsafe-memory-access=allow -version >/dev/null 2>&1; then
+           |  SJSONNET_JAVA_OPTS="--sun-misc-unsafe-memory-access=allow"
+           |fi
+           |exec "$$JAVACMD" -Xss$stackSize --enable-native-access=ALL-UNNAMED $$SJSONNET_JAVA_OPTS $$JAVA_OPTS -cp "$$0" 'sjsonnet.SjsonnetMain' "$$@"""".stripMargin,
+      cmdCommands =
+        s"""set "JAVACMD=java.exe"
+           |if not "%JAVA_HOME%"=="" set "JAVACMD=%JAVA_HOME%\\bin\\java.exe"
+           |set "SJSONNET_JAVA_OPTS="
+           |"%JAVACMD%" --sun-misc-unsafe-memory-access=allow -version >nul 2>&1
+           |if "%errorlevel%" == "0" set "SJSONNET_JAVA_OPTS=--sun-misc-unsafe-memory-access=allow"
+           |"%JAVACMD%" -Xss$stackSize --enable-native-access=ALL-UNNAMED %SJSONNET_JAVA_OPTS% %JAVA_OPTS% -cp "%~dpnx0" "sjsonnet.SjsonnetMain" %*""".stripMargin
+    )
+
+    def assemblySmoke = Task {
+      val jar = assembly().path
+      val jarCommand =
+        if (scala.util.Properties.isWin) Seq[os.Shellable](jar)
+        else
+          Seq[os.Shellable](
+            "env",
+            "-u",
+            "JDK_JAVA_OPTIONS",
+            "-u",
+            "JAVA_TOOL_OPTIONS",
+            jar
+          )
+      def callJar(args: os.Shellable*) =
+        os.proc((jarCommand ++ args)*).call(
+          stdout = os.Pipe,
+          stderr = os.Pipe,
+          check = false
+        )
+
+      val version = callJar("--version")
+      assert(
+        version.exitCode == 0,
+        s"--version failed with exit ${version.exitCode}: ${version.err.text()}"
+      )
+      assert(version.err.text().isEmpty, s"--version stderr was not empty: ${version.err.text()}")
+
+      val help = callJar("--help")
+      val helpOut = help.out.text()
+      val helpErr = help.err.text()
+      assert(help.exitCode == 0, s"--help failed with exit ${help.exitCode}: $helpErr")
+      assert(helpErr.isEmpty, s"--help stderr was not empty: $helpErr")
+      assert(!helpOut.contains("Missing argument"), helpOut)
+      assert(!helpOut.contains("Unknown argument"), helpOut)
+
+      val stack = callJar(
+        "--exec",
+        "--max-stack",
+        "2",
+        "local f(n) = if n == 0 then 0 else f(n - 1); f(3)"
+      )
+      val stackErr = stack.err.text()
+      assert(stack.exitCode != 0, s"--max-stack unexpectedly exited ${stack.exitCode}")
+      assert(stackErr.contains("Max stack frames exceeded."), stackErr)
+
+      val defaultStack = callJar(
+        "--exec",
+        "local f(n) = if n == 0 then 0 else f(n - 1); f(1000)"
+      )
+      val defaultStackErr = defaultStack.err.text()
+      assert(
+        defaultStack.exitCode != 0,
+        s"default max-stack unexpectedly exited ${defaultStack.exitCode}"
+      )
+      assert(defaultStackErr.contains("Max stack frames exceeded."), defaultStackErr)
+    }
+
     def scalacOptions = super.scalacOptions() ++ Seq("-release", "17") ++
       (if (JvmWorkerUtil.isScala3(scalaVersion())) Seq("-Yfuture-lazy-vals") else Seq.empty)
     def javacOptions = super.javacOptions() ++ Seq("--release", "17")
