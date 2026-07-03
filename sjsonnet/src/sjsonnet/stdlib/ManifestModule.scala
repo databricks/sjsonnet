@@ -37,6 +37,105 @@ object ManifestModule extends AbstractFunctionModule {
     case ujson.Null    => "null"
   }
 
+  private def isXmlNameStartChar(c: Int): Boolean =
+    c == ':' || c == '_' ||
+    (c >= 'A' && c <= 'Z') ||
+    (c >= 'a' && c <= 'z') ||
+    (c >= 0xc0 && c <= 0xd6) ||
+    (c >= 0xd8 && c <= 0xf6) ||
+    (c >= 0xf8 && c <= 0x2ff) ||
+    (c >= 0x370 && c <= 0x37d) ||
+    (c >= 0x37f && c <= 0x1fff) ||
+    (c >= 0x200c && c <= 0x200d) ||
+    (c >= 0x2070 && c <= 0x218f) ||
+    (c >= 0x2c00 && c <= 0x2fef) ||
+    (c >= 0x3001 && c <= 0xd7ff) ||
+    (c >= 0xf900 && c <= 0xfdcf) ||
+    (c >= 0xfdf0 && c <= 0xfffd) ||
+    (c >= 0x10000 && c <= 0xeffff)
+
+  private def isXmlNameChar(c: Int): Boolean =
+    isXmlNameStartChar(c) ||
+    c == '-' || c == '.' ||
+    (c >= '0' && c <= '9') ||
+    c == 0xb7 ||
+    (c >= 0x300 && c <= 0x36f) ||
+    (c >= 0x203f && c <= 0x2040)
+
+  private def isXmlChar(c: Int): Boolean =
+    c == 0x9 || c == 0xa || c == 0xd ||
+    (c >= 0x20 && c <= 0xd7ff) ||
+    (c >= 0xe000 && c <= 0xfffd) ||
+    (c >= 0x10000 && c <= 0x10ffff)
+
+  private def isXmlName(s: String): Boolean = {
+    if (s.isEmpty) false
+    else {
+      var i = 0
+      var c = s.codePointAt(i)
+      if (!isXmlNameStartChar(c)) false
+      else {
+        i += Character.charCount(c)
+        while (i < s.length) {
+          c = s.codePointAt(i)
+          if (!isXmlNameChar(c)) return false
+          i += Character.charCount(c)
+        }
+        true
+      }
+    }
+  }
+
+  private def codePointName(c: Int): String =
+    "U+" + c.toHexString.toUpperCase.reverse.padTo(4, '0').reverse
+
+  private def quotedJsonString(s: String): String = {
+    val out = new StringBuilderWriter(s.length + 2)
+    BaseRenderer.escape(out, s, unicode = false)
+    out.toString
+  }
+
+  private def xmlNameOrFail(name: String, kind: String): String = {
+    // std.manifestXmlJsonml returns XML. XML start-tags, end-tags, empty-element tags, and
+    // attributes all use the XML 1.0 Name production, so names that cannot form XML are rejected.
+    if (!isXmlName(name)) {
+      Error.fail(
+        s"invalid XML $kind name " + quotedJsonString(name)
+      )
+    }
+    name
+  }
+
+  private def xmlAttrValue(v: ujson.Value): String = v match {
+    case ujson.Str(str) => str
+    case ujson.Num(n)   => ujson.write(n)
+    case ujson.True     => "true"
+    case ujson.False    => "false"
+    case ujson.Null     => "null"
+    case other          => ujson.write(other)
+  }
+
+  private def appendXmlEscaped(s: String, out: StringBuilder, attribute: Boolean): Unit = {
+    var i = 0
+    while (i < s.length) {
+      val c = s.codePointAt(i)
+      if (!isXmlChar(c)) Error.fail("invalid XML character " + codePointName(c))
+      c match {
+        case '<'              => out.append("&lt;")
+        case '>'              => out.append("&gt;")
+        case '&'              => out.append("&amp;")
+        case '"' if attribute => out.append("&quot;")
+        case _                =>
+          if (c <= 0xffff) out.append(c.toChar)
+          else {
+            out.append(Character.highSurrogate(c))
+            out.append(Character.lowSurrogate(c))
+          }
+      }
+      i += Character.charCount(c)
+    }
+  }
+
   /**
    * [[https://jsonnet.org/ref/stdlib.html#std-manifestJson std.manifestJson(value)]].
    *
@@ -619,39 +718,39 @@ object ManifestModule extends AbstractFunctionModule {
      * the JsonML input.
      */
     builtin("manifestXmlJsonml", "value") { (pos, ev, value: Val) =>
-      import scalatags.Text.all.{value => _, _}
-      def rec(v: ujson.Value): Frag = {
+      def rec(v: ujson.Value, out: StringBuilder): Unit = {
         v match {
-          case ujson.Str(ss)                                                         => ss
+          case ujson.Str(ss) => appendXmlEscaped(ss, out, attribute = false)
           case ujson.Arr(mutable.Seq(ujson.Str(t), attrs: ujson.Obj, children @ _*)) =>
-            tag(t)(
-              // TODO remove the `toSeq` once this is fixed in scala3
-              attrs.value.toSeq.map {
-                case (k, ujson.Str(v)) => attr(k) := v
-
-                // use ujson.write to make sure output number format is same as
-                // google/jsonnet, e.g. whole numbers are printed without the
-                // decimal point and trailing zero
-                case (k, ujson.Num(v)) => attr(k) := ujson.write(v)
-
-                case (k, ujson.True)  => attr(k) := "true"
-                case (k, ujson.False) => attr(k) := "false"
-                case (k, ujson.Null)  => attr(k) := "null"
-
-                case (k, v) =>
-                  Error.fail(
-                    "std.manifestXmlJsonml: unsupported attribute type " + ujsonTypeName(v)
-                  )
-              }.toSeq,
-              children.map(rec)
-            )
+            val tagName = xmlNameOrFail(t, "tag")
+            out.append('<').append(tagName)
+            // TODO remove the `toSeq` once this is fixed in scala3
+            attrs.value.toSeq.foreach { case (k, v) =>
+              out.append(' ').append(xmlNameOrFail(k, "attribute")).append("=\"")
+              appendXmlEscaped(xmlAttrValue(v), out, attribute = true)
+              out.append('"')
+            }
+            out.append('>')
+            children.foreach(rec(_, out))
+            out.append("</").append(tagName).append('>')
           case ujson.Arr(mutable.Seq(ujson.Str(t), children @ _*)) =>
-            tag(t)(children.map(rec).toSeq)
+            val tagName = xmlNameOrFail(t, "tag")
+            out.append('<').append(tagName).append('>')
+            children.foreach(rec(_, out))
+            out.append("</").append(tagName).append('>')
           case x =>
             Error.fail("std.manifestXmlJsonml: unsupported type " + ujsonTypeName(x))
         }
       }
-      rec(Materializer(value)(ev)).render
+      val out = new StringBuilder
+      Materializer(value)(ev) match {
+        case arr: ujson.Arr => rec(arr, out)
+        case other          =>
+          Error.fail(
+            s"Expected a JSONML value (an array), got ${ujsonTypeName(other)}"
+          )
+      }
+      out.toString
     }
   )
 }
