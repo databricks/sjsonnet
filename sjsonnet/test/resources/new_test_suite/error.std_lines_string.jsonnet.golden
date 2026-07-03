@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.lines] Wrong parameter type: expected Array, got string
+    at [<root>].(error.std_lines_string.jsonnet:1:10)

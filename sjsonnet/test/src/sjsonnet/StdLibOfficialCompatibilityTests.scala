@@ -15,6 +15,15 @@ object StdLibOfficialCompatibilityTests extends TestSuite {
       assert(evalErr("""std.flattenArrays([[1], null, [2]])""").contains("array and null"))
     }
 
+    test("lines follows official array-to-text semantics") {
+      eval("""std.lines(["a", "b"])""") ==> ujson.Str("a\nb\n")
+      eval("""std.lines(["a", null, "b"])""") ==> ujson.Str("a\nb\n")
+
+      val stringInputError = evalErr("""std.lines("a\nb\n")""")
+      assert(stringInputError.contains("expected Array"))
+      assert(stringInputError.contains("got string"))
+    }
+
     test("flattenDeepArray wraps scalar values") {
       eval("""std.flattenDeepArray(1)""") ==> ujson.Arr(1)
       eval("""std.flattenDeepArray(null)""") ==> ujson.Arr(ujson.Null)
