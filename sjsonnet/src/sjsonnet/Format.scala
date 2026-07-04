@@ -1,10 +1,11 @@
 package sjsonnet
 
 /**
- * Minimal re-implementation of Python's `%` formatting logic, since Jsonnet's `%` formatter is
- * basically "do whatever python does", with a link to:
+ * Minimal re-implementation of Python's `%` formatting logic. Jsonnet documents `std.format` and
+ * the `%` operator as following Python formatting rules:
  *
- *   - https://docs.python.org/2/library/stdtypes.html#string-formatting
+ *   - https://jsonnet.org/ref/stdlib.html#std-format
+ *   - https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting
  *
  * Parses the formatted strings into a sequence of literal strings separated by `%` interpolations
  * modelled as structured [[Format.FormatSpec]]s, and use those to decide how to inteprolate the
@@ -93,12 +94,28 @@ object Format {
       conversion == 's' && !hasWidth && !hasPrecision &&
       (flags & SimpleStringDisqualifierFlags) == 0
 
-    def withStarWidth(newWidth: Int): FormatSpec =
-      new FormatSpec((bits & ~(NumberMask << WidthShift)) | (encodeNumber(newWidth) << WidthShift))
+    // Jsonnet documents std.format as Python-style formatting. Python treats a negative
+    // dynamic width as left adjustment with the absolute width.
+    def withStarWidth(newWidth: Int): FormatSpec = {
+      val normalizedWidth =
+        if (newWidth < 0) {
+          if (newWidth == Int.MinValue)
+            throw new Exception("Format width/precision is too large: " + newWidth)
+          -newWidth
+        } else newWidth
+      val normalizedFlags = if (newWidth < 0) flags | LeftAdjustedFlag else flags
+      new FormatSpec(
+        (bits & ~(NumberMask << WidthShift) & ~(FlagsMask << FlagsShift)) |
+        (normalizedFlags.toLong << FlagsShift) |
+        (encodeNumber(normalizedWidth) << WidthShift)
+      )
+    }
 
+    // Python treats a negative dynamic precision as zero; %g later maps precision 0 to 1.
     def withStarPrecision(newPrecision: Int): FormatSpec =
       new FormatSpec(
-        (bits & ~(NumberMask << PrecisionShift)) | (encodeNumber(newPrecision) << PrecisionShift)
+        (bits & ~(NumberMask << PrecisionShift)) |
+        (encodeNumber(math.max(newPrecision, 0)) << PrecisionShift)
       )
 
     def withStarValues(newWidth: Int, newPrecision: Int): FormatSpec =
@@ -241,6 +258,19 @@ object Format {
   def widenRaw(formatted: FormatSpec, txt: String): String =
     if (!formatted.hasWidth) txt // fast path: no width/padding needed
     else widen(formatted, "", "", txt, numeric = false, signedConversion = false)
+
+  private def formatString(formatted: FormatSpec, txt: String): String = {
+    val truncated =
+      if (!formatted.hasPrecision) txt
+      else {
+        val precision = formatted.precisionValue
+        if (precision == 0) ""
+        else if (txt.codePointCount(0, txt.length) <= precision) txt
+        else txt.substring(0, txt.offsetByCodePoints(0, precision))
+      }
+    widenRaw(formatted, truncated)
+  }
+
   def widen(
       formatted: FormatSpec,
       lhs: String,
@@ -645,7 +675,7 @@ object Format {
                       )
                     }
                     i += 1
-                    formatted = formatted.withStarWidth(width.asInt)
+                    formatted = withStarWidth(formatted, width, idx)
                     valuesArr.value(i)
                   case (false, true) =>
                     val precision = valuesArr.value(i)
@@ -655,7 +685,7 @@ object Format {
                       )
                     }
                     i += 1
-                    formatted = formatted.withStarPrecision(precision.asInt)
+                    formatted = withStarPrecision(formatted, precision, idx)
                     valuesArr.value(i)
                   case (true, true) =>
                     val width = valuesArr.value(i)
@@ -672,7 +702,8 @@ object Format {
                       )
                     }
                     i += 1
-                    formatted = formatted.withStarValues(width.asInt, precision.asInt)
+                    formatted =
+                      withStarPrecision(withStarWidth(formatted, width, idx), precision, idx)
                     valuesArr.value(i)
                 }
             } else {
@@ -706,7 +737,8 @@ object Format {
                     pos
                   )
               }
-              widenRaw(formatted, vs.str)
+              if (formatted.conversion == 's') formatString(formatted, vs.str)
+              else widenRaw(formatted, vs.str)
             case vn: Val.Num =>
               val s = vn.asDouble
               formatted.conversion match {
@@ -728,7 +760,7 @@ object Format {
                   val c = if (codePoint >= 0xd800 && codePoint <= 0xdfff) 0xfffd else codePoint
                   widenRaw(formatted, Character.toString(c))
                 case 's' =>
-                  widenRaw(formatted, RenderUtils.renderDouble(s))
+                  formatString(formatted, RenderUtils.renderDouble(s))
                 case _ =>
                   Error.fail(
                     "unsupported format conversion at position %d, got number".format(i)
@@ -752,7 +784,7 @@ object Format {
               )
             case _: Val.Null =>
               formatted.conversion match {
-                case 's' => widenRaw(formatted, "null")
+                case 's' => formatString(formatted, "null")
                 case 'c' => Error.fail("%c expected number or string, got null")
                 case _   =>
                   Error.fail(
@@ -766,7 +798,7 @@ object Format {
                 case r: Val.Obj => Materializer.apply0(r, new Renderer(indent = -1))
                 case _          => Materializer(rawVal)
               }
-              widenRaw(formatted, value.toString)
+              formatString(formatted, value.toString)
           }
           i += 1
           formattedValue
@@ -807,7 +839,7 @@ object Format {
         case 'g'             => formatGeneric(formatted, numericValue).toLowerCase
         case 'G'             => formatGeneric(formatted, numericValue)
         case 'c'             => Error.fail("%c expected number or string, got boolean")
-        case 's'             => widenRaw(formatted, textValue)
+        case 's'             => formatString(formatted, textValue)
         case _               =>
           Error.fail(
             "expected number or string at position %d, got boolean".format(index)
@@ -816,7 +848,7 @@ object Format {
 
   private def formatStrictBoolean(formatted: FormatSpec, index: Int, value: String): String =
     formatted.conversion match {
-      case 's' => widenRaw(formatted, value)
+      case 's' => formatString(formatted, value)
       case 'c' => Error.fail("%c expected number or string, got boolean")
       case _   =>
         Error.fail(
@@ -984,6 +1016,39 @@ object Format {
     case _            => false
   }
 
+  private def withStarWidth(formatted: FormatSpec, width: Val, idx: Int): FormatSpec =
+    try formatted.withStarWidth(starInteger(width, "width", idx))
+    catch {
+      case e: Error     => throw e
+      case e: Exception =>
+        Error.fail(e.getMessage)
+    }
+
+  private def withStarPrecision(formatted: FormatSpec, precision: Val, idx: Int): FormatSpec =
+    try formatted.withStarPrecision(starInteger(precision, "precision", idx))
+    catch {
+      case e: Error     => throw e
+      case e: Exception =>
+        Error.fail(e.getMessage)
+    }
+
+  private def starInteger(value: Val, name: String, idx: Int): Int =
+    value match {
+      case n: Val.Num =>
+        val d = n.asDouble
+        // Jsonnet has one number type, so Python's "integer required for *" rule maps to
+        // finite whole-number values. Fractional star arguments must not be rounded.
+        if (!d.isWhole || !d.isValidInt)
+          Error.fail("* %s at position %d requires an integer".format(name, idx))
+        d.toInt
+      case _ =>
+        Error.fail("* %s at position %d requires an integer".format(name, idx))
+    }
+
+  // std.format follows Python's % formatting. Jsonnet numbers have IEEE double semantics, so
+  // floating-point formats preserve the sign bit of -0.0 even though -0.0 == 0.0.
+  private def isNegative(s: Double): Boolean = s < 0 || (s == 0.0 && 1.0 / s < 0)
+
   private def formatInteger(formatted: FormatSpec, s: Double): String = {
     formatIntegralRadix(formatted, s, 10, _ => "")
   }
@@ -991,7 +1056,7 @@ object Format {
   private def formatFloat(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
-      if (s < 0) "-" else "",
+      if (isNegative(s)) "-" else "",
       "",
       sjsonnet.DecimalFormat
         .format(
@@ -1002,7 +1067,7 @@ object Format {
           math.abs(s)
         ),
       numeric = true,
-      signedConversion = s >= 0
+      signedConversion = !isNegative(s)
     )
 
   }
@@ -1051,14 +1116,31 @@ object Format {
     }
   }
 
+  private def decimalExponent(value: Double): Int = {
+    if (value == 0 || value.isNaN || value.isInfinity) 0
+    else {
+      val exact = new java.math.BigDecimal(value)
+      var exponent = math.floor(math.log10(value)).toInt
+      while (exact.compareTo(java.math.BigDecimal.ONE.scaleByPowerOfTen(exponent + 1)) >= 0) {
+        exponent += 1
+      }
+      while (exact.compareTo(java.math.BigDecimal.ONE.scaleByPowerOfTen(exponent)) < 0) {
+        exponent -= 1
+      }
+      exponent
+    }
+  }
+
   private def roundedGenericExponent(s: Double, precision: Int): Int = {
     if (s == 0) 0
     else {
       val abs = math.abs(s)
-      val rawExponent = math.floor(math.log10(abs)).toInt
+      val rawExponent = decimalExponent(abs)
       val scale = math.pow(10, rawExponent - precision + 1)
-      val rounded = Math.round(abs / scale) * scale
-      if (rounded == 0) 0 else math.floor(math.log10(rounded)).toInt
+      val roundedDigits = Math.round(abs / scale)
+      if (roundedDigits == 0) 0
+      else if (roundedDigits.toDouble >= math.pow(10, precision)) rawExponent + 1
+      else rawExponent
     }
   }
 
@@ -1069,7 +1151,7 @@ object Format {
     if (exponent < -4 || exponent >= precision) {
       widen(
         formatted,
-        if (s < 0) "-" else "",
+        if (isNegative(s)) "-" else "",
         "",
         sjsonnet.DecimalFormat
           .format(
@@ -1080,13 +1162,13 @@ object Format {
             math.abs(s)
           ),
         numeric = true,
-        signedConversion = s >= 0
+        signedConversion = !isNegative(s)
       )
     } else {
-      val fractionalPrecision = math.max(0, precision - exponent - 1)
+      val fractionalPrecision = math.max(0, precision - 1 - exponent)
       widen(
         formatted,
-        if (s < 0) "-" else "",
+        if (isNegative(s)) "-" else "",
         "",
         sjsonnet.DecimalFormat
           .format(
@@ -1097,7 +1179,7 @@ object Format {
             math.abs(s)
           ),
         numeric = true,
-        signedConversion = s >= 0
+        signedConversion = !isNegative(s)
       )
     }
 
@@ -1106,7 +1188,7 @@ object Format {
   private def formatExponent(formatted: FormatSpec, s: Double): String = {
     widen(
       formatted,
-      if (s < 0) "-" else "",
+      if (isNegative(s)) "-" else "",
       "",
       sjsonnet.DecimalFormat
         .format(
@@ -1117,7 +1199,7 @@ object Format {
           math.abs(s)
         ),
       numeric = true,
-      signedConversion = s >= 0
+      signedConversion = !isNegative(s)
     )
   }
 
