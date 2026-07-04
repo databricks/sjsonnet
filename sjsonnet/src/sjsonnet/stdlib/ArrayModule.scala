@@ -574,7 +574,7 @@ object ArrayModule extends AbstractFunctionModule {
               case n                 =>
                 Error.fail("second argument must be a string, got " + n.prettyName)
             }
-            str.str.contains(secondArg)
+            secondArg.nonEmpty && str.str.contains(secondArg)
           case a: Val.Arr =>
             var i = 0
             var found = false
