@@ -147,6 +147,47 @@ object MainTests extends TestSuite {
       assert(err.contains("Max stack frames exceeded."))
     }
 
+    test("maxStackRejectsNonPositiveValues") {
+      val (zeroRes, zeroOut, zeroErr) = runMain("--exec", "1", "--max-stack", "0")
+      assert(zeroRes == 1)
+      assert(zeroOut.isEmpty)
+      assert(zeroErr.contains("ERROR: invalid --max-stack value: 0"))
+      assert(!zeroErr.contains("Max stack frames exceeded."))
+
+      val (negativeRes, negativeOut, negativeErr) = runMain("--exec", "1", "--max-stack", "-1")
+      assert(negativeRes == 1)
+      assert(negativeOut.isEmpty)
+      assert(negativeErr.contains("ERROR: invalid --max-stack value: -1"))
+      assert(!negativeErr.contains("Max stack frames exceeded."))
+    }
+
+    test("maxTraceRejectsNegativeValues") {
+      val (res, out, err) = runMain("--exec", "error 'x'", "--max-trace", "-1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("ERROR: invalid --max-trace value: -1"))
+      assert(!err.contains("sjsonnet.Error"))
+    }
+
+    test("maxParserRecursionDepthRejectsNegativeValues") {
+      val (res, out, err) = runMain("--exec", "1", "--max-parser-recursion-depth", "-1")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("ERROR: invalid --max-parser-recursion-depth value: -1"))
+      assert(!err.contains("Parsing exceeded maximum recursion depth of -1"))
+    }
+
+    test("maxParserRecursionDepthZeroAllowsNonRecursiveExpressions") {
+      val (res, out, err) = runMain("--exec", "1", "--max-parser-recursion-depth", "0")
+      assert((res, out, err) == ((0, "1\n", "")))
+
+      val (nestedRes, nestedOut, nestedErr) =
+        runMain("--exec", "[1]", "--max-parser-recursion-depth", "0")
+      assert(nestedRes == 1)
+      assert(nestedOut.isEmpty)
+      assert(nestedErr.contains("Parsing exceeded maximum recursion depth of 0"))
+    }
+
     test("maxStackDoesNotCountTailRecursiveCalls") {
       val (res, out, err) = runMain(
         "--exec",
