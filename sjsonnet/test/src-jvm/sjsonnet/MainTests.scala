@@ -299,6 +299,59 @@ object MainTests extends TestSuite {
       assert(os.read(multiDest / "world") == expectedWorld + "\n")
     }
 
+    test("multiRejectsOutputPathsEscapingParent") {
+      val root = os.temp.dir()
+      val multiDest = root / "out"
+      val (res, out, err) =
+        runMain("""{"../escape.txt": "owned"}""", "--exec", "--multi", multiDest, "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("path escapes from parent"))
+      assert(!err.contains("IllegalArgumentException"))
+      assert(!os.exists(root / "escape.txt"))
+    }
+
+    test("multiRejectsNestedOutputPathsEscapingParent") {
+      val root = os.temp.dir()
+      val multiDest = root / "out"
+      val (res, out, err) =
+        runMain("""{"a/../../escape.txt": "owned"}""", "--exec", "--multi", multiDest, "--string")
+      assert(res == 1)
+      assert(out.isEmpty)
+      assert(err.contains("path escapes from parent"))
+      assert(!err.contains("IllegalArgumentException"))
+      assert(!os.exists(root / "escape.txt"))
+    }
+
+    test("multiAllowsNormalizedOutputPathsInsideParent") {
+      val root = os.temp.dir()
+      val multiDest = root / "out"
+      os.makeDir.all(multiDest)
+      val (res, out, err) =
+        runMain("""{"dir/../ok.txt": "ok"}""", "--exec", "--multi", multiDest, "--string")
+      assert((res, out, err) == ((0, s"$multiDest/ok.txt\n", "")))
+      assert(os.read(multiDest / "ok.txt") == "ok\n")
+    }
+
+    test("multiNormalizesAbsoluteOutputPathsInsideParent") {
+      val root = os.temp.dir()
+      val multiDest = root / "out"
+      val externalPath = root / "external" / "abs.txt"
+      val expectedPath = multiDest / os.SubPath(externalPath.toString.dropWhile(_ == '/'))
+      val (res, out, err) =
+        runMain(
+          "{" + ujson.write(externalPath.toString) + ": \"inside\"}",
+          "--exec",
+          "--multi",
+          multiDest,
+          "--string",
+          "--create-output-dirs"
+        )
+      assert((res, out, err) == ((0, s"$expectedPath\n", "")))
+      assert(os.read(expectedPath) == "inside\n")
+      assert(!os.exists(externalPath))
+    }
+
     test("missingExtStrFileErrorsAsImport") {
       checkCliStderrGolden(
         "cli_missing_ext_str_file.jsonnet",

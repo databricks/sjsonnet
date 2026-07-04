@@ -421,6 +421,20 @@ object SjsonnetMainBase {
       case e: Error                    => Left(Error.formatError(e, maxTrace))
     }
 
+  private def multiOutputPath(multiPath: String, fileName: String): Either[String, os.FilePath] =
+    Try {
+      // Multi output names must stay under the requested output directory.
+      val normalizedFileName = fileName.dropWhile(_ == '/')
+      (os.FilePath(multiPath) / os.SubPath(normalizedFileName)).asInstanceOf[os.FilePath]
+    }.toEither.left.map {
+      case e: IllegalArgumentException
+          if Option(e.getMessage).exists(_.contains("ups must be zero")) =>
+        s"openat $fileName: path escapes from parent"
+      case e: InvalidPathException     => s"openat $fileName: ${e.getMessage}"
+      case e: IllegalArgumentException => s"openat $fileName: ${e.getMessage}"
+      case e                           => e.toString
+    }
+
   private def writeFile(
       config: Config,
       f: os.Path,
@@ -692,7 +706,7 @@ object SjsonnetMainBase {
                     ujson.transform(v, renderer)
                     writer.toString
                   }
-                  relPath = (os.FilePath(multiPath) / os.RelPath(f)).asInstanceOf[os.FilePath]
+                  relPath <- multiOutputPath(multiPath, f)
                   _ <- writeFile(config, relPath.resolveFrom(wd), rendered, trailingNewline)
                 } yield relPath
               }
