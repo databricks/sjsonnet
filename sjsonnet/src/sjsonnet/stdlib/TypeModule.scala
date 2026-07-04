@@ -137,13 +137,14 @@ object TypeModule extends AbstractFunctionModule {
     def evalRhs(v1: Eval, v2: Eval, ev: EvalScope, pos: Position): Val = {
       val a = v1.value
       val b = v2.value
-      // Use structural equality first (avoids double materialization on success path)
+      // Use structural equality first (avoids double materialization on success path).
       if (ev.equal(a, b)) Val.True(pos)
       else {
-        // Only materialize on failure for the error message
-        val x1 = Materializer(a)(ev)
-        val x2 = Materializer(b)(ev)
-        Error.fail("std.assertEqual: " + x1 + " != " + x2)
+        // Match official std.jsonnet: strings are JSON-escaped, and non-strings are
+        // stringified through Jsonnet value rendering by the later concatenation.
+        val x1 = Materializer.stringify(a)(ev)
+        val x2 = Materializer.stringify(b)(ev)
+        Error.fail("Assertion failed. " + x1 + " != " + x2)
       }
     }
   }

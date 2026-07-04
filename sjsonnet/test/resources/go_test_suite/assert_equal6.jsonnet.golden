@@ -1,2 +1,2 @@
-sjsonnet.Error: [std.assertEqual] "\u001b[31m" != ""
+sjsonnet.Error: [std.assertEqual] Assertion failed. "\u001b[31m" != ""
     at [<root>].(assert_equal6.jsonnet:1:16)
