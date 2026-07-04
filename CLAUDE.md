@@ -2,26 +2,26 @@
 
 ## Build & Test
 
-Uses [Mill](https://mill-build.org/) 1.1.2. Cross-built for Scala 3.3.7, 2.13.18, and 2.12.21 (JVM only).
+Uses the [Mill](https://mill-build.org/) version declared in `build.mill`. Cross-built against the latest patch releases on the configured Scala 2.12.x (JVM only), 2.13.x, and 3.3.x LTS lines; exact versions are declared by `scalaVersions` and `jvmScalaVersions` in `build.mill`.
 
 ```bash
-# Compile (JVM, Scala 3)
-./mill 'sjsonnet.jvm[3.3.7]'.compile
+# Compile all JVM Scala versions
+./mill 'sjsonnet.jvm[_]'.compile
 
-# Run all JVM tests (Scala 3)
-./mill 'sjsonnet.jvm[3.3.7]'.test
+# Run all JVM tests
+./mill 'sjsonnet.jvm[_]'.test
 
 # Run all tests across all platforms
 ./mill __.test
 
-# Build assembly JAR
-./mill 'sjsonnet.jvm[3.3.7]'.assembly
+# Build assembly JARs
+./mill 'sjsonnet.jvm[_]'.assembly
 
 # GraalVM native image
 ./mill sjsonnet.graal.nativeImage
 ```
 
-The assembly JAR is at `out/sjsonnet/jvm/3.3.7/assembly.dest/out.jar`. Run it with `java -Xss100m -jar out.jar`.
+Assembly JARs are written under `out/sjsonnet/jvm/<scala-version>/assembly.dest/out.jar`. Run one with `java -Xss100m -jar out.jar`.
 
 ## Formatting
 
@@ -71,7 +71,7 @@ Every bug fix should include a regression test:
 2. Create `new_test_suite/<descriptive_name>.jsonnet.golden` with expected output.
    - Success tests: JSON output followed by a newline, using `std.assertEqual` chains ending in `true`.
    - Error tests (filename starts with `error.`): expected stderr including stack traces.
-3. Run `./mill 'sjsonnet.jvm[3.3.7]'.test` to verify.
+3. Run `./mill 'sjsonnet.jvm[_]'.test` to verify.
 
 ## Debug Stats
 
