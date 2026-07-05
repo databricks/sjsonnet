@@ -15,20 +15,6 @@ object BaseCharRenderer {
    */
   final val MaxCachedDepth = 32
 
-  /** Digit-pair lookup tables for two-digits-at-a-time integer rendering. */
-  private[sjsonnet] val DIGIT_TENS: Array[Char] = {
-    val a = new Array[Char](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i / 10).toChar; i += 1 }
-    a
-  }
-  private[sjsonnet] val DIGIT_ONES: Array[Char] = {
-    val a = new Array[Char](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i % 10).toChar; i += 1 }
-    a
-  }
-
   private[sjsonnet] val HEX_CHARS: Array[Char] =
     Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 }
@@ -54,7 +40,7 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 1000)
   }
 
-  private val longScratchBuf: Array[Char] = new Array[Char](20)
+  private val longScratchBuf: Array[Byte] = new Array[Byte](FastLongRenderer.MaxLongChars)
 
   protected var depth: Int = 0
 
@@ -218,49 +204,24 @@ class BaseCharRenderer[T <: upickle.core.CharOps.Output](
 
   /**
    * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
-   * digit-pair lookup table for fast two-digits-at-a-time conversion.
+   * digit-pair lookup tables and 8-digit chunking to keep hardware long division out of the common
+   * int-sized path and to reduce it to at most two divisions for larger longs.
    */
   protected def writeLongDirect(v: Long): Unit = {
     flushBuffer()
-    if (v == 0L) {
-      elemBuilder.ensureLength(1)
-      elemBuilder.appendUnsafe('0')
-      return
-    }
-    if (v == Long.MinValue) {
-      visitFloat64StringParts("-9223372036854775808", -1, -1, -1)
-      return
-    }
-    val negative = v < 0
-    var abs = if (negative) -v else v
-    // Write digits backward into a small local buffer, then bulk-copy.
-    // Max Long digits = 19, plus sign = 20.
     val buf = longScratchBuf
-    var pos = 20
-    while (abs >= 100) {
-      val q = abs / 100
-      val r = (abs - q * 100L).toInt
-      abs = q
-      pos -= 2
-      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
-      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
-    }
-    if (abs >= 10) {
-      val r = abs.toInt
-      pos -= 2
-      buf(pos + 1) = BaseCharRenderer.DIGIT_ONES(r)
-      buf(pos) = BaseCharRenderer.DIGIT_TENS(r)
-    } else {
-      pos -= 1
-      buf(pos) = ('0' + abs.toInt).toChar
-    }
-    if (negative) { pos -= 1; buf(pos) = '-' }
-    val totalLen = 20 - pos
-    elemBuilder.ensureLength(totalLen)
+    val len = FastLongRenderer.writeLong(v, buf, 0)
+    elemBuilder.ensureLength(len)
     val cbArr = elemBuilder.arr
-    val startPos = elemBuilder.getLength
-    System.arraycopy(buf, pos, cbArr, startPos, totalLen)
-    elemBuilder.length = startPos + totalLen
+    var pos = elemBuilder.getLength
+    val end = pos + len
+    var i = 0
+    while (pos < end) {
+      cbArr(pos) = buf(i).toChar
+      pos += 1
+      i += 1
+    }
+    elemBuilder.length = end
   }
 
   def visitString(s: CharSequence, index: Int): T = {

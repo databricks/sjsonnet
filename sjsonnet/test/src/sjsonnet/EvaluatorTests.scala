@@ -1170,6 +1170,8 @@ object EvaluatorTests extends TestSuite {
       eval("""std.manifestJson(1e100)""") ==> ujson.Str(expected1e100)
       eval("""std.manifestJson(1e308)""") ==> ujson.Str(expected1e308)
       eval("""std.manifestToml({a: 1e100})""") ==> ujson.Str("a = " + expected1e100)
+      eval("""std.manifestToml({a: 9223372036854775808})""") ==>
+        ujson.Str("a = 9223372036854776000")
     }
 
     test("assertBooleanTypeCheck") {

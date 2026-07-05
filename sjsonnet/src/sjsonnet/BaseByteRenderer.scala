@@ -28,7 +28,7 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 
   protected val elemBuilder = new upickle.core.ByteBuilder
   private val unicodeCharBuilder = new upickle.core.CharBuilder
-  private val longScratchBuf: Array[Byte] = new Array[Byte](20)
+  private val longScratchBuf: Array[Byte] = new Array[Byte](FastLongRenderer.MaxLongChars)
 
   def flushByteBuilder(): Unit = {
     elemBuilder.writeOutToIfLongerThan(out, if (depth == 0) 0 else 8192)
@@ -166,49 +166,18 @@ class BaseByteRenderer[T <: java.io.OutputStream](
 
   /**
    * Write a long integer directly into elemBuilder without intermediate String allocation. Uses
-   * digit-pair lookup table for fast two-digits-at-a-time conversion.
+   * digit-pair lookup tables and 8-digit chunking to keep hardware long division out of the common
+   * int-sized path and to reduce it to at most two divisions for larger longs.
    */
   protected def writeLongDirect(v: Long): Unit = {
     flushBuffer()
-    if (v == 0L) {
-      elemBuilder.ensureLength(1)
-      elemBuilder.appendUnsafeC('0')
-      return
-    }
-    if (v == Long.MinValue) {
-      visitFloat64StringParts("-9223372036854775808", -1, -1, -1)
-      return
-    }
-    val negative = v < 0
-    var abs = if (negative) -v else v
-    // Write digits backward into a small local buffer, then bulk-copy.
-    // Max Long digits = 19, plus sign = 20.
     val buf = longScratchBuf
-    var pos = 20
-    while (abs >= 100) {
-      val q = abs / 100
-      val r = (abs - q * 100L).toInt
-      abs = q
-      pos -= 2
-      buf(pos + 1) = BaseByteRenderer.DIGIT_ONES(r)
-      buf(pos) = BaseByteRenderer.DIGIT_TENS(r)
-    }
-    if (abs >= 10) {
-      val r = abs.toInt
-      pos -= 2
-      buf(pos + 1) = BaseByteRenderer.DIGIT_ONES(r)
-      buf(pos) = BaseByteRenderer.DIGIT_TENS(r)
-    } else {
-      pos -= 1
-      buf(pos) = ('0' + abs.toInt).toByte
-    }
-    if (negative) { pos -= 1; buf(pos) = '-'.toByte }
-    val totalLen = 20 - pos
-    elemBuilder.ensureLength(totalLen)
+    val len = FastLongRenderer.writeLong(v, buf, 0)
+    elemBuilder.ensureLength(len)
     val bArr = elemBuilder.arr
     val startPos = elemBuilder.length
-    System.arraycopy(buf, pos, bArr, startPos, totalLen)
-    elemBuilder.length = startPos + totalLen
+    System.arraycopy(buf, 0, bArr, startPos, len)
+    elemBuilder.length = startPos + len
   }
 
   def visitString(s: CharSequence, index: Int): T = {
@@ -545,21 +514,4 @@ object BaseByteRenderer {
     'f'.toByte
   )
 
-  /**
-   * Digit-pair lookup tables for two-digits-at-a-time integer rendering. DIGIT_TENS(i) gives the
-   * tens digit byte for value i (0..99). DIGIT_ONES(i) gives the ones digit byte for value i
-   * (0..99).
-   */
-  private[sjsonnet] val DIGIT_TENS: Array[Byte] = {
-    val a = new Array[Byte](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i / 10).toByte; i += 1 }
-    a
-  }
-  private[sjsonnet] val DIGIT_ONES: Array[Byte] = {
-    val a = new Array[Byte](100)
-    var i = 0
-    while (i < 100) { a(i) = ('0' + i % 10).toByte; i += 1 }
-    a
-  }
 }
