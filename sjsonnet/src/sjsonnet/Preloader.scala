@@ -130,40 +130,43 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
   }
 
   private def discover(path: Path, content: ResolvedFile): Either[Error, Unit] = {
-    CachedResolver.parseJsonImport(
+    val parsedJson = CachedResolver.parseJsonImport(
       path,
       content,
       internedStrings,
       settings
-    ) match {
-      case Some((expr, fs)) =>
-        cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
-        Right(())
-      case None =>
-        val parser = new Parser(path, internedStrings, internedFieldSets, settings)
-        try {
-          fastparse.parse(content.getParserInput(), parser.document(_)) match {
-            case f: Parsed.Failure =>
-              val traced = f.trace()
-              Left(new ParseError(s"$path: ${traced.msg}", offset = traced.index))
-            case Parsed.Success((expr, fs), _) =>
-              // Stash the parsed AST on the cache entry so the Interpreter doesn't re-run fastparse.
-              // The optimizer still runs once at evaluation time on cache hit.
-              cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
-              // Match the synchronous evaluator's docBase: resolve relative to the importing file's
-              // parent directory, not the file path itself. See Importer.resolveAndReadOrFail, which
-              // calls resolve(pos.fileScope.currentFile.parent(), ...).
-              val docBase = path.parent()
-              ImportFinder.collect(expr).foreach { found =>
-                parentImporter.resolve(docBase, found.value).foreach { resolved =>
-                  record(resolved, found.kind)
-                }
+    )
+    if (parsedJson.isDefined) {
+      val parsed = parsedJson.get
+      val expr = parsed._1
+      val fs = parsed._2
+      cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
+      Right(())
+    } else {
+      val parser = new Parser(path, internedStrings, internedFieldSets, settings)
+      try {
+        fastparse.parse(content.getParserInput(), parser.document(_)) match {
+          case f: Parsed.Failure =>
+            val traced = f.trace()
+            Left(new ParseError(s"$path: ${traced.msg}", offset = traced.index))
+          case Parsed.Success((expr, fs), _) =>
+            // Stash the parsed AST on the cache entry so the Interpreter doesn't re-run fastparse.
+            // The optimizer still runs once at evaluation time on cache hit.
+            cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
+            // Match the synchronous evaluator's docBase: resolve relative to the importing file's
+            // parent directory, not the file path itself. See Importer.resolveAndReadOrFail, which
+            // calls resolve(pos.fileScope.currentFile.parent(), ...).
+            val docBase = path.parent()
+            ImportFinder.collect(expr).foreach { found =>
+              parentImporter.resolve(docBase, found.value).foreach { resolved =>
+                record(resolved, found.kind)
               }
-              Right(())
-          }
-        } catch {
-          case e: ParseError => Left(e)
+            }
+            Right(())
         }
+      } catch {
+        case e: ParseError => Left(e)
+      }
     }
   }
 

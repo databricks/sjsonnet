@@ -307,15 +307,14 @@ class CachedResolver(
         val parsed: Either[Error, (Expr, FileScope)] = content.preParsedAst match {
           case Some(pre) => Right(pre)
           case None      =>
-            CachedResolver.parseJsonImport(
+            val parsedJson = CachedResolver.parseJsonImport(
               path,
               content,
               internedStrings,
               settings
-            ) match {
-              case Some(parsedJson) => Right(parsedJson)
-              case None             => parseJsonnet(path, content)
-            }
+            )
+            if (parsedJson.isDefined) Right(parsedJson.get)
+            else parseJsonnet(path, content)
         }
         parsed.flatMap { case (e, fs) => process(e, fs) }
       }
@@ -369,17 +368,17 @@ object CachedResolver {
       path: Path,
       content: ResolvedFile,
       internedStrings: mutable.HashMap[String, String],
-      settings: Settings): Option[(Expr, FileScope)] = {
-    if (!path.last.endsWith(".json")) return None
+      settings: Settings): OptionVal[(Expr, FileScope)] = {
+    if (!path.last.endsWith(".json")) return OptionVal.None
     val fileScope = new FileScope(path)
     try {
       val visitor =
         new JsonImportVisitor(fileScope, internedStrings, settings)
-      Some((ujson.ByteArrayParser.transform(content.readRawBytes(), visitor), fileScope))
+      OptionVal.some((ujson.ByteArrayParser.transform(content.readRawBytes(), visitor), fileScope))
     } catch {
       case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
           _: JsonParseDepthExceeded | _: NumberFormatException =>
-        None
+        OptionVal.None
     }
   }
 
