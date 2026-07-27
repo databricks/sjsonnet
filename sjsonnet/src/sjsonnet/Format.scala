@@ -1,5 +1,7 @@
 package sjsonnet
 
+import scala.util.control.NonFatal
+
 /**
  * Minimal re-implementation of Python's `%` formatting logic, since Jsonnet's `%` formatter is
  * basically "do whatever python does", with a link to:
@@ -273,7 +275,7 @@ object Format {
   }
 
   def format(s: String, values0: Val, pos: Position)(implicit evaluator: EvalScope): Val.Str = {
-    val parsed = parseFormatCached(s, evaluator.formatCache)
+    val parsed = parseFormatOrFail(pos)(parseFormatCached(s, evaluator.formatCache))
     format(parsed, values0, pos)
   }
 
@@ -558,8 +560,18 @@ object Format {
 
   def format(leading: String, chunks: scala.Seq[(FormatSpec, String)], values0: Val, pos: Position)(
       implicit evaluator: EvalScope): Val.Str = {
-    format(lowerParsedFormat((leading, chunks)), values0, pos)
+    val parsed = parseFormatOrFail(pos)(lowerParsedFormat((leading, chunks)))
+    format(parsed, values0, pos)
   }
+
+  private def parseFormatOrFail(pos: Position)(parse: => RuntimeFormat)(implicit
+      evaluator: EvalErrorScope): RuntimeFormat =
+    try parse
+    catch {
+      case e: Error    => throw e
+      case NonFatal(e) =>
+        Error.fail(e.getMessage, pos)
+    }
 
   private def appendLeading(output: java.lang.StringBuilder, parsed: RuntimeFormat): Unit = {
     val source = parsed.source
