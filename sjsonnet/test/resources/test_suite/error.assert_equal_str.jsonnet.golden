@@ -1,2 +1,2 @@
-sjsonnet.Error: [std.assertEqual] "one\ntwo" != "three\nfour\n"
+sjsonnet.Error: [std.assertEqual] Assertion failed. "one\ntwo" != "three\nfour\n"
     at [<root>].(error.assert_equal_str.jsonnet:17:16)
