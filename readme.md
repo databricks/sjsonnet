@@ -335,16 +335,19 @@ To generate the static files without starting a server:
 The output is a single `index.html` file (with the Sjsonnet JS engine inlined) written to `out/playground/bundle.dest/`. You can open it directly in a browser — no server needed — or serve it with any static file server. The editor UI (CodeMirror) is loaded from a CDN at runtime, so an internet connection is required.
 
 ## Development
-To compile the JVM version:
+
+The configured build tracks the latest patch releases on the Scala 2.12.x (JVM only), 2.13.x, and 3.3.x LTS lines. Exact versions are declared in `build.mill`.
+
+To compile the JVM versions:
 
 ```bash
-./mill 'sjsonnet.jvm[3.3.7]'.compile
+./mill 'sjsonnet.jvm[_]'.compile
 ```
 
-To run the tests:
+To run the JVM tests:
 
 ```bash
-./mill 'sjsonnet.jvm[3.3.7]'.test
+./mill 'sjsonnet.jvm[_]'.test
 ```
 
 If you want to test for all platforms and versions, you can run
@@ -357,16 +360,16 @@ If you want to test for all platforms and versions, you can run
 
 Sjsonnet comes with a built in thin-client and background server, to help
 mitigate the unfortunate JVM warmup overhead that adds ~1s to every invocation
-down to 0.2-0.3s. For the simple non-client-server executable, you can use
+down to 0.2-0.3s. For the simple non-client-server executables, you can use
 
 ```bash
-./mill -i show sjsonnet[3.3.7].jvm.assembly
+./mill -i show 'sjsonnet.jvm[_].assembly'
 ```
 
-To create the executable. For the client-server executable, you can use
+For the client-server executables, you can use
 
 ```bash
-./mill -i show sjsonnet[3.3.7].server.assembly
+./mill -i show 'sjsonnet.jvm[_].server.assembly'
 ```
 
 By default, the Sjsonnet background server lives in `~/.sjsonnet`, and lasts 5
