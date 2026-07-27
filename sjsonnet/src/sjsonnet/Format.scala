@@ -286,7 +286,13 @@ object Format {
       else if (signedConversion && formatted.signCharacter) "+" + lhs
       else lhs
 
-    val missingWidth = formatted.widthOr(-1) - lhs2.length - mhs.length - rhs.length
+    val missingWidth =
+      if (numeric) formatted.widthOr(-1) - lhs2.length - mhs.length - rhs.length
+      else
+        formatted.widthOr(-1) -
+        lhs2.codePointCount(0, lhs2.length) -
+        mhs.codePointCount(0, mhs.length) -
+        rhs.codePointCount(0, rhs.length)
 
     if (missingWidth <= 0) {
       // Avoid unnecessary string concatenation when parts are empty
