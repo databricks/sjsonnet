@@ -282,8 +282,8 @@ object Format {
       signedConversion: Boolean): String = {
 
     val lhs2 =
-      if (signedConversion && formatted.blankBeforePositive) " " + lhs
-      else if (signedConversion && formatted.signCharacter) "+" + lhs
+      if (signedConversion && formatted.signCharacter) "+" + lhs
+      else if (signedConversion && formatted.blankBeforePositive) " " + lhs
       else lhs
 
     val missingWidth = formatted.widthOr(-1) - lhs2.length - mhs.length - rhs.length
