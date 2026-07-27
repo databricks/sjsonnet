@@ -4,6 +4,15 @@ import java.io.{ByteArrayOutputStream, StringWriter}
 import utest._
 
 object RendererTests extends TestSuite {
+  private final class ExposedCharRenderer(out: StringBuilderWriter)
+      extends BaseCharRenderer[StringBuilderWriter](out) {
+    def write(v: Long): Unit = writeLongDirect(v)
+  }
+  private final class ExposedByteRenderer(out: ByteArrayOutputStream)
+      extends BaseByteRenderer[ByteArrayOutputStream](out) {
+    def write(v: Long): Unit = writeLongDirect(v)
+  }
+
   def tests: Tests = Tests {
     test("hello") {
       ujson.transform(ujson.Arr(ujson.Num(1), ujson.Num(2)), new Renderer()).toString ==>
@@ -56,6 +65,80 @@ object RendererTests extends TestSuite {
       test("large") { render(9999999999L) ==> "9999999999" }
       test("maxValue") { render(Long.MaxValue) ==> Long.MaxValue.toString }
       test("minValue") { render(Long.MinValue) ==> Long.MinValue.toString }
+    }
+
+    test("writeLongDirectBoundaries") {
+      def renderChar(v: Long): String = {
+        val out = new StringBuilderWriter
+        val renderer = new ExposedCharRenderer(out)
+        renderer.write(v)
+        renderer.flushCharBuilder()
+        out.toString
+      }
+      def renderByte(v: Long): String = {
+        val out = new ByteArrayOutputStream
+        val renderer = new ExposedByteRenderer(out)
+        renderer.write(v)
+        renderer.flushByteBuilder()
+        new String(out.toByteArray, java.nio.charset.StandardCharsets.UTF_8)
+      }
+
+      val values = Seq(
+        0L,
+        1L,
+        -1L,
+        9L,
+        10L,
+        99L,
+        100L,
+        101L,
+        9999L,
+        10000L,
+        99999L,
+        100000L,
+        999999L,
+        1000000L,
+        9999999L,
+        10000000L,
+        99999999L,
+        100000000L,
+        100000001L,
+        999999999L,
+        1000000000L,
+        Int.MaxValue.toLong,
+        999999999999999L,
+        1000000000000000L,
+        9999999999999999L,
+        10000000000000000L,
+        10000000000000001L,
+        99999999999999999L,
+        100000000000000000L,
+        999999999999999999L,
+        1000000000000000000L,
+        1000000000000000001L,
+        -9999999999999999L,
+        -10000000000000000L,
+        -10000000000000001L,
+        (1L << 37) - 1L,
+        1L << 37,
+        (1L << 37) + 1L,
+        (1L << 53) - 1L,
+        1L << 53,
+        Long.MaxValue,
+        Long.MinValue
+      )
+      for (value <- values) {
+        val expected = value.toString
+        renderChar(value) ==> expected
+        renderByte(value) ==> expected
+      }
+      val random = new java.util.Random(0)
+      for (_ <- 0 until 4096) {
+        val value = random.nextLong()
+        val expected = value.toString
+        renderChar(value) ==> expected
+        renderByte(value) ==> expected
+      }
     }
 
     test("visitFloat64Integers") {
