@@ -195,6 +195,21 @@ object SjsonnetMainBase {
           Left("ERROR: cannot use --no-trailing-newline with --yaml-stream")
         else Right(())
       }
+      _ <- {
+        if (config.maxStack < 1) Left(s"ERROR: invalid --max-stack value: ${config.maxStack}")
+        else Right(())
+      }
+      _ <- {
+        if (config.maxTrace < 0) Left(s"ERROR: invalid --max-trace value: ${config.maxTrace}")
+        else Right(())
+      }
+      _ <- {
+        if (config.maxParserRecursionDepth < 0)
+          Left(
+            s"ERROR: invalid --max-parser-recursion-depth value: ${config.maxParserRecursionDepth}"
+          )
+        else Right(())
+      }
       file <- Right(config.file)
       debugStats =
         if (config.debugStats.value) { val s = new DebugStats; statsToReport = s; s }
