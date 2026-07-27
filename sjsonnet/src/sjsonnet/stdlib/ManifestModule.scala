@@ -446,25 +446,14 @@ object ManifestModule extends AbstractFunctionModule {
    */
   private object Lines extends Val.Builtin1("lines", "arr") {
     def evalRhs(v1: Eval, ev: EvalScope, pos: Position): Val = {
+      val out = new StringBuilder
       v1.value.asArr.foreach {
-        case _: Val.Str | _: Val.Null => // donothing
-        case x                        =>
+        case s: Val.Str  => out.append(s.str).append('\n')
+        case _: Val.Null => // skip nulls like std.join
+        case x           =>
           Error.fail("std.lines: expected string or null element, got " + x.value.prettyName)
       }
-      Val.Str(
-        pos,
-        Materializer
-          .apply(v1.value)(ev)
-          .asInstanceOf[ujson.Arr]
-          .value
-          .filter(_ != ujson.Null)
-          .map {
-            case ujson.Str(s) => s + "\n"
-            case _            =>
-              throw new RuntimeException("Unexpected") /* we ensure it's all strings above */
-          }
-          .mkString
-      )
+      Val.Str(pos, out.toString)
     }
   }
 
