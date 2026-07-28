@@ -164,7 +164,7 @@ object sjsonnet extends VersionFileModule {
       with ScalaJSModule
       with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.20.2"
+    def scalaJSVersion = "1.22.0"
     val sourceDirs = Seq(
       "src",
       "src-js",
@@ -174,7 +174,7 @@ object sjsonnet extends VersionFileModule {
 
     def mvnDeps = super.mvnDeps() ++
       Seq(
-        mvn"org.virtuslab::scala-yaml::0.3.1"
+        mvn"org.virtuslab::scala-yaml::0.3.3"
       )
 
     def nodeJsArgs: List[String] = List("--stack-size=" + stackSizekBytes)
@@ -281,7 +281,7 @@ object sjsonnet extends VersionFileModule {
     def mvnDeps = super.mvnDeps() ++
       Seq(
         mvn"com.github.lolgab::scala-native-crypto::0.3.0",
-        mvn"org.virtuslab::scala-yaml::0.3.1"
+        mvn"org.virtuslab::scala-yaml::0.3.3"
       )
 
     def releaseMode = ReleaseMode.ReleaseFull
