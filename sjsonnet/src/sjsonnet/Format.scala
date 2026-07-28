@@ -687,6 +687,13 @@ object Format {
                       )
                     }
                     i += 1
+                    if (i >= valuesArr.length)
+                      Error.fail(
+                        "too few values to format: %d, expected at least %d".format(
+                          valuesArr.length,
+                          i + 1
+                        )
+                      )
                     formatted = withStarWidth(formatted, width, idx)
                     valuesArr.value(i)
                   case (false, true) =>
@@ -697,6 +704,13 @@ object Format {
                       )
                     }
                     i += 1
+                    if (i >= valuesArr.length)
+                      Error.fail(
+                        "too few values to format: %d, expected at least %d".format(
+                          valuesArr.length,
+                          i + 1
+                        )
+                      )
                     formatted = withStarPrecision(formatted, precision, idx)
                     valuesArr.value(i)
                   case (true, true) =>
@@ -707,6 +721,13 @@ object Format {
                       )
                     }
                     i += 1
+                    if (i >= valuesArr.length)
+                      Error.fail(
+                        "too few values to format: %d, expected at least %d".format(
+                          valuesArr.length,
+                          i + 1
+                        )
+                      )
                     val precision = valuesArr.value(i)
                     if (!precision.isInstanceOf[Val.Num]) {
                       Error.fail(
@@ -714,6 +735,13 @@ object Format {
                       )
                     }
                     i += 1
+                    if (i >= valuesArr.length)
+                      Error.fail(
+                        "too few values to format: %d, expected at least %d".format(
+                          valuesArr.length,
+                          i + 1
+                        )
+                      )
                     formatted =
                       withStarPrecision(withStarWidth(formatted, width, idx), precision, idx)
                     valuesArr.value(i)
