@@ -552,7 +552,7 @@ object MathModule extends AbstractFunctionModule {
      * The official docs list std.mantissa(x) as a mathematical function.
      */
     builtin("mantissa", "x") { (pos, ev, x: Double) =>
-      if (x == 0) 0.0
+      if (x == 0) x
       else {
         val bits = java.lang.Double.doubleToRawLongBits(x)
         val absBits = bits & 0x7fffffffffffffffL
