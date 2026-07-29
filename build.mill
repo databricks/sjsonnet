@@ -390,17 +390,22 @@ object sjsonnet extends VersionFileModule {
            |  JAVACMD="$$JAVA_HOME/bin/java"
            |fi
            |SJSONNET_JAVA_OPTS=""
-           |if "$$JAVACMD" --sun-misc-unsafe-memory-access=allow -version >/dev/null 2>&1; then
-           |  SJSONNET_JAVA_OPTS="--sun-misc-unsafe-memory-access=allow"
+           |if "$$JAVACMD" --enable-native-access=ALL-UNNAMED -version >/dev/null 2>&1; then
+           |  SJSONNET_JAVA_OPTS="--enable-native-access=ALL-UNNAMED"
            |fi
-           |exec "$$JAVACMD" -Xss$stackSize --enable-native-access=ALL-UNNAMED $$SJSONNET_JAVA_OPTS $$JAVA_OPTS -cp "$$0" 'sjsonnet.SjsonnetMain' "$$@"""".stripMargin,
+           |if "$$JAVACMD" --sun-misc-unsafe-memory-access=allow -version >/dev/null 2>&1; then
+           |  SJSONNET_JAVA_OPTS="$$SJSONNET_JAVA_OPTS --sun-misc-unsafe-memory-access=allow"
+           |fi
+           |exec "$$JAVACMD" -Xss$stackSize $$SJSONNET_JAVA_OPTS $$JAVA_OPTS -cp "$$0" 'sjsonnet.SjsonnetMain' "$$@"""".stripMargin,
       cmdCommands =
         s"""set "JAVACMD=java.exe"
            |if not "%JAVA_HOME%"=="" set "JAVACMD=%JAVA_HOME%\\bin\\java.exe"
            |set "SJSONNET_JAVA_OPTS="
+           |"%JAVACMD%" --enable-native-access=ALL-UNNAMED -version >nul 2>&1
+           |if "%errorlevel%" == "0" set "SJSONNET_JAVA_OPTS=--enable-native-access=ALL-UNNAMED"
            |"%JAVACMD%" --sun-misc-unsafe-memory-access=allow -version >nul 2>&1
-           |if "%errorlevel%" == "0" set "SJSONNET_JAVA_OPTS=--sun-misc-unsafe-memory-access=allow"
-           |"%JAVACMD%" -Xss$stackSize --enable-native-access=ALL-UNNAMED %SJSONNET_JAVA_OPTS% %JAVA_OPTS% -cp "%~dpnx0" "sjsonnet.SjsonnetMain" %*""".stripMargin
+           |if "%errorlevel%" == "0" set "SJSONNET_JAVA_OPTS=%SJSONNET_JAVA_OPTS% --sun-misc-unsafe-memory-access=allow"
+           |"%JAVACMD%" -Xss$stackSize %SJSONNET_JAVA_OPTS% %JAVA_OPTS% -cp "%~dpnx0" "sjsonnet.SjsonnetMain" %*""".stripMargin
     )
 
     def assemblySmoke = Task {
@@ -460,9 +465,9 @@ object sjsonnet extends VersionFileModule {
       assert(defaultStackErr.contains("Max stack frames exceeded."), defaultStackErr)
     }
 
-    def scalacOptions = super.scalacOptions() ++ Seq("-release", "17") ++
+    def scalacOptions = super.scalacOptions() ++ Seq("-release", "11") ++
       (if (JvmWorkerUtil.isScala3(scalaVersion())) Seq("-Yfuture-lazy-vals") else Seq.empty)
-    def javacOptions = super.javacOptions() ++ Seq("--release", "17")
+    def javacOptions = super.javacOptions() ++ Seq("--release", "11")
 
     def mvnDeps = super.mvnDeps() ++ Seq(
       mvn"org.tukaani:xz::1.11",
@@ -478,6 +483,9 @@ object sjsonnet extends VersionFileModule {
 
     object client extends JavaModule with SjsonnetPublishModule {
       def artifactName = "sjsonnet-server"
+      // Daemon (client/server) mode relies on JDK 16 Unix-domain-socket APIs
+      // (UnixDomainSocketAddress / StandardProtocolFamily.UNIX), so unlike the
+      // core library and CLI it cannot target JDK 11.
       def javacOptions = super.javacOptions() ++ Seq("--release", "17", "-Xlint:deprecation", "-Werror")
       object test extends JavaTests with TestModule.Junit4
     }
@@ -486,6 +494,9 @@ object sjsonnet extends VersionFileModule {
       def artifactName = "sjsonnet-server"
       def scalaVersion = SjsonnnetJvmModule.this.crossValue
       def moduleDeps = Seq(SjsonnnetJvmModule.this, client)
+      // Daemon (client/server) mode relies on JDK 16 Unix-domain-socket APIs
+      // (UnixDomainSocketAddress / StandardProtocolFamily.UNIX), so unlike the
+      // core library and CLI it cannot target JDK 11.
       def scalacOptions = super.scalacOptions() ++ Seq("-release", "17", "-deprecation", "-Werror") ++
         (if (JvmWorkerUtil.isScala3(scalaVersion())) Seq("-Yfuture-lazy-vals") else Seq.empty)
       def javacOptions = super.javacOptions() ++ Seq("--release", "17")
