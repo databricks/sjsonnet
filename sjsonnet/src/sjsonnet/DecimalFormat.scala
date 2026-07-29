@@ -14,6 +14,38 @@ object DecimalFormat {
     sign + Platform.repeatString("0", targetWidth - nWidth) + absN
   }
 
+  private def formatExponentParts(
+      precision: Int,
+      hashes: Int,
+      alternate: Boolean,
+      expLength: Int,
+      expNum: Long,
+      prefix: String,
+      fracDigits: String): String = {
+    val expSign = if (expNum >= 0) "+" else ""
+    val expFrag = expSign + leftPad(expNum, expLength)
+
+    (precision, alternate) match {
+      case (0, false) => prefix + "E" + expFrag
+      case (0, true)  => prefix + ".E" + expFrag
+      case (_, _)     =>
+        // Strip trailing zeros only for '#' (hash) positions, not '0' positions
+        val stripped =
+          if (hashes == 0) fracDigits
+          else {
+            var end = fracDigits.length
+            var hashesLeft = hashes
+            while (end > 0 && hashesLeft > 0 && fracDigits.charAt(end - 1) == '0') {
+              end -= 1
+              hashesLeft -= 1
+            }
+            fracDigits.substring(0, end)
+          }
+        if (stripped.isEmpty) prefix + "E" + expFrag
+        else prefix + "." + stripped + "E" + expFrag
+    }
+  }
+
   def format(
       zeroes: Int,
       hashes: Int,
@@ -25,40 +57,65 @@ object DecimalFormat {
         var expNum =
           if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
         val precision = zeroes + hashes
-        // Scale so mantissa * 10^precision becomes a roundable integer
-        val divided = number / Math.pow(10, (expNum - precision).toDouble)
-        var rounded = Math.round(divided)
-        val tenPowPrec = Math.pow(10, precision).toLong
-        if (rounded.toDouble >= Math.pow(10, precision + 1)) {
-          rounded = Math.round(rounded / 10.0)
-          expNum += 1
-        }
-        val intPart = rounded / tenPowPrec
-        val fracNum = math.abs(rounded % tenPowPrec)
-        val prefix = intPart.toString
-        val expSign = if (expNum >= 0) "+" else ""
-        val expFrag = expSign + leftPad(expNum, expLength)
-        // Left-pad fractional digits with zeros to exact precision width
-        val fracDigits = leftPad(fracNum, precision)
-
-        (precision, alternate) match {
-          case (0, false) => prefix + "E" + expFrag
-          case (0, true)  => prefix + ".E" + expFrag
-          case (_, _)     =>
-            // Strip trailing zeros only for '#' (hash) positions, not '0' positions
-            val stripped =
-              if (hashes == 0) fracDigits
-              else {
-                var end = fracDigits.length
-                var hashesLeft = hashes
-                while (end > 0 && hashesLeft > 0 && fracDigits.charAt(end - 1) == '0') {
-                  end -= 1
-                  hashesLeft -= 1
-                }
-                fracDigits.substring(0, end)
-              }
-            if (stripped.isEmpty) prefix + "E" + expFrag
-            else prefix + "." + stripped + "E" + expFrag
+        if (precision > 15) {
+          // A Double cannot represent every scaled mantissa once scientific formatting asks for
+          // more than 16 significant digits. Math.round first loses low digits and then saturates
+          // at Long.MaxValue. Start from the exact binary64 value and keep the scaled integer
+          // outside Long.
+          val tenPowPrec = BigInt(10).pow(precision)
+          val exactMagnitude = BigDecimal.exact(number).abs
+          val exactJava = exactMagnitude.bigDecimal
+          if (exactJava.signum() != 0) {
+            while (
+              exactJava.compareTo(
+                java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt + 1)
+              ) >= 0
+            ) expNum += 1
+            while (
+              exactJava.compareTo(java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt)) < 0
+            ) expNum -= 1
+          }
+          val scaleExponent = precision - expNum.toInt
+          val scaled =
+            if (scaleExponent >= 0) exactMagnitude * BigDecimal(10).pow(scaleExponent)
+            else exactMagnitude / BigDecimal(10).pow(-scaleExponent)
+          var roundedMagnitude =
+            scaled.setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt
+          if (roundedMagnitude >= tenPowPrec * 10) {
+            roundedMagnitude /= 10
+            expNum += 1
+          }
+          val rounded = if (number < 0) -roundedMagnitude else roundedMagnitude
+          val fracStr = (rounded % tenPowPrec).abs.toString
+          val fracDigits = Platform.repeatString("0", precision - fracStr.length) + fracStr
+          formatExponentParts(
+            precision,
+            hashes,
+            alternate,
+            expLength,
+            expNum,
+            (rounded / tenPowPrec).toString,
+            fracDigits
+          )
+        } else {
+          // Scale so mantissa * 10^precision becomes a roundable integer
+          val divided = number / Math.pow(10, (expNum - precision).toDouble)
+          var rounded = Math.round(divided)
+          val tenPowPrec = Math.pow(10, precision).toLong
+          if (rounded.toDouble >= Math.pow(10, precision + 1)) {
+            rounded = Math.round(rounded / 10.0)
+            expNum += 1
+          }
+          val fracNum = math.abs(rounded % tenPowPrec)
+          formatExponentParts(
+            precision,
+            hashes,
+            alternate,
+            expLength,
+            expNum,
+            (rounded / tenPowPrec).toString,
+            leftPad(fracNum, precision)
+          )
         }
 
       case None =>
