@@ -4,7 +4,6 @@ import java.io.{BufferedInputStream, ByteArrayOutputStream, File, FileInputStrea
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util
 import java.util.Base64
-import java.util.HexFormat
 import java.util.zip.GZIPOutputStream
 import com.google.re2j.Pattern
 import net.jpountz.xxhash.{StreamingXXHash64, XXHashFactory}
@@ -20,7 +19,6 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 object Platform {
-  private val hexFormat = HexFormat.of()
 
   private[sjsonnet] type ParseCacheMap =
     TrieMap[(Path, String), Either[Error, (Expr, FileScope)]]
@@ -489,9 +487,7 @@ object Platform {
   }
 
   private def computeHash(algorithm: String, s: String): String =
-    hexFormat.formatHex(
-      java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8))
-    )
+    Hex.encode(java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8)))
 
   def md5(s: String): String = computeHash("MD5", s)
 

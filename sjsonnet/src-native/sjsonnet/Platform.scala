@@ -31,8 +31,6 @@ object Platform {
   def newImporterResolveCacheMap(): ImporterResolveCacheMap =
     TrieMap.empty[(Path, String), Option[Path]]
 
-  private val hexChars = "0123456789abcdef".toCharArray
-
   private def repeatCapacity(s: String, count: Int): Int =
     if (count > 0 && s.length <= Int.MaxValue / count) s.length * count else 0
 
@@ -480,22 +478,8 @@ object Platform {
     result.mkString("\n")
   }
 
-  private def bytesToHex(bytes: Array[Byte]): String = {
-    val out = new Array[Char](bytes.length * 2)
-    var i = 0
-    var j = 0
-    while (i < bytes.length) {
-      val b = bytes(i) & 0xff
-      out(j) = hexChars(b >>> 4)
-      out(j + 1) = hexChars(b & 0x0f)
-      i += 1
-      j += 2
-    }
-    new String(out)
-  }
-
   private def computeHash(algorithm: String, s: String): String =
-    bytesToHex(java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8)))
+    Hex.encode(java.security.MessageDigest.getInstance(algorithm).digest(s.getBytes(UTF_8)))
 
   def md5(s: String): String = computeHash("MD5", s)
 
