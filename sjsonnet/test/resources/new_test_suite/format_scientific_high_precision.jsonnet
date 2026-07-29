@@ -12,4 +12,9 @@ std.assertEqual(std.format("%.16e", 1.00000762939453125), "1.0000076293945312e+0
 std.assertEqual(std.format("%.16e", -1.00000762939453125), "-1.0000076293945312e+00") &&
 std.assertEqual(std.format("%.16e", 0), "0.0000000000000000e+00") &&
 std.assertEqual(std.format("%.16e", -0.0), "-0.0000000000000000e+00") &&
+std.assertEqual(std.format("%.20e", 1.7976931348623157e308), "1.79769313486231570815e+308") &&
+std.assertEqual(std.format("%.20e", 5e-324), "4.94065645841246544177e-324") &&
+std.assertEqual(std.format("%.40e", 1.0), "1.0000000000000000000000000000000000000000e+00") &&
+std.assertEqual(std.format("%.25e", 0.1), "1.0000000000000000555111512e-01") &&
+std.assertEqual(std.format("%.30e", 3.14159265358979323), "3.141592653589793115997963468544e+00") &&
 true
