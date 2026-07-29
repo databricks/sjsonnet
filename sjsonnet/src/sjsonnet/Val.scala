@@ -1530,7 +1530,8 @@ object Val {
     // After materialization arr becomes non-null; delegate to parent Arr logic.
     @inline private def isMaterialized: Boolean = arr ne null
 
-    /** Raw byte backing data for zero-copy extraction (e.g. base64 encode). Always non-null. */
+    /** Raw byte backing data for zero-copy extraction (e.g. base64 encode). Always non-null.
+     *  CONTRACT: callers MUST NOT mutate the returned array — it may be shared via import cache. */
     override def rawBytes: Array[Byte] = byteData
 
     override def value(i: Int): Val = {
@@ -1624,6 +1625,7 @@ object Val {
       }
     }
 
+    /** CONTRACT: callers MUST NOT mutate the returned array. */
     override def rawBytes: Array[Byte] = {
       val current = byteData
       if (current != null) current
