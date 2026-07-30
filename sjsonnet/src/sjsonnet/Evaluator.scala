@@ -894,9 +894,10 @@ class Evaluator(
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
         if (rr < 0) Error.fail("Shift by negative exponent", pos)
-        if (rr >= 1 && math.abs(ll) >= (1L << (63 - rr)))
+        val masked = (rr % 64).toInt
+        if (masked >= 1 && math.abs(ll) >= (1L << (63 - masked)))
           Error.fail("Numeric value outside safe integer range for bitwise operation", pos)
-        (ll << rr).toDouble
+        (ll << masked).toDouble
       case Expr.BinaryOp.OP_>> =>
         val ll = visitExprAsDouble(e.lhs).toSafeLong(pos)
         val rr = visitExprAsDouble(e.rhs).toSafeLong(pos)
