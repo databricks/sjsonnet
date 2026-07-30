@@ -1222,7 +1222,8 @@ object Format {
             if (formatted.alternate) 0 else fractionalPrecision,
             formatted.alternate,
             None,
-            math.abs(s)
+            math.abs(s),
+            useExactDecimal = precision > 15
           ),
         numeric = true,
         signedConversion = !isNegative(s)

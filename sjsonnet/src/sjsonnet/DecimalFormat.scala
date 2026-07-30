@@ -19,7 +19,16 @@ object DecimalFormat {
       hashes: Int,
       alternate: Boolean,
       expLengthOpt: Option[Int],
-      number: Double): String = {
+      number: Double): String =
+    format(zeroes, hashes, alternate, expLengthOpt, number, useExactDecimal = false)
+
+  private[sjsonnet] def format(
+      zeroes: Int,
+      hashes: Int,
+      alternate: Boolean,
+      expLengthOpt: Option[Int],
+      number: Double,
+      useExactDecimal: Boolean): String = {
     expLengthOpt match {
       case Some(expLength) =>
         var expNum =
@@ -75,9 +84,15 @@ object DecimalFormat {
           if (alternate) prefix + "." else prefix
         } else {
           val denominator = BigDecimal(10).pow(precision)
-          val bd = BigDecimal(number).abs
+          val exactDecimal = useExactDecimal || precision > 15
+          val bd =
+            if (exactDecimal) BigDecimal.exact(number).abs
+            else BigDecimal(number).abs
           val scaled =
-            (bd * denominator + BigDecimal("0.5")).setScale(0, BigDecimal.RoundingMode.FLOOR)
+            if (exactDecimal)
+              (bd * denominator).setScale(0, BigDecimal.RoundingMode.HALF_EVEN)
+            else
+              (bd * denominator + BigDecimal("0.5")).setScale(0, BigDecimal.RoundingMode.FLOOR)
           val wholeBD = (scaled / denominator).setScale(0, BigDecimal.RoundingMode.FLOOR)
           val fracBD = (scaled - wholeBD * denominator).abs
 
