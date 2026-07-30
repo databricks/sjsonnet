@@ -65,6 +65,8 @@ class Evaluator(
   def materialize(v: Val): Value = Materializer.apply(v)
   val cachedImports: collection.mutable.HashMap[Path, Val] =
     collection.mutable.HashMap.empty[Path, Val]
+  private val cachedImportStrings = collection.mutable.HashMap.empty[Path, Val.Str]
+  private val cachedImportBinaries = collection.mutable.HashMap.empty[Path, Val.Arr]
 
   // Hot path: top 7 types cover 96.1% of all visitExpr calls across benchmarks.
   // Order matches the empirically-measured frequency for C1 monomorphic dispatch parity.
@@ -1267,23 +1269,16 @@ class Evaluator(
   }
 
   def visitImportStr(e: ImportStr): Val.Str = {
-    Val.Str(
-      e.pos,
-      importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)._2.readString()
-    )
+    val (path, file) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = false)
+    cachedImportStrings.getOrElseUpdate(path, Val.Str(e.pos, file.readString()))
   }
 
   def visitImportBin(e: ImportBin): Val.Arr = {
-    val rawBytes =
-      importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)._2.readRawBytes()
-    val len = rawBytes.length
-    val arr = new Array[Eval](len)
-    var i = 0
-    while (i < len) {
-      arr(i) = Val.cachedNum(e.pos, (rawBytes(i) & 0xff).toDouble)
-      i += 1
-    }
-    Val.Arr(e.pos, arr)
+    val (path, file) = importer.resolveAndReadOrFail(e.value, e.pos, binaryData = true)
+    cachedImportBinaries.getOrElseUpdate(
+      path,
+      Val.Arr.fromBytes(e.pos, file.readRawBytes().clone())
+    )
   }
 
   def visitImport(e: Import): Val = {
