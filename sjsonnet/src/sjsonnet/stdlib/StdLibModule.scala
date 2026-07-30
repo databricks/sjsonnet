@@ -75,9 +75,9 @@ object StdLibModule {
    */
   private val traceFunction = new Val.Builtin2("trace", "str", "rest") {
     def evalRhs(str: Eval, rest: Eval, ev: EvalScope, pos: Position): Val = {
-      ev.trace(
-        s"TRACE: ${pos.fileScope.currentFileLastPathElement} " + str.value.asString
-      )
+      val file = pos.fileScope.currentFileLastPathElement
+      val line = ev.prettyIndex(pos).map { case (l, _) => ":" + l }.getOrElse("")
+      ev.trace(s"TRACE: $file$line " + str.value.asString)
       rest.value
     }
 
