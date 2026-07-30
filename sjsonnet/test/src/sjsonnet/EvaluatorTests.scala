@@ -623,7 +623,7 @@ object EvaluatorTests extends TestSuite {
 
       val (used, usedTraces) = evalWithTraces("""std.trace("used trace", 1)""")
       used ==> ujson.Num(1)
-      usedTraces ==> Vector("TRACE: (memory) used trace")
+      usedTraces ==> Vector("TRACE: (memory):1 used trace")
     }
     test("identityFunctionTraces") {
       // Issue #815: the identity-elision fast paths must force the argument exactly as a normal
@@ -631,7 +631,7 @@ object EvaluatorTests extends TestSuite {
       // Direct identity elision: the traced argument is forced exactly once.
       val (idVal, idTraces) = evalWithTraces("""(function(x) x)(std.trace("idtrace", 5))""")
       idVal ==> ujson.Num(5)
-      idTraces ==> Vector("TRACE: (memory) idtrace")
+      idTraces ==> Vector("TRACE: (memory):1 idtrace")
 
       // Self-composition identity (g = id): still forced exactly once.
       val (compVal, compTraces) =
@@ -639,7 +639,7 @@ object EvaluatorTests extends TestSuite {
           """local g = function(x) x; local f = function(x) g(g(x)); f(std.trace("comp", 9))"""
         )
       compVal ==> ujson.Num(9)
-      compTraces ==> Vector("TRACE: (memory) comp")
+      compTraces ==> Vector("TRACE: (memory):1 comp")
 
       // Laziness preserved: identity map stays lazy, so std.length does not force the element.
       val (lazyVal, lazyTraces) =

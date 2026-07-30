@@ -1,4 +1,4 @@
-TRACE: lazy_array_reverse_cache_trace.jsonnet lazy-array-make-reverse-cache 0
-TRACE: lazy_array_reverse_cache_trace.jsonnet lazy-array-map-reverse-cache 0
-TRACE: lazy_array_reverse_cache_trace.jsonnet lazy-array-mapWithIndex-reverse-cache 0
+TRACE: lazy_array_reverse_cache_trace.jsonnet:2 lazy-array-make-reverse-cache 0
+TRACE: lazy_array_reverse_cache_trace.jsonnet:4 lazy-array-map-reverse-cache 0
+TRACE: lazy_array_reverse_cache_trace.jsonnet:6 lazy-array-mapWithIndex-reverse-cache 0
 true
