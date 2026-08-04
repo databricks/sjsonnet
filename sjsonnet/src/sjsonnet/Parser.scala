@@ -903,7 +903,7 @@ class Parser(
               /*
                * Prevent duplicate fields in list comprehension. See: https://github.com/databricks/sjsonnet/issues/99
                *
-             * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
+               * If comps._1 is a forspec with value greater than one lhs cannot be a Expr.Str
                * Otherwise the field value will be overriden by the multiple iterations of forspec
                */
               (lhs, comps) match {
