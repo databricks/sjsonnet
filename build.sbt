@@ -1,4 +1,9 @@
-val sjsonnetVersion = IO.readLines(new File("sjsonnet/version")).head.trim
+import scala.sys.process._
+
+val sjsonnetVersion = sys.env.getOrElse(
+  "SJSONNET_VERSION",
+  Process(Seq("git", "rev-parse", "HEAD")).!!.trim
+)
 cancelable in Global := true
 
 val options = Seq("-Wconf:origin=scala.collection.compat.*:s", "-Xlint:all", "-release", "11", "-Yfuture-lazy-vals")
