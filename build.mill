@@ -158,44 +158,10 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
 
 object sjsonnet extends Module {
   def currentVersion = Task.Input {
-    sys.env.get("SJSONNET_VERSION") match {
-      case Some(version) => version
-      case None =>
-        val dotGit = BuildCtx.workspaceRoot / ".git"
-        val gitDir =
-          if (os.isDir(dotGit)) dotGit
-          else {
-            val gitDirPrefix = "gitdir: "
-            val contents = os.read(dotGit).trim
-            if (!contents.startsWith(gitDirPrefix))
-              throw new Exception(s"Invalid Git metadata in $dotGit")
-            os.Path(contents.stripPrefix(gitDirPrefix), BuildCtx.workspaceRoot)
-          }
-        val commonDirFile = gitDir / "commondir"
-        val commonDir =
-          if (os.isFile(commonDirFile)) os.Path(os.read(commonDirFile).trim, gitDir)
-          else gitDir
-        val head = os.read(gitDir / "HEAD").trim
-        val refPrefix = "ref: "
-        if (!head.startsWith(refPrefix)) head
-        else {
-          val ref = head.stripPrefix(refPrefix)
-          Seq(gitDir / os.RelPath(ref), commonDir / os.RelPath(ref))
-            .find(os.isFile)
-            .map(os.read(_).trim)
-            .orElse {
-              val packedRefs = commonDir / "packed-refs"
-              if (!os.isFile(packedRefs)) None
-              else
-                os.read.lines(packedRefs).collectFirst {
-                  case line if !line.startsWith("#") && !line.startsWith("^") &&
-                      line.endsWith(s" $ref") =>
-                    line.takeWhile(_ != ' ')
-                }
-            }
-            .getOrElse(throw new Exception(s"Unable to resolve Git ref $ref"))
-        }
-    }
+    sys.env.getOrElse(
+      "SJSONNET_VERSION",
+      os.proc("git", "rev-parse", "HEAD").call(cwd = BuildCtx.workspaceRoot).out.trim()
+    )
   }
 
   trait SjsonnetScalaJSModule
