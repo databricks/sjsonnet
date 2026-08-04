@@ -169,7 +169,7 @@ object sjsonnet extends Module {
       with ScalaJSModule
       with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.22.0"
+    def scalaJSVersion = "1.20.2"
     val sourceDirs = Seq(
       "src",
       "src-js",
