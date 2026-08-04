@@ -367,8 +367,8 @@ object Val {
 
     // Product-extractor accessors backing `case Val.Str(pos, s)` (see Str.unapply). Reading these
     // off the scrutinee avoids the per-match Some+Tuple2 allocation the old extractor incurred.
-    private[sjsonnet] def _1: Position = pos
-    private[sjsonnet] def _2: String = str
+    def _1: Position = pos
+    def _2: String = str
 
     /**
      * Iterative rope flattening — stack-safe for arbitrarily deep trees. For a left-leaning rope of
@@ -445,10 +445,10 @@ object Val {
      * materializer. The `Str` type test before extraction keeps the match refutable, so
      * `AsciiSafeStr` (the only subclass) is matched exactly as before.
      */
-    private[sjsonnet] def unapply(s: Str): StrExtract = new StrExtract(s)
+    def unapply(s: Str): StrExtract = new StrExtract(s)
 
     /** Allocation-free extractor result for [[Str.unapply]]; `get` exposes `_1`/`_2`. */
-    private[sjsonnet] final class StrExtract(val self: Str) extends AnyVal {
+    final class StrExtract(val self: Str) extends AnyVal {
       def isEmpty: Boolean = self == null
       def get: Str = self
     }
