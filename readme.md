@@ -381,8 +381,11 @@ programmatically via `new Interpreter(...).interpret(...)`.
 
 ## Publishing
 
-To publish the JVM version to Maven, make sure the version number in `build.mill` is correct, then run the following commands:
+By default, the build version is the full commit hash of the current Git checkout. Set
+`SJSONNET_VERSION` to override it, for example when publishing a release:
+
 ```bash
+export SJSONNET_VERSION=0.7.1
 ./mill -i mill.scalalib.SonatypeCentralPublishModule/publishAll \
     --username $SONATYPE_USER --password $SONATYPE_PASSWORD --publishArtifacts __.publishArtifacts \
     --gpgArgs --passphrase=$GPG_PASSPHRASE,--batch,--yes,-a,-b,--pinentry-mode=loopback
