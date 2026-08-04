@@ -2,7 +2,6 @@
 //| mill-jvm-version: zulu:21
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
-//| - com.lihaoyi::mill-contrib-versionfile:$MILL_VERSION
 package build
 
 import mill._
@@ -15,7 +14,6 @@ import scalajslib.api._
 import scalafmt._
 import javalib.api.JvmWorkerUtil
 import javalib.NativeImageModule
-import contrib.versionfile.VersionFileModule
 import contrib.jmh.JmhModule
 import mill.util.Jvm
 import mill.api.BuildCtx
@@ -158,7 +156,14 @@ object bench extends ScalaModule with JmhModule with ScalafmtModule {
   }
 }
 
-object sjsonnet extends VersionFileModule {
+object sjsonnet extends Module {
+  def currentVersion = Task.Input {
+    sys.env.getOrElse(
+      "SJSONNET_VERSION",
+      os.proc("git", "rev-parse", "HEAD").call(cwd = BuildCtx.workspaceRoot).out.trim()
+    )
+  }
+
   trait SjsonnetScalaJSModule
       extends SjsonnetCrossModule
       with ScalaJSModule
