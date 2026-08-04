@@ -52,6 +52,19 @@ object JsonImportFastPathTests extends TestSuite {
       )
     }
 
+    test("profiler handles strict json imports without source offsets") {
+      val interp = interpreter(Map("data.json" -> """{"a":1}"""), Settings.default)
+      val profiler = new Profiler(ProfileOutputFormat.Text, DummyPath("root"))
+      interp.evaluator.profiler = profiler
+
+      interp.interpret("""import "data.json"""", DummyPath("root", "main.jsonnet")) ==>
+      Right(ujson.Obj("a" -> 1))
+
+      profiler.initLineColLookup(pos => interp.evaluator.prettyIndex(pos))
+      val output = ProfilePrinter.formatResult(profiler.collectResult()).mkString("\n")
+      assert(output.contains(":?:? Obj"))
+    }
+
     test("strict json import sorted key caches are lazy and reusable") {
       val fields = (0 until 20).map(i => s""""k${19 - i}":$i""").mkString("{", ",", "}")
       val obj = interpreter(Map("data.json" -> fields), Settings.default)

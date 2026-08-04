@@ -263,6 +263,7 @@ trait EvalErrorScope {
   def wd: Path
 
   def prettyIndex(pos: Position): Option[(Int, Int)] = {
+    if (pos.offset < 0) return None
     val file = pos.currentFile
     if (file == null) return None
     importer.read(file, binaryData = false).map { s =>
