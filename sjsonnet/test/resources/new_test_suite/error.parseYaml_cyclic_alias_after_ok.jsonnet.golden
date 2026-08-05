@@ -1,0 +1,3 @@
+sjsonnet.Error: [std.parseYaml] Recursive YAML alias reference
+    at [<root>].(error.parseYaml_cyclic_alias_after_ok.jsonnet:4:14)
+

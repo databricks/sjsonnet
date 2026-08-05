@@ -435,7 +435,14 @@ object Platform {
             }
             ujson.Arr(buf)
         }
-      case Left(e) => Error.fail("Error converting YAML to JSON: " + e.getMessage)
+      case Left(e) =>
+        // scala-yaml rejects cyclic (and forward) aliases at compose time with
+        // "There is no anchor for <identity hash> alias"; the hash is
+        // non-deterministic, so normalize to the same stable message the JVM
+        // backend produces.
+        if (e.getMessage != null && e.getMessage.startsWith("There is no anchor for"))
+          Error.fail("Recursive YAML alias reference")
+        else Error.fail("Error converting YAML to JSON: " + e.getMessage)
     }
   }
 
