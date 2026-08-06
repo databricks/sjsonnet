@@ -27,7 +27,7 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     var key: String = _
     def subVisitor: Visitor[?, ?] = self
     def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
-    def visitKeyValue(s: Any): Unit = key = s.toString
+    def visitKeyValue(s: Any): Unit = key = ValVisitor.replaceLoneSurrogates(s.toString)
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)
       allKeys.put(key, false)
@@ -52,5 +52,48 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
       }
     )
 
-  def visitString(s: CharSequence, index: Int): Val = Val.Str(pos, s.toString)
+  def visitString(s: CharSequence, index: Int): Val =
+    Val.Str(pos, ValVisitor.replaceLoneSurrogates(s.toString))
+}
+
+object ValVisitor {
+
+  /**
+   * Replace unpaired UTF-16 surrogates with U+FFFD. JSON inputs may contain lone
+   * surrogate escapes (RFC 8259 lets implementations accept them); keeping them
+   * would corrupt to '?' on UTF-8 output. Matches the replacement policy of
+   * std.char / %c and go-jsonnet's JSON decoding. Strings without surrogates are
+   * returned as-is without allocation.
+   */
+  private[sjsonnet] def replaceLoneSurrogates(s: String): String = {
+    val len = s.length
+    var i = 0
+    while (i < len) {
+      val c = s.charAt(i)
+      if (c >= 0xd800 && c <= 0xdfff) {
+        val sb = new java.lang.StringBuilder(len)
+        sb.append(s, 0, i)
+        while (i < len) {
+          val ch = s.charAt(i)
+          if (
+            Character.isHighSurrogate(ch) && i + 1 < len &&
+            Character.isLowSurrogate(s.charAt(i + 1))
+          ) {
+            sb.append(ch)
+            sb.append(s.charAt(i + 1))
+            i += 2
+          } else if (ch >= 0xd800 && ch <= 0xdfff) {
+            sb.append('\ufffd')
+            i += 1
+          } else {
+            sb.append(ch)
+            i += 1
+          }
+        }
+        return sb.toString
+      }
+      i += 1
+    }
+    s
+  }
 }
