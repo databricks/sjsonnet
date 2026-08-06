@@ -828,20 +828,24 @@ class Parser(
 
   def objinside[$: P](pos: Position, currentDepth: Int): P[Expr.ObjBody] = {
     P(
-      member(currentDepth + 1).rep(sep = ",") ~ ",".? ~ (forspec(currentDepth + 1) ~ compspec(
+      member(currentDepth + 1).rep(sep = ",") ~ ",".!.? ~ (forspec(currentDepth + 1) ~ compspec(
         currentDepth + 1
       )).?
-    ).flatMap { case t @ (exprs, _) =>
-      val seen = collection.mutable.Set.empty[String]
-      var overlap: String = null
-      exprs.foreach {
-        case Expr.Member.Field(_, Expr.FieldName.Fixed(n), _, _, _, _) =>
-          if (seen(n)) overlap = n
-          else seen.add(n)
-        case _ =>
+    ).flatMap { case (exprs, trailingComma, comp) =>
+      if (exprs.isEmpty && trailingComma.isDefined) {
+        Fail.opaque("at least one object member before ','")
+      } else {
+        val seen = collection.mutable.Set.empty[String]
+        var overlap: String = null
+        exprs.foreach {
+          case Expr.Member.Field(_, Expr.FieldName.Fixed(n), _, _, _, _) =>
+            if (seen(n)) overlap = n
+            else seen.add(n)
+          case _ =>
+        }
+        if (overlap == null) Pass((exprs, comp))
+        else Fail.opaque("no duplicate field: " + overlap)
       }
-      if (overlap == null) Pass(t)
-      else Fail.opaque("no duplicate field: " + overlap)
     }.flatMapX {
       case (exprs, None) =>
         val b =
@@ -1026,19 +1030,22 @@ class Parser(
   def args[$: P]: P[(Array[Expr], Array[String])] = args(0)
 
   def args[$: P](currentDepth: Int): P[(Array[Expr], Array[String])] = {
-    P(((id ~ "=" ~ !"=").? ~ expr(currentDepth + 1)).rep(sep = ",") ~ ",".?).flatMapX { x =>
-      if (
-        x.sliding(2).exists {
-          case Seq(l, r) => l._1.isDefined && r._1.isEmpty
-          case _         => false
+    P(((id ~ "=" ~ !"=").? ~ expr(currentDepth + 1)).rep(sep = ",") ~ ",".!.?).flatMapX {
+      case (x, trailingComma) if x.isEmpty && trailingComma.isDefined =>
+        Fail.opaque("at least one argument before ','")
+      case (x, _) =>
+        if (
+          x.sliding(2).exists {
+            case Seq(l, r) => l._1.isDefined && r._1.isEmpty
+            case _         => false
+          }
+        ) {
+          Fail.opaque("no positional params after named params")
+        } else {
+          val args = x.iterator.map(_._2).toArray
+          val namedNames = x.iterator.dropWhile(_._1.isEmpty).map(_._1.get).toArray
+          Pass((args, namedNames))
         }
-      ) {
-        Fail.opaque("no positional params after named params")
-      } else {
-        val args = x.iterator.map(_._2).toArray
-        val namedNames = x.iterator.dropWhile(_._1.isEmpty).map(_._1.get).toArray
-        Pass((args, namedNames))
-      }
     }
   }
 
@@ -1047,25 +1054,28 @@ class Parser(
   def params[$: P](currentDepth: Int): P[Expr.Params] = {
     val ctx = implicitly[P[?]]
     P(
-      (Pos ~~ id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".?
-    ).flatMapX { x =>
-      val seen = collection.mutable.Set.empty[String]
-      var overlap: (Position, String) = null
-      for ((pos, k, _) <- x) {
-        if (overlap == null) {
-          if (seen(k)) overlap = (pos, k)
-          else seen.add(k)
+      (Pos ~~ id ~ ("=" ~ expr(currentDepth + 1)).?).rep(sep = ",") ~ ",".!.?
+    ).flatMapX {
+      case (x, trailingComma) if x.isEmpty && trailingComma.isDefined =>
+        Fail.opaque("at least one parameter before ','")
+      case (x, _) =>
+        val seen = collection.mutable.Set.empty[String]
+        var overlap: (Position, String) = null
+        for ((pos, k, _) <- x) {
+          if (overlap == null) {
+            if (seen(k)) overlap = (pos, k)
+            else seen.add(k)
+          }
         }
-      }
-      if (overlap == null) {
-        val names = x.map(_._2).toArray[String]
-        val exprs = x.map(_._3.orNull).toArray[Expr]
-        Pass(Expr.Params(names, exprs))
-      } else {
-        ctx.cut = true
-        ctx.index = overlap._1.offset
-        Fail.opaque("no duplicate parameter: " + overlap._2)
-      }
+        if (overlap == null) {
+          val names = x.map(_._2).toArray[String]
+          val exprs = x.map(_._3.orNull).toArray[Expr]
+          Pass(Expr.Params(names, exprs))
+        } else {
+          ctx.cut = true
+          ctx.index = overlap._1.offset
+          Fail.opaque("no duplicate parameter: " + overlap._2)
+        }
     }
   }
 
