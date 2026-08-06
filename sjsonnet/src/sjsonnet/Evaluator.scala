@@ -1180,7 +1180,7 @@ class Evaluator(
       e.asserted.msg match {
         case null => Error.fail("Assertion failed", e)
         case msg  =>
-          Error.fail("Assertion failed: " + materializeError(visitExpr(msg)), e)
+          Error.fail(materializeError(visitExpr(msg)), e)
       }
     }
     visitExpr(e.returned)
@@ -1641,7 +1641,7 @@ class Evaluator(
         e.asserted.msg match {
           case null => Error.fail("Assertion failed", e)
           case msg  =>
-            Error.fail("Assertion failed: " + materializeError(visitExpr(msg)), e)
+            Error.fail(materializeError(visitExpr(msg)), e)
         }
       }
       visitExprWithTailCallSupport(e.returned)
@@ -1761,7 +1761,7 @@ class Evaluator(
             case null => Error.fail("Assertion failed", a.value.pos)
             case msg  =>
               Error.fail(
-                "Assertion failed: " + materializeError(visitExpr(msg)(newScope)),
+                materializeError(visitExpr(msg)(newScope)),
                 a.value.pos
               )
           }
