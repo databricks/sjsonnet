@@ -225,8 +225,13 @@ object ManifestModule extends AbstractFunctionModule {
   private object ParseJson extends Val.Builtin1("parseJson", "str") {
     def evalRhs(str: Eval, ev: EvalScope, pos: Position): Val = {
       try {
-        ujson.StringParser.transform(str.value.asString, new ValVisitor(pos))
+        ujson.StringParser.transform(
+          str.value.asString,
+          new ValVisitor(pos, rejectUnpairedSurrogates = true)
+        )
       } catch {
+        case _: ValVisitor.InvalidUnicodeString =>
+          throw Error.fail("Invalid JSON: unpaired surrogate in string", pos)(ev)
         case e: ujson.ParseException =>
           throw Error.fail("Invalid JSON: " + e.getMessage, pos)(ev)
         case _: ujson.IncompleteParseException =>
