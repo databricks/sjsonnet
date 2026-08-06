@@ -95,7 +95,9 @@ object StdLibModule {
   private val extVarFunction = new Val.Builtin1("extVar", "x") {
     def evalRhs(_x: Eval, ev: EvalScope, pos: Position): Val = {
       val x = _x.value.asString
-      ev.visitExpr(ev.extVars(x).getOrElse(Error.fail("Unknown extVar: " + x)))(ValScope.empty)
+      ev.visitExpr(
+        ev.extVars(x).getOrElse(Error.fail("Undefined external variable: " + x))
+      )(ValScope.empty)
     }
 
     override def staticSafe = false

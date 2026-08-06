@@ -1,2 +1,3 @@
-sjsonnet.Error: [std.extVar] Unknown extVar: UNKNOWN
+sjsonnet.Error: [std.extVar] Undefined external variable: UNKNOWN
     at [<root>].(extvar_unknown.jsonnet:1:11)
+
