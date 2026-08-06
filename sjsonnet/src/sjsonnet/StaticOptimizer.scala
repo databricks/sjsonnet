@@ -162,6 +162,11 @@ class StaticOptimizer(
       // Identity-equivalent function recognition. Cheap pattern match here keeps the runtime
       // fast path (`Val.Func.isEffectivelyIdentity`) at single-field cost.
       case f: Function =>
+        // At this point `super.transform` has already processed (and exited) the function body,
+        // so `scope.size` is the absolute index that was assigned to the function's first
+        // parameter (see `identifyStaticIdentity`). Record it so builtin `specialize` hooks can
+        // resolve the parameters by index.
+        f.paramBaseIdx = scope.size
         identifyStaticIdentity(f)
         f
 

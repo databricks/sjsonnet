@@ -405,6 +405,12 @@ object Expr {
     var staticIdentityShape: Byte = 0
     // When `staticIdentityShape == 2`, the absolute scope index of the captured `g`.
     var staticIdentityCapturedIdx: Int = -1
+
+    // Absolute ValScope index of this function's first parameter, assigned by StaticOptimizer
+    // (equal to `scope.size` at the definition site). Remains -1 until set. Lets a `Builtin`'s
+    // `specialize` recover the scope indices of a lambda's parameters (e.g. the `acc`/element
+    // params of a `std.foldl` callback) so it can pattern-match the body by index.
+    var paramBaseIdx: Int = -1
   }
   final case class IfElse(var pos: Position, cond: Expr, `then`: Expr, `else`: Expr) extends Expr {
     final override private[sjsonnet] def tag = ExprTags.IfElse
