@@ -2096,6 +2096,13 @@ object Val {
       value0
     }
 
+    /**
+     * This object's own members (excluding any inherited from `super`), as a map. For objects
+     * backed by inline storage this lazily materializes the map (via [[getValue0]]); the returned
+     * map must not be mutated by callers.
+     */
+    private[sjsonnet] def getMemberMap: util.LinkedHashMap[String, Obj.Member] = getValue0
+
     def triggerAllAsserts(brokenAssertionLogic: Boolean): Unit = {
       // Short-circuit: no asserts in this object or any super
       if (hasAnyAsserts && !asserting) {
@@ -2301,7 +2308,12 @@ object Val {
       }
     }
 
-    private def getAllKeys = {
+    /**
+     * The key union of this object and its entire `super` chain, mapping each key to its
+     * hidden-ness (`true` if hidden, `false` if visible). Lazily computed and cached; the returned
+     * map is shared and must not be mutated by callers.
+     */
+    private[sjsonnet] def getAllKeys: util.LinkedHashMap[String, java.lang.Boolean] = {
       if (allKeys == null) {
         val allKeys = new util.LinkedHashMap[String, java.lang.Boolean]
         gatherKeys(allKeys)
