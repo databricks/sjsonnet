@@ -531,10 +531,16 @@ class Parser(
   def arrBody[$: P](pos: Position): P[Expr] = arrBody(pos, 0)
 
   def arrBody[$: P](offset: Position, currentDepth: Int): P[Expr] = {
+    val ctx = implicitly[P[?]]
     P(
       expr(currentDepth + 1) ~
       (compSuffix(currentDepth + 1) | "," ~ (compSuffix(currentDepth + 1) | (expr(currentDepth + 1)
-        .rep(0, sep = ",") ~ ",".?).map(Right(_)))).?
+        .rep(0, sep = ",") ~ ",".!.?).flatMapX {
+        case (rest, trailingComma) if rest.isEmpty && trailingComma.isDefined =>
+          ctx.cut = true
+          Fail.opaque("at least one array element before ','")
+        case (rest, _) => Pass(Right(rest))
+      })).?
     ).map {
       case (first: Val, None)        => Val.Arr(offset, Array(first))
       case (first, None)             => Expr.Arr(offset, Array(first))
