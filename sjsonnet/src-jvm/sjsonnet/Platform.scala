@@ -167,7 +167,18 @@ object Platform {
   private def parseYamlDecimalLong(value: String): ujson.Num =
     ujson.Num(java.lang.Long.parseLong(value).toDouble)
 
-  private def yamlNodeToJson(node: Node, input: String): ujson.Value = node match {
+  private def yamlNodeToJson(node: Node, input: String): ujson.Value =
+    yamlNodeToJson(node, input, new java.util.IdentityHashMap[Node, java.lang.Boolean]())
+
+  // SnakeYAML resolves an alias to the anchor's Node instance, so a cyclic alias
+  // (e.g. `a: &x [*x]`) re-enters a collection node that is still being converted
+  // and would overflow the stack. Only collection nodes are tracked (scalars
+  // cannot contain references); revisiting a completed node is a shared (DAG)
+  // alias and stays legal.
+  private def yamlNodeToJson(
+      node: Node,
+      input: String,
+      inProgress: java.util.IdentityHashMap[Node, java.lang.Boolean]): ujson.Value = node match {
     case sn: ScalarNode =>
       val rawValue = sn.getValue
       // SnakeYAML 2.x strips the trailing newline from clip-chomped block scalars
@@ -249,43 +260,51 @@ object Platform {
       }
 
     case mn: MappingNode =>
-      val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
-      buf.sizeHint(mn.getValue.size)
-      for (tuple <- mn.getValue.asScala) {
-        val keyNode = tuple.getKeyNode
-        if (keyNode.getTag == Tag.MERGE) {
-          // YAML merge key (<<): merge referenced mapping(s) with lower priority.
-          // Convert to JSON first so nested merge keys are resolved recursively.
-          val mergeObjs: Seq[ujson.Obj] = tuple.getValueNode match {
-            case mapNode: MappingNode =>
-              Seq(yamlNodeToJson(mapNode, input).asInstanceOf[ujson.Obj])
-            case seqNode: SequenceNode =>
-              seqNode.getValue.asScala.map { node =>
-                yamlNodeToJson(node, input).asInstanceOf[ujson.Obj]
-              }.toSeq
-            case other => Error.fail("Invalid YAML merge value: " + other.getTag)
-          }
-          for (obj <- mergeObjs; (k, v) <- obj.value) {
-            if (!buf.contains(k)) {
-              buf(k) = v
+      if (inProgress.put(mn, java.lang.Boolean.TRUE) != null)
+        Error.fail("Recursive YAML alias reference")
+      try {
+        val buf = upickle.core.LinkedHashMap[String, ujson.Value]()
+        buf.sizeHint(mn.getValue.size)
+        for (tuple <- mn.getValue.asScala) {
+          val keyNode = tuple.getKeyNode
+          if (keyNode.getTag == Tag.MERGE) {
+            // YAML merge key (<<): merge referenced mapping(s) with lower priority.
+            // Convert to JSON first so nested merge keys are resolved recursively.
+            val mergeObjs: Seq[ujson.Obj] = tuple.getValueNode match {
+              case mapNode: MappingNode =>
+                Seq(yamlNodeToJson(mapNode, input, inProgress).asInstanceOf[ujson.Obj])
+              case seqNode: SequenceNode =>
+                seqNode.getValue.asScala.map { node =>
+                  yamlNodeToJson(node, input, inProgress).asInstanceOf[ujson.Obj]
+                }.toSeq
+              case other => Error.fail("Invalid YAML merge value: " + other.getTag)
             }
+            for (obj <- mergeObjs; (k, v) <- obj.value) {
+              if (!buf.contains(k)) {
+                buf(k) = v
+              }
+            }
+          } else {
+            val key = keyNode match {
+              case sn: ScalarNode => yamlScalarKey(sn, input)
+              case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
+            }
+            buf(key) = yamlNodeToJson(tuple.getValueNode, input, inProgress)
           }
-        } else {
-          val key = keyNode match {
-            case sn: ScalarNode => yamlScalarKey(sn, input)
-            case other          => Error.fail("Invalid YAML mapping key type: " + other.getTag)
-          }
-          buf(key) = yamlNodeToJson(tuple.getValueNode, input)
         }
-      }
-      ujson.Obj(buf)
+        ujson.Obj(buf)
+      } finally inProgress.remove(mn)
 
     case sn: SequenceNode =>
-      val buf = new mutable.ArrayBuffer[ujson.Value](sn.getValue.size)
-      for (n <- sn.getValue.asScala) {
-        buf += yamlNodeToJson(n, input)
-      }
-      ujson.Arr(buf)
+      if (inProgress.put(sn, java.lang.Boolean.TRUE) != null)
+        Error.fail("Recursive YAML alias reference")
+      try {
+        val buf = new mutable.ArrayBuffer[ujson.Value](sn.getValue.size)
+        for (n <- sn.getValue.asScala) {
+          buf += yamlNodeToJson(n, input, inProgress)
+        }
+        ujson.Arr(buf)
+      } finally inProgress.remove(sn)
 
     case _ =>
       Error.fail("Unsupported YAML node type: " + node.getClass.getSimpleName)
