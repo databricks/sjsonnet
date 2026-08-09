@@ -51,111 +51,73 @@ object DecimalFormat {
       hashes: Int,
       alternate: Boolean,
       expLengthOpt: Option[Int],
-      number: Double): String =
-    format(zeroes, hashes, alternate, expLengthOpt, number, useExactDecimal = false)
-
-  private[sjsonnet] def format(
-      zeroes: Int,
-      hashes: Int,
-      alternate: Boolean,
-      expLengthOpt: Option[Int],
-      number: Double,
-      useExactDecimal: Boolean): String = {
+      number: Double): String = {
     expLengthOpt match {
       case Some(expLength) =>
         var expNum =
           if (number == 0.0) 0L else Math.floor(Math.log10(math.abs(number))).toLong
         val precision = zeroes + hashes
-        if (precision > 15) {
-          // A Double cannot represent every scaled mantissa once scientific formatting asks for
-          // more than 16 significant digits. Math.round first loses low digits and then saturates
-          // at Long.MaxValue. Start from the exact binary64 value and keep the scaled integer
-          // outside Long.
-          val tenPowPrec = BigInt(10).pow(precision)
-          val exactMagnitude = BigDecimal.exact(number).abs
-          val exactJava = exactMagnitude.bigDecimal
-          if (exactJava.signum() != 0) {
-            while (
-              exactJava.compareTo(
-                java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt + 1)
-              ) >= 0
-            ) expNum += 1
-            while (
-              exactJava.compareTo(java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt)) < 0
-            ) expNum -= 1
-          }
-          val scaleExponent = precision - expNum.toInt
-          val scaled =
-            if (scaleExponent >= 0) exactMagnitude * BigDecimal(10).pow(scaleExponent)
-            else exactMagnitude / BigDecimal(10).pow(-scaleExponent)
-          var roundedMagnitude =
-            scaled.setScale(0, BigDecimal.RoundingMode.HALF_EVEN).toBigInt
-          if (roundedMagnitude >= tenPowPrec * 10) {
-            roundedMagnitude /= 10
-            expNum += 1
-          }
-          val rounded = if (number < 0) -roundedMagnitude else roundedMagnitude
-          val fracStr = (rounded % tenPowPrec).abs.toString
-          val fracDigits = Platform.repeatString("0", precision - fracStr.length) + fracStr
-          formatExponentParts(
-            precision,
-            hashes,
-            alternate,
-            expLength,
-            expNum,
-            (rounded / tenPowPrec).toString,
-            fracDigits
-          )
-        } else {
-          // Scale so mantissa * 10^precision becomes a roundable integer
-          val divided = number / Math.pow(10, (expNum - precision).toDouble)
-          var rounded = Math.round(divided)
-          val tenPowPrec = Math.pow(10, precision).toLong
-          if (rounded.toDouble >= Math.pow(10, precision + 1)) {
-            rounded = Math.round(rounded / 10.0)
-            expNum += 1
-          }
-          val fracNum = math.abs(rounded % tenPowPrec)
-          formatExponentParts(
-            precision,
-            hashes,
-            alternate,
-            expLength,
-            expNum,
-            (rounded / tenPowPrec).toString,
-            leftPad(fracNum, precision)
-          )
+        // Start from the exact binary64 value, shift the decimal point without an intermediate
+        // rounding, then perform the one requested round using ties-to-even.
+        val tenPowPrec = BigInt(10).pow(precision)
+        val exactJava = BigDecimal.exact(number).abs.bigDecimal
+        if (exactJava.signum() != 0) {
+          while (
+            exactJava.compareTo(
+              java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt + 1)
+            ) >= 0
+          ) expNum += 1
+          while (exactJava.compareTo(java.math.BigDecimal.ONE.scaleByPowerOfTen(expNum.toInt)) < 0)
+            expNum -= 1
         }
+        var roundedMagnitude = BigInt(
+          exactJava
+            .scaleByPowerOfTen(precision - expNum.toInt)
+            .setScale(0, java.math.RoundingMode.HALF_EVEN)
+            .toBigInteger
+        )
+        if (roundedMagnitude >= tenPowPrec * 10) {
+          roundedMagnitude /= 10
+          expNum += 1
+        }
+        val rounded = if (number < 0) -roundedMagnitude else roundedMagnitude
+        val fracStr = (rounded % tenPowPrec).abs.toString
+        val fracDigits = Platform.repeatString("0", precision - fracStr.length) + fracStr
+        formatExponentParts(
+          precision,
+          hashes,
+          alternate,
+          expLength,
+          expNum,
+          (rounded / tenPowPrec).toString,
+          fracDigits
+        )
 
       case None =>
         val precision = zeroes + hashes
         if (precision == 0) {
-          // Round half away from zero (matching go-jsonnet/jrsonnet behavior)
-          val rounded =
-            if (number != number || math.abs(number) >= 4503599627370496.0) number
-            else if (number >= 0) math.floor(number + 0.5)
-            else math.ceil(number - 0.5)
+          val rounded = math.rint(number)
           val prefix =
             if (number != number) rounded.toLong.toString
             else RenderUtils.truncatedDoubleToString(rounded)
           if (alternate) prefix + "." else prefix
         } else {
-          val denominator = BigDecimal(10).pow(precision)
-          val exactDecimal = useExactDecimal || precision > 15
-          val bd =
-            if (exactDecimal) BigDecimal.exact(number).abs
-            else BigDecimal(number).abs
-          val scaled =
-            if (exactDecimal)
-              (bd * denominator).setScale(0, BigDecimal.RoundingMode.HALF_EVEN)
-            else
-              (bd * denominator + BigDecimal("0.5")).setScale(0, BigDecimal.RoundingMode.FLOOR)
-          val wholeBD = (scaled / denominator).setScale(0, BigDecimal.RoundingMode.FLOOR)
-          val fracBD = (scaled - wholeBD * denominator).abs
+          val denominator = BigInt(10).pow(precision)
+          val scaled = BigInt(
+            BigDecimal
+              .exact(number)
+              .abs
+              .bigDecimal
+              .scaleByPowerOfTen(precision)
+              .setScale(0, java.math.RoundingMode.HALF_EVEN)
+              .toBigInteger
+          )
+          val whole = scaled / denominator
+          val fracMagnitude = scaled % denominator
 
           val sign = if (number < 0) "-" else ""
-          val prefix = sign + wholeBD.toBigInt.toString
-          val fracStr = fracBD.toBigInt.toString
+          val prefix = sign + whole.toString
+          val fracStr = fracMagnitude.toString
 
           val frac =
             if (fracStr == "0" && zeroes == 0) ""
