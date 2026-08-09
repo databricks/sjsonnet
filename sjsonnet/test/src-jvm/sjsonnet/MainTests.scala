@@ -691,6 +691,25 @@ object MainTests extends TestSuite {
       assert(err.contains("stream mode: top-level object was a object"))
     }
 
+    test("legacyYamlStreamUsesPre072Formatting") {
+      // Array elements render as YAML documents, not JSON documents.
+      val (res, out, err) = runMain("[{a: 1}, {b: 2}]", "--exec", "--legacy-yaml-stream")
+      assert((res, out, err) == ((0, "a: 1\n---\nb: 2\n", "")))
+    }
+
+    test("legacyYamlStreamFallsBackForNonArrayTopLevel") {
+      // Unlike --yaml-stream, a non-array top-level renders normally instead of erroring.
+      val (res, out, err) = runMain("{a: 1}", "--exec", "--legacy-yaml-stream")
+      assert((res, out, err) == ((0, "{\n   \"a\": 1\n}\n", "")))
+    }
+
+    test("legacyYamlStreamImpliesYamlStream") {
+      // --legacy-yaml-stream is exclusive with --no-trailing-newline, just like --yaml-stream.
+      val (res, out, err) = runMain("[{a: 1}]", "--exec", "--legacy-yaml-stream", "--no-trailing-newline")
+      assert(res == 1)
+      assert(err.contains("cannot use --no-trailing-newline with --yaml-stream"))
+    }
+
     // -- No trailing newline behavior --
 
     test("noTrailingNewline") {
