@@ -189,7 +189,11 @@ object SjsonnetMainBase {
         )
         .left
         .map(_ + envVarsDoc)
-      config = normalizedArgs.forcedFile.fold(config0)(f => config0.copy(file = f))
+      config1 = normalizedArgs.forcedFile.fold(config0)(f => config0.copy(file = f))
+      // --legacy-yaml-stream implies --yaml-stream.
+      config =
+        if (config1.legacyYamlStream.value) config1.copy(yamlStream = mainargs.Flag(true))
+        else config1
       _ <- {
         if (config.noTrailingNewline.value && config.yamlStream.value)
           Left("ERROR: cannot use --no-trailing-newline with --yaml-stream")
@@ -530,6 +534,8 @@ object SjsonnetMainBase {
     }
   }
 
+  private def isScalar(v: ujson.Value) = !v.isInstanceOf[ujson.Arr] && !v.isInstanceOf[ujson.Obj]
+
   private def jsonTypeName(v: ujson.Value): String = v match {
     case _: ujson.Obj  => "object"
     case _: ujson.Arr  => "array"
@@ -740,6 +746,41 @@ object SjsonnetMainBase {
               "error: multi mode: top-level should be an object " +
               "whose keys are filenames and values hold the JSON for that file."
             )
+        }
+      case (None, true) if config.legacyYamlStream.value =>
+        // Pre-0.7.2 --yaml-stream formatting. Retained behind --legacy-yaml-stream:
+        // array elements render as YAML documents (not JSON), and a non-array
+        // top-level falls back to normal rendering instead of erroring.
+        interp.interpret(jsonnetCode, path).flatMap {
+          case arr: ujson.Arr =>
+            writeToFile(config, wd) { writer =>
+              handleRenderError(config.maxTrace) {
+                arr.value.toSeq match {
+                  case Nil         => // do nothing
+                  case Seq(single) =>
+                    val renderer = rendererForConfig(writer, config, () => currentPos)
+                    single.transform(renderer)
+                    writer.write(if (isScalar(single)) "\n..." else "")
+                  case multiple =>
+                    for ((v, i) <- multiple.zipWithIndex) {
+                      if (i > 0) writer.write('\n')
+                      if (isScalar(v)) writer.write("--- ")
+                      else if (i != 0) writer.write("---\n")
+                      val renderer = rendererForConfig(
+                        writer,
+                        config.copy(yamlOut = mainargs.Flag(true)),
+                        () => currentPos
+                      )
+                      v.transform(renderer)
+                    }
+                }
+                writer.write('\n')
+                ""
+              }
+            }
+
+          case _ =>
+            renderNormal(config, interp, jsonnetCode, path, wd, () => currentPos, stdoutStream)
         }
       case (None, true) =>
         // YAML stream (--no-trailing-newline is already rejected above for yaml-stream)
