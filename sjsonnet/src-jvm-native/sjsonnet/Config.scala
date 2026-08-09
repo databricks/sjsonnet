@@ -39,6 +39,11 @@ final case class Config(
     )
     yamlStream: Flag = Flag(),
     @arg(
+      name = "legacy-yaml-stream",
+      doc = "Use the pre-0.7.2 --yaml-stream formatting (implies --yaml-stream)"
+    )
+    legacyYamlStream: Flag = Flag(),
+    @arg(
       name = "string",
       short = 'S',
       doc = "Expect a string, manifest as plain text"
