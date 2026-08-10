@@ -1,6 +1,7 @@
 package sjsonnet.stdlib
 
 import sjsonnet._
+import sjsonnet.Expr.Member.Visibility
 import sjsonnet.functions.AbstractFunctionModule
 
 import scala.collection.mutable
@@ -820,6 +821,249 @@ object ArrayModule extends AbstractFunctionModule {
         case arr => Error.fail("cannot fold " + arr.prettyName)
       }
 
+    }
+
+    override def specialize(args: Array[Expr], tailstrict: Boolean): (Val.Builtin, Array[Expr]) = {
+      if (args.length != 3) return null
+      args(0) match {
+        case f: Expr.Function if isObjectMergeFoldl(f) => (FoldlObjectMerge, args)
+        case _                                         => null
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // std.foldl object-merge fast path.
+  //
+  // Recognizes the common (and, at scale, pathological) pattern of composing an object inside a
+  // foldl, e.g. `std.foldl(function(acc, x) acc { [key(x)]: x }, arr, {})`. Evaluated naively this
+  // builds a `super` chain of depth N: each step allocates an object whose `super` is the previous
+  // accumulator, and later key-union / lookup / materialization each walk that chain, giving
+  // O(N^2) time and transient memory (see the `getAllKeys` rebuild in `Val.Obj`). When the per-step
+  // object literal cannot observe the accumulator, that chain is semantically inert, so we instead
+  // gather every step's own members into a single map and return one object holding that map over
+  // `init` as its (depth-1) `super` — O(N) overall. `init` is kept intact, so its own `super` chain
+  // and assertions still resolve and fire exactly as they would under naive evaluation.
+  //
+  // Detection is fully static (in `Foldl.specialize`): the callback must be a 2-parameter literal
+  // whose body, after stripping `local`/`assert` wrappers and seeing through `if/else`, is a tree
+  // of leaves each of which is one of:
+  //   - `acc`                        (a no-op step),
+  //   - `acc { <object literal> }`   (ObjExtend), or
+  //   - `acc + <object literal>`     (BinaryOp `+`),
+  // where every "delta" object literal has: no `+:` fields, no method fields, no assertions, no
+  // `super` reference, and no reference to `acc` (transitively). Transitivity is covered by also
+  // rejecting any `local` binding (on the spine or inside a delta) whose right-hand side references
+  // `acc`, so `acc` can reach a delta only through a direct reference, which we reject. `acc` may
+  // still appear freely in `assert`/`if` conditions, since those are forced immediately rather than
+  // captured into the result.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Base class for the read-only reference scanners below. Delegates traversal to
+   * [[ExprTransform.rec]] (which is total over the AST) but intercepts array comprehensions:
+   * `rec`'s `Comp` case routes the `Array[CompSpec]` through `transformArr`, which fails at runtime
+   * (`ScopedExprTransform` overrides this case, so in the optimizer it is dead code). We only need
+   * to visit each child expression, so we recurse into the comprehension's parts directly.
+   */
+  private abstract class ExprRefScanner extends ExprTransform {
+    var found = false
+    protected def hit(e: Expr): Boolean
+    final def transform(e: Expr): Expr = {
+      if (!found) {
+        if (hit(e)) found = true
+        else
+          e match {
+            case Expr.Comp(_, value, first, rest) =>
+              transform(value)
+              transform(first)
+              var i = 0
+              while (i < rest.length) { transform(rest(i)); i += 1 }
+            case _ => rec(e)
+          }
+      }
+      e
+    }
+  }
+
+  /** Scans an expression subtree for a reference to a specific ValScope index. */
+  private final class ContainsIdxScanner(idx: Int) extends ExprRefScanner {
+    protected def hit(e: Expr): Boolean = e match {
+      case id: Expr.ValidId => id.nameIdx == idx
+      case _                => false
+    }
+  }
+
+  private def containsIdx(e: Expr, idx: Int): Boolean = {
+    val s = new ContainsIdxScanner(idx)
+    s.transform(e)
+    s.found
+  }
+
+  /** Scans an expression subtree for any `super` reference. */
+  private final class ContainsSuperScanner extends ExprRefScanner {
+    protected def hit(e: Expr): Boolean = e match {
+      case _: Expr.Super | _: Expr.SelectSuper | _: Expr.LookupSuper | _: Expr.InSuper => true
+      case _                                                                           => false
+    }
+  }
+
+  private def containsSuper(e: Expr): Boolean = {
+    val s = new ContainsSuperScanner
+    s.transform(e)
+    s.found
+  }
+
+  /** True if `e` is a direct reference to the accumulator parameter. */
+  private def isAccRef(e: Expr, accIdx: Int): Boolean = e match {
+    case id: Expr.ValidId => id.nameIdx == accIdx
+    case _                => false
+  }
+
+  /**
+   * True if `delta` (the ext of `acc { delta }` or the rhs of `acc + delta`) is an object literal
+   * that can neither observe nor capture the accumulator. See the header comment above.
+   */
+  private def isSafeDelta(delta: Expr, accIdx: Int): Boolean = delta match {
+    // A constant-folded static object has only literal fields with fixed names and default
+    // visibility, so it references neither `acc` nor `super`.
+    case o: Val.Obj                  => o.getSuper == null
+    case ml: Expr.ObjBody.MemberList =>
+      if (ml.asserts != null && ml.asserts.length > 0) return false
+      val fields = ml.fields
+      var i = 0
+      while (i < fields.length) {
+        val f = fields(i)
+        if (f.plus) return false // `+:` implicitly reads `super` (i.e. `acc`)
+        if (f.args != null) return false // method field
+        i += 1
+      }
+      !containsIdx(ml, accIdx) && !containsSuper(ml)
+    case _ => false // object comprehensions and non-object deltas are not handled
+  }
+
+  /**
+   * Walks the "spine" of the callback body — `local`/`assert` wrappers and `if/else` branches —
+   * requiring that no spine `local` binding references `acc` and that every leaf is a bare `acc`,
+   * an `acc { lit }` (`ObjExtend`), or an `acc + lit` (`+`) whose `lit` is a safe delta.
+   */
+  private def isLimitedFoldlBody(e: Expr, accIdx: Int): Boolean = e match {
+    case le: Expr.LocalExpr =>
+      var i = 0
+      while (i < le.bindings.length) {
+        if (containsIdx(le.bindings(i).rhs, accIdx)) return false
+        i += 1
+      }
+      isLimitedFoldlBody(le.returned, accIdx)
+    case ae: Expr.AssertExpr => isLimitedFoldlBody(ae.returned, accIdx)
+    case ie: Expr.IfElse     =>
+      // A missing `else` yields null when the condition is false, which is not an object and would
+      // break the fold, so require both branches to be present and limited.
+      ie.`else` != null &&
+      isLimitedFoldlBody(ie.`then`, accIdx) &&
+      isLimitedFoldlBody(ie.`else`, accIdx)
+    case id: Expr.ValidId   => id.nameIdx == accIdx // bare `acc`
+    case oe: Expr.ObjExtend => isAccRef(oe.base, accIdx) && isSafeDelta(oe.ext, accIdx)
+    case bo: Expr.BinaryOp if bo.op == Expr.BinaryOp.OP_+ =>
+      isAccRef(bo.lhs, accIdx) && isSafeDelta(bo.rhs, accIdx)
+    case _ => false
+  }
+
+  private def isObjectMergeFoldl(f: Expr.Function): Boolean = {
+    val params = f.params
+    if (params.names.length != 2) return false
+    val defs = params.defaultExprs
+    if (defs != null && (defs(0) != null || defs(1) != null)) return false
+    val base = f.paramBaseIdx
+    if (base < 0) return false
+    isLimitedFoldlBody(f.body, base)
+  }
+
+  /**
+   * Runtime for the object-merge foldl fast path. Instead of building the depth-N `super` chain
+   * that naive evaluation would (`init { d0 } { d1 } ...`), it gathers every step's own members
+   * into a single map and returns one object holding that map over `init` as its (depth-1) super —
+   * O(N) instead of O(N^2). `init` is preserved as-is (super chain, assertions and all), so the
+   * fast path makes no assumptions about its shape.
+   *
+   * Correctness rests entirely on [[Foldl.specialize]]'s static analysis, which guarantees each
+   * step is `acc` (a no-op), `acc { lit }` or `acc + lit`, where `lit` cannot observe or capture
+   * the accumulator. The first form returns `accObj` unchanged; the other two return an object
+   * whose immediate super is `accObj`, so harvesting its own members yields exactly that step's
+   * `lit`.
+   *
+   * The accumulator's key union is threaded through the fold in one shared map (grown by
+   * [[foldlMergeKeys]]) rather than rebuilt each step, so a callback that *reads* the accumulator —
+   * e.g. a dedup guard `assert !std.objectHas(acc, k) ...` that `specialize` strips from the shape
+   * check but still executes at runtime — resolves each key lookup in O(1). A fresh wrapper per
+   * step keeps per-step value/key-name caches from going stale as the map grows.
+   */
+  private def objectMergeFoldl(
+      func: Val.Func,
+      arr: Val.Arr,
+      init: Val.Obj,
+      ev: EvalScope,
+      pos: Position): Val = {
+    val direct = arr.directBackingArray
+    val len = if (direct == null) arr.length else direct.length
+    if (len == 0) return init
+    val combined = new java.util.LinkedHashMap[String, Val.Obj.Member]()
+    // Shared key union, seeded from `init` and grown as members are gathered. Rebuilding it per
+    // step (as a bare accumulator would when its callback calls `std.objectHas(acc, _)`) is the
+    // O(N^2) blowup this fast path exists to avoid.
+    val allKeys = new java.util.LinkedHashMap[String, java.lang.Boolean](init.getAllKeys)
+    val noOff = pos.noOffset
+    var i = 0
+    while (i < len) {
+      // A fresh accumulator each step: the members gathered so far, layered over `init`, sharing
+      // the growing `combined` and `allKeys` maps. Fresh instances start with empty value and
+      // key-name caches, so those lazily-computed per-step views reflect the accumulator as of this
+      // step even though the shared maps keep growing.
+      val accObj = new Val.Obj(pos, combined, false, null, init, null, allKeys)
+      val elem = if (direct == null) arr.eval(i) else direct(i)
+      val r = func.apply2(accObj, elem, noOff)(ev, TailstrictModeDisabled)
+      if (r ne accObj) {
+        val delta = r.asObj.getMemberMap
+        combined.putAll(delta)
+        foldlMergeKeys(allKeys, delta)
+      }
+      i += 1
+    }
+    new Val.Obj(pos, combined, false, null, init, null, allKeys)
+  }
+
+  /**
+   * Grow a foldl accumulator's shared key-union map with one step's own members (`delta`), applying
+   * the same visibility-merge rules `Val.Obj` uses when gathering keys, so the shared map stays
+   * identical to a full re-gather over `init { d0 } { d1 } ...`. Keeps the fast path's per-step key
+   * union O(|delta|) rather than O(depth).
+   */
+  private def foldlMergeKeys(
+      allKeys: java.util.LinkedHashMap[String, java.lang.Boolean],
+      delta: java.util.LinkedHashMap[String, Val.Obj.Member]): Unit = {
+    delta.forEach { (k, m) =>
+      val vis = m.visibility
+      if (!allKeys.containsKey(k)) allKeys.put(k, vis == Visibility.Hidden)
+      else if (vis == Visibility.Hidden) allKeys.put(k, java.lang.Boolean.TRUE)
+      else if (vis == Visibility.Unhide) allKeys.put(k, java.lang.Boolean.FALSE)
+    }
+  }
+
+  /**
+   * Specialized `std.foldl` emitted by [[Foldl.specialize]] for the statically recognized
+   * object-merge pattern. `arr` and `init` are arbitrary runtime values the pattern does not
+   * constrain (it only inspects the callback), so anything other than an array folded onto an
+   * object is left to the generic [[Foldl]], which also raises the correct error for bad inputs.
+   */
+  private object FoldlObjectMerge extends Val.Builtin3("foldl", "func", "arr", "init") {
+    override def staticSafe: Boolean = false
+
+    def evalRhs(_func: Eval, arr: Eval, init: Eval, ev: EvalScope, pos: Position): Val = {
+      val func = _func.value.asFunc
+      (arr.value, init.value) match {
+        case (a: Val.Arr, io: Val.Obj) => objectMergeFoldl(func, a, io, ev, pos)
+        case _                         => Foldl.evalRhs(_func, arr, init, ev, pos)
+      }
     }
   }
 
