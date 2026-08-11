@@ -1182,10 +1182,15 @@ object Format {
     else {
       val abs = math.abs(s)
       val rawExponent = decimalExponent(abs)
-      val scale = math.pow(10, rawExponent - precision + 1)
-      val roundedDigits = Math.round(abs / scale)
-      if (roundedDigits == 0) 0
-      else if (roundedDigits.toDouble >= math.pow(10, precision)) rawExponent + 1
+      val roundedDigits = BigInt(
+        BigDecimal
+          .exact(abs)
+          .bigDecimal
+          .scaleByPowerOfTen(precision - 1 - rawExponent)
+          .setScale(0, java.math.RoundingMode.HALF_EVEN)
+          .toBigInteger
+      )
+      if (roundedDigits >= BigInt(10).pow(precision)) rawExponent + 1
       else rawExponent
     }
   }
@@ -1222,8 +1227,7 @@ object Format {
             if (formatted.alternate) 0 else fractionalPrecision,
             formatted.alternate,
             None,
-            math.abs(s),
-            useExactDecimal = precision > 15
+            math.abs(s)
           ),
         numeric = true,
         signedConversion = !isNegative(s)
