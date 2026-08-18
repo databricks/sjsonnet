@@ -38,6 +38,17 @@ class Evaluator(
   private val maxStack: Int = settings.maxStack
   private[sjsonnet] var profiler: Profiler = _
 
+  // Rotating arg buffers for TailCall creation (zero-alloc trampoline).
+  // Safety: Func.apply copies Eval refs out of the buffer (extendSimple/arraycopy)
+  // before evalRhs can produce the next TailCall, so no slot is overwritten while live.
+  private var tailCallBufIdx: Int = 0
+  private val tailCallArgBuf1: Array[Array[Eval]] = Array.fill(4)(new Array[Eval](1))
+  private val tailCallArgBuf2: Array[Array[Eval]] = Array.fill(4)(new Array[Eval](2))
+  private val tailCallArgBuf3: Array[Array[Eval]] = Array.fill(4)(new Array[Eval](3))
+  @inline private def nextTailCallBufIdx(): Int = {
+    val i = tailCallBufIdx; tailCallBufIdx = (i + 1) & 3; i
+  }
+
   @inline private[sjsonnet] final def checkStackDepth(pos: Position): Unit = {
     stackDepth += 1
     if (debugStats != null && stackDepth > debugStats.maxStackDepth)
@@ -1694,7 +1705,8 @@ class Evaluator(
             val isStrict = e.isStrict
             val func = visitExpr(e.value).cast[Val.Func]
             val arg: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
-            new TailCall(func, Array[Eval](arg), null, e, strict = isStrict)
+            val buf = tailCallArgBuf1(nextTailCallBufIdx()); buf(0) = arg
+            new TailCall(func, buf, null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply2 =>
           try {
@@ -1702,7 +1714,8 @@ class Evaluator(
             val func = visitExpr(e.value).cast[Val.Func]
             val a1: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
             val a2: Eval = if (!isStrict) visitAsLazy(e.a2) else visitExpr(e.a2)
-            new TailCall(func, Array[Eval](a1, a2), null, e, strict = isStrict)
+            val buf = tailCallArgBuf2(nextTailCallBufIdx()); buf(0) = a1; buf(1) = a2
+            new TailCall(func, buf, null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case e: Apply3 =>
           try {
@@ -1711,7 +1724,8 @@ class Evaluator(
             val a1: Eval = if (!isStrict) visitAsLazy(e.a1) else visitExpr(e.a1)
             val a2: Eval = if (!isStrict) visitAsLazy(e.a2) else visitExpr(e.a2)
             val a3: Eval = if (!isStrict) visitAsLazy(e.a3) else visitExpr(e.a3)
-            new TailCall(func, Array[Eval](a1, a2, a3), null, e, strict = isStrict)
+            val buf = tailCallArgBuf3(nextTailCallBufIdx()); buf(0) = a1; buf(1) = a2; buf(2) = a3
+            new TailCall(func, buf, null, e, strict = isStrict)
           } catch Error.withStackFrame(e)
         case _ => visitExpr(e)
       }
