@@ -1,0 +1,2 @@
+sjsonnet.Error: [std.parseJson] Invalid JSON: unpaired surrogate in string
+    at [<root>].(error.parsejson_lone_low_surrogate.jsonnet:1:14)
