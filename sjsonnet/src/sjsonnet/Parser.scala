@@ -679,7 +679,8 @@ class Parser(
       CharIn(".[({")./.!.flatMapX { s =>
         val i = new Position(fileScope, implicitly[P[$]].index - 1)
         (s.charAt(0): @switch) match {
-          case '.' => Pass ~ id.map(x => Expr.Select(i, _: Expr, x))
+          case '.' =>
+            Pass ~ id.map(x => Expr.Select(i, _: Expr, internedStrings.getOrElseUpdate(x, x)))
           case '[' =>
             Pass ~ (expr(currentDepth + 1).? ~ (":" ~ expr(currentDepth + 1).?).rep ~ "]").map {
               case (Some(tree), Seq()) => Expr.Lookup(i, _: Expr, tree)
@@ -1008,8 +1009,12 @@ class Parser(
 
   def fieldname[$: P](currentDepth: Int): P[Expr.FieldName] = {
     P(
-      id.map(Expr.FieldName.Fixed.apply) |
-      string.map(Expr.FieldName.Fixed.apply) |
+      id.map(s => Expr.FieldName.Fixed(internedStrings.getOrElseUpdate(s, s))) |
+      string.map(s =>
+        Expr.FieldName.Fixed(
+          if (s.length > 1024) s else internedStrings.getOrElseUpdate(s, s)
+        )
+      ) |
       "[" ~ expr(currentDepth + 1).map(Expr.FieldName.Dyn.apply) ~ "]"
     )
   }
