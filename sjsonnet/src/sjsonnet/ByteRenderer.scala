@@ -58,6 +58,8 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
   private var stringValueCount = 0
   private var stringValueCacheKeys: Array[String] = null
   private var stringValueCacheBytes: Array[Array[Byte]] = null
+  private var keyCacheKeys: Array[String] = null
+  private var keyCacheBytes: Array[Array[Byte]] = null
 
   override def visitFloat64(d: Double, index: Int): OutputStream = {
     flushBuffer()
@@ -320,10 +322,46 @@ class ByteRenderer(out: OutputStream = new java.io.ByteArrayOutputStream(), inde
       ctx: Materializer.MaterializeContext)(implicit evaluator: EvalScope): Unit = {
     markNonEmpty()
     flushBuffer()
-    renderQuotedString(key)
+    renderCachedKey(key)
     elemBuilder.append(':')
     elemBuilder.append(' ')
     materializeChild(childVal, matDepth, ctx)
+  }
+
+  @inline private def renderCachedKey(key: String): Unit = {
+    if (key.length > ByteRenderer.KeyCacheMaxKeyLength) {
+      renderQuotedString(key)
+      return
+    }
+    var cacheKeys = keyCacheKeys
+    var cacheBytes = keyCacheBytes
+    if (cacheKeys == null) {
+      cacheKeys = new Array[String](ByteRenderer.KeyCacheSize)
+      cacheBytes = new Array[Array[Byte]](ByteRenderer.KeyCacheSize)
+      keyCacheKeys = cacheKeys
+      keyCacheBytes = cacheBytes
+    }
+    val slot = System.identityHashCode(key) & ByteRenderer.KeyCacheMask
+    if (cacheKeys(slot) eq key) {
+      val bytes = cacheBytes(slot)
+      if (bytes != null) {
+        appendCachedStringBytes(bytes)
+        return
+      }
+      // Second identity hit: capture the rendered bytes for replay.
+      val startLen = elemBuilder.length
+      renderQuotedString(key)
+      val rendered = elemBuilder.length - startLen
+      val made = new Array[Byte](rendered)
+      System.arraycopy(elemBuilder.arr, startLen, made, 0, rendered)
+      cacheBytes(slot) = made
+    } else {
+      // First sight (or collision eviction): don't allocate yet — one-shot keys
+      // (e.g. computed field names) would otherwise pay a byte[] copy per key.
+      cacheKeys(slot) = key
+      cacheBytes(slot) = null
+      renderQuotedString(key)
+    }
   }
 
   private def renderAsciiSafeValueString(str: String): Unit = {
@@ -574,4 +612,7 @@ object ByteRenderer {
   private final val StringValueCacheSize = 32
   private final val StringValueCacheMask = StringValueCacheSize - 1
   private final val DirectCachedStringWriteMinLength = 1024
+  private final val KeyCacheSize = 64
+  private final val KeyCacheMask = KeyCacheSize - 1
+  private final val KeyCacheMaxKeyLength = 32
 }
