@@ -46,11 +46,12 @@ object ProfileOutputFormat {
  */
 final class Profiler(val format: ProfileOutputFormat, wd: Path) {
 
+  private def relativeFileName(pos: Position): Option[String] =
+    Option(pos).flatMap(p => Option(p.currentFile)).map(_.relativeToString(wd))
+
   private class ExprBox(val expr: Expr) {
     val id: BoxId = {
-      val fileName = Option(expr.pos)
-        .map(_.currentFile.relativeToString(wd))
-        .getOrElse("<unknown>")
+      val fileName = relativeFileName(expr.pos).getOrElse("<unknown>")
 
       val name = {
         val exprName = expr.getClass.getName.split('.').last.split('$').last
@@ -111,11 +112,8 @@ final class Profiler(val format: ProfileOutputFormat, wd: Path) {
 
   private def flameGraphFrameName(e: Expr): String = {
     val name = e.exprErrorString
-    if (isBuiltin(e) || e.pos == null) name
-    else {
-      val file = e.pos.currentFile.relativeToString(wd)
-      s"$name ($file)"
-    }
+    if (isBuiltin(e)) name
+    else relativeFileName(e.pos).fold(name)(file => s"$name ($file)")
   }
 
   private def getOrCreate(e: Expr): ExprBox = {
