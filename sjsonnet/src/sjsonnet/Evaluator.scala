@@ -795,12 +795,19 @@ class Evaluator(
   }
 
   def visitObjExtend(e: ObjExtend)(implicit scope: ValScope): Val = {
-    val original = visitExpr(e.base).cast[Val.Obj]
-    e.ext match {
-      case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
-      case ext: ObjBody.ObjComp    => visitObjComp(ext, original)
-      case o: Val.Obj              => o.addSuper(e.pos, original)
-      case _                       => Error.fail("Should not have happened", e.pos)
+    val base = visitExpr(e.base)
+    base match {
+      case original: Val.Obj =>
+        e.ext match {
+          case ext: ObjBody.MemberList => visitMemberList(e.pos, ext, original)
+          case ext: ObjBody.ObjComp    => visitObjComp(ext, original)
+          case o: Val.Obj              => o.addSuper(e.pos, original)
+          case _                       => Error.fail("Should not have happened", e.pos)
+        }
+      case _ =>
+        // Desugar to + so stringification, RHS evaluation and errors share the same path.
+        // Reuse the evaluated base to avoid evaluating the original expression twice.
+        visitBinaryOp(BinaryOp(e.pos, base, BinaryOp.OP_+, e.ext))
     }
   }
 

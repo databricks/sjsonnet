@@ -42,6 +42,130 @@ object EvaluatorTests extends TestSuite {
       eval("std.objectKeysValues({a: error 'unused'})[0].key") ==> ujson.Str("a")
       assert(evalErr("std.objectKeysValues({a: error 'boom'})[0].value").contains("boom"))
     }
+    test("objectExtension") {
+      test("matchesAddition") {
+        val bodies = Seq(
+          "{}",
+          "{ x: 1 }",
+          "{ z: 0, a: [true, null, { nested: 'value' }] }",
+          "{ local value = 2, x: value, y: self.x + 1 }",
+          "{ x: 1, nested: { y: $.x } }",
+          "{ hidden:: error 'unused', visible: 1 }",
+          "{ f(x):: x + 1, value: self.f(1) }",
+          "{ assert self.x == 1, x: 1 }",
+          "{ x+: 1, hasSuper: 'x' in super }",
+          "{ [null]: error 'unused', ['x' + 'y']: 1 }",
+          "{ [key]: key for key in ['z', 'a'] }",
+          "{ [key]: error 'unused' for key in [] }",
+          "{ [key]: error 'unused' for key in [null] }"
+        )
+        for {
+          body <- bodies
+          base <- Seq("'hello'", "(function(x) x)('prefix')", "('🙂' + '\\n\\\"')")
+          preserveOrder <- Seq(false, true)
+        } {
+          eval(s"($base) $body", preserveOrder = preserveOrder) ==>
+          eval(s"($base) + $body", preserveOrder = preserveOrder)
+        }
+      }
+      test("chainedExtensions") {
+        eval("'prefix' { x: 1 } { y: 2 }") ==>
+        eval("'prefix' + { x: 1 } + { y: 2 }")
+        eval("(function(x) x)('prefix') { x: 1 }", strict = true) ==>
+        ujson.Str("prefix{\"x\": 1}")
+        // Strict mode deliberately forbids consecutive object bodies as a syntax restriction.
+        assert(
+          evalErr("'prefix' {} {}", strict = true).contains("Adjacent object literals not allowed")
+        )
+      }
+      test("invalidBase") {
+        for {
+          base <- Seq("42", "[error 'unused']", "true", "false", "null", "function(x) x")
+          body <- Seq("{}", "{ x: 1 }", "{ local x = 1, x: x }", "{ [k]: 1 for k in ['x'] }")
+        } {
+          evalErr(s"($base) $body").takeWhile(_ != '\n') ==>
+          evalErr(s"($base) + $body").takeWhile(_ != '\n')
+        }
+      }
+      test("errorOrder") {
+        for (op <- Seq("", "+")) {
+          assert(
+            evalErr(s"(error 'base first') $op { [error 'key second']: 1 }")
+              .startsWith("sjsonnet.Error: base first")
+          )
+          for (base <- Seq("'prefix'", "42")) {
+            assert(
+              evalErr(s"$base $op { [error 'key first']: error 'value later' }")
+                .startsWith("sjsonnet.Error: key first")
+            )
+            assert(
+              evalErr(s"$base $op { [k]: 1 for k in error 'source first' }")
+                .startsWith("sjsonnet.Error: source first")
+            )
+            assert(
+              evalErr(s"$base $op { [k]: 1 for k in ['x', 'x'] }")
+                .contains("Duplicate key x")
+            )
+          }
+          assert(
+            evalErr(s"42 $op { assert false: 'unused assertion', x: error 'unused value' }")
+              .startsWith("sjsonnet.Error: Unknown binary operation: number + object")
+          )
+        }
+      }
+      test("materializationErrors") {
+        for (body <- Seq(
+               "{ assert false: 'assertion' }",
+               "{ x: error 'visible field' }",
+               "{ x: super.x }",
+               "{ f(x): x }"
+             )) {
+          evalErr(s"'prefix' $body").takeWhile(_ != '\n') ==>
+          evalErr(s"'prefix' + $body").takeWhile(_ != '\n')
+        }
+      }
+      test("evaluatedOnce") {
+        val body = "{ [std.trace('key', 'x')]: std.trace('value', 1) }"
+        val (value, traces) = evalWithTraces(s"std.trace('base', 'prefix') $body")
+        value ==> ujson.Str("prefix{\"x\": 1}")
+        traces.size ==> 3
+        assert(traces(0).endsWith("base"))
+        assert(traces(1).endsWith("key"))
+        assert(traces(2).endsWith("value"))
+      }
+      test("objectBase") {
+        for (op <- Seq("", "+")) {
+          eval(s"local base = { x: 1, y: self.x }; (base $op { x: 2, z: super.x })") ==>
+          ujson.Obj("x" -> 2, "y" -> 2, "z" -> 1)
+          eval(s"local base = { x: [1] }; base $op { x+: [2] }") ==>
+          ujson.Obj("x" -> ujson.Arr(1, 2))
+          eval(s"local base = { x: 1 }; base $op { [k]: super.x + 1 for k in ['y'] }") ==>
+          ujson.Obj("x" -> 1, "y" -> 2)
+          eval(s"local base = { assert self.x == 2, x: 1 }; base $op { x: 2 }") ==>
+          ujson.Obj("x" -> 2)
+          eval(s"local base = { x: error 'unused' }; (base $op { y: 2 }).y") ==>
+          ujson.Num(2)
+        }
+      }
+      test("foldlFallback") {
+        for (op <- Seq("", "+")) {
+          eval(s"std.foldl(function(acc, x) acc $op { x: x }, [1, 2], 'prefix')") ==>
+          ujson.Str("prefix{\"x\": 1}{\"x\": 2}")
+          eval(s"std.foldl(function(acc, x) acc $op { x: x }, [], 'prefix')") ==>
+          ujson.Str("prefix")
+        }
+      }
+      test("sharedBodyWithDifferentBaseTypes") {
+        def program(op: String): String =
+          s"""local extend(base) = base $op { z: 0, a: 1, hidden:: error 'unused' };
+             |[extend('prefix'), extend({ inherited: 2 }), extend('prefix')]
+             |""".stripMargin
+        for (preserveOrder <- Seq(false, true)) {
+          eval(program(""), preserveOrder = preserveOrder) ==>
+          eval(program("+"), preserveOrder = preserveOrder)
+        }
+      }
+    }
     test("arrays") {
       eval("[1, [2, 3], 4][1][0]") ==> ujson.Num(2)
       eval("([1, 2, 3] + [4, 5, 6])[3]") ==> ujson.Num(4)
