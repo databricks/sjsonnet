@@ -35,6 +35,19 @@ object JsonImportFastPathTests extends TestSuite {
     }
   }
 
+  private def unicodeEscape(hex: String): String = "\\" + "u" + hex
+
+  private def assertInvalidUnicodeImport(json: String): Unit = {
+    val result = eval(Map("surrogate.json" -> json), """import "surrogate.json"""")
+    assert(result.isLeft)
+    result match {
+      case Left(error) =>
+        assert(error.contains("Invalid JSON: unpaired surrogate in string"))
+        assert(!error.contains("Internal Error"))
+      case Right(_) => assert(false)
+    }
+  }
+
   def tests: Tests = Tests {
     test("strict json imports produce normal Jsonnet values") {
       val files = Map(
@@ -102,6 +115,19 @@ object JsonImportFastPathTests extends TestSuite {
       eval(files, """import "loose.json"""") ==> Right(ujson.Obj("a" -> 1))
     }
 
+    test("surrogate escapes in Jsonnet fallback comments do not fail json import") {
+      val files = Map(
+        "loose-surrogate-comment.json" ->
+        s"""// "${unicodeEscape("D800")}"
+           |{
+           |  a: 1,
+           |}
+           |""".stripMargin
+      )
+
+      eval(files, """import "loose-surrogate-comment.json"""") ==> Right(ujson.Obj("a" -> 1))
+    }
+
     test("duplicate json object keys keep Jsonnet duplicate-field error semantics") {
       val files = Map("dupe.json" -> """{"a":1,"a":2}""")
 
@@ -140,6 +166,48 @@ object JsonImportFastPathTests extends TestSuite {
         case Left(error) => assert(!error.contains("Internal Error"))
         case Right(_)    => assert(false)
       }
+    }
+
+    test("unpaired surrogate json imports fail before producing Jsonnet strings") {
+      assertInvalidUnicodeImport(s"""{"s":"${unicodeEscape("D800")}"}""")
+      assertInvalidUnicodeImport(s"""{"s":"${unicodeEscape("DC00")}"}""")
+      assertInvalidUnicodeImport(s""""${unicodeEscape("D800")}"""")
+      assertInvalidUnicodeImport(s""""${unicodeEscape("DC00")}"""")
+    }
+
+    test("unpaired surrogate error position stays char-accurate after multi-byte utf8") {
+      // "é" is 2 bytes in UTF-8: the bad escape's backslash sits at char 6 (1-based column 7).
+      // A byte-based offset would drift to column 8.
+      val files = Map("surrogate.json" -> s"""{"é":"${unicodeEscape("D800")}"}""")
+      val result = eval(files, """import "surrogate.json"""")
+      assert(result.isLeft)
+      result match {
+        case Left(error) =>
+          assert(error.contains("Invalid JSON: unpaired surrogate in string"))
+          assert(error.contains("at line 1 column 7"))
+        case Right(_) => assert(false)
+      }
+    }
+
+    test("valid surrogate pair json imports keep codepoint strings") {
+      val pairEscape = unicodeEscape("D83D") + unicodeEscape("DE00")
+      val files = Map("surrogate-pair.json" -> s"""{"s":"$pairEscape","$pairEscape":"key"}""")
+
+      eval(files, """local obj = import "surrogate-pair.json"; [std.codepoint(obj.s), obj[std.char(128512)]]""") ==>
+      Right(ujson.Arr(128512, "key"))
+    }
+
+    test("escaped surrogate text json imports stay ordinary strings") {
+      val escapedText = "\\" + unicodeEscape("D800")
+      val files = Map(
+        "escaped-surrogate-text.json" -> s"""{"s":"$escapedText"}""",
+        "escaped-surrogate-text-with-suffix.json" -> s"""{"s":"${escapedText}abc"}"""
+      )
+
+      eval(files, """(import "escaped-surrogate-text.json").s""") ==>
+      Right(ujson.Str(unicodeEscape("D800")))
+      eval(files, """(import "escaped-surrogate-text-with-suffix.json").s""") ==>
+      Right(ujson.Str(unicodeEscape("D800") + "abc"))
     }
 
     test("deep json imports keep parser recursion guard") {

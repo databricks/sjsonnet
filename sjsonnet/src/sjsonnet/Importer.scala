@@ -302,24 +302,38 @@ class CachedResolver(
 
   def parse(path: Path, content: ResolvedFile)(implicit
       ev: EvalErrorScope): Either[Error, (Expr, FileScope)] = {
-    parseCache.getOrElseUpdate(
-      (path, content.contentHash()), {
-        val parsed: Either[Error, (Expr, FileScope)] = content.preParsedAst match {
-          case Some(pre) => Right(pre)
-          case None      =>
-            CachedResolver.parseJsonImport(
-              path,
-              content,
-              internedStrings,
-              settings
-            ) match {
-              case Some(parsedJson) => Right(parsedJson)
-              case None             => parseJsonnet(path, content)
-            }
+    try {
+      parseCache.getOrElseUpdate(
+        (path, content.contentHash()), {
+          val parsed: Either[Error, (Expr, FileScope)] = content.preParsedAst match {
+            case Some(pre) => Right(pre)
+            case None      =>
+              CachedResolver.parseJsonImportOrNull(
+                path,
+                content,
+                internedStrings,
+                settings
+              ) match {
+                case null       => parseJsonnet(path, content)
+                case parsedJson => Right(parsedJson)
+              }
+          }
+          parsed.flatMap { case (e, fs) => process(e, fs) }
         }
-        parsed.flatMap { case (e, fs) => process(e, fs) }
-      }
-    )
+      )
+    } catch {
+      case e: CachedResolver.InvalidJsonUnicode =>
+        val pos =
+          if (e.offset >= 0) new Position(e.fileScope, e.offset)
+          else e.fileScope.noOffsetPos
+        // Named frames (e.g. <root>) hide unnamed position frames in Error.formatError,
+        // so surface the position in the message like fastparse ParseErrors do.
+        val where = ev.prettyIndex(pos) match {
+          case Some((line, col)) => s" at line $line column $col"
+          case None              => ""
+        }
+        Left(new ParseError(CachedResolver.InvalidJsonUnicodeMessage + where).addFrame(pos))
+    }
   }
 
   private def parseJsonnet(path: Path, content: ResolvedFile)(implicit
@@ -364,24 +378,141 @@ object CachedResolver {
   private final class DuplicateJsonKey extends RuntimeException(null, null, false, false)
   private final class InvalidJsonNumber extends RuntimeException(null, null, false, false)
   private final class JsonParseDepthExceeded extends RuntimeException(null, null, false, false)
+  private[sjsonnet] final class InvalidJsonUnicode(val fileScope: FileScope, val offset: Int = -1)
+      extends RuntimeException(null, null, false, false)
 
-  private[sjsonnet] def parseJsonImport(
+  private[sjsonnet] val InvalidJsonUnicodeMessage = "Invalid JSON: unpaired surrogate in string"
+
+  /**
+   * Parses strict `.json` imports through ujson's parser. Returns null when this fast path should
+   * fall back to the Jsonnet parser; the nullable result avoids Some/None allocations in the import
+   * hot path without adding a reusable OptionVal abstraction to this semantic fix.
+   */
+  private[sjsonnet] def parseJsonImportOrNull(
       path: Path,
       content: ResolvedFile,
       internedStrings: mutable.HashMap[String, String],
-      settings: Settings): Option[(Expr, FileScope)] = {
-    if (!path.last.endsWith(".json")) return None
+      settings: Settings): (Expr, FileScope) = {
+    if (!path.last.endsWith(".json")) return null
     val fileScope = new FileScope(path)
+    val bytes = content.readRawBytes()
     try {
       val visitor =
         new JsonImportVisitor(fileScope, internedStrings, settings)
-      Some((ujson.ByteArrayParser.transform(content.readRawBytes(), visitor), fileScope))
+      val expr = ujson.ByteArrayParser.transform(bytes, visitor)
+      rejectUnpairedSurrogateEscapes(bytes, fileScope)
+      (expr, fileScope)
     } catch {
+      case e: InvalidJsonUnicode =>
+        // Scanner and visitor report byte offsets; Position offsets are char indexes.
+        if (e.offset >= 0) throw new InvalidJsonUnicode(fileScope, charOffset(bytes, e.offset))
+        else throw e
+      case _: ValVisitor.InvalidUnicodeString =>
+        throw new InvalidJsonUnicode(fileScope)
+      case e: Exception if isUnpairedSurrogateParserError(e) =>
+        throw new InvalidJsonUnicode(fileScope)
       case _: ujson.ParsingFailedException | _: DuplicateJsonKey | _: InvalidJsonNumber |
           _: JsonParseDepthExceeded | _: NumberFormatException =>
-        None
+        null
     }
   }
+
+  private final val Backslash = '\\'.toByte
+  private final val Quote = '"'.toByte
+  private final val U = 'u'.toByte
+  private final val UpperD = 'D'.toByte
+  private final val LowerD = 'd'.toByte
+  private final val Zero = '0'.toByte
+  private final val Nine = '9'.toByte
+  private final val UpperA = 'A'.toByte
+  private final val UpperF = 'F'.toByte
+  private final val LowerA = 'a'.toByte
+  private final val LowerF = 'f'.toByte
+
+  // Scans raw bytes for \uD800-\uDFFF escape sequences, catching unpaired surrogates even if
+  // ujson normalizes them to U+FFFD before calling visitString (where the visitor check would miss).
+  private def rejectUnpairedSurrogateEscapes(bytes: Array[Byte], fileScope: FileScope): Unit = {
+    var i = 0
+    var foundPotentialSurrogateEscape = false
+    while (i + 5 < bytes.length && !foundPotentialSurrogateEscape) {
+      foundPotentialSurrogateEscape =
+        bytes(i) == Backslash && bytes(i + 1) == U && isD(bytes(i + 2))
+      i += 1
+    }
+    if (!foundPotentialSurrogateEscape) return
+
+    i = 0
+    var inString = false
+    var escaped = false
+    while (i < bytes.length) {
+      val b = bytes(i)
+      if (!inString) {
+        if (b == Quote) inString = true
+        i += 1
+      } else if (escaped) {
+        if (b == U && i + 4 < bytes.length && isHex4(bytes, i + 1)) {
+          val code = hex4(bytes, i + 1)
+          if (Character.isHighSurrogate(code.toChar)) {
+            val nextEscape = i + 5
+            if (
+              nextEscape + 6 > bytes.length || bytes(nextEscape) != Backslash ||
+              bytes(nextEscape + 1) != U || !isHex4(bytes, nextEscape + 2) ||
+              !Character.isLowSurrogate(hex4(bytes, nextEscape + 2).toChar)
+            ) {
+              throw new InvalidJsonUnicode(fileScope, i - 1)
+            }
+            i = nextEscape + 6
+          } else if (Character.isLowSurrogate(code.toChar)) {
+            throw new InvalidJsonUnicode(fileScope, i - 1)
+          } else {
+            i += 5
+          }
+        } else {
+          i += 1
+        }
+        escaped = false
+      } else if (b == Backslash) {
+        escaped = true
+        i += 1
+      } else {
+        if (b == Quote) inString = false
+        i += 1
+      }
+    }
+  }
+
+  // Position offsets are interpreted as char indexes into the decoded file (see
+  // EvalErrorScope.prettyIndex), so translate the scanner's byte index. Error path only.
+  private def charOffset(bytes: Array[Byte], byteOffset: Int): Int =
+    new String(bytes, 0, byteOffset, java.nio.charset.StandardCharsets.UTF_8).length
+
+  private def isD(b: Byte): Boolean = b == UpperD || b == LowerD
+
+  private def isHex4(bytes: Array[Byte], offset: Int): Boolean =
+    isHex(bytes(offset)) && isHex(bytes(offset + 1)) && isHex(bytes(offset + 2)) &&
+    isHex(bytes(offset + 3))
+
+  private def isHex(b: Byte): Boolean =
+    (b >= Zero && b <= Nine) || (b >= UpperA && b <= UpperF) ||
+    (b >= LowerA && b <= LowerF)
+
+  private def hex4(bytes: Array[Byte], offset: Int): Int =
+    (hex(bytes(offset)) << 12) | (hex(bytes(offset + 1)) << 8) |
+    (hex(bytes(offset + 2)) << 4) | hex(bytes(offset + 3))
+
+  private def hex(b: Byte): Int =
+    if (b <= Nine) b - Zero
+    else if (b <= UpperF) b - UpperA + 10
+    else b - LowerA + 10
+
+  // Last-resort catch for ujson's own surrogate validation (upickle#722).
+  // Fragile: depends on ujson throwing plain Exception with "Un-paired ... surrogate ..." message.
+  // Primary defenses are ValVisitor.rejectUnpairedSurrogates + rejectUnpairedSurrogateEscapes above.
+  private[sjsonnet] def isUnpairedSurrogateParserError(e: Exception): Boolean =
+    e.getClass == classOf[Exception] &&
+    e.getMessage != null &&
+    e.getMessage.startsWith("Un-paired ") &&
+    e.getMessage.contains(" surrogate ")
 
   private final class JsonImportVisitor(
       fileScope: FileScope,
@@ -418,9 +549,21 @@ object CachedResolver {
         if (length >= 0) keys.sizeHint(length)
         if (length >= 0) members.sizeHint(length)
         private var key: String = _
+        private var keyIndex: Int = -1
         def subVisitor: upickle.core.Visitor[?, ?] = self
-        def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
-        def visitKeyValue(s: Any): Unit = key = intern(s.toString)
+        def visitKey(index: Int): upickle.core.StringVisitor.type = {
+          keyIndex = index
+          upickle.core.StringVisitor
+        }
+        def visitKeyValue(s: Any): Unit = {
+          val str = s.toString
+          try ValVisitor.rejectUnpairedSurrogates(str)
+          catch {
+            case _: ValVisitor.InvalidUnicodeString =>
+              throw new InvalidJsonUnicode(fileScope, keyIndex)
+          }
+          key = intern(str)
+        }
         def visitValue(v: Val, index: Int): Unit = {
           if (!seen.add(key)) throw new DuplicateJsonKey
           keys += key
@@ -473,6 +616,11 @@ object CachedResolver {
       val str = s match {
         case str: String => str
         case _           => s.toString
+      }
+      try ValVisitor.rejectUnpairedSurrogates(str)
+      catch {
+        case _: ValVisitor.InvalidUnicodeString =>
+          throw new InvalidJsonUnicode(fileScope, index)
       }
       val unique = intern(str)
       Val.Str(pos(index), unique)

@@ -130,16 +130,18 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
   }
 
   private def discover(path: Path, content: ResolvedFile): Either[Error, Unit] = {
-    CachedResolver.parseJsonImport(
-      path,
-      content,
-      internedStrings,
-      settings
-    ) match {
-      case Some((expr, fs)) =>
+    try {
+      val parsedJson = CachedResolver.parseJsonImportOrNull(
+        path,
+        content,
+        internedStrings,
+        settings
+      )
+      if (parsedJson != null) {
+        val (expr, fs) = parsedJson
         cache.put((path, false), PreParsedResolvedFile(content, expr, fs))
         Right(())
-      case None =>
+      } else {
         val parser = new Parser(path, internedStrings, internedFieldSets, settings)
         try {
           fastparse.parse(content.getParserInput(), parser.document(_)) match {
@@ -164,6 +166,12 @@ class Preloader(parentImporter: Importer, settings: Settings = Settings.default)
         } catch {
           case e: ParseError => Left(e)
         }
+      }
+    } catch {
+      case e: CachedResolver.InvalidJsonUnicode =>
+        Left(
+          new ParseError(s"$path: ${CachedResolver.InvalidJsonUnicodeMessage}", offset = e.offset)
+        )
     }
   }
 
