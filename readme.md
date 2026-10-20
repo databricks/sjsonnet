@@ -81,20 +81,24 @@ Sjsonnet can be used from Java and Scala:
 
 ```java
 // Java
-sjsonnet.SjsonnetMain.main0(
+sjsonnet.SjsonnetMainBase.main0(
     new String[]{"foo.jsonnet"},
-    new DefaultParseCache,
+    new sjsonnet.DefaultParseCache(),
     System.in,
     System.out,
     System.err,
     os.package$.MODULE$.pwd(),
-    scala.None$.empty()
+    scala.Option.empty(),
+    scala.Option.empty(),
+    sjsonnet.SjsonnetMainBase.main0$default$9()
 );
+```
 
+```scala
 // Scala
-sjsonnet.SjsonnetMain.main0(
+sjsonnet.SjsonnetMainBase.main0(
     Array("foo.jsonnet"),
-    new DefaultParseCache,
+    new sjsonnet.DefaultParseCache,
     System.in,
     System.out,
     System.err,
