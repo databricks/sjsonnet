@@ -7,8 +7,31 @@ import upickle.core.{ArrVisitor, ObjVisitor, Visitor}
 
 import scala.collection.mutable
 
+object ValVisitor {
+  final class InvalidUnicodeString extends RuntimeException(null, null, false, false)
+
+  def rejectUnpairedSurrogates(s: CharSequence): Unit = {
+    var i = 0
+    val length = s.length
+    while (i < length) {
+      val c = s.charAt(i)
+      if (Character.isHighSurrogate(c)) {
+        if (i + 1 >= length || !Character.isLowSurrogate(s.charAt(i + 1))) {
+          throw new InvalidUnicodeString
+        }
+        i += 2
+      } else if (Character.isLowSurrogate(c)) {
+        throw new InvalidUnicodeString
+      } else {
+        i += 1
+      }
+    }
+  }
+}
+
 /** Parse JSON directly into a literal `Val` */
-class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
+class ValVisitor(pos: Position, rejectUnpairedSurrogates: Boolean = false)
+    extends JsVisitor[Val, Val] { self =>
 
   override def visitJsonableObject(length: Int, index: Int): ObjVisitor[Val, Val] =
     visitObject(length, index)
@@ -27,7 +50,10 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
     var key: String = _
     def subVisitor: Visitor[?, ?] = self
     def visitKey(index: Int): upickle.core.StringVisitor.type = upickle.core.StringVisitor
-    def visitKeyValue(s: Any): Unit = key = s.toString
+    def visitKeyValue(s: Any): Unit = {
+      key = s.toString
+      if (rejectUnpairedSurrogates) ValVisitor.rejectUnpairedSurrogates(key)
+    }
     def visitValue(v: Val, index: Int): Unit = {
       cache.put(key, v)
       allKeys.put(key, false)
@@ -52,5 +78,8 @@ class ValVisitor(pos: Position) extends JsVisitor[Val, Val] { self =>
       }
     )
 
-  def visitString(s: CharSequence, index: Int): Val = Val.Str(pos, s.toString)
+  def visitString(s: CharSequence, index: Int): Val = {
+    if (rejectUnpairedSurrogates) ValVisitor.rejectUnpairedSurrogates(s)
+    Val.Str(pos, s.toString)
+  }
 }
