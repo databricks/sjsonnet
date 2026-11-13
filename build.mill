@@ -1,4 +1,4 @@
-//| mill-version: 1.1.6
+//| mill-version: 1.3.1
 //| mill-jvm-version: zulu:21
 //| mvnDeps:
 //| - com.lihaoyi::mill-contrib-jmh:$MILL_VERSION
@@ -169,7 +169,7 @@ object sjsonnet extends Module {
       with ScalaJSModule
       with SjsonnetPublishModule {
     def moduleDir = super.moduleDir / os.up
-    def scalaJSVersion = "1.20.2"
+    def scalaJSVersion = "1.22.0"
     val sourceDirs = Seq(
       "src",
       "src-js",
@@ -263,7 +263,8 @@ object sjsonnet extends Module {
   trait SjsonnetWasmModule extends SjsonnetScalaJSModule {
     def moduleKind = Task { ModuleKind.ESModule }
     def moduleSplitStyle = ModuleSplitStyle.FewestModules
-    def scalaJSExperimentalUseWebAssembly = true
+    override def esFeatures = super.esFeatures().withESVersion(ESVersion.ES2022)
+    def scalaJSUseWebAssembly = true
     override def nodeJsArgs = super.nodeJsArgs ++ List("--experimental-wasm-exnref")
     object test extends SjsonnetScalaJSTests
   }
